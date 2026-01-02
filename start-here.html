@@ -163,6 +163,19 @@
                     <span>Theory Academy</span>
                 </a>
 
+                <a href="#interactive-tutorials" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                    <span>Interactive Tutorials</span>
+                </a>
+
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6 px-3">Customization</div>
+                <a href="#settings" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span>Settings & Preferences</span>
+                </a>
+                <a href="#recommendation-weights" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span>Recommendation Weights</span>
+                </a>
+
                 <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6 px-3">Reference</div>
                 <a href="#keyboard-shortcuts" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
                     <span>Keyboard Shortcuts</span>
@@ -243,7 +256,15 @@
                 <!-- App Overview Section -->
                 <section id="overview" class="guide-section mb-16">
                     <h2 class="text-3xl font-bold text-gray-900 mb-6">App Overview</h2>
-                    <p class="text-gray-600 mb-8">The app is organized into four main tabs, each serving a specific purpose. You can switch between tabs using the navigation at the top of the screen.</p>
+                    <p class="text-gray-600 mb-4">The app is organized into four main tabs, each serving a specific purpose. You can switch between tabs using the navigation at the top of the screen.</p>
+
+                    <!-- Screenshot: App Overview -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/app-overview.png" alt="Interactive Music Theory Lab - App Overview showing the main landing page with four feature cards" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>App landing page:</strong> Choose from Chord Lab, Composition Studio, Scale Explorer, or Theory Academy
+                        </div>
+                    </div>
 
                     <div class="space-y-4">
                         <div class="bg-white rounded-xl p-6 border border-gray-200">
@@ -326,7 +347,15 @@
                         <h2 class="text-3xl font-bold text-gray-900">Chord Lab</h2>
                     </div>
 
-                    <p class="text-gray-600 mb-8">The Chord Lab is where you build and explore individual chords. Think of it as your chord workbench - select a root note, choose a chord type, and hear how it sounds.</p>
+                    <p class="text-gray-600 mb-4">The Chord Lab is where you build and explore individual chords. Think of it as your chord workbench - select a root note, choose a chord type, and hear how it sounds.</p>
+
+                    <!-- Screenshot: Chord Lab -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/chord-lab-overview.png" alt="Chord Lab interface showing root note selection, chord library, and piano keyboard" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Chord Lab:</strong> Build chords using the root note selector (left), browse the chord library (center), and see notes on the keyboard (bottom)
+                        </div>
+                    </div>
 
                     <!-- Building Your First Chord -->
                     <div class="mb-10">
@@ -455,7 +484,15 @@
                         <h2 class="text-3xl font-bold text-gray-900">Composition Studio</h2>
                     </div>
 
-                    <p class="text-gray-600 mb-8">The Composition Studio is where your chord progression comes to life. Here you can arrange chords, organize them into sections, add melodies, and see your music rendered as professional notation.</p>
+                    <p class="text-gray-600 mb-4">The Composition Studio is where your chord progression comes to life. Here you can arrange chords, organize them into sections, add melodies, and see your music rendered as professional notation.</p>
+
+                    <!-- Screenshot: Composition Studio -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/composition-studio-overview.png" alt="Composition Studio interface showing chord cards, notation, and analysis panels" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Composition Studio:</strong> Chord progression cards (top), staff notation with editing toolbar, Voice Leading analysis, and Theory Insights
+                        </div>
+                    </div>
 
                     <!-- Working with Your Progression -->
                     <div class="mb-10">
@@ -600,7 +637,15 @@
                         <h2 class="text-3xl font-bold text-gray-900">AI Recommendations</h2>
                     </div>
 
-                    <p class="text-gray-600 mb-8">The AI-powered Recommendations Modal is your creative assistant. It analyzes your current progression and suggests chords, melodies, and harmonizations that will sound great.</p>
+                    <p class="text-gray-600 mb-4">The AI-powered Recommendations Modal is your creative assistant. It analyzes your current progression and suggests chords, melodies, and harmonizations that will sound great.</p>
+
+                    <!-- Screenshot: Recommendations Modal -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/recommendations-modal.png" alt="AI Recommendations modal showing chord suggestions with scores and explanations" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Recommendation Center:</strong> AI-powered chord suggestions with match scores, style/mood filters, and one-click apply
+                        </div>
+                    </div>
 
                     <div class="callout callout-info p-4 rounded-lg mb-8">
                         <div class="flex gap-3">
@@ -656,6 +701,10 @@
                                     <li>- Melodic phrases and patterns</li>
                                     <li>- Style-aware suggestions (pop, jazz, classical, etc.)</li>
                                 </ul>
+                                <!-- Screenshot: Melody Suggestions -->
+                                <div class="mt-4 rounded-lg overflow-hidden border border-gray-200">
+                                    <img src="images/guide/recommendations-melody.png" alt="Melody suggestions showing note recommendations with chord tone labels" class="w-full">
+                                </div>
                             </div>
 
                             <div class="bg-white rounded-xl p-5 border border-gray-200">
@@ -711,7 +760,15 @@
                         <h2 class="text-3xl font-bold text-gray-900">Scale Explorer</h2>
                     </div>
 
-                    <p class="text-gray-600 mb-6">The Scale Explorer helps you understand scales and modes - the foundation of melody writing. See which notes belong to each scale and how they map to the keyboard.</p>
+                    <p class="text-gray-600 mb-4">The Scale Explorer helps you understand scales and modes - the foundation of melody writing. See which notes belong to each scale and how they map to the keyboard.</p>
+
+                    <!-- Screenshot: Scale Explorer -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/scale-explorer.png" alt="Scale Explorer showing root note selection, scale categories, and scale list" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Scale Explorer:</strong> Select a root note, filter by category (Basic, Modes, Jazz, World), and browse 25+ scale types with detailed info
+                        </div>
+                    </div>
 
                     <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200">
                         <div class="p-4">
@@ -742,7 +799,15 @@
                         <h2 class="text-3xl font-bold text-gray-900">Theory Academy</h2>
                     </div>
 
-                    <p class="text-gray-600 mb-8">The Theory Academy is your structured learning path through music theory. Whether you're a complete beginner or looking to deepen your knowledge, there's a lesson path for you.</p>
+                    <p class="text-gray-600 mb-4">The Theory Academy is your structured learning path through music theory. Whether you're a complete beginner or looking to deepen your knowledge, there's a lesson path for you.</p>
+
+                    <!-- Screenshot: Theory Academy -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/theory-academy.png" alt="Theory Academy showing learning paths from Beginner to Advanced with progress tracking" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Theory Academy:</strong> Structured learning paths (Beginner, Intermediate, Advanced) with XP tracking, streaks, and interactive lessons
+                        </div>
+                    </div>
 
                     <div class="callout callout-tip p-4 rounded-lg mb-8">
                         <div class="flex gap-3">
@@ -824,6 +889,246 @@
                                 <span>Export to the Composition Studio and start creating!</span>
                             </li>
                         </ol>
+                    </div>
+                </section>
+
+                <!-- Interactive Tutorials Section -->
+                <section id="interactive-tutorials" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Interactive Tutorials</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-4">The best way to learn is by doing! Interactive tutorials guide you step-by-step through creating real songs, teaching you the app's features as you go.</p>
+
+                    <!-- Screenshot: Let It Be Tutorial Selection -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/let-it-be-tutorial-modal.png" alt="Let It Be tutorial selection showing verse and chorus options" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Tutorial Selection:</strong> Choose which part of "Let It Be" you want to learn - verse or chorus, each teaching different skills
+                        </div>
+                    </div>
+
+                    <div class="callout callout-tip p-4 rounded-lg mb-8">
+                        <div class="flex gap-3">
+                            <svg class="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            <div>
+                                <div class="font-semibold text-emerald-800">Start with "Let It Be"</div>
+                                <p class="text-emerald-700 text-sm mt-1">The "Let It Be" tutorial is the perfect introduction. Click the <strong>Tutorial Let It Be</strong> button in the header to begin!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- How Tutorials Work -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">How Tutorials Work</h3>
+
+                        <p class="text-gray-600 mb-4">Tutorials use a guided step-by-step approach that highlights exactly what you need to do:</p>
+
+                        <!-- Screenshot: Tutorial In Progress -->
+                        <div class="mb-6 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                            <img src="images/guide/let-it-be-tutorial-interactive.png" alt="Interactive tutorial showing step-by-step guidance with highlighted elements" class="w-full">
+                            <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                                <strong>Guided Learning:</strong> Each step shows you exactly what to click, with the tutorial banner tracking your progress
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200">
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Step-by-Step Guidance</h4>
+                                <p class="text-gray-600 text-sm">Each step tells you exactly what to do. The tutorial highlights the element you need to interact with.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Progress Tracking</h4>
+                                <p class="text-gray-600 text-sm">The tutorial banner shows which step you're on (e.g., "Step 2 of 39") and provides navigation buttons.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Helpful Tips</h4>
+                                <p class="text-gray-600 text-sm">Each step includes context about why you're doing something, helping you understand the concepts.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Exit Anytime</h4>
+                                <p class="text-gray-600 text-sm">Click "End Lesson" if you want to stop the tutorial and explore on your own.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Available Tutorials -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Available Tutorials</h3>
+
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">Recommended</span>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 mb-1">"Let It Be" Verse</h4>
+                                <p class="text-gray-600 text-sm">Learn the C-G-Am-F progression with inversions, chord grouping, and duplication. The perfect starting point!</p>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <h4 class="font-semibold text-gray-900 mb-1">"Let It Be" Chorus</h4>
+                                <p class="text-gray-600 text-sm">Build the Am-G-F-C progression using drag-and-drop reordering, Quick Add chords, and tempo (BPM) settings.</p>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">Coming Soon</span>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 mb-1">"Let It Be" Melody</h4>
+                                <p class="text-gray-600 text-sm">Learn to add melody notes using the VexFlow notation editor.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Settings & Preferences Section -->
+                <section id="settings" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Settings & Preferences</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-4">Customize the app to match your preferences. Access settings from the sidebar menu (click the hamburger icon in the top-left).</p>
+
+                    <!-- Screenshot: Sidebar Settings -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/sidebar-settings.png" alt="Sidebar showing Display, Keyboard, and Features settings" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Settings Sidebar:</strong> Access display options, keyboard preferences, and feature toggles from the left sidebar
+                        </div>
+                    </div>
+
+                    <!-- Settings Categories -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Settings Categories</h3>
+
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <h4 class="font-semibold text-gray-900 mb-2">Display Settings</h4>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li><strong>Dark Mode:</strong> Switch between light and dark themes</li>
+                                    <li><strong>Notation Style:</strong> Choose between full notation or simplified symbols</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <h4 class="font-semibold text-gray-900 mb-2">Keyboard Settings</h4>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li><strong>Octaves:</strong> Set how many octaves the piano keyboard displays (2-8)</li>
+                                    <li><strong>Key Names:</strong> Show or hide note names on piano keys</li>
+                                    <li><strong>Classic Style:</strong> Toggle between modern and classic piano styling</li>
+                                    <li><strong>Guitar Fretboard:</strong> Switch between piano keyboard and guitar fretboard view</li>
+                                    <li><strong>Roman Numerals:</strong> Display chord function as Roman numerals (I, IV, V, etc.)</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <h4 class="font-semibold text-gray-900 mb-2">Feature Settings</h4>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li><strong>Chord Span Brackets:</strong> Show brackets indicating chord duration in notation</li>
+                                    <li><strong>Chord Tone Colors:</strong> Color-code notes based on their function in the chord (root, third, fifth, etc.)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Recommendation Weights Section -->
+                <section id="recommendation-weights" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Recommendation Weights</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-4">Fine-tune how the AI generates chord and melody suggestions by adjusting the recommendation weights. This powerful feature lets you customize suggestions to match your musical style and preferences.</p>
+
+                    <!-- Screenshot: Recommendation Weights Modal -->
+                    <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
+                        <img src="images/guide/recommendation-weights.png" alt="Recommendation Weights modal showing style, mood, presets, and custom weight sliders" class="w-full">
+                        <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                            <strong>Recommendation Settings:</strong> Choose musical style, mood, genre presets, and fine-tune individual weight factors
+                        </div>
+                    </div>
+
+                    <div class="callout callout-info p-4 rounded-lg mb-8">
+                        <div class="flex gap-3">
+                            <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div>
+                                <div class="font-semibold text-blue-800">Access Recommendation Weights</div>
+                                <p class="text-blue-700 text-sm mt-1">Open the sidebar and click <strong>Recommendation Weights</strong> at the bottom of the Settings section.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Settings -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Quick Settings</h3>
+
+                        <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200">
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Musical Style</h4>
+                                <p class="text-gray-600 text-sm">Choose from Balanced Blend, Top 40/Pop, Jazz/Complex, Classical/Traditional, Rock/Power, or Indie/Alternative.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Intended Mood</h4>
+                                <p class="text-gray-600 text-sm">Set the emotional character: Happy/Bright, Melancholic/Dark, Jazzy/Complex, Tense/Dramatic, Calm/Peaceful, or Energetic/Driving.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Presets -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Presets</h3>
+
+                        <p class="text-gray-600 mb-4">Use presets for quick configuration:</p>
+
+                        <div class="grid sm:grid-cols-2 gap-3">
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <h4 class="font-medium text-gray-900 text-sm mb-1">Approaches</h4>
+                                <p class="text-gray-600 text-xs">Balanced, Voice Leading, Harmonic Function, Style Match, Mood Match</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <h4 class="font-medium text-gray-900 text-sm mb-1">Genre Templates</h4>
+                                <p class="text-gray-600 text-xs">Pop, Rock, Bossa Nova, Blues, Jazz, Classical, Gospel, R&B/Soul, Country, Latin Jazz</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Weights -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Custom Weights</h3>
+
+                        <p class="text-gray-600 mb-4">For advanced control, adjust individual factors that influence recommendations:</p>
+
+                        <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200">
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Harmonic Function</h4>
+                                <p class="text-gray-600 text-sm">How well chords follow traditional progressions (tonic → subdominant → dominant)</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Voice Leading</h4>
+                                <p class="text-gray-600 text-sm">Smoothness of voice movement - minimal jumps, common tones, contrary motion</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Style Fit</h4>
+                                <p class="text-gray-600 text-sm">How well chords match your selected musical style</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Mood Fit</h4>
+                                <p class="text-gray-600 text-sm">How well chords match your desired emotional character</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Modal Interchange</h4>
+                                <p class="text-gray-600 text-sm">How often to suggest borrowed chords from parallel modes (like bVII, iv, bVI from parallel minor)</p>
+                            </div>
+                        </div>
                     </div>
                 </section>
 

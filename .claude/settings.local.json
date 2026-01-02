@@ -34,7 +34,6 @@
       "Bash(C:UsersagaciAppDataLocalTempprogressionBuilder_6c31253.js)",
       "Bash(git checkout:*)",
       "Bash(grep:*)",
-      "Bash(dir \"c:\\\\Users\\\\agaci\\\\Documents\\\\Github\\\\Music Theory Lab\\\\CUsersagaci*\")",
       "Bash(npx vite build:*)",
       "Bash(wc:*)",
       "Bash(for f in /c/Users/agaci/Documents/Github/Music Theory Lab/src/modules/notation/*.js)",
@@ -44,7 +43,12 @@
       "Bash(for f in /c/Users/agaci/Documents/Github/Music Theory Lab/src/init/*.js)",
       "Bash(for f in /c/Users/agaci/Documents/Github/Music Theory Lab/src/modules/notation/measureIsolation/*.js)",
       "Bash(for f in /c/Users/agaci/Documents/Github/Music Theory Lab/src/modules/ui/recommendations/UnifiedRecommendationModal/*.js)",
-      "Bash(for:*)"
+      "Bash(for:*)",
+      "Bash(dir \"c:\\\\Users\\\\agaci\\\\Documents\\\\Github\\\\Music Theory Lab\\\\*.md\")",
+      "Bash(npm view:*)",
+      "Bash(npm search:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []

@@ -3293,25 +3293,9 @@ export function playFromSelectedMeasure() {
 
                 if (notesToPlay.length === 0) return;
 
-                // Calculate total duration including tied notes
-                let totalDuration = Tone.Time(bassNote.duration).toSeconds();
-
-                if (bassNoteIndex === 0 && !bassNote.isTied && window.getCompositionState) {
-                    const compositionState = window.getCompositionState();
-                    let nextMeasureIndex = measureIndex + 1;
-                    while (nextMeasureIndex < compositionState.getMeasureCount()) {
-                        const nextMeasure = compositionState.getMeasure(nextMeasureIndex);
-                        const nextBassVoice = nextMeasure?.notation?.bass?.voices?.[0];
-                        const nextNote = nextBassVoice?.notes?.[0];
-
-                        if (nextNote && nextNote.isTied && nextNote.beat === 0 && nextNote.chordIndex === chordIndex) {
-                            totalDuration += Tone.Time(nextNote.duration).toSeconds();
-                            nextMeasureIndex++;
-                        } else {
-                            break;
-                        }
-                    }
-                }
+                // Use pre-calculated merged duration if available (from tie-merging in event building)
+                // Otherwise calculate using getDurationInSeconds which handles dotted/tuplet notes
+                let totalDuration = bassNote.mergedDuration || getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted);
 
                 piano.triggerAttackRelease(notesToPlay, totalDuration, bassTime);
 
@@ -4581,34 +4565,16 @@ export function playAllMelody() {
                     return;
                 }
 
-                // Calculate full duration including tied notes (only for first bass note)
-                let totalDuration = Tone.Time(bassNote.duration).toSeconds();
+                // Use pre-calculated merged duration if available (from tie-merging in event building)
+                // Otherwise calculate using getDurationInSeconds which handles dotted/tuplet notes
+                let totalDuration = bassNote.mergedDuration || getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted);
 
-                if (bassNoteIndex === 0 && !bassNote.isTied && window.getCompositionState) {
-                    const compositionState = window.getCompositionState();
-                    // Look ahead to find tied continuations of this chord
-                    let nextMeasureIndex = measureIndex + 1;
-                    while (nextMeasureIndex < compositionState.getMeasureCount()) {
-                        const nextMeasure = compositionState.getMeasure(nextMeasureIndex);
-                        const nextBassVoice = nextMeasure?.notation?.bass?.voices?.[0];
-                        const nextNote = nextBassVoice?.notes?.[0];
-
-                        // Check if the next measure starts with a tied note (continuation of THIS chord)
-                        // Must verify chordIndex matches to avoid adding tied notes from other chords
-                        if (nextNote && nextNote.isTied && nextNote.beat === 0 && nextNote.chordIndex === chordIndex) {
-                            const addedDuration = Tone.Time(nextNote.duration).toSeconds();
-                            totalDuration += addedDuration;
-                            nextMeasureIndex++;
-                        } else {
-                            break; // No more tied continuations
-                        }
-                    }
+                // Track for chord release scheduling
+                if (bassNoteIndex === 0) {
                     chordTotalDuration = totalDuration;
                 }
 
                 // Play the bass note(s) with the exact calculated duration
-                // Use the totalDuration which includes tied notes for the first bass note
-                // For continuation notes (isTied), just use the single note duration
                 piano.triggerAttackRelease(notesToPlay, totalDuration, bassTime);
 
                 // Add to activeNotes when bass note starts (each pitch in the chord)
@@ -4657,70 +4623,155 @@ export function playAllMelody() {
     }, (() => {
         // Schedule ALL bass notes from compositionState, not just one per chord
         // This ensures patterns like arpeggio, alberti, boogie etc. play correctly
+        // Uses tie-merging approach (same as treble) for seamless playback
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
             const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
-            const events = [];
-            const measureCount = compositionState.getMeasureCount();
-
             // Build playback order considering repeat signs
             const playbackOrder = buildPlaybackMeasureOrder(compositionState);
 
-            // Iterate through playback order (respects repeats)
+            // Helper to compare pitches (handles both single notes and chords)
+            const samePitches = (a, b) => {
+                if (!a || !b) return false;
+                if (a.pitches && b.pitches) {
+                    if (a.pitches.length !== b.pitches.length) return false;
+                    for (let i = 0; i < a.pitches.length; i++) {
+                        if (a.pitches[i] !== b.pitches[i]) return false;
+                    }
+                    return true;
+                }
+                return !!a.pitch && !!b.pitch && a.pitch === b.pitch;
+            };
+
+            // PHASE 1: Collect all bass notes from all voices into a flat list
+            // Group by voiceIndex to track ties correctly per voice
+            const allBassNotesByVoice = {};
+
             playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
                 const measureData = compositionState.getMeasure(measureIndex);
                 const bassVoices = measureData?.notation?.bass?.voices || [];
-
-                if (bassVoices.length === 0) {
-                    return;
-                }
-
-                // Get the chord for this measure (for chord release tracking)
                 const chord = measureData.chord || {};
 
-                // MULTI-VOICE: Schedule bass notes from ALL voices
                 bassVoices.forEach((bassVoice, voiceIndex) => {
                     if (!bassVoice || !bassVoice.notes || bassVoice.notes.length === 0) {
                         return;
                     }
 
-                    // Schedule each bass note in this voice
-                    bassVoice.notes.forEach((note, noteIndex) => {
-                        // Skip rests
-                        if (note.type === 'rest' || note.isRest) {
-                            return;
-                        }
+                    if (!allBassNotesByVoice[voiceIndex]) {
+                        allBassNotesByVoice[voiceIndex] = [];
+                    }
 
-                        // Skip tied notes - they are continuations, not new attacks
-                        if (note.isTied) {
-                            return;
-                        }
-
-                        // Calculate absolute time for this note using playbackPosition (not measureIndex)
-                        // This ensures repeated sections play at the correct time
-                        const measureStartBeat = playbackPosition * beatsPerMeasure;
-                        const noteBeat = note.beat || 0;
-                        const absoluteBeat = measureStartBeat + noteBeat;
-                        const noteTime = absoluteBeat * beatDuration;
-                        const safeTime = Math.max(0, noteTime);
-
-                        // Clone note and add source measure for highlighting
-                        const specificNote = {
+                    bassVoice.notes.forEach(note => {
+                        // Add note with playback position metadata
+                        allBassNotesByVoice[voiceIndex].push({
                             ...note,
                             sourceMeasureIndex: measureIndex,
-                            voiceIndex: voiceIndex
-                        };
-
-                        events.push({
-                            time: safeTime,
-                            chord,
-                            measureIndex, // Keep original for highlighting
-                            specificNote
+                            playbackPosition,
+                            voiceIndex,
+                            chord
                         });
                     });
                 });
+            });
+
+            const events = [];
+
+            // PHASE 2: Process each voice separately with tie-merging
+            Object.keys(allBassNotesByVoice).forEach(voiceIndexKey => {
+                const voiceNotes = allBassNotesByVoice[voiceIndexKey];
+
+                // Sort notes by playback position and beat
+                voiceNotes.sort((a, b) => {
+                    if (a.playbackPosition !== b.playbackPosition) {
+                        return a.playbackPosition - b.playbackPosition;
+                    }
+                    return (a.beat || 0) - (b.beat || 0);
+                });
+
+                for (let i = 0; i < voiceNotes.length; i++) {
+                    const note = voiceNotes[i];
+
+                    // Skip rests
+                    if (note.type === 'rest' || note.isRest) {
+                        continue;
+                    }
+
+                    // Skip notes without pitches
+                    if (!note.pitch && (!note.pitches || note.pitches.length === 0)) {
+                        continue;
+                    }
+
+                    const prev = i > 0 ? voiceNotes[i - 1] : null;
+
+                    // Determine if this note is a continuation of a tie group
+                    const isContinuation =
+                        prev &&
+                        (
+                            // New-style ties: this note is marked as a continuation or end
+                            ((note.tie === 'continue' || note.tie === 'end') && samePitches(note, prev)) ||
+                            // Legacy ties: previous note has tied=true and same pitch
+                            (prev.tied && samePitches(note, prev)) ||
+                            // isTied flag: this note is a continuation from a previous tied note
+                            (note.isTied && samePitches(note, prev))
+                        );
+
+                    // Skip pure continuation notes – their duration will be merged into the start note
+                    if (isContinuation) {
+                        continue;
+                    }
+
+                    // Calculate absolute time for this note
+                    const measureStartBeat = note.playbackPosition * beatsPerMeasure;
+                    const noteBeat = note.beat || 0;
+                    const absoluteBeat = measureStartBeat + noteBeat;
+                    const noteTime = absoluteBeat * beatDuration;
+                    const safeTime = Math.max(0, noteTime);
+
+                    // Start with this note's duration - use tuplet-aware AND dotted-aware calculation
+                    let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tuplet, note.dotted);
+
+                    // Look ahead to merge durations of tied continuation notes
+                    let j = i + 1;
+                    while (j < voiceNotes.length) {
+                        const next = voiceNotes[j];
+                        if (!next || next.type === 'rest' || next.isRest) break;
+
+                        const prevInChain = voiceNotes[j - 1];
+
+                        const nextIsContinuation =
+                            // New-style ties: continue/end and same pitch
+                            ((next.tie === 'continue' || next.tie === 'end') && samePitches(next, prevInChain)) ||
+                            // Legacy ties: previous note in chain has tied=true and same pitch
+                            (prevInChain && prevInChain.tied && samePitches(next, prevInChain)) ||
+                            // isTied flag: this note is a continuation from a previous tied note
+                            (next.isTied && samePitches(next, prevInChain));
+
+                        if (!nextIsContinuation) {
+                            break;
+                        }
+
+                        // Merge this continuation note's duration into the total
+                        totalDurationSeconds += getDurationInSeconds(next.duration, tempo, next.tuplet, next.dotted);
+
+                        // Advance chain
+                        j++;
+                    }
+
+                    // Clone note and add source measure for highlighting
+                    const specificNote = {
+                        ...note,
+                        mergedDuration: totalDurationSeconds // Store pre-calculated merged duration
+                    };
+
+                    events.push({
+                        time: safeTime,
+                        chord: note.chord,
+                        measureIndex: note.sourceMeasureIndex,
+                        specificNote
+                    });
+                }
             });
 
             // Sort events by time to ensure correct playback order
@@ -5036,25 +5087,9 @@ export function playProgressionOnly() {
 
                 if (notesToPlay.length === 0) return;
 
-                // Calculate total duration including tied notes
-                let totalDuration = Tone.Time(bassNote.duration).toSeconds();
-
-                if (bassNoteIndex === 0 && !bassNote.isTied && window.getCompositionState) {
-                    const compositionState = window.getCompositionState();
-                    let nextMeasureIndex = measureIndex + 1;
-                    while (nextMeasureIndex < compositionState.getMeasureCount()) {
-                        const nextMeasure = compositionState.getMeasure(nextMeasureIndex);
-                        const nextBassVoice = nextMeasure?.notation?.bass?.voices?.[0];
-                        const nextNote = nextBassVoice?.notes?.[0];
-
-                        if (nextNote && nextNote.isTied && nextNote.beat === 0 && nextNote.chordIndex === chordIndex) {
-                            totalDuration += Tone.Time(nextNote.duration).toSeconds();
-                            nextMeasureIndex++;
-                        } else {
-                            break;
-                        }
-                    }
-                }
+                // Use pre-calculated merged duration if available (from tie-merging in event building)
+                // Otherwise calculate using getDurationInSeconds which handles dotted/tuplet notes
+                let totalDuration = bassNote.mergedDuration || getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted);
 
                 // Play the bass notes
                 piano.triggerAttackRelease(notesToPlay, totalDuration, bassTime);
