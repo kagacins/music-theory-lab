@@ -9068,6 +9068,277 @@ export class NoteEditor {
   }
 
   /**
+   * Apply a lyric syllable to all selected notes
+   * @param {Object} lyricData - { text: string, syllabic: 'single'|'begin'|'middle'|'end' }
+   */
+  applyLyricToSelected(lyricData) {
+    if (this.selectedNotes.size === 0) {
+      console.log('[applyLyricToSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Skip rests
+      if (note.isRest) continue;
+
+      // Apply lyric data to the note
+      note.lyric = { text: lyricData.text, syllabic: lyricData.syllabic || 'single' };
+      changedCount++;
+    }
+
+    if (changedCount > 0) {
+      console.log(`[applyLyricToSelected] Applied lyric "${lyricData.text}" to ${changedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Remove lyrics from all selected notes
+   */
+  removeLyricFromSelected() {
+    if (this.selectedNotes.size === 0) {
+      console.log('[removeLyricFromSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let removedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      if (note.lyric) {
+        note.lyric = null;
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`[removeLyricFromSelected] Removed lyrics from ${removedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Apply a pedal marking to all selected notes
+   * @param {string} pedalType - 'down', 'up', 'half', 'change'
+   */
+  applyPedalToSelected(pedalType) {
+    if (this.selectedNotes.size === 0) {
+      console.log('[applyPedalToSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Toggle pedal: if same type already applied, remove it
+      if (note.pedal === pedalType) {
+        note.pedal = null;
+      } else {
+        note.pedal = pedalType;
+      }
+      changedCount++;
+    }
+
+    if (changedCount > 0) {
+      console.log(`[applyPedalToSelected] Applied/toggled '${pedalType}' pedal on ${changedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Remove pedal markings from all selected notes
+   */
+  removePedalFromSelected() {
+    if (this.selectedNotes.size === 0) {
+      console.log('[removePedalFromSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let removedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      if (note.pedal) {
+        note.pedal = null;
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`[removePedalFromSelected] Removed pedal from ${removedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Apply beam control to selected notes
+   * @param {string} beamAction - 'start', 'end', 'break', or 'clear'
+   *
+   * Beam property format: { start: boolean, end: boolean, break: boolean }
+   * - start: true = force start of a new beam group here
+   * - end: true = force end of beam group here
+   * - break: true = prevent this note from being beamed with neighbors
+   */
+  applyBeamToSelected(beamAction) {
+    if (this.selectedNotes.size === 0) {
+      console.log('[applyBeamToSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let changedCount = 0;
+
+    // Sort selected notes by position (measure, then beat)
+    const sortedNotes = [...this.selectedNotes].sort((a, b) => {
+      const [mA, , , nA] = this.parseNoteId(a);
+      const [mB, , , nB] = this.parseNoteId(b);
+      if (mA !== mB) return mA - mB;
+      return nA - nB;
+    });
+
+    for (const noteId of sortedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Skip rests - they can't be beamed
+      if (note.isRest) continue;
+
+      // Initialize beam object if needed
+      if (!note.beam) {
+        note.beam = { start: false, end: false, break: false };
+      }
+
+      switch (beamAction) {
+        case 'start':
+          // Toggle start flag
+          note.beam.start = !note.beam.start;
+          // If setting start, clear break
+          if (note.beam.start) note.beam.break = false;
+          break;
+        case 'end':
+          // Toggle end flag
+          note.beam.end = !note.beam.end;
+          // If setting end, clear break
+          if (note.beam.end) note.beam.break = false;
+          break;
+        case 'break':
+          // Toggle break flag (note won't be beamed)
+          note.beam.break = !note.beam.break;
+          // If setting break, clear start/end
+          if (note.beam.break) {
+            note.beam.start = false;
+            note.beam.end = false;
+          }
+          break;
+        case 'clear':
+          // Remove all beam overrides
+          note.beam = null;
+          break;
+      }
+
+      changedCount++;
+    }
+
+    if (changedCount > 0) {
+      console.log(`[applyBeamToSelected] Applied '${beamAction}' beam action on ${changedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Clear all beam overrides from selected notes
+   */
+  clearBeamFromSelected() {
+    this.applyBeamToSelected('clear');
+  }
+
+  /**
    * Destroy the editor
    */
   destroy() {

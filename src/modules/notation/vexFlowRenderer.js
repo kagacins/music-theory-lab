@@ -760,6 +760,8 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     stemDirection = null, // Optional stem direction: 1 (up), -1 (down), null (auto)
     ornament = null, // Ornament: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
     graceNotes = null, // Array of grace notes: { pitch, duration, slash }
+    lyric = null,    // Lyric syllable: { text: string, syllabic: 'single'|'begin'|'middle'|'end' }
+    pedal = null,    // Pedal marking: 'down', 'up', 'half', 'change'
   } = noteData;
 
   // Convert duration if needed
@@ -910,6 +912,53 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     }
   }
 
+  // Add lyric syllable if specified
+  // Lyrics appear below the bass staff (for treble clef notes, use BOTTOM with extra offset)
+  if (!isRest && lyric && lyric.text) {
+    try {
+      // Format lyric text based on syllabic position
+      let lyricText = lyric.text;
+      if (lyric.syllabic === 'begin' || lyric.syllabic === 'middle') {
+        lyricText += '-';  // Add hyphen for continuing syllables
+      }
+      if (lyric.syllabic === 'middle' || lyric.syllabic === 'end') {
+        lyricText = '-' + lyricText;  // Prefix hyphen for continued syllables
+      }
+
+      // Lyrics always go below the staff system
+      const lyricAnnotation = new VF.Annotation(lyricText)
+        .setFont('Times New Roman', 11, 'normal')
+        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
+
+      staveNote.addModifier(lyricAnnotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding lyric annotation:', error.message);
+    }
+  }
+
+  // Add pedal marking if specified
+  // Pedal markings appear below bass staff notes
+  if (!isRest && pedal) {
+    try {
+      // Map pedal type to display symbol
+      const pedalSymbols = {
+        'down': 'Ped.',    // Depress pedal
+        'up': '*',          // Release pedal
+        'change': '↻',      // Quick release and re-depress
+        'half': '½Ped.'     // Half-pedal
+      };
+      const pedalText = pedalSymbols[pedal] || pedal;
+
+      const pedalAnnotation = new VF.Annotation(pedalText)
+        .setFont('Times New Roman', 12, 'italic')
+        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
+
+      staveNote.addModifier(pedalAnnotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding pedal annotation:', error.message);
+    }
+  }
+
   return staveNote;
 }
 
@@ -926,9 +975,11 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {string|null} dynamic - Dynamic marking: 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'sfz', 'fp'
  * @param {string|null} ornament - Ornament: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
  * @param {Array|null} graceNotes - Array of grace notes: { pitch, duration, slash }
+ * @param {Object|null} lyric - Lyric syllable: { text: string, syllabic: 'single'|'begin'|'middle'|'end' }
+ * @param {string|null} pedal - Pedal marking: 'down', 'up', 'half', 'change'
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null, dynamic = null, ornament = null, graceNotes = null) {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null, dynamic = null, ornament = null, graceNotes = null, lyric = null, pedal = null) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
@@ -1074,6 +1125,51 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
       staveNote.addModifier(annotation, 0);
     } catch (error) {
       console.warn('[VexFlowRenderer] Error adding dynamic annotation to chord:', error.message);
+    }
+  }
+
+  // Add lyric syllable if specified
+  if (lyric && lyric.text) {
+    try {
+      // Format lyric text based on syllabic position
+      let lyricText = lyric.text;
+      if (lyric.syllabic === 'begin' || lyric.syllabic === 'middle') {
+        lyricText += '-';  // Add hyphen for continuing syllables
+      }
+      if (lyric.syllabic === 'middle' || lyric.syllabic === 'end') {
+        lyricText = '-' + lyricText;  // Prefix hyphen for continued syllables
+      }
+
+      // Lyrics always go below the staff system
+      const lyricAnnotation = new VF.Annotation(lyricText)
+        .setFont('Times New Roman', 11, 'normal')
+        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
+
+      staveNote.addModifier(lyricAnnotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding lyric annotation to chord:', error.message);
+    }
+  }
+
+  // Add pedal marking if specified
+  if (pedal) {
+    try {
+      // Map pedal type to display symbol
+      const pedalSymbols = {
+        'down': 'Ped.',    // Depress pedal
+        'up': '*',          // Release pedal
+        'change': '↻',      // Quick release and re-depress
+        'half': '½Ped.'     // Half-pedal
+      };
+      const pedalText = pedalSymbols[pedal] || pedal;
+
+      const pedalAnnotation = new VF.Annotation(pedalText)
+        .setFont('Times New Roman', 12, 'italic')
+        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
+
+      staveNote.addModifier(pedalAnnotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding pedal annotation to chord:', error.message);
     }
   }
 

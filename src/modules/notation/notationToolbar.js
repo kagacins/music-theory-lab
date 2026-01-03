@@ -202,6 +202,9 @@ export class NotationToolbar {
     this.onVoltaExtend = options.onVoltaExtend || (() => {});  // Extend volta bracket (left/right)
     this.onVoltaShrink = options.onVoltaShrink || (() => {});  // Shrink volta bracket (left/right)
     this.onChordSymbolApply = options.onChordSymbolApply || (() => {});
+    this.onLyricApply = options.onLyricApply || (() => {});  // Apply lyric to selected note
+    this.onPedalApply = options.onPedalApply || (() => {});  // Apply pedal marking to selected note
+    this.onBeamApply = options.onBeamApply || (() => {});  // Apply beam control to selected notes
     this.onCopy = options.onCopy || (() => {});
     this.onPaste = options.onPaste || (() => {});
     this.onCopyBlock = options.onCopyBlock || (() => {});
@@ -465,12 +468,12 @@ export class NotationToolbar {
         <div class="toolbar-tier toolbar-tier-1">
           <!-- Mode Toggle (Leftmost - Alt-based mode switching with sticky toggle) -->
           <div class="toolbar-section mode-section" style="display: flex; align-items: center; gap: 4px;">
-            <span class="text-xs text-gray-600" style="white-space: nowrap;">Entry:</span>
+            <span class="text-xs" style="white-space: nowrap; color: #d1d5db;">Entry:</span>
             <div class="button-group" style="display: flex; gap: 2px;">
               <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}" data-interaction-mode="noteEntry" title="Entry Mode ON - click adds notes (hold Alt to select)" style="min-width: 32px; padding: 4px 8px;">ON</button>
               <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}" data-interaction-mode="select" title="Entry Mode OFF - click selects notes (hold Alt to add)" style="min-width: 32px; padding: 4px 8px;">OFF</button>
             </div>
-            <span class="mode-hint text-xs text-gray-500" style="white-space: nowrap;">${this.interactionMode === 'noteEntry' ? '(Alt=Sel)' : '(Alt=Add)'}</span>
+            <span class="mode-hint text-xs" style="white-space: nowrap; color: #9ca3af;">${this.interactionMode === 'noteEntry' ? '(Alt=Sel)' : '(Alt=Add)'}</span>
           </div>
 
           <!-- Selection Indicator (shown when notes selected) -->
@@ -734,6 +737,43 @@ export class NotationToolbar {
             <div class="toolbar-group-content">
               <input type="text" class="chord-symbol-input" placeholder="Cmaj7" title="Chord symbol">
               <button class="toolbar-btn apply-chord-btn" data-action="applyChord" title="Apply">✓</button>
+            </div>
+          </div>
+
+          <!-- Lyric Input (in Tier 2) -->
+          <div class="toolbar-group tier2-group lyric-group">
+            <span class="group-label">Lyric</span>
+            <div class="toolbar-group-content">
+              <input type="text" class="lyric-input" placeholder="la" title="Lyric syllable">
+              <select class="lyric-syllabic" title="Syllable type">
+                <option value="single">Single</option>
+                <option value="begin">Begin─</option>
+                <option value="middle">─Mid─</option>
+                <option value="end">─End</option>
+              </select>
+              <button class="toolbar-btn apply-lyric-btn" data-action="applyLyric" title="Apply lyric">✓</button>
+            </div>
+          </div>
+
+          <!-- Pedal Markings (in Tier 2) -->
+          <div class="toolbar-group tier2-group pedal-group">
+            <span class="group-label">Pedal</span>
+            <div class="toolbar-group-content">
+              <button class="toolbar-btn pedal-btn" data-pedal="down" title="Pedal down (Ped.)">Ped</button>
+              <button class="toolbar-btn pedal-btn" data-pedal="up" title="Pedal up (*)">*</button>
+              <button class="toolbar-btn pedal-btn" data-pedal="change" title="Pedal change">⟳</button>
+              <button class="toolbar-btn pedal-btn" data-pedal="half" title="Half pedal">½</button>
+            </div>
+          </div>
+
+          <!-- Beam Controls (in Tier 2) -->
+          <div class="toolbar-group tier2-group beam-group">
+            <span class="group-label">Beam</span>
+            <div class="toolbar-group-content">
+              <button class="toolbar-btn beam-btn" data-beam="start" title="Start beam group">[</button>
+              <button class="toolbar-btn beam-btn" data-beam="end" title="End beam group">]</button>
+              <button class="toolbar-btn beam-btn" data-beam="break" title="Break beam (force separate beams)">⊘</button>
+              <button class="toolbar-btn beam-btn beam-clear" data-beam="clear" title="Clear manual beaming">✕</button>
             </div>
           </div>
         </div>
@@ -1384,6 +1424,101 @@ export class NotationToolbar {
         font-weight: 600;
       }
 
+      /* Lyric input styles */
+      .lyric-input {
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--bg-tertiary, #333);
+        background: var(--bg-input, #222);
+        color: var(--text-primary, #fff);
+        font-size: 12px;
+        width: 50px;
+        text-align: center;
+        height: 32px;
+      }
+
+      .lyric-input:focus {
+        outline: 2px solid var(--accent-color, #4a9eff);
+        border-color: var(--accent-color, #4a9eff);
+      }
+
+      .lyric-input::placeholder {
+        color: var(--text-muted, #666);
+        font-style: italic;
+      }
+
+      .lyric-syllabic {
+        padding: 4px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--bg-tertiary, #333);
+        background: var(--bg-input, #222);
+        color: var(--text-primary, #fff);
+        font-size: 10px;
+        height: 32px;
+        cursor: pointer;
+      }
+
+      .lyric-syllabic:focus {
+        outline: 2px solid var(--accent-color, #4a9eff);
+        border-color: var(--accent-color, #4a9eff);
+      }
+
+      .apply-lyric-btn {
+        width: 28px;
+        padding: 0;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      /* Pedal button styles */
+      .pedal-btn {
+        min-width: 28px;
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .pedal-btn[data-pedal="down"] {
+        background: linear-gradient(135deg, #4ade80, #22c55e);
+      }
+
+      .pedal-btn[data-pedal="up"] {
+        background: linear-gradient(135deg, #f87171, #ef4444);
+        font-size: 14px;
+      }
+
+      .pedal-btn[data-pedal="change"] {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      }
+
+      .pedal-btn[data-pedal="half"] {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      }
+
+      /* Beam button styles */
+      .beam-btn {
+        min-width: 28px;
+        padding: 4px 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .beam-btn[data-beam="start"] {
+        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+      }
+
+      .beam-btn[data-beam="end"] {
+        background: linear-gradient(135deg, #c084fc, #a855f7);
+      }
+
+      .beam-btn[data-beam="break"] {
+        background: linear-gradient(135deg, #fb923c, #f97316);
+      }
+
+      .beam-btn[data-beam="clear"] {
+        background: linear-gradient(135deg, #6b7280, #4b5563);
+      }
+
       /* 2nd Voice options group - subtle highlight */
       .voice-options-group {
         background: rgba(74, 158, 255, 0.05);
@@ -1846,6 +1981,51 @@ export class NotationToolbar {
           e.target.value = ''; // Clear after applying
         }
       }
+    });
+
+    // Lyric apply button
+    this.container.querySelector('.apply-lyric-btn')?.addEventListener('click', () => {
+      const input = this.container.querySelector('.lyric-input');
+      const syllabicSelect = this.container.querySelector('.lyric-syllabic');
+      const lyricText = input?.value.trim();
+      const syllabic = syllabicSelect?.value || 'single';
+      if (lyricText) {
+        this.onLyricApply({ text: lyricText, syllabic });
+        input.value = ''; // Clear after applying
+      }
+    });
+
+    // Lyric input - apply on Enter key
+    this.container.querySelector('.lyric-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const lyricText = e.target.value.trim();
+        const syllabicSelect = this.container.querySelector('.lyric-syllabic');
+        const syllabic = syllabicSelect?.value || 'single';
+        if (lyricText) {
+          this.onLyricApply({ text: lyricText, syllabic });
+          e.target.value = ''; // Clear after applying
+        }
+      }
+    });
+
+    // Pedal marking buttons
+    this.container.querySelectorAll('.pedal-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const pedalType = e.currentTarget.dataset.pedal;
+        if (pedalType) {
+          this.onPedalApply(pedalType);
+        }
+      });
+    });
+
+    // Beam control buttons
+    this.container.querySelectorAll('.beam-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const beamAction = e.currentTarget.dataset.beam;
+        if (beamAction) {
+          this.onBeamApply(beamAction);
+        }
+      });
     });
 
     // Rest display mode buttons

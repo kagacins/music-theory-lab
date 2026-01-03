@@ -61,8 +61,9 @@ function isBeamable(vexNote) {
 }
 
 /**
- * Generate beams that respect tuplet groupings
+ * Generate beams that respect tuplet groupings and manual beam controls
  * Tuplet notes are beamed together as a unit, non-tuplet notes use standard beaming
+ * Manual beam controls (_beamControl) allow forcing beam start/end/break points
  * @param {Array} vexNotes - All VexFlow notes in the measure
  * @param {Object} tupletGroups - Tuplet groups from createNotesForStaff
  * @returns {Array} - Array of VexFlow Beam objects
@@ -96,8 +97,11 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
     group.notes.forEach(n => tupletNoteSet.add(n));
   }
 
-  // Group consecutive non-tuplet beamable notes, breaking at rests
-  // This ensures notes separated by rests are NOT beamed together
+  // Group consecutive non-tuplet beamable notes, breaking at:
+  // - Rests
+  // - Notes with _beamControl.break = true
+  // - After notes with _beamControl.end = true
+  // - Before notes with _beamControl.start = true
   const beamGroups = [];
   let currentGroup = [];
 
@@ -112,9 +116,39 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
       continue;
     }
 
+    const beamControl = note._beamControl;
+
+    // Check if this note should break beaming entirely
+    if (beamControl?.break) {
+      // End current group before this note
+      if (currentGroup.length >= 2) {
+        beamGroups.push(currentGroup);
+      }
+      currentGroup = [];
+      // This note is not beamed - skip it
+      continue;
+    }
+
+    // Check if this note should start a new beam group
+    if (beamControl?.start && currentGroup.length > 0) {
+      // End previous group before starting new one
+      if (currentGroup.length >= 2) {
+        beamGroups.push(currentGroup);
+      }
+      currentGroup = [];
+    }
+
     // Check if this note is beamable
     if (isBeamable(note)) {
       currentGroup.push(note);
+
+      // Check if this note should end the beam group
+      if (beamControl?.end) {
+        if (currentGroup.length >= 2) {
+          beamGroups.push(currentGroup);
+        }
+        currentGroup = [];
+      }
     } else {
       // Rest or non-beamable note breaks the current beam group
       if (currentGroup.length >= 2) {
@@ -3470,7 +3504,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
         accidentalTracker.getAccidentalForNote(pitch, keySignature)
       );
       // Use computed measure-aware accidentals (overrides any provided accidentals for correct notation)
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection, note.dynamic || null, note.ornament || null, note.graceNotes || null);
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection, note.dynamic || null, note.ornament || null, note.graceNotes || null, note.lyric || null, note.pedal || null);
       if (!chordNote) {
         console.warn('[createNotesForStaff] createChordNote returned null for note:', JSON.stringify(note), 'adjustedPitches:', adjustedPitches);
         continue;
@@ -3479,6 +3513,11 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
       // Preserve isTied property for cross-measure tie rendering
       if (note.isTied !== undefined) {
         chordNote.isTied = note.isTied;
+      }
+
+      // Preserve beam property for custom beam grouping
+      if (note.beam) {
+        chordNote._beamControl = note.beam;
       }
 
       // Track ottava brackets
@@ -3541,6 +3580,11 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
       // Preserve isTied property for cross-measure tie rendering
       if (note.isTied !== undefined) {
         staveNote.isTied = note.isTied;
+      }
+
+      // Preserve beam property for custom beam grouping
+      if (note.beam) {
+        staveNote._beamControl = note.beam;
       }
 
       // Track ottava brackets

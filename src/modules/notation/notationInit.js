@@ -1630,6 +1630,21 @@ export function initEnhancedNotation(options = {}) {
       }
     };
 
+    // Handle lyric application to selected note
+    notationComposer.toolbar.onLyricApply = (lyricData) => {
+      noteEditor.applyLyricToSelected(lyricData);
+    };
+
+    // Handle pedal marking application to selected note
+    notationComposer.toolbar.onPedalApply = (pedalType) => {
+      noteEditor.applyPedalToSelected(pedalType);
+    };
+
+    // Handle beam control application to selected notes
+    notationComposer.toolbar.onBeamApply = (beamAction) => {
+      noteEditor.applyBeamToSelected(beamAction);
+    };
+
     // Handle copy/paste/octave operations
     notationComposer.toolbar.onCopy = () => {
       noteEditor.copySelectedNotes();

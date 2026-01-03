@@ -927,6 +927,9 @@ export class NotationComposer {
               slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
               fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
               stemDirection: note.stemDirection || null,  // Stem direction override
+              lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
+              pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
+              beam: note.beam || null,  // Manual beam control { start, end, break }
             }))
           ),
           // MULTI-VOICE: Gather bass notes from ALL voices, not just voice 0
@@ -954,6 +957,9 @@ export class NotationComposer {
               slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
               fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
               stemDirection: note.stemDirection || null,  // Stem direction override
+              lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
+              pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
+              beam: note.beam || null,  // Manual beam control { start, end, break }
             }))
           ),
           keySignature: m.keySignature || this.compositionState.metadata.key,
@@ -1275,6 +1281,9 @@ export class NotationComposer {
           slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
           fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
           stemDirection: note.stemDirection || null,  // Stem direction override
+          lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
+          pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
+          beam: note.beam || null,  // Manual beam control { start, end, break }
         }))
       ),
       bassNotes: (m.notation.bass.voices || []).flatMap((voice, voiceIndex) =>
@@ -1301,6 +1310,9 @@ export class NotationComposer {
           slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
           fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
           stemDirection: note.stemDirection || null,  // Stem direction override
+          lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
+          pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
+          beam: note.beam || null,  // Manual beam control { start, end, break }
         }))
       ),
       keySignature: m.keySignature || this.compositionState.metadata.key,
