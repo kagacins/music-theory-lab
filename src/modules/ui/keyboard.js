@@ -84,7 +84,7 @@ export function releaseActiveKey(noteName = null) {
             const keyEl = document.getElementById(keyId);
             if (keyEl) {
                 // Remove all playback highlighting classes
-                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback', 'active-lesson-playback');
             }
             activeKeyNoteNames.delete(noteName);
             if (activeKeyNoteName === noteName) {
@@ -101,7 +101,7 @@ export function releaseActiveKey(noteName = null) {
                 const keyId = getNoteKeyId(note);
                 const keyEl = document.getElementById(keyId);
                 if (keyEl) {
-                    keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                    keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback', 'active-lesson-playback');
                 }
             } catch (e) {
                 // Ignore errors for individual note release
@@ -296,7 +296,7 @@ export function renderKeyboard() {
                 const currentTabNow = window.currentTab || 'builder';
                 
                 // Add consistent playback highlighting based on current tab
-                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback', 'active-lesson-playback');
                 if (currentTabNow === 'builder') {
                     keyEl.classList.add('active-builder-playback');
                 } else if (currentTabNow === 'scales') {
@@ -305,6 +305,8 @@ export function renderKeyboard() {
                     keyEl.classList.add('active-progression');
                 } else if (currentTabNow === 'melody') {
                     keyEl.classList.add('active-melody-playback');
+                } else if (currentTabNow === 'learn') {
+                    keyEl.classList.add('active-lesson-playback');
                 }
 
                 // If recording melody on the melody tab, add note to interactive melody
@@ -366,7 +368,7 @@ export function renderKeyboard() {
             }
             
             // Add consistent playback highlighting based on current tab
-            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback', 'active-lesson-playback');
             if (currentTab === 'builder') {
                 keyEl.classList.add('active-builder-playback');
             } else if (currentTab === 'scales') {
@@ -375,6 +377,8 @@ export function renderKeyboard() {
                 keyEl.classList.add('active-progression');
             } else if (currentTab === 'melody') {
                 keyEl.classList.add('active-melody-playback');
+            } else if (currentTab === 'learn') {
+                keyEl.classList.add('active-lesson-playback');
             }
 
             // If recording on the trainer tab, capture chord (all active keys)

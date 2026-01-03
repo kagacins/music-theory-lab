@@ -981,7 +981,25 @@ export function setupWindowExports() {
 
     // Melody Section Toggle (Composition Studio)
     // Uses standard section pattern with -toggle and -panel naming
-    function toggleMelodySection(sectionId) {
+    function toggleMelodySection(sectionId, event = null) {
+        // If event is provided, check if click was in the right 25% zone (collapse zone)
+        // This prevents accidental collapses from clicking elsewhere on the header
+        if (event && event.currentTarget) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const clickX = event.clientX;
+            const rightZoneStart = rect.right - (rect.width * 0.25); // Right 25% of header
+
+            // If click was NOT in the right zone, don't toggle
+            // Exception: if clicking directly on chevron (which should always work)
+            const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                                   event.target.closest('.chevron-icon') ||
+                                   event.target.closest('svg[class*="rotate"]');
+
+            if (clickX < rightZoneStart && !clickedChevron) {
+                return; // Click was in left 75%, ignore
+            }
+        }
+
         const panel = document.getElementById(`${sectionId}-panel`);
         const chevron = document.getElementById(`${sectionId}-chevron`);
         if (!panel) return;

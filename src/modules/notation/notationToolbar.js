@@ -516,6 +516,11 @@ export class NotationToolbar {
             <span class="editing-context-indicator" title="Current editing context"><span class="context-icon">📍</span><span class="context-text">Ready</span></span>
           </div>
 
+          <!-- Quick Actions (Essential) -->
+          <div class="toolbar-section quick-actions-section">
+            <button class="toolbar-btn measure-edit-btn" data-action="measureEdit" title="Measure Isolation Editor (Edit single measure)">🔲</button>
+          </div>
+
           <!-- Floating Palette Toggle -->
           <div class="toolbar-section palette-section">
             <label class="floating-palette-toggle" title="Show persistent quick-tools palette">
@@ -532,6 +537,64 @@ export class NotationToolbar {
 
         <!-- TIER 2: EXPANDED (Click to Show) -->
         <div class="toolbar-tier toolbar-tier-2 ${this.isTier2Expanded ? 'expanded' : 'collapsed'}">
+          <!-- Voice Selection (grouped with V2 Rests) -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Voice</span>
+            <div class="toolbar-group-content">
+              <select class="voice-select" title="Voice (V to cycle)">
+                <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>V1</option>
+                <option value="2" ${this.voiceNumber === 2 ? 'selected' : ''}>V2</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Voice 2 Rest Display (grouped with Voice) -->
+          <div class="toolbar-group tier2-group rest-display-section">
+            <span class="group-label">V2 Rests</span>
+            <div class="toolbar-group-content">
+              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean mode - hide redundant rests">Clean</button>
+              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests explicitly">All</button>
+            </div>
+          </div>
+
+          <!-- Edit Actions -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Edit</span>
+            <div class="toolbar-group-content">
+              <button class="toolbar-btn undo-btn" data-action="undo" title="Undo (Ctrl+Z)">↩</button>
+              <button class="toolbar-btn redo-btn" data-action="redo" title="Redo (Ctrl+Y)">↪</button>
+              <button class="toolbar-btn delete-btn" data-action="delete" title="Delete">🗑</button>
+            </div>
+          </div>
+
+          <!-- Copy/Paste -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Clip</span>
+            <div class="toolbar-group-content">
+              <button class="toolbar-btn copy-btn" data-action="copy" title="Copy (Ctrl+C)">📋</button>
+              <button class="toolbar-btn paste-btn" data-action="paste" title="Paste (Ctrl+V)">📥</button>
+              <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy Block">📦</button>
+            </div>
+          </div>
+
+          <!-- View Options -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">View</span>
+            <div class="toolbar-group-content">
+              <select class="time-signature-select" title="Time signature">
+                ${TIME_SIGNATURES.map(ts => `
+                  <option value="${ts.value}" ${this.timeSignature === ts.value ? 'selected' : ''}>${ts.value}</option>
+                `).join('')}
+              </select>
+              <select class="measures-select" title="Measures per line">
+                ${MEASURES_PER_LINE_OPTIONS.map(m => `
+                  <option value="${m}" ${m === this.measuresPerLine ? 'selected' : ''}>${m}</option>
+                `).join('')}
+              </select>
+              <button class="toolbar-btn metronome-btn ${this.metronomeEnabled ? 'active' : ''}" data-action="metronome" title="Metronome">🔔</button>
+            </div>
+          </div>
+
           <!-- Tuplets -->
           <div class="toolbar-group tier2-group">
             <span class="group-label">Tuplet</span>
@@ -634,65 +697,6 @@ export class NotationToolbar {
               ${REPEAT_SIGNS.map(r => `
                 <button class="toolbar-btn repeat-btn" data-repeat="${r.id}" title="${r.label}">${r.symbol}</button>
               `).join('')}
-            </div>
-          </div>
-
-          <!-- Voice Selection -->
-          <div class="toolbar-group tier2-group">
-            <span class="group-label">Voice</span>
-            <div class="toolbar-group-content">
-              <select class="voice-select" title="Voice (V to cycle)">
-                <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>V1</option>
-                <option value="2" ${this.voiceNumber === 2 ? 'selected' : ''}>V2</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Edit Actions -->
-          <div class="toolbar-group tier2-group">
-            <span class="group-label">Edit</span>
-            <div class="toolbar-group-content">
-              <button class="toolbar-btn undo-btn" data-action="undo" title="Undo (Ctrl+Z)">↩</button>
-              <button class="toolbar-btn redo-btn" data-action="redo" title="Redo (Ctrl+Y)">↪</button>
-              <button class="toolbar-btn delete-btn" data-action="delete" title="Delete">🗑</button>
-              <button class="toolbar-btn measure-edit-btn" data-action="measureEdit" title="Measure Isolation Editor">🔲</button>
-            </div>
-          </div>
-
-          <!-- Copy/Paste -->
-          <div class="toolbar-group tier2-group">
-            <span class="group-label">Clip</span>
-            <div class="toolbar-group-content">
-              <button class="toolbar-btn copy-btn" data-action="copy" title="Copy (Ctrl+C)">📋</button>
-              <button class="toolbar-btn paste-btn" data-action="paste" title="Paste (Ctrl+V)">📥</button>
-              <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy Block">📦</button>
-            </div>
-          </div>
-
-          <!-- View Options -->
-          <div class="toolbar-group tier2-group">
-            <span class="group-label">View</span>
-            <div class="toolbar-group-content">
-              <select class="time-signature-select" title="Time signature">
-                ${TIME_SIGNATURES.map(ts => `
-                  <option value="${ts.value}" ${this.timeSignature === ts.value ? 'selected' : ''}>${ts.value}</option>
-                `).join('')}
-              </select>
-              <select class="measures-select" title="Measures per line">
-                ${MEASURES_PER_LINE_OPTIONS.map(m => `
-                  <option value="${m}" ${m === this.measuresPerLine ? 'selected' : ''}>${m}</option>
-                `).join('')}
-              </select>
-              <button class="toolbar-btn metronome-btn ${this.metronomeEnabled ? 'active' : ''}" data-action="metronome" title="Metronome">🔔</button>
-            </div>
-          </div>
-
-          <!-- Voice 2 Rest Display -->
-          <div class="toolbar-group tier2-group rest-display-section">
-            <span class="group-label">V2 Rests</span>
-            <div class="toolbar-group-content">
-              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean mode - hide redundant rests">Clean</button>
-              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests explicitly">All</button>
             </div>
           </div>
 

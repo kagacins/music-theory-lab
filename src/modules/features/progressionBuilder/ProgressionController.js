@@ -4235,8 +4235,24 @@ export function saveStateBeforeChange() {
 /**
  * Toggle progression controls panel
  */
-export function toggleProgressionControlsPanel() {
+export function toggleProgressionControlsPanel(event = null) {
     if (isGuidedModeActive()) return;
+
+    // If event is provided, check if click was in the right 25% zone (collapse zone)
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX;
+        const rightZoneStart = rect.right - (rect.width * 0.25);
+
+        // If click was NOT in the right zone, don't toggle (unless clicking chevron)
+        const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                               event.target.closest('.chevron-icon') ||
+                               event.target.closest('svg[class*="rotate"]');
+
+        if (clickX < rightZoneStart && !clickedChevron) {
+            return;
+        }
+    }
 
     const panel = document.getElementById('progression-controls-panel');
     const chevron = document.getElementById('progression-controls-chevron');
@@ -4257,8 +4273,24 @@ export function toggleProgressionControlsPanel() {
 /**
  * Toggle progression cards panel
  */
-export function toggleProgressionCardsPanel() {
+export function toggleProgressionCardsPanel(event = null) {
     if (isGuidedModeActive()) return;
+
+    // If event is provided, check if click was in the right 25% zone (collapse zone)
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX;
+        const rightZoneStart = rect.right - (rect.width * 0.25);
+
+        // If click was NOT in the right zone, don't toggle (unless clicking chevron)
+        const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                               event.target.closest('.chevron-icon') ||
+                               event.target.closest('svg[class*="rotate"]');
+
+        if (clickX < rightZoneStart && !clickedChevron) {
+            return;
+        }
+    }
 
     const panel = document.getElementById('progression-visualization-panel');
     const chevron = document.getElementById('progression-visualization-chevron');

@@ -1148,29 +1148,29 @@ button:active:not(:disabled),
    Theory Academy Lesson Playback Highlighting
    ============================================ */
 
-/* Lesson playback - purple/indigo theme for Theory Academy */
+/* Lesson playback - blue theme for Theory Academy (matches header pill) */
 .white-key.active-lesson-playback,
 .modern-keyboard .white-key.active-lesson-playback {
-    background: linear-gradient(180deg, #8b5cf6 0%, #6366f1 100%) !important;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
     box-shadow:
-        0 0 20px rgba(139, 92, 246, 0.6),
-        0 4px 12px rgba(139, 92, 246, 0.4),
+        0 0 20px rgba(59, 130, 246, 0.6),
+        0 4px 12px rgba(59, 130, 246, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.3),
-        inset 0 -2px 0 rgba(99, 102, 241, 0.6) !important;
-    border-color: rgba(139, 92, 246, 0.5) !important;
+        inset 0 -2px 0 rgba(37, 99, 235, 0.6) !important;
+    border-color: rgba(59, 130, 246, 0.5) !important;
     animation: none !important;
     transform: none !important;
 }
 
 .black-key.active-lesson-playback,
 .modern-keyboard .black-key.active-lesson-playback {
-    background: linear-gradient(180deg, #6d28d9 0%, #4c1d95 100%) !important;
+    background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%) !important;
     box-shadow:
-        0 0 20px rgba(139, 92, 246, 0.7),
-        0 4px 12px rgba(139, 92, 246, 0.5),
+        0 0 20px rgba(59, 130, 246, 0.7),
+        0 4px 12px rgba(59, 130, 246, 0.5),
         inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -2px 0 rgba(76, 29, 149, 0.8) !important;
-    border-color: rgba(109, 40, 217, 0.7) !important;
+        inset 0 -2px 0 rgba(30, 64, 175, 0.8) !important;
+    border-color: rgba(29, 78, 216, 0.7) !important;
     animation: none !important;
     transform: none !important;
 }

@@ -1247,7 +1247,7 @@
             <div class="bg-white p-4 rounded-xl shadow-2xl border border-amber-100 mb-4 max-w-7xl mx-auto">
                 <div id="builder-sections-container" class="space-y-3">
                 <div class="mb-3 builder-section-item">
-                    <button id="chord-setup-toggle" onclick="if (!event.target.closest('.drag-handle')) { window.toggleChordSetupPanel && window.toggleChordSetupPanel(); }" class="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="chord-setup-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('button')) { window.toggleChordSetupPanel && window.toggleChordSetupPanel(event); }" class="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder" style="pointer-events: auto;">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -1340,7 +1340,7 @@
                 </div>
 
                 <div class="mb-3 builder-section-item">
-                    <button id="chord-library-toggle" onclick="window.toggleChordLibraryPanel && window.toggleChordLibraryPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-sky-700 to-teal-600 hover:from-sky-800 hover:to-teal-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="chord-library-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('button')) { window.toggleChordLibraryPanel && window.toggleChordLibraryPanel(event); }" class="w-full px-4 py-2 bg-gradient-to-r from-sky-700 to-teal-600 hover:from-sky-800 hover:to-teal-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-3">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -1450,7 +1450,7 @@
                 <div id="trainer-sections-container" class="space-y-3">
                 <!-- Song/Artist Search Section -->
                 <div class="mb-3 trainer-section-item">
-                    <button id="song-search-toggle" onclick="window.toggleSongSearchPanel && window.toggleSongSearchPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="song-search-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('button')) { window.toggleSongSearchPanel && window.toggleSongSearchPanel(event); }" class="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -1507,7 +1507,7 @@
                 
                 <!-- NEW: Control Grid (collapsible) -->
                 <div class="mb-3 trainer-section-item">
-                    <button id="progression-controls-toggle" onclick="window.toggleProgressionControlsPanel && window.toggleProgressionControlsPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="progression-controls-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('button')) { window.toggleProgressionControlsPanel && window.toggleProgressionControlsPanel(event); }" class="w-full px-4 py-2 bg-gradient-to-r from-teal-500 to-indigo-500 hover:from-teal-600 hover:to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -1621,7 +1621,7 @@
 
                 <!-- Progression Timeline -->
                 <div class="mb-3 trainer-section-item">
-                    <button id="progression-visualization-toggle" onclick="window.toggleProgressionCardsPanel && window.toggleProgressionCardsPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="progression-visualization-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('button')) { window.toggleProgressionCardsPanel && window.toggleProgressionCardsPanel(event); }" class="w-full px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-3">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -2037,7 +2037,7 @@
 
                 <!-- Song Workbench (collapsible) - formerly Progression Setup -->
                 <div class="mb-3 melody-section-item">
-                    <button id="melody-progression-setup-toggle" onclick="window.toggleMelodySection && window.toggleMelodySection('melody-progression-setup')" class="w-full px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="melody-progression-setup-toggle" onclick="window.toggleMelodySection && window.toggleMelodySection('melody-progression-setup', event)" class="w-full px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -2120,7 +2120,7 @@
 
                 <!-- Chord Progression Card -->
                 <div class="mb-3 melody-section-item">
-                    <div id="chord-progression-card-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('.header-action-btn') && !event.target.closest('button')) { window.toggleMelodySection && window.toggleMelodySection('chord-progression-card'); }" class="w-full px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
+                    <div id="chord-progression-card-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('.header-action-btn') && !event.target.closest('button')) { window.toggleMelodySection && window.toggleMelodySection('chord-progression-card', event); }" class="w-full px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
                         <span class="flex items-center gap-2 flex-wrap">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder" style="pointer-events: auto;">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -2391,7 +2391,7 @@
 
                 <!-- Staff Notation Card (Primary Focus) -->
                 <div class="mb-3 melody-section-item">
-                    <div id="staff-notation-card-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('.shortcuts-btn') && !event.target.closest('button')) { window.toggleMelodySection && window.toggleMelodySection('staff-notation-card'); }" class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
+                    <div id="staff-notation-card-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('.shortcuts-btn') && !event.target.closest('button')) { window.toggleMelodySection && window.toggleMelodySection('staff-notation-card', event); }" class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
                         <span class="flex items-center gap-3">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder" style="pointer-events: auto;">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>

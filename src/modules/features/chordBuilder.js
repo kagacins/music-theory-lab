@@ -1069,9 +1069,25 @@ function showChordSuggestionsModal(chordType, inversion) {
 // Collapsible Panel Toggles (Chord Builder UI)
 // =========================================================================
 
-export function toggleChordSetupPanel() {
+export function toggleChordSetupPanel(event = null) {
     // Don't allow panel toggling during guided mode (scroll is locked)
     if (isGuidedModeActive()) return;
+
+    // If event is provided, check if click was in the right 25% zone (collapse zone)
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX;
+        const rightZoneStart = rect.right - (rect.width * 0.25);
+
+        // If click was NOT in the right zone, don't toggle (unless clicking chevron)
+        const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                               event.target.closest('.chevron-icon') ||
+                               event.target.closest('svg[class*="rotate"]');
+
+        if (clickX < rightZoneStart && !clickedChevron) {
+            return;
+        }
+    }
 
     const panel = document.getElementById('chord-setup-panel');
     const chevron = document.getElementById('chord-setup-chevron');
@@ -1092,9 +1108,25 @@ export function toggleChordSetupPanel() {
     }
 }
 
-export function toggleChordLibraryPanel() {
+export function toggleChordLibraryPanel(event = null) {
     // Don't allow panel toggling during guided mode (scroll is locked)
     if (isGuidedModeActive()) return;
+
+    // If event is provided, check if click was in the right 25% zone (collapse zone)
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX;
+        const rightZoneStart = rect.right - (rect.width * 0.25);
+
+        // If click was NOT in the right zone, don't toggle (unless clicking chevron)
+        const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                               event.target.closest('.chevron-icon') ||
+                               event.target.closest('svg[class*="rotate"]');
+
+        if (clickX < rightZoneStart && !clickedChevron) {
+            return;
+        }
+    }
 
     const panel = document.getElementById('chord-library-panel');
     const chevron = document.getElementById('chord-library-chevron');

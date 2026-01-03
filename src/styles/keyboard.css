@@ -91,7 +91,7 @@
     border-right: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.modern-keyboard .white-key:hover:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback) {
+.modern-keyboard .white-key:hover:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback):not(.active-lesson-playback) {
     background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.9),
@@ -101,7 +101,7 @@
     transform: translateY(-1px);
 }
 
-.modern-keyboard .white-key:active:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback) {
+.modern-keyboard .white-key:active:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback):not(.active-lesson-playback) {
     background: linear-gradient(180deg, #f1f3f5 0%, #e9ecef 50%, #dee2e6 100%);
     box-shadow:
         inset 0 2px 4px rgba(0, 0, 0, 0.1),
@@ -114,6 +114,7 @@
 .modern-keyboard .white-key.active-builder-playback,
 .modern-keyboard .white-key.active-scale-playback,
 .modern-keyboard .white-key.active-melody-playback,
+.modern-keyboard .white-key.active-lesson-playback,
 .modern-keyboard .white-key.active-progression,
 .modern-keyboard .white-key.active-builder,
 .modern-keyboard .white-key.active-scale,
@@ -125,6 +126,7 @@
 .modern-keyboard .black-key.active-builder-playback,
 .modern-keyboard .black-key.active-scale-playback,
 .modern-keyboard .black-key.active-melody-playback,
+.modern-keyboard .black-key.active-lesson-playback,
 .modern-keyboard .black-key.active-progression,
 .modern-keyboard .black-key.active-builder,
 .modern-keyboard .black-key.active-scale,
@@ -222,7 +224,7 @@
         0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.modern-keyboard .black-key:hover:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback) {
+.modern-keyboard .black-key:hover:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback):not(.active-lesson-playback) {
     background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
     box-shadow:
         inset 0 -3px 6px rgba(0, 0, 0, 0.5),
@@ -232,7 +234,7 @@
     transform: translateY(-1px);
 }
 
-.modern-keyboard .black-key:active:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback) {
+.modern-keyboard .black-key:active:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback):not(.active-lesson-playback) {
     background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
     box-shadow:
         inset 0 2px 4px rgba(0, 0, 0, 0.8),
