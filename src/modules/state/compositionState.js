@@ -981,6 +981,11 @@ export class CompositionState {
         // Array of { id, measureIndex, type } where type is 'repeatStart', 'repeatEnd', 'repeatBoth'
         this.repeatSigns = [];
         this._nextRepeatId = 1;
+
+        // Volta brackets (1st/2nd endings) - stored as regions
+        // Array of { id, startMeasure, endMeasure, number } where number is '1', '2', '1, 2', etc.
+        this.voltaBrackets = [];
+        this._nextVoltaId = 1;
     }
 
     // ========================================================================
@@ -8181,6 +8186,263 @@ export class CompositionState {
         this.repeatSigns = [];
         this._nextRepeatId = 1;
         this.events.emit('repeatSignsCleared');
+    }
+
+    // ========================================================================
+    // VOLTA BRACKET MANAGEMENT (1st/2nd endings)
+    // ========================================================================
+
+    /**
+     * Add a volta bracket region
+     * @param {Object} params - Volta bracket parameters
+     * @param {number} params.startMeasure - Starting measure index
+     * @param {number} params.endMeasure - Ending measure index (inclusive)
+     * @param {string} params.number - Volta number ('1', '2', '1, 2', etc.)
+     * @returns {Object} The created volta bracket
+     */
+    addVoltaBracket({ startMeasure, endMeasure, number }) {
+        // Validate parameters
+        if (startMeasure < 0 || endMeasure < startMeasure) {
+            console.warn('[addVoltaBracket] Invalid measure range');
+            return null;
+        }
+
+        // Find all voltas with the same number that overlap OR are adjacent to this range
+        // Adjacent means: their end is one before our start, or their start is one after our end
+        const toMerge = this.voltaBrackets.filter(v =>
+            v.number === number && (
+                // Overlapping: ranges intersect
+                !(endMeasure < v.startMeasure || startMeasure > v.endMeasure) ||
+                // Adjacent left: existing ends right before new starts
+                v.endMeasure === startMeasure - 1 ||
+                // Adjacent right: existing starts right after new ends
+                v.startMeasure === endMeasure + 1
+            )
+        );
+
+        // Calculate merged range including the new bracket and all adjacent/overlapping ones
+        let mergedStart = startMeasure;
+        let mergedEnd = endMeasure;
+
+        for (const v of toMerge) {
+            mergedStart = Math.min(mergedStart, v.startMeasure);
+            mergedEnd = Math.max(mergedEnd, v.endMeasure);
+        }
+
+        // Remove all the voltas we're merging
+        for (const v of toMerge) {
+            const index = this.voltaBrackets.findIndex(vb => vb.id === v.id);
+            if (index >= 0) {
+                this.voltaBrackets.splice(index, 1);
+            }
+        }
+
+        // Create the merged volta
+        const volta = {
+            id: `volta_${this._nextVoltaId++}`,
+            startMeasure: mergedStart,
+            endMeasure: mergedEnd,
+            number,
+        };
+
+        this.voltaBrackets.push(volta);
+        this.voltaBrackets.sort((a, b) => a.startMeasure - b.startMeasure);
+        this.events.emit('voltaBracketAdded', volta);
+        return volta;
+    }
+
+    /**
+     * Remove a volta bracket by ID
+     * @param {string} voltaId - Volta bracket ID
+     * @returns {boolean} True if removed
+     */
+    removeVoltaBracket(voltaId) {
+        const index = this.voltaBrackets.findIndex(v => v.id === voltaId);
+        if (index >= 0) {
+            const removed = this.voltaBrackets.splice(index, 1)[0];
+            this.events.emit('voltaBracketRemoved', removed);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get volta bracket for a specific measure
+     * Returns the volta bracket that contains this measure (if any)
+     * @param {number} measureIndex - Measure index
+     * @returns {Object|null} Volta bracket or null
+     */
+    getVoltaForMeasure(measureIndex) {
+        return this.voltaBrackets.find(v =>
+            measureIndex >= v.startMeasure && measureIndex <= v.endMeasure
+        ) || null;
+    }
+
+    /**
+     * Get volta bracket type for a specific measure
+     * Returns the bracket type for VexFlow rendering
+     * @param {number} measureIndex - Measure index
+     * @returns {Object|null} { type: 'begin'|'mid'|'end'|'begin_end', number: '1' } or null
+     */
+    getVoltaTypeForMeasure(measureIndex) {
+        const volta = this.getVoltaForMeasure(measureIndex);
+        if (!volta) return null;
+
+        const isStart = measureIndex === volta.startMeasure;
+        const isEnd = measureIndex === volta.endMeasure;
+
+        let type;
+        if (isStart && isEnd) {
+            type = 'begin_end';
+        } else if (isStart) {
+            type = 'begin';
+        } else if (isEnd) {
+            type = 'end';
+        } else {
+            type = 'mid';
+        }
+
+        return { type, number: volta.number };
+    }
+
+    /**
+     * Get all volta brackets
+     * @returns {Array} Array of volta brackets
+     */
+    getAllVoltaBrackets() {
+        return [...this.voltaBrackets];
+    }
+
+    /**
+     * Clear all volta brackets
+     */
+    clearVoltaBrackets() {
+        this.voltaBrackets = [];
+        this._nextVoltaId = 1;
+        this.events.emit('voltaBracketsCleared');
+    }
+
+    /**
+     * Toggle volta bracket at measure - convenience method for toolbar
+     * If measure is within a volta with the same number, remove just that measure
+     * (potentially splitting the bracket). Otherwise, create/merge a volta with that number.
+     * @param {number} measureIndex - Measure index
+     * @param {string} number - Volta number ('1' or '2')
+     * @returns {Object|null} Created volta or null if removed
+     */
+    toggleVoltaAtMeasure(measureIndex, number) {
+        const existingVolta = this.getVoltaForMeasure(measureIndex);
+
+        if (existingVolta && existingVolta.number === number) {
+            // Same number - remove this measure from the volta
+            // This may split the volta into two pieces
+            const { startMeasure, endMeasure } = existingVolta;
+            this.removeVoltaBracket(existingVolta.id);
+
+            // If it was a single-measure volta, we're done (just removed)
+            if (startMeasure === endMeasure) {
+                return null;
+            }
+
+            // Check if we need to create left piece (measures before this one)
+            if (measureIndex > startMeasure) {
+                this.addVoltaBracket({
+                    startMeasure: startMeasure,
+                    endMeasure: measureIndex - 1,
+                    number,
+                });
+            }
+
+            // Check if we need to create right piece (measures after this one)
+            if (measureIndex < endMeasure) {
+                this.addVoltaBracket({
+                    startMeasure: measureIndex + 1,
+                    endMeasure: endMeasure,
+                    number,
+                });
+            }
+
+            return null;
+        } else if (existingVolta) {
+            // Different number - remove the measure from that volta first
+            // (splitting if needed), then add the new number
+            const { startMeasure, endMeasure, number: oldNumber } = existingVolta;
+            this.removeVoltaBracket(existingVolta.id);
+
+            // Recreate pieces of old volta without this measure
+            if (startMeasure !== endMeasure) {
+                if (measureIndex > startMeasure) {
+                    this.addVoltaBracket({
+                        startMeasure: startMeasure,
+                        endMeasure: measureIndex - 1,
+                        number: oldNumber,
+                    });
+                }
+                if (measureIndex < endMeasure) {
+                    this.addVoltaBracket({
+                        startMeasure: measureIndex + 1,
+                        endMeasure: endMeasure,
+                        number: oldNumber,
+                    });
+                }
+            }
+        }
+
+        // Create a single-measure volta (will auto-merge with adjacent same-number voltas)
+        return this.addVoltaBracket({
+            startMeasure: measureIndex,
+            endMeasure: measureIndex,
+            number,
+        });
+    }
+
+    /**
+     * Extend volta bracket to include adjacent measure
+     * @param {string} voltaId - Volta bracket ID
+     * @param {string} direction - 'left' or 'right'
+     * @returns {boolean} True if extended
+     */
+    extendVoltaBracket(voltaId, direction) {
+        const volta = this.voltaBrackets.find(v => v.id === voltaId);
+        if (!volta) return false;
+
+        if (direction === 'left' && volta.startMeasure > 0) {
+            volta.startMeasure--;
+            this.events.emit('voltaBracketUpdated', volta);
+            return true;
+        } else if (direction === 'right') {
+            volta.endMeasure++;
+            this.events.emit('voltaBracketUpdated', volta);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Shrink volta bracket from an edge
+     * @param {string} voltaId - Volta bracket ID
+     * @param {string} direction - 'left' or 'right'
+     * @returns {boolean} True if shrunk (or removed if single-measure)
+     */
+    shrinkVoltaBracket(voltaId, direction) {
+        const volta = this.voltaBrackets.find(v => v.id === voltaId);
+        if (!volta) return false;
+
+        if (volta.startMeasure === volta.endMeasure) {
+            // Single measure - remove entirely
+            return this.removeVoltaBracket(voltaId);
+        }
+
+        if (direction === 'left') {
+            volta.startMeasure++;
+            this.events.emit('voltaBracketUpdated', volta);
+            return true;
+        } else if (direction === 'right') {
+            volta.endMeasure--;
+            this.events.emit('voltaBracketUpdated', volta);
+            return true;
+        }
+        return false;
     }
 }
 

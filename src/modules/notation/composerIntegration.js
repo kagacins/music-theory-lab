@@ -1042,6 +1042,8 @@ export class NotationComposer {
         tempoMarkings: compositionState ? compositionState.tempoMarkings : [],
         // Repeat signs
         repeatSigns: compositionState ? compositionState.repeatSigns : [],
+        // Volta brackets (1st/2nd endings)
+        voltaBrackets: compositionState ? compositionState.voltaBrackets : [],
       });
     }
 
@@ -1578,6 +1580,8 @@ export class NotationComposer {
         tempoMarkings: compositionState ? compositionState.tempoMarkings : [],
         // Repeat signs
         repeatSigns: compositionState ? compositionState.repeatSigns : [],
+        // Volta brackets (1st/2nd endings)
+        voltaBrackets: compositionState ? compositionState.voltaBrackets : [],
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1796,6 +1800,8 @@ export class NotationComposer {
       tempoMarkings: compositionState ? compositionState.tempoMarkings : [],
       // Repeat signs
       repeatSigns: compositionState ? compositionState.repeatSigns : [],
+      // Volta brackets (1st/2nd endings)
+      voltaBrackets: compositionState ? compositionState.voltaBrackets : [],
     });
 
     const allRenderedMeasures = [];
@@ -2122,6 +2128,15 @@ export class NotationComposer {
       if (window.setSelectedChordIndex) {
         window.setSelectedChordIndex(index);
       }
+    }
+
+    // Update volta buttons to highlight if this measure is in a volta bracket
+    if (this.toolbar && index >= 0) {
+      this.toolbar.selectionMeasureIndices = new Set([index]);
+      this.toolbar.updateVoltaButtonsForSelection();
+    } else if (this.toolbar) {
+      this.toolbar.selectionMeasureIndices = new Set();
+      this.toolbar.updateVoltaButtonsForSelection();
     }
 
     // Re-render to show highlight

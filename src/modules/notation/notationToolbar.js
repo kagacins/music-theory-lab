@@ -123,6 +123,14 @@ export const REPEAT_SIGNS = [
 ];
 
 /**
+ * Volta brackets (1st/2nd endings)
+ */
+export const VOLTA_BRACKETS = [
+  { id: '1', label: '1st Ending', symbol: '1.' },
+  { id: '2', label: '2nd Ending', symbol: '2.' },
+];
+
+/**
  * Zoom levels
  */
 export const ZOOM_LEVELS = [50, 75, 100, 125, 150, 175, 200];
@@ -161,6 +169,7 @@ export class NotationToolbar {
     this.selectionDotted = null;  // null = no selection, 'mixed' = multiple, true/false = all same
     this.selectionTied = null;  // null = no selection, 'mixed' = multiple, true/false = all same
     this.selectionTuplet = null;  // null = no tuplet, 'triplet'/'quintuplet'/'sextuplet' = all same tuplet type
+    this.selectionMeasureIndices = new Set();  // Measure indices of selected notes (for volta highlighting)
 
     // Callbacks
     this.onDurationChange = options.onDurationChange || (() => {});
@@ -189,6 +198,9 @@ export class NotationToolbar {
     this.onGraceNoteTranspose = options.onGraceNoteTranspose || (() => {});  // Transpose grace notes by half steps
     this.onTempoMarkingApply = options.onTempoMarkingApply || (() => {});  // Apply tempo marking at selected position
     this.onRepeatSignApply = options.onRepeatSignApply || (() => {});  // Apply repeat sign at selected measure
+    this.onVoltaBracketApply = options.onVoltaBracketApply || (() => {});  // Apply volta bracket at selected measure
+    this.onVoltaExtend = options.onVoltaExtend || (() => {});  // Extend volta bracket (left/right)
+    this.onVoltaShrink = options.onVoltaShrink || (() => {});  // Shrink volta bracket (left/right)
     this.onChordSymbolApply = options.onChordSymbolApply || (() => {});
     this.onCopy = options.onCopy || (() => {});
     this.onPaste = options.onPaste || (() => {});
@@ -697,6 +709,22 @@ export class NotationToolbar {
               ${REPEAT_SIGNS.map(r => `
                 <button class="toolbar-btn repeat-btn" data-repeat="${r.id}" title="${r.label}">${r.symbol}</button>
               `).join('')}
+            </div>
+          </div>
+
+          <!-- Volta Brackets (1st/2nd Endings) -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Endings</span>
+            <div class="toolbar-group-content volta-buttons">
+              ${VOLTA_BRACKETS.map(v => `
+                <button class="toolbar-btn volta-btn" data-volta="${v.id}" title="${v.label}">${v.symbol}</button>
+              `).join('')}
+              <span class="volta-extend-controls" style="display: none; margin-left: 4px;">
+                <button class="toolbar-btn volta-extend-btn" data-direction="left" title="Extend volta left">◀+</button>
+                <button class="toolbar-btn volta-shrink-btn" data-direction="left" title="Shrink volta from left">◀−</button>
+                <button class="toolbar-btn volta-shrink-btn" data-direction="right" title="Shrink volta from right">−▶</button>
+                <button class="toolbar-btn volta-extend-btn" data-direction="right" title="Extend volta right">+▶</button>
+              </span>
             </div>
           </div>
 
@@ -1603,6 +1631,36 @@ export class NotationToolbar {
         const repeatType = e.currentTarget.dataset.repeat;
         if (repeatType) {
           this.onRepeatSignApply(repeatType);
+        }
+      });
+    });
+
+    // Volta bracket buttons
+    this.container.querySelectorAll('.volta-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const voltaNumber = e.currentTarget.dataset.volta;
+        if (voltaNumber) {
+          this.onVoltaBracketApply(voltaNumber);
+        }
+      });
+    });
+
+    // Volta extend buttons
+    this.container.querySelectorAll('.volta-extend-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const direction = e.currentTarget.dataset.direction;
+        if (direction) {
+          this.onVoltaExtend(direction);
+        }
+      });
+    });
+
+    // Volta shrink buttons
+    this.container.querySelectorAll('.volta-shrink-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const direction = e.currentTarget.dataset.direction;
+        if (direction) {
+          this.onVoltaShrink(direction);
         }
       });
     });
@@ -2663,6 +2721,10 @@ export class NotationToolbar {
       this.updateTieButtonForSelection();
       this.updateTupletButtonsForSelection();
 
+      // Clear volta button highlighting when no selection
+      this.selectionMeasureIndices = new Set();
+      this.updateVoltaButtonsForSelection();
+
       return;
     }
 
@@ -2725,6 +2787,15 @@ export class NotationToolbar {
       }
     }
 
+    // Track measure indices from selected notes for volta highlighting
+    const measureIndices = new Set();
+    selectedNotes.forEach(note => {
+      if (note.measureIndex !== undefined) {
+        measureIndices.add(note.measureIndex);
+      }
+    });
+    this.selectionMeasureIndices = measureIndices;
+
     // Update button states to reflect selection
     this.updateDurationButtonsForSelection();
     this.updateArticulationButtonsForSelection();
@@ -2733,6 +2804,7 @@ export class NotationToolbar {
     this.updateAccidentalButtonsForSelection();
     this.updateTieButtonForSelection();
     this.updateTupletButtonsForSelection();
+    this.updateVoltaButtonsForSelection();
   }
 
   /**
@@ -2935,6 +3007,44 @@ export class NotationToolbar {
         btn.title = isInsertMode
           ? `Exit ${tupletType} insert mode`
           : `Enter ${tupletType} insert mode (${noteCount} notes)`;
+      }
+    });
+  }
+
+  /**
+   * Update volta bracket buttons to show which volta(s) apply to selected measure(s)
+   * Highlights the "1." or "2." button when the selected note is in a volta bracket
+   */
+  updateVoltaButtonsForSelection() {
+    if (!this.container) return;
+
+    // Get composition state to check volta brackets
+    const compositionState = window.getCompositionState?.();
+
+    // Find which volta numbers apply to the selected measure(s)
+    const activeVoltaNumbers = new Set();
+
+    if (compositionState && this.selectionMeasureIndices && this.selectionMeasureIndices.size > 0) {
+      for (const measureIndex of this.selectionMeasureIndices) {
+        const volta = compositionState.getVoltaForMeasure?.(measureIndex);
+        if (volta) {
+          activeVoltaNumbers.add(volta.number);
+        }
+      }
+    }
+
+    // Update button states
+    this.container.querySelectorAll('.volta-btn').forEach(btn => {
+      const voltaId = btn.dataset.volta;
+      const isActive = activeVoltaNumbers.has(voltaId);
+
+      btn.classList.toggle('active', isActive);
+
+      // Update title based on state
+      if (isActive) {
+        btn.title = `Remove ${voltaId === '1' ? '1st' : '2nd'} ending from this measure`;
+      } else {
+        btn.title = `Add ${voltaId === '1' ? '1st' : '2nd'} ending to selected measure`;
       }
     });
   }

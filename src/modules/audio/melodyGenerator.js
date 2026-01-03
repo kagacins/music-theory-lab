@@ -144,7 +144,7 @@ function getDurationInSeconds(duration, tempo, tuplet = null, dotted = false) {
 // ============================================================================
 
 /**
- * Build playback measure order considering repeat signs.
+ * Build playback measure order considering repeat signs and volta brackets.
  * Returns an array of { measureIndex, playbackPosition } that represents
  * the order in which measures should be played.
  *
@@ -152,6 +152,10 @@ function getDurationInSeconds(duration, tempo, tuplet = null, dotted = false) {
  * - repeatStart (|:) marks the start of a section to repeat
  * - repeatEnd (:|) marks the end and causes playback to jump back to the most recent repeatStart
  * - repeatBoth (:|:) ends the previous repeat section AND starts a new one
+ *
+ * Volta brackets (1st/2nd endings) work with repeat signs:
+ * - On first pass: play measures with "1" ending, skip "2" ending
+ * - On second pass (after repeat): skip "1" ending, play "2" ending
  *
  * Each repeat section is played exactly once (play through, then repeat once).
  *
@@ -165,8 +169,9 @@ function buildPlaybackMeasureOrder(compositionState) {
     }
 
     const repeatSigns = compositionState.getAllRepeatSigns();
+    const voltaBrackets = compositionState.getAllVoltaBrackets ? compositionState.getAllVoltaBrackets() : [];
 
-    // If no repeat signs, just play measures in order
+    // If no repeat signs, just play measures in order (skip volta brackets without repeats)
     if (!repeatSigns || repeatSigns.length === 0) {
         return Array.from({ length: measureCount }, (_, i) => ({
             measureIndex: i,
@@ -180,11 +185,21 @@ function buildPlaybackMeasureOrder(compositionState) {
         repeatSignMap.set(sign.measureIndex, sign.type);
     });
 
+    // Build a map of volta brackets by measure index
+    // Each measure maps to its volta bracket number ('1', '2', etc.)
+    const voltaMap = new Map();
+    voltaBrackets.forEach(volta => {
+        for (let m = volta.startMeasure; m <= volta.endMeasure; m++) {
+            voltaMap.set(m, volta.number);
+        }
+    });
+
     // Build the playback order
     const playbackOrder = [];
     let playbackPosition = 0;
     let currentRepeatStartMeasure = 0; // Where to jump back to on repeat
     let repeatUsed = new Set(); // Track which repeat sections have been used
+    let currentRepeatPass = 1; // Track which pass we're on (1 = first, 2 = second)
 
     // Check if there's a repeatEnd without a preceding repeatStart
     // In this case, treat measure 0 as an implicit repeat start
@@ -198,6 +213,7 @@ function buildPlaybackMeasureOrder(compositionState) {
 
     while (measureIndex < measureCount) {
         const repeatType = repeatSignMap.get(measureIndex);
+        const voltaNumber = voltaMap.get(measureIndex);
 
         // Determine if this measure acts as a repeat START
         const isRepeatStart = repeatType === 'repeatStart' || repeatType === 'repeatBoth';
@@ -213,13 +229,22 @@ function buildPlaybackMeasureOrder(compositionState) {
 
                 if (!repeatUsed.has(repeatKey)) {
                     // Add this measure first (it's part of the ending section)
-                    playbackOrder.push({
-                        measureIndex,
-                        playbackPosition: playbackPosition++
-                    });
+                    // But check volta - skip if it's a "1" ending on second pass or "2" ending on first pass
+                    const shouldSkip = voltaNumber && (
+                        (currentRepeatPass === 1 && voltaNumber !== '1') ||
+                        (currentRepeatPass === 2 && voltaNumber === '1')
+                    );
+
+                    if (!shouldSkip) {
+                        playbackOrder.push({
+                            measureIndex,
+                            playbackPosition: playbackPosition++
+                        });
+                    }
 
                     // Mark this repeat as used
                     repeatUsed.add(repeatKey);
+                    currentRepeatPass = 2; // Switch to second pass
 
                     // Jump back to repeat start
                     measureIndex = currentRepeatStartMeasure;
@@ -230,13 +255,24 @@ function buildPlaybackMeasureOrder(compositionState) {
             // Now set this as the start of a (new) repeat section
             currentRepeatStartMeasure = measureIndex;
             inRepeatSection = true;
+            currentRepeatPass = 1; // Reset to first pass for new section
         }
 
-        // Add current measure to playback order
-        playbackOrder.push({
-            measureIndex,
-            playbackPosition: playbackPosition++
-        });
+        // Check if this measure should be skipped due to volta brackets
+        // - On first pass (currentRepeatPass === 1): play "1", skip "2" (and any other)
+        // - On second pass (currentRepeatPass === 2): skip "1", play "2" (and any other)
+        const shouldSkipForVolta = voltaNumber && (
+            (currentRepeatPass === 1 && voltaNumber !== '1') ||
+            (currentRepeatPass === 2 && voltaNumber === '1')
+        );
+
+        // Add current measure to playback order (unless skipped for volta)
+        if (!shouldSkipForVolta) {
+            playbackOrder.push({
+                measureIndex,
+                playbackPosition: playbackPosition++
+            });
+        }
 
         // Handle repeat end markers AFTER adding the measure
         if (isRepeatEnd) {
@@ -245,6 +281,7 @@ function buildPlaybackMeasureOrder(compositionState) {
             if (inRepeatSection && !repeatUsed.has(repeatKey)) {
                 // Mark this repeat as used
                 repeatUsed.add(repeatKey);
+                currentRepeatPass = 2; // Switch to second pass
 
                 // Jump back to repeat start
                 measureIndex = currentRepeatStartMeasure;
@@ -259,6 +296,9 @@ function buildPlaybackMeasureOrder(compositionState) {
                 // Repeat already used or not in a section
                 if (repeatType === 'repeatEnd') {
                     inRepeatSection = false;
+                    // DON'T reset currentRepeatPass here - we need it to stay at 2
+                    // so that volta 2 endings after the repeat are played.
+                    // Only reset when we encounter a NEW repeat start.
                 }
             }
         }
@@ -267,6 +307,7 @@ function buildPlaybackMeasureOrder(compositionState) {
     }
 
     console.log('[buildPlaybackMeasureOrder] Repeat signs:', repeatSigns);
+    console.log('[buildPlaybackMeasureOrder] Volta brackets:', voltaBrackets);
     console.log('[buildPlaybackMeasureOrder] Playback order:', playbackOrder);
 
     return playbackOrder;

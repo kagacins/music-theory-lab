@@ -240,7 +240,7 @@ if (hasMultipleVoices) {
 
 ## Notation Toolbar Enhancement Plan
 
-### Implementation Status (Updated December 30, 2025)
+### Implementation Status (Updated January 3, 2026)
 
 #### ✅ COMPLETED Features
 
@@ -262,6 +262,17 @@ if (hasMultipleVoices) {
 | **Transpose Tools** | Octave and semitone transposition (shown when notes selected) | ✅ Done |
 | **V2 Rest Display** | Clean/Explicit mode for multi-voice rest visibility | ✅ Done |
 | **Metronome Toggle** | In View section | ✅ Done |
+| **Dynamics** | pp, p, mp, mf, f, ff, sfz, fp with toolbar buttons and rendering | ✅ Done |
+| **Slurs** | Data structure + drawSlurs() rendering with curve positioning | ✅ Done |
+| **Hairpins (Crescendo/Decrescendo)** | Toolbar buttons + drawHairpins() with cross-measure support | ✅ Done |
+| **Cross-Measure Ties** | Manual tie curve rendering via drawManualTies() | ✅ Done |
+| **Repeat Signs** | Start/End/Both repeat barlines with toolbar and rendering | ✅ Done |
+| **Tempo Markings** | Allegro, Andante, Moderato, etc. with rendering above staff | ✅ Done |
+| **Grace Notes** | Acciaccatura/Appoggiatura with VexFlow GraceNoteGroup | ✅ Done |
+| **Ornaments** | Trill, mordent, inverted mordent, turn with VexFlow Ornament | ✅ Done |
+| **Measure Isolation Editor** | Modal editor with slot grid, entry mode, navigation arrows | ✅ Done |
+| **Chord Symbols Above Staff** | Toolbar input + rendering above staff via grandStaff.js | ✅ Done |
+| **Volta Brackets** | 1st/2nd endings with VexFlow setVoltaType() + playback support | ✅ Done |
 
 #### Current Toolbar Layout
 
@@ -293,83 +304,17 @@ FLOATING PALETTE (Optional, customizable):
 └──────────────────────────┘
 ```
 
-### Remaining Tier 1 Enhancements (High Priority)
+### Remaining Enhancements (Lower Priority)
 
-#### 1. Dynamics
-**Symbols**: pp, p, mp, mf, f, ff, sfz, fp
-**Status**: ❌ Not started
-**Implementation**:
-- Add `dynamics` property to Unit class
-- Render below staff using VexFlow's `Annotation` or `TextDynamics`
-- Store in note data structure
-- Add dynamics button group to Tier 2
-
-#### 2. Slurs and Phrase Marks
-**Status**: 🔧 DATA STRUCTURE EXISTS, UI MISSING
-**Existing Infrastructure** (`buildingBlock.js:260-261`):
-```javascript
-// Slur information: { start: slurId, end: slurId } - supports nested slurs
-this.slur = options.slur || null;
-```
-- `slur` property already exists on Unit class
-- `_computeSlurForPart()` method handles slurs in split notes (lines 1047-1060)
-- Slur data flows through measure rendering
-**Remaining Work**:
-- Create UI for slur creation (click-drag between notes or button to slur selected notes)
-- Implement VexFlow `Curve` rendering based on slur data
-- Add slur button to Tier 2 near Tie button
-
-#### 3. Crescendo/Decrescendo (Hairpins)
-**Status**: ❌ Not started
-**Implementation**:
-- Store start/end positions in compositionState
-- Use VexFlow's `StaveHairpin`
-- UI: Add hairpin buttons after dynamics in Tier 2
-
-### Remaining Tier 2 Enhancements (Medium Priority)
-
-#### 4. Repeat Signs and Endings
-**Types**: Start repeat, end repeat, first/second endings
-**Status**: ❌ Not started
-**Implementation**:
-- Measure-level attributes
-- Use VexFlow's `Barline` types and `Volta`
-
-#### 5. Tempo Markings
-**Types**: BPM, Italian terms (Allegro, Andante, etc.)
-**Status**: ❌ Not started
-**Implementation**:
-- Store in composition metadata or measure
-- Render using VexFlow's `StaveText`
-
-#### 6. Grace Notes
-**Status**: ❌ Not started
-**Implementation**:
-- Use VexFlow's `GraceNoteGroup`
-- Add `graceNotes` array property to main notes
-
-#### 7. Ornaments
-**Types**: Trill, mordent, turn, tremolo
-**Status**: ❌ Not started
-**Implementation**:
-- Use VexFlow's `Ornament` modifier
-- Add to articulation options in Tier 2
-
-### Remaining Tier 3 Enhancements (Lower Priority)
-
-#### 8. Custom Beam Groups
+#### 1. Custom Beam Groups
 Allow users to control beam groupings manually.
 **Status**: ❌ Not started
 
-#### 9. Lyrics/Text Annotations
+#### 2. Lyrics/Text Annotations
 Add text below notes for lyrics or analysis.
 **Status**: ❌ Not started
 
-#### 10. Chord Symbols Above Staff
-Display chord names above the staff.
-**Status**: ⚠️ Input exists (Tier 2), rendering above staff not implemented
-
-#### 11. Pedal Markings
+#### 3. Pedal Markings
 Piano-specific sustain pedal notation.
 **Status**: ⚠️ Data structure exists (`Unit.pedal`), no UI
 
@@ -386,24 +331,26 @@ Piano-specific sustain pedal notation.
 
 ## Measure Isolation Editing Feature
 
-### Concept Overview
+### ✅ IMPLEMENTED (January 2026)
 
-**Measure Isolation Editing** allows users to edit a single measure in isolation without affecting surrounding measures. Changes are validated before being applied, ensuring the measure respects time signature constraints.
+**Measure Isolation Editing** allows users to edit measures in isolation with a dedicated modal interface.
 
-### User Workflow
+### Current Implementation
 
-1. **Select Measure**: Click on a measure to select it
-2. **Enter Edit Mode**: Click "Edit Measure" button or press `E`
-3. **Isolated Editing**:
-   - Measure expands to show detailed editing view
-   - Notes can be moved, resized, added, deleted freely
-   - Real-time beat counter shows current/max beats
-   - Surrounding measures are dimmed but visible for context
-4. **Validate**: System checks if edits fit within time signature
-5. **Apply/Cancel**:
-   - "Apply" commits changes if valid
-   - "Cancel" reverts to original state
-   - Invalid states prevent Apply (with feedback)
+1. **Discoverability**: Pencil icon overlay appears on measure hover
+2. **Entry**: Click pencil icon or use keyboard shortcut to open modal
+3. **Editing Features**:
+   - Slot-based grid for precise note placement (48 units per beat)
+   - Entry Mode toggle (defaults to ON for immediate note entry)
+   - Note selection, deletion, and pitch modification
+   - Beat position snapping based on current duration
+   - Real-time beat counter display
+4. **Navigation**:
+   - Left/right arrows flank the measure pill for quick navigation
+   - Keyboard shortcuts (Ctrl+← / Ctrl+→) for measure navigation
+   - Auto-save changes when navigating between measures
+5. **Compound Meters**: Proper beat line groupings for 6/8, 9/8, 12/8
+6. **Context**: Previous/Next measure toggles show surrounding context
 
 ### Technical Design
 
@@ -540,12 +487,12 @@ function validateMeasure(measure, timeSignature) {
 
 ## Implementation Priority Matrix
 
-### Phase 1: Critical Fixes - Status (Updated December 30, 2025)
+### Phase 1: Critical Fixes - Status (Updated January 3, 2026)
 
 | Item | Effort | Impact | Priority | Status |
 |------|--------|--------|----------|--------|
 | Fix articulation leaking on shift-insert | Low | High | P0 | ✅ Resolved (intentional behavior) |
-| Complete bass clef tie rendering | Medium | High | P0 | ⚠️ Needs verification |
+| Complete bass clef tie rendering | Medium | High | P0 | ✅ Done (drawManualTies handles both clefs) |
 | Fix tied note merging tolerance | Low | Medium | P1 | ✅ Resolved via refactoring |
 | Implement bass clef shift operations | High | High | P1 | ✅ Done (`insertBassNoteWithShiftAtPosition`) |
 
@@ -562,39 +509,33 @@ function validateMeasure(measure, timeSignature) {
 
 | Item | Effort | Impact | Priority | Status |
 |------|--------|--------|----------|--------|
-| Dynamics support | Medium | High | P1 | ❌ Not started |
-| Slurs and phrase marks | High | High | P1 | ⚠️ Data structure ready, UI missing |
-| Measure Isolation Editing | High | Very High | P1 | ❌ Not started |
-| Crescendo/decrescendo | Medium | Medium | P2 | ❌ Not started |
-| Toolbar redesign | Medium | Medium | P2 | ✅ DONE (progressive disclosure, floating palette) |
+| Dynamics support | Medium | High | P1 | ✅ Done (toolbar + VexFlow Annotation rendering) |
+| Slurs and phrase marks | High | High | P1 | ✅ Done (drawSlurs with curve positioning) |
+| Measure Isolation Editing | High | Very High | P1 | ✅ Done (modal with slot grid, navigation, compound meters) |
+| Crescendo/decrescendo | Medium | Medium | P2 | ✅ Done (drawHairpins with cross-measure support) |
+| Toolbar redesign | Medium | Medium | P2 | ✅ Done (progressive disclosure, floating palette) |
 
 ### Phase 4: Advanced Features - Status
 
 | Item | Effort | Impact | Priority | Status |
 |------|--------|--------|----------|--------|
-| Repeat signs and endings | Medium | Medium | P2 | ❌ Not started |
-| Grace notes | Medium | Medium | P3 | ❌ Not started |
-| Ornaments | Low | Low | P3 | ❌ Not started |
+| Repeat signs | Medium | Medium | P2 | ✅ Done (start/end/both barlines) |
+| Volta brackets (1st/2nd endings) | Medium | Medium | P2 | ✅ Done (VexFlow + playback) |
+| Grace notes | Medium | Medium | P3 | ✅ Done (acciaccatura/appoggiatura) |
+| Ornaments | Low | Low | P3 | ✅ Done (trill, mordent, turn) |
+| Tempo markings | Low | Medium | P3 | ✅ Done (Allegro, Andante, etc.) |
 | Custom beam groups | High | Low | P3 | ❌ Not started |
 | Lyrics support | Medium | Medium | P3 | ❌ Not started |
+| Pedal markings | Medium | Low | P3 | ⚠️ Data structure exists, no UI |
+| Chord symbols above staff | Medium | Medium | P3 | ✅ Done |
 
-### Revised Priority for Next Steps
+### Remaining Work Summary
 
-Based on completed work, the recommended implementation order is:
+Almost all notation features are now complete! The remaining items are:
 
-**Immediate (P1):**
-1. **Dynamics support** - Medium effort, high impact for expressive notation
-2. **Slurs UI** - Data structure ready, just need click-drag UI and VexFlow rendering
-3. **Verify bass clef ties** - May already work, needs testing
-
-**Short-term (P2):**
-1. **Crescendo/decrescendo** - Complements dynamics
-2. **Measure Isolation Editing** - High-value UX improvement
-
-**Medium-term (P3):**
-1. **Grace notes**
-2. **Ornaments** - Low effort addition to articulation system
-3. **Repeat signs**
+1. **Custom Beam Groups** - Manual beam grouping control
+2. **Lyrics Support** - Text below notes
+3. **Pedal Markings** - UI for existing data structure
 
 ---
 
@@ -708,30 +649,41 @@ export const NotationDebugger = {
 
 ## Conclusion
 
-The Music Theory Lab notation system has a solid foundation with the unit-based subdivision system and VexFlow integration.
+The Music Theory Lab notation system is now feature-complete for professional music composition with comprehensive VexFlow integration.
 
-### Completed Improvements (as of December 30, 2025)
+### ✅ All Major Features Complete (as of January 3, 2026)
 
 1. **Stability**:
-   - ✅ Bass clef shift operations implemented (`insertBassNoteWithShiftAtPosition`)
-   - ✅ parentIndex chain protection added to `setNote()`
+   - ✅ Bass clef shift operations (`insertBassNoteWithShiftAtPosition`)
+   - ✅ parentIndex chain protection in `setNote()`
    - ✅ Multi-voice rest handling with configurable display modes
-   - ⚠️ Cross-measure tie handling documented, needs verification
+   - ✅ Cross-measure tie handling via `drawManualTies()`
 
 2. **User Experience**:
-   - ✅ Toolbar redesigned with progressive disclosure (Tier 1/Tier 2)
+   - ✅ Toolbar with progressive disclosure (Tier 1/Tier 2)
    - ✅ Floating palette with customization and tab-awareness
    - ✅ Entry/Select mode toggle for intuitive workflow
    - ✅ Staff selection with Auto/Treble/Bass modes
-   - ✅ Keyboard shortcuts implemented
+   - ✅ Keyboard shortcuts throughout
+   - ✅ Measure Isolation Editor with pencil overlay, navigation, compound meters
 
-### Remaining Work
+3. **Expressive Notation**:
+   - ✅ Dynamics (pp, p, mp, mf, f, ff, sfz, fp)
+   - ✅ Hairpins (crescendo/decrescendo) with cross-measure support
+   - ✅ Slurs with proper curve positioning
+   - ✅ Ties including cross-measure ties
+   - ✅ Articulations (staccato, accent, tenuto, marcato)
+   - ✅ Ornaments (trill, mordent, turn)
+   - ✅ Grace notes (acciaccatura, appoggiatura)
+   - ✅ Tempo markings (Allegro, Andante, etc.)
+   - ✅ Repeat signs (start, end, both)
+   - ✅ Volta brackets (1st/2nd endings) with playback support
 
-1. **Features**: Add dynamics, slurs UI, and the Measure Isolation Editing feature
-2. **Architecture**: Consider unified APIs for note operations (optional - current split approach is intentional)
-3. **Expressive Notation**: Crescendo/decrescendo, grace notes, ornaments
+### Remaining Minor Features
 
-The **Measure Isolation Editing** feature remains a significant opportunity to improve user confidence when editing compositions. By allowing users to edit measures in isolation with validation before committing, we can eliminate the fear of unintended consequences that currently makes notation editing feel fragile.
+1. **Custom Beam Groups** - Manual beam grouping control
+2. **Lyrics Support** - Text below notes
+3. **Pedal Markings** - UI for existing data structure
 
 ---
 
@@ -739,16 +691,16 @@ The **Measure Isolation Editing** feature remains a significant opportunity to i
 
 | File | Lines | Key Functions |
 |------|-------|---------------|
-| `noteEditor.js` | ~7400 | `insertNoteBeforeSelected()`, `insertNoteAfterSelected()`, `handleStaffClick()`, `insertBassNoteWithShiftAtPosition()` |
+| `noteEditor.js` | ~7400 | `insertNoteBeforeSelected()`, `applyHairpinToSelected()`, `applyOrnamentToSelected()`, `addGraceNoteToSelected()` |
 | `buildingBlock.js` | ~1150 | `setNote()`, `getNotes()`, `renderToMeasures()`, `_computeSlurForPart()` |
-| `compositionState.js` | ~7200 | `insertTrebleNoteWithShift()`, `deleteTrebleNoteWithShift()`, `renderTrebleBlocksToMeasures()`, `renderBassBlocksToMeasures()` |
-| `vexFlowRenderer.js` | ~1400 | `parseNote()`, `getRequiredAccidental()`, `createStaveNote()` |
-| `grandStaff.js` | ~4300 | `fillGapsWithRests()`, voice separation logic, `drawTieCurve()`, `drawPartialTieCurve()` |
-| `notationToolbar.js` | ~2200 | Progressive disclosure UI, floating palette, customization settings |
-| `trainerState.js` | ~650 | `setCurrentKey()`, global training state |
+| `compositionState.js` | ~8400 | `insertTrebleNoteWithShift()`, `addHairpin()`, `addTempoMarking()`, `addRepeatSign()`, `addVoltaBracket()` |
+| `vexFlowRenderer.js` | ~1400 | `parseNote()`, `createStaveNote()`, `createChordNote()` (with dynamics, ornaments, grace notes) |
+| `grandStaff.js` | ~5000 | `drawManualTies()`, `drawHairpins()`, `drawSlurs()`, `drawTempoMarkings()` |
+| `notationToolbar.js` | ~3200 | Progressive disclosure UI, floating palette, dynamics/hairpin/ornament buttons |
+| `MeasureIsolationEditor.js` | ~3900 | Slot grid editing, navigation, compound meters |
 
 ---
 
 *Document generated: December 26, 2025*
-*Last Updated: December 30, 2025*
-*Version: 1.2*
+*Last Updated: January 3, 2026*
+*Version: 2.0 - Feature Complete*

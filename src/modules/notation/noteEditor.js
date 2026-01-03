@@ -4700,6 +4700,41 @@ export class NoteEditor {
     this.composerIntegration.render(true);
   }
 
+  /**
+   * Apply a volta bracket at the current selected measure
+   * @param {string} voltaNumber - '1', '2', or other ending number
+   */
+  applyVoltaBracket(voltaNumber) {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Get the measure index from: 1) selected notes, 2) selected measure, 3) default to 0
+    let measureIndex = 0;
+    if (this.selectedNotes.size > 0) {
+      const firstNoteId = [...this.selectedNotes][0];
+      const [measIdx] = this.parseNoteId(firstNoteId);
+      measureIndex = measIdx;
+    } else if (this.composerIntegration?.selectedMeasure != null) {
+      measureIndex = this.composerIntegration.selectedMeasure;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    // Toggle volta at this measure
+    const result = compositionState.toggleVoltaAtMeasure(measureIndex, voltaNumber);
+
+    if (result) {
+      console.log(`[applyVoltaBracket] Added volta ${voltaNumber} at measure ${measureIndex}`);
+    } else {
+      console.log(`[applyVoltaBracket] Removed volta ${voltaNumber} from measure ${measureIndex}`);
+    }
+
+    this.composerIntegration.render(true);
+  }
+
   // ============================================================================
   // TIES, DOTTED, RESTS
   // ============================================================================
@@ -6917,7 +6952,7 @@ export class NoteEditor {
       bassY = bounds.actualBassY;
     } else {
       // Fallback: calculate positions from measure Y in layout coordinates
-      const systemMarginTop = 20;
+      const systemMarginTop = 30; // Match GRAND_STAFF_DEFAULTS
       const staffHeight = 80;
       const staffSpacing = 80;
       trebleY = bounds.y + systemMarginTop;

@@ -1550,6 +1550,11 @@ export function initEnhancedNotation(options = {}) {
       noteEditor.applyRepeatSign(repeatType);
     };
 
+    // Handle volta bracket application
+    notationComposer.toolbar.onVoltaBracketApply = (voltaNumber) => {
+      noteEditor.applyVoltaBracket(voltaNumber);
+    };
+
     // Handle chord symbol application
     notationComposer.toolbar.onChordSymbolApply = (chordSymbol) => {
       // Find the target chord based on selection priority:

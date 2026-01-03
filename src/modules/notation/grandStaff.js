@@ -152,8 +152,8 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
 export const GRAND_STAFF_DEFAULTS = {
   measureWidth: 252,           // Width of each measure (balanced for 16 sixteenth notes and standard screens)
   staffSpacing: 80,            // Vertical space between staves
-  systemMarginTop: 20,         // Top margin for first system
-  systemMarginBottom: 160,     // Bottom margin (increased for chord brackets + deep bass ledger lines)
+  systemMarginTop: 30,         // Top margin for each system (volta brackets + chord symbols)
+  systemMarginBottom: 60,      // Bottom margin (bass ledger lines + some padding)
   braceWidth: 15,              // Width for the brace
   measurePadding: 10,          // Padding within measures
   clefWidth: 30,               // Width for clef
@@ -2339,6 +2339,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     restDisplayMode = 'clean',      // 'clean' (smart omission) or 'explicit' (show all)
     // Repeat signs
     repeatSign = null,              // 'repeatStart', 'repeatEnd', 'repeatBoth', or null
+    // Volta brackets (1st/2nd endings)
+    voltaType = null,               // { type: 'begin'|'mid'|'end'|'begin_end', number: '1' } or null
   } = options;
 
   const {
@@ -2403,6 +2405,21 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // Add measure number
   if (measureNumber !== null && isFirstInSystem) {
     trebleStave.setMeasure(measureNumber);
+  }
+
+  // Add volta bracket (1st/2nd endings) if present
+  if (voltaType && VF.Volta) {
+    // VexFlow Volta types: NONE=1, BEGIN=2, MID=3, END=4, BEGIN_END=5
+    const voltaTypeMap = {
+      'begin': VF.Volta.type?.BEGIN ?? 2,
+      'mid': VF.Volta.type?.MID ?? 3,
+      'end': VF.Volta.type?.END ?? 4,
+      'begin_end': VF.Volta.type?.BEGIN_END ?? 5,
+    };
+    const vfVoltaType = voltaTypeMap[voltaType.type] || voltaTypeMap['begin'];
+    // Y position: VexFlow Volta y parameter shifts bracket vertically relative to stave's y
+    // Chord symbols now at trebleY+20. Volta at 0 places it at stave top, above chord text.
+    trebleStave.setVoltaType(vfVoltaType, voltaType.number + '.', 0);
   }
 
   // Draw staves
@@ -3161,9 +3178,12 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     // Calculate available width (excluding clef/key/time sig space on first measure in system)
     const noteAreaWidth = isFirstInSystem ? (width - 60) : width; // ~60px for clef/key/time
     const noteAreaStart = isFirstInSystem ? (x + 60) : x;
-    const chordX = noteAreaStart + (noteAreaWidth * beatFraction) + 5;
-    // Position 30px above treble staff, but never go below y=15 to stay on canvas
-    const chordY = Math.max(15, trebleY - 30);
+    const chordX = noteAreaStart + (noteAreaWidth * beatFraction) - 3; // Shift left 3px to avoid note collisions
+    // Position chord symbols immediately above treble staff top line
+    // trebleY is the y parameter passed to VexFlow stave, but VexFlow draws the top staff line
+    // approximately 10-15px below that. trebleY + 20 positions the text baseline closer to staff,
+    // with the 14px font rendering above the baseline, appearing just above the top staff line.
+    const chordY = trebleY + 20;
 
     // Use VexFlow's CanvasContext methods for text rendering
     // Standard notation style: black, serif font, moderate size
@@ -3637,6 +3657,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     tempoMarkings = [],          // Array of tempo marking objects from compositionState
     // Repeat signs
     repeatSigns = [],            // Array of repeat sign objects from compositionState
+    // Volta brackets (1st/2nd endings)
+    voltaBrackets = [],          // Array of volta bracket objects from compositionState
   } = options;
 
   // Calculate dimensions
@@ -4534,6 +4556,25 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     const globalMeasureIndex = globalMeasureOffset + i;
     const measureRepeatSign = repeatSigns.find(rs => rs.measureIndex === globalMeasureIndex);
 
+    // Look up volta bracket for this measure (using global measure index)
+    const measureVolta = voltaBrackets.find(v =>
+      globalMeasureIndex >= v.startMeasure && globalMeasureIndex <= v.endMeasure
+    );
+    let voltaType = null;
+    if (measureVolta) {
+      const isStart = globalMeasureIndex === measureVolta.startMeasure;
+      const isEnd = globalMeasureIndex === measureVolta.endMeasure;
+      if (isStart && isEnd) {
+        voltaType = { type: 'begin_end', number: measureVolta.number };
+      } else if (isStart) {
+        voltaType = { type: 'begin', number: measureVolta.number };
+      } else if (isEnd) {
+        voltaType = { type: 'end', number: measureVolta.number };
+      } else {
+        voltaType = { type: 'mid', number: measureVolta.number };
+      }
+    }
+
     // Render the measure
     const result = renderGrandStaffMeasure(context, measures[i], {
       x,
@@ -4558,6 +4599,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       restDisplayMode,
       // Repeat sign for this measure
       repeatSign: measureRepeatSign?.type || null,
+      // Volta bracket for this measure
+      voltaType,
     });
 
     if (result) {

@@ -421,7 +421,7 @@ export class StaffLayoutManager {
       bassY = measureBounds.actualBassY;
     } else {
       // Fallback: calculate positions (old way)
-      const systemMarginTop = 20;
+      const systemMarginTop = 30; // Match GRAND_STAFF_DEFAULTS
       const staffHeight = 80;
       const staffSpacing = 80;
       trebleY = measureBounds.y + systemMarginTop;
