@@ -110,8 +110,9 @@ const INTERVAL_DEFINITIONS = {
 const CHORD_GROUPS = [
     { title: 'Triads', types: ['Major', 'Minor', 'Augmented', 'Diminished', 'Sus2', 'Sus4', 'Power Chord'] },
     { title: 'Sevenths', types: ['Dominant 7th', 'Major 7th', 'Minor 7th', 'Half-Diminished 7th', 'Diminished 7th', 'Minor-Major 7th'] },
-    { title: 'Ninths', types: ['Major 9th', 'Dominant 9th', 'Minor 9th', '6/9', 'Add9'] },
-    { title: 'Extended', types: ['Dominant 11th', 'Minor 11th', 'Dominant 13th'] },
+    { title: 'Sixths', types: ['Major 6th', 'Minor 6th', '6/9'] },
+    { title: 'Ninths', types: ['Major 9th', 'Dominant 9th', 'Minor 9th', 'Add9'] },
+    { title: 'Extended', types: ['Dominant 11th', 'Minor 11th', 'Dominant 13th', 'Major 7th #11'] },
     { title: 'Altered', types: ['Augmented 7th', '7b5', '7#5', '7b9', '7#9'] },
 ];
 

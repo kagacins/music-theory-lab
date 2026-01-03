@@ -555,47 +555,167 @@ body[data-active-tab="learn"] #main-app > .max-w-7xl.mx-auto {
 }
 
 /* ============================================================================
-   MODERN MODAL BACKDROP - Enhanced blur and overlay
+   MODAL ANIMATIONS - Gentle entrance/exit animations only
    ============================================================================ */
 
-/* Modern modal backdrop with blur */
-.modal-backdrop-blur {
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+/* Backdrop fade-in animation */
+[id$="-modal"]:not(.hidden) {
+    animation: backdrop-fade-in 0.2s ease-out;
 }
 
-/* Modal content container with smooth entrance */
-.modal-content-modern {
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 20px;
-    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.25),
-                0 10px 30px -10px rgba(0, 0, 0, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    animation: modal-enter 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+@keyframes backdrop-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
-@keyframes modal-enter {
-    from {
+/* Modal content scale-in animation with gentle spring effect */
+.modal-content-modern,
+[id$="-modal"] > div:not([class*="fixed"]) {
+    animation: modal-scale-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: center center;
+}
+
+/* Scale-in animation */
+@keyframes modal-scale-in {
+    0% {
         opacity: 0;
         transform: scale(0.95) translateY(10px);
     }
-    to {
+    100% {
         opacity: 1;
         transform: scale(1) translateY(0);
     }
 }
 
-/* Dark variant */
-.modal-content-modern.dark {
-    background: rgba(30, 41, 59, 0.98);
-    border: 1px solid rgba(100, 200, 255, 0.15);
-    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.5),
-                0 10px 30px -10px rgba(0, 0, 0, 0.3),
-                0 0 40px rgba(100, 200, 255, 0.1);
+/* Modal exit animation class (add via JS before hiding) */
+.modal-exit {
+    animation: modal-scale-out 0.15s ease-in forwards;
+}
+
+@keyframes modal-scale-out {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+}
+
+/* ============================================================================
+   STAGGERED ANIMATIONS - Dynamic list and card animations
+   ============================================================================ */
+
+/* Base stagger animation */
+@keyframes stagger-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes stagger-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Chord cards staggered animation */
+.chord-card,
+[data-chord-index],
+.progression-card {
+    animation: stagger-fade-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+/* Stagger delays for first 12 cards */
+.chord-card:nth-child(1), [data-chord-index="0"] { animation-delay: 0ms; }
+.chord-card:nth-child(2), [data-chord-index="1"] { animation-delay: 40ms; }
+.chord-card:nth-child(3), [data-chord-index="2"] { animation-delay: 80ms; }
+.chord-card:nth-child(4), [data-chord-index="3"] { animation-delay: 120ms; }
+.chord-card:nth-child(5), [data-chord-index="4"] { animation-delay: 160ms; }
+.chord-card:nth-child(6), [data-chord-index="5"] { animation-delay: 200ms; }
+.chord-card:nth-child(7), [data-chord-index="6"] { animation-delay: 240ms; }
+.chord-card:nth-child(8), [data-chord-index="7"] { animation-delay: 280ms; }
+.chord-card:nth-child(9), [data-chord-index="8"] { animation-delay: 320ms; }
+.chord-card:nth-child(10), [data-chord-index="9"] { animation-delay: 360ms; }
+.chord-card:nth-child(11), [data-chord-index="10"] { animation-delay: 400ms; }
+.chord-card:nth-child(12), [data-chord-index="11"] { animation-delay: 440ms; }
+
+/* Recommendation items staggered animation */
+.recommendation-item,
+[class*="recommendation"] > div,
+.suggestion-item {
+    animation: stagger-scale-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.recommendation-item:nth-child(1) { animation-delay: 50ms; }
+.recommendation-item:nth-child(2) { animation-delay: 100ms; }
+.recommendation-item:nth-child(3) { animation-delay: 150ms; }
+.recommendation-item:nth-child(4) { animation-delay: 200ms; }
+.recommendation-item:nth-child(5) { animation-delay: 250ms; }
+.recommendation-item:nth-child(6) { animation-delay: 300ms; }
+.recommendation-item:nth-child(7) { animation-delay: 350ms; }
+.recommendation-item:nth-child(8) { animation-delay: 400ms; }
+
+/* List items in modals */
+[id$="-modal"] li,
+[id$="-modal"] .list-item {
+    animation: stagger-fade-in 0.2s ease-out backwards;
+}
+
+[id$="-modal"] li:nth-child(1) { animation-delay: 30ms; }
+[id$="-modal"] li:nth-child(2) { animation-delay: 60ms; }
+[id$="-modal"] li:nth-child(3) { animation-delay: 90ms; }
+[id$="-modal"] li:nth-child(4) { animation-delay: 120ms; }
+[id$="-modal"] li:nth-child(5) { animation-delay: 150ms; }
+[id$="-modal"] li:nth-child(6) { animation-delay: 180ms; }
+
+/* Scale cards hover micro-interaction */
+.scale-card,
+[class*="scale-item"] {
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.scale-card:hover,
+[class*="scale-item"]:hover {
+    transform: translateY(-2px) scale(1.02);
+}
+
+/* Sidebar menu items staggered */
+.sidebar-btn {
+    animation: stagger-fade-in 0.3s ease-out backwards;
+}
+
+.sidebar-btn:nth-child(1) { animation-delay: 50ms; }
+.sidebar-btn:nth-child(2) { animation-delay: 100ms; }
+.sidebar-btn:nth-child(3) { animation-delay: 150ms; }
+.sidebar-btn:nth-child(4) { animation-delay: 200ms; }
+.sidebar-btn:nth-child(5) { animation-delay: 250ms; }
+.sidebar-btn:nth-child(6) { animation-delay: 300ms; }
+.sidebar-btn:nth-child(7) { animation-delay: 350ms; }
+.sidebar-btn:nth-child(8) { animation-delay: 400ms; }
+
+/* Disable stagger animations for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .chord-card,
+    [data-chord-index],
+    .progression-card,
+    .recommendation-item,
+    .suggestion-item,
+    [id$="-modal"] li,
+    .sidebar-btn {
+        animation: none;
+    }
 }
 
 #sidebar h2 {
@@ -1022,9 +1142,8 @@ button:hover:not(:disabled),
     box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.2);
 }
 
-button:active:not(:disabled),
-.key-button:active,
-.panel-toggle:active {
+button:active:not(:disabled):not([id$="-toggle"]),
+.key-button:active {
     transform: translateY(0) scale(0.98);
     transition-duration: 0.08s;
 }
@@ -2287,10 +2406,25 @@ body.compact-mode .compact-show.block {
     scroll-behavior: smooth;
 }
 
-/* Dark Mode Styles */
+/* ============================================================================
+   DARK MODE STYLES - Enhanced 2024+ Refresh
+   Richer colors, stronger glows, better contrast
+   ============================================================================ */
 body.dark-mode {
-    background: #1a1a2e;
-    color: #e0e0e0;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f1f5f9;
+}
+
+/* Dark mode gradient background shimmer effect */
+body.dark-mode::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 20% 30%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(59, 130, 246, 0.06) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
 }
 
 /* Dark mode - update background colors */
@@ -2377,20 +2511,40 @@ body.dark-mode .preset-panel-toolbar {
     background: rgba(22, 33, 62, 0.9) !important;
 }
 
-/* Dark mode - cards */
-body.dark-mode .preset-card {
-    background: #1e2a47 !important;
-    border-color: #2a3f5f !important;
+/* Dark mode - cards with enhanced glow */
+body.dark-mode .preset-card,
+body.dark-mode .chord-card,
+body.dark-mode [data-chord-index] {
+    background: rgba(30, 41, 59, 0.95) !important;
+    border-color: rgba(71, 85, 105, 0.5) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 20px rgba(102, 126, 234, 0.05);
 }
 
-body.dark-mode .preset-card:hover {
-    border-color: #667eea !important;
+body.dark-mode .preset-card:hover,
+body.dark-mode .chord-card:hover,
+body.dark-mode [data-chord-index]:hover {
+    border-color: #818cf8 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 30px rgba(129, 140, 248, 0.2);
+    transform: translateY(-2px);
 }
 
 /* Dark mode - buttons (preserve gradient buttons) */
 body.dark-mode button:not([class*="bg-gradient"]):not([class*="bg-blue"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-indigo"]):not([class*="bg-teal"]):not([class*="bg-orange"]):not([class*="bg-amber"]):not([class*="bg-lime"]) {
-    background: #2a3f5f !important;
-    color: #e0e0e0 !important;
+    background: rgba(51, 65, 85, 0.8) !important;
+    color: #f1f5f9 !important;
+    border: 1px solid rgba(71, 85, 105, 0.5);
+}
+
+/* Dark mode - gradient buttons get stronger glow */
+body.dark-mode button[class*="bg-gradient"]:hover,
+body.dark-mode button[class*="from-"]:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 40px currentColor;
+    filter: brightness(1.1);
+}
+
+/* Dark mode - panel toggles with glow */
+body.dark-mode .panel-toggle:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 30px rgba(129, 140, 248, 0.25) !important;
 }
 
 /* Dark mode - keyboard */

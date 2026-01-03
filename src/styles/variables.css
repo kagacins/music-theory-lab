@@ -273,25 +273,65 @@
 }
 
 /* ============================================
-   DARK MODE OVERRIDES
+   DARK MODE OVERRIDES - Richer, more saturated (2024+ refresh)
    ============================================ */
 [data-theme="dark"],
 .dark {
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-tertiary: #0f3460;
-    --text-primary: #eaeaea;
-    --text-secondary: #a0a0a0;
-    --text-muted: #6b7280;
+    /* Rich, deep backgrounds with slight color tint */
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
 
+    /* Brighter, more readable text */
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+
+    /* Cards with subtle elevation */
     --card-bg: #1e293b;
-    --card-border: #334155;
-    --border-color: #334155;
-    --border-color-dark: #475569;
+    --card-border: #475569;
+    --border-color: #475569;
+    --border-color-dark: #64748b;
 
+    /* Scrollbar styling */
     --scrollbar-track: rgba(255, 255, 255, 0.05);
-    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.25);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
+
+    /* Enhanced shadows with colored glow for dark mode */
+    --shadow-sm: 0 2px 4px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.5), 0 4px 8px -2px rgba(0, 0, 0, 0.35);
+    --shadow-xl: 0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 10px 20px -6px rgba(0, 0, 0, 0.4);
+
+    /* Stronger colored glows for dark mode */
+    --shadow-glow: 0 0 30px rgba(102, 126, 234, 0.5);
+    --shadow-glow-primary: 0 0 30px rgba(139, 92, 246, 0.5);
+    --shadow-glow-amber: 0 0 30px rgba(245, 158, 11, 0.5);
+    --shadow-glow-teal: 0 0 30px rgba(20, 184, 166, 0.5);
+    --shadow-glow-lime: 0 0 30px rgba(132, 204, 22, 0.5);
+    --shadow-glow-blue: 0 0 30px rgba(59, 130, 246, 0.5);
+
+    /* Card shadows with subtle glow */
+    --card-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 0 20px rgba(102, 126, 234, 0.1);
+    --card-shadow-hover: 0 16px 32px -8px rgba(0, 0, 0, 0.5), 0 0 30px rgba(102, 126, 234, 0.15);
+
+    /* Boosted primary colors for dark mode visibility */
+    --color-primary: #a78bfa;
+    --color-primary-light: #c4b5fd;
+    --color-primary-dark: #8b5cf6;
+    --color-secondary: #818cf8;
+    --color-secondary-light: #a5b4fc;
+
+    /* Brighter semantic colors */
+    --color-success: #34d399;
+    --color-success-light: #6ee7b7;
+    --color-warning: #fbbf24;
+    --color-warning-light: #fcd34d;
+    --color-error: #f87171;
+    --color-error-light: #fca5a5;
+    --color-info: #60a5fa;
+    --color-info-light: #93c5fd;
 }
 
 /* ============================================

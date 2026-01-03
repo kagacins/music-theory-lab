@@ -48,7 +48,13 @@ import { renderGrandStaffMeasure } from '../../../notation/grandStaff.js';
 
 // Import from parent modal modules
 import { modalState, MELODY_VIEWS } from './ModalState.js';
-import { getScoreQualityLabel } from './MusicUtils.js';
+import {
+    getScoreQualityLabel,
+    showMelodyScoreTooltip,
+    hideMelodyScoreTooltip,
+    showPhraseScoreTooltip,
+    hidePhraseScoreTooltip
+} from './MusicUtils.js';
 import { updatePersistentProgressionBar } from './StructureBuilders.js';
 
 // ============================================================================
@@ -1225,11 +1231,11 @@ function createPhraseCard(phrase, index, key) {
     if (phraseScoreBadge) {
         phraseScoreBadge.addEventListener('mouseenter', (e) => {
             e.stopPropagation();
-            window.showPhraseScoreTooltip && window.showPhraseScoreTooltip(e, phraseScoreBadge);
+            showPhraseScoreTooltip(e, phraseScoreBadge);
         });
         phraseScoreBadge.addEventListener('mouseleave', (e) => {
             e.stopPropagation();
-            window.hidePhraseScoreTooltip && window.hidePhraseScoreTooltip();
+            hidePhraseScoreTooltip();
         });
     }
 
@@ -1965,11 +1971,11 @@ function createMelodySuggestionItem(suggestion, index, key) {
     if (melodyScoreBadge) {
         melodyScoreBadge.addEventListener('mouseenter', (e) => {
             e.stopPropagation();
-            window.showMelodyScoreTooltip && window.showMelodyScoreTooltip(e, melodyScoreBadge);
+            showMelodyScoreTooltip(e, melodyScoreBadge);
         });
         melodyScoreBadge.addEventListener('mouseleave', (e) => {
             e.stopPropagation();
-            window.hideMelodyScoreTooltip && window.hideMelodyScoreTooltip();
+            hideMelodyScoreTooltip();
         });
     }
 

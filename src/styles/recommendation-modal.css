@@ -130,7 +130,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--rm-space-md) var(--rm-space-lg);
+    padding: var(--rm-space-sm) var(--rm-space-md);
     border-bottom: 1px solid var(--rm-border);
     background: linear-gradient(135deg, var(--rm-primary) 0%, var(--rm-primary-dark) 100%);
     color: white;
@@ -169,12 +169,12 @@
    PROGRESSION BAR - Compact chord display
    ============================================ */
 .rm-progression-bar {
-    padding: 6px 12px;
+    padding: 4px 10px;
     background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
     border-bottom: 1px solid var(--rm-border);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: wrap;
 }
 
@@ -278,12 +278,12 @@
    ============================================ */
 .rm-tabs {
     display: flex;
-    gap: 4px;
-    padding: 6px 8px;
+    gap: 3px;
+    padding: 4px 6px;
     background: #e5e7eb;
     border-bottom: none;
-    border-radius: 8px;
-    margin: 0 12px 0 12px;
+    border-radius: 6px;
+    margin: 0 10px;
     justify-content: stretch;
 }
 
@@ -297,10 +297,10 @@
 
 .rm-tab {
     flex: 1;
-    padding: 8px 12px;
+    padding: 5px 8px;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 5px;
     font-size: var(--rm-font-md);
     font-weight: 500;
     cursor: pointer;
@@ -332,12 +332,12 @@
    CONTEXT BAR - Compact single row
    ============================================ */
 .rm-context-bar {
-    padding: 6px 12px;
+    padding: 4px 10px;
     background: var(--rm-bg-subtle);
     border-bottom: 1px solid var(--rm-border);
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
 }
 
@@ -347,7 +347,7 @@
 .rm-content {
     flex: 1;
     overflow-y: auto;
-    padding: var(--rm-space-md);
+    padding: var(--rm-space-sm) var(--rm-space-md);
     min-height: 350px;
 }
 
@@ -356,8 +356,8 @@
    ============================================ */
 .rm-view-toggle {
     display: flex;
-    gap: var(--rm-space-sm);
-    margin-bottom: var(--rm-space-md);
+    gap: var(--rm-space-xs);
+    margin-bottom: var(--rm-space-sm);
 }
 
 .rm-view-btn {
@@ -389,7 +389,7 @@
 .rm-intent-nav {
     display: flex;
     gap: var(--rm-space-xs);
-    margin-bottom: var(--rm-space-md);
+    margin-bottom: var(--rm-space-sm);
     flex-wrap: wrap;
 }
 
