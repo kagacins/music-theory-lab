@@ -454,21 +454,76 @@ export class SlotGrid {
     }
 
     /**
+     * Check if this is a compound meter (6/8, 9/8, 12/8, etc.)
+     * Compound meters have numerators divisible by 3 (but not 3 itself) and denom of 8
+     * @returns {boolean}
+     */
+    isCompoundMeter() {
+        const { num, denom } = this.timeSignature;
+        // 6/8, 9/8, 12/8 are compound (groups of 3 eighth notes per beat)
+        // 3/8 is simple (3 beats of eighth notes)
+        return denom === 8 && num > 3 && num % 3 === 0;
+    }
+
+    /**
+     * Get the number of slots per "felt" beat for display purposes
+     * In compound meters (6/8, 9/8, 12/8), each felt beat = dotted quarter = 3 eighth notes
+     * In simple meters, each felt beat = quarter note = 2 eighth notes
+     * @returns {number} Slots per felt beat
+     */
+    getSlotsPerFeltBeat() {
+        if (this.isCompoundMeter()) {
+            // Compound: dotted quarter = 1.5 beats = 12 slots
+            return SLOTS_PER_BEAT * 1.5;
+        }
+        // Simple: quarter = 1 beat = 8 slots
+        return SLOTS_PER_BEAT;
+    }
+
+    /**
      * Get beat information for a slot
+     * Handles both simple and compound meters correctly
      * @param {number} slotIndex - Slot index
-     * @returns {Object} { beat, subBeat, isDownbeat, isHalfBeat, isQuarterBeat }
+     * @returns {Object} { beat, subBeat, isDownbeat, isHalfBeat, isQuarterBeat, isTripletBeat }
      */
     getSlotBeatInfo(slotIndex) {
-        const beat = Math.floor(slotIndex / SLOTS_PER_BEAT) + 1;  // 1-indexed for display
-        const subBeat = slotIndex % SLOTS_PER_BEAT;
+        // Get local slot within measure
+        const localSlot = slotIndex % this.slotsPerMeasure;
 
-        return {
-            beat,
-            subBeat,
-            isDownbeat: subBeat === 0,
-            isHalfBeat: subBeat === SLOTS_PER_BEAT / 2,  // 4 for 8 slots/beat
-            isQuarterBeat: subBeat % (SLOTS_PER_BEAT / 4) === 0  // Every 2 slots
-        };
+        if (this.isCompoundMeter()) {
+            // Compound meter (6/8, 9/8, 12/8): group by dotted quarters (12 slots each)
+            const slotsPerFeltBeat = 12;  // dotted quarter = 1.5 * 8 slots
+            const feltBeat = Math.floor(localSlot / slotsPerFeltBeat) + 1;
+            const subBeat = localSlot % slotsPerFeltBeat;
+
+            // In compound, each felt beat divides into 3 equal parts (triplet feel)
+            // Each part = 4 slots (eighth note)
+            const eighthNoteSlots = 4;  // 8th note = 0.5 beat = 4 slots
+
+            return {
+                beat: feltBeat,
+                subBeat,
+                isDownbeat: subBeat === 0,  // Start of felt beat (dotted quarter)
+                isHalfBeat: false,  // Not meaningful in compound time
+                isQuarterBeat: subBeat % eighthNoteSlots === 0,  // Each eighth note
+                isTripletBeat: subBeat % eighthNoteSlots === 0 && subBeat !== 0,  // 2nd and 3rd eighth of triplet group
+                isCompound: true
+            };
+        } else {
+            // Simple meter: original behavior
+            const beat = Math.floor(slotIndex / SLOTS_PER_BEAT) + 1;  // 1-indexed for display
+            const subBeat = slotIndex % SLOTS_PER_BEAT;
+
+            return {
+                beat,
+                subBeat,
+                isDownbeat: subBeat === 0,
+                isHalfBeat: subBeat === SLOTS_PER_BEAT / 2,  // 4 for 8 slots/beat
+                isQuarterBeat: subBeat % (SLOTS_PER_BEAT / 4) === 0,  // Every 2 slots
+                isTripletBeat: false,
+                isCompound: false
+            };
+        }
     }
 
     /**

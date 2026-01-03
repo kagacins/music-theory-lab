@@ -88,6 +88,8 @@ export class NotationComposer {
     this.selectedMeasureIndex = -1;   // Blue border for selected measure
     this.activeMeasureIndex = -1;     // Yellow background for playing measure
     this.activeNotes = new Set();     // Note IDs for red highlighting during playback
+    this.hoveredMeasureIndex = -1;    // Track hovered measure for edit icon overlay
+    this.measureEditOverlay = null;   // DOM element for measure edit icon
 
     // Playback cursor state
     this.playbackCursor = null;       // { measureIndex, beat } for vertical cursor line
@@ -2556,11 +2558,32 @@ export class NotationComposer {
     if (hoveredRegion && !hoveredRegion.isRest && hoveredRegion.analysis && hoveredRegion.analysis.tooltip) {
       // Use document.body to avoid overflow clipping issues
       showNoteTooltip(document.body, hoveredRegion.analysis, e.clientX, e.clientY);
+      this.hideMeasureEditOverlay(); // Hide edit icon when showing tooltip
       return;
     }
 
     // Hide tooltip when not over a note
     hideNoteTooltip();
+
+    // Check if mouse is over a measure for edit icon
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(x, y);
+    if (staffPosition && staffPosition.measure) {
+      // Apply section filter offset for correct global index
+      const filterOffset = this.getMeasureFilterOffset();
+      const globalMeasureIndex = staffPosition.measure.index + filterOffset;
+
+      // Only update if measure changed
+      if (globalMeasureIndex !== this.hoveredMeasureIndex) {
+        // Position at top-right corner of the measure
+        const measureBounds = staffPosition.measure;
+        const measureRight = rect.left + measureBounds.x + measureBounds.width;
+        const measureTop = rect.top + measureBounds.y;
+        this.showMeasureEditOverlay(measureRight - 5, measureTop + 5, globalMeasureIndex);
+      }
+    } else {
+      // Use delayed hide to allow mouse to reach the overlay
+      this.scheduleMeasureEditOverlayHide();
+    }
   }
 
   /**
@@ -2568,6 +2591,145 @@ export class NotationComposer {
    */
   handleMouseLeave() {
     hideNoteTooltip();
+    this.scheduleMeasureEditOverlayHide();
+  }
+
+  /**
+   * Handle canvas mouse leave specifically
+   */
+  handleCanvasMouseLeave() {
+    hideNoteTooltip();
+    // Delay hiding to allow user to move mouse to the overlay
+    this.scheduleMeasureEditOverlayHide();
+  }
+
+  /**
+   * Schedule hiding the measure edit overlay with a delay
+   * This allows the user to move their mouse from the canvas to the overlay
+   */
+  scheduleMeasureEditOverlayHide() {
+    // Clear any existing hide timer
+    if (this.measureEditHideTimer) {
+      clearTimeout(this.measureEditHideTimer);
+    }
+    // Set a short delay before hiding
+    this.measureEditHideTimer = setTimeout(() => {
+      if (!this.isMouseOverEditOverlay) {
+        this.hideMeasureEditOverlay();
+      }
+    }, 150);
+  }
+
+  /**
+   * Create the measure edit overlay icon (lazy initialization)
+   */
+  createMeasureEditOverlay() {
+    if (this.measureEditOverlay) return this.measureEditOverlay;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'measure-edit-overlay';
+    overlay.className = 'measure-edit-overlay';
+    overlay.innerHTML = `
+      <button class="measure-edit-btn" title="Edit this measure (double-click also works)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+      </button>
+    `;
+    overlay.style.cssText = `
+      position: fixed;
+      z-index: 1000;
+      pointer-events: auto;
+      display: none;
+      padding: 4px;
+    `;
+
+    // Track when mouse is over the overlay to prevent hiding
+    overlay.addEventListener('mouseenter', () => {
+      this.isMouseOverEditOverlay = true;
+      if (this.measureEditHideTimer) {
+        clearTimeout(this.measureEditHideTimer);
+        this.measureEditHideTimer = null;
+      }
+    });
+    overlay.addEventListener('mouseleave', () => {
+      this.isMouseOverEditOverlay = false;
+      this.scheduleMeasureEditOverlayHide();
+    });
+
+    // Style the button
+    const btn = overlay.querySelector('.measure-edit-btn');
+    btn.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: 2px solid white;
+      border-radius: 6px;
+      cursor: pointer;
+      color: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: transform 0.15s, box-shadow 0.15s;
+    `;
+
+    btn.addEventListener('mouseenter', () => {
+      btn.style.transform = 'scale(1.1)';
+      btn.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.4)';
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.transform = 'scale(1)';
+      btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    });
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const measureIndex = this.hoveredMeasureIndex;
+      console.log('[MeasureEditOverlay] Click - measureIndex:', measureIndex);
+      if (measureIndex >= 0 && window.openMeasureIsolationEditor) {
+        this.hideMeasureEditOverlay(true); // preserve index until function called
+        window.openMeasureIsolationEditor(measureIndex);
+        this.hoveredMeasureIndex = -1; // now reset
+      } else {
+        console.warn('[MeasureEditOverlay] Click failed - measureIndex:', measureIndex, 'hasFunction:', !!window.openMeasureIsolationEditor);
+      }
+    });
+
+    document.body.appendChild(overlay);
+    this.measureEditOverlay = overlay;
+    return overlay;
+  }
+
+  /**
+   * Show the measure edit overlay at a specific position
+   * @param {number} x - X position (client coordinates)
+   * @param {number} y - Y position (client coordinates)
+   * @param {number} measureIndex - Global measure index
+   */
+  showMeasureEditOverlay(x, y, measureIndex) {
+    const overlay = this.createMeasureEditOverlay();
+    this.hoveredMeasureIndex = measureIndex;
+
+    // Position the overlay - offset slightly to bottom-right of the measure
+    overlay.style.left = `${x - 14}px`;
+    overlay.style.top = `${y - 14}px`;
+    overlay.style.display = 'block';
+  }
+
+  /**
+   * Hide the measure edit overlay
+   * @param {boolean} preserveIndex - If true, don't reset hoveredMeasureIndex (used when clicking)
+   */
+  hideMeasureEditOverlay(preserveIndex = false) {
+    if (this.measureEditOverlay) {
+      this.measureEditOverlay.style.display = 'none';
+    }
+    if (!preserveIndex) {
+      this.hoveredMeasureIndex = -1;
+    }
   }
 
   /**

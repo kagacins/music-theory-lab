@@ -5925,7 +5925,7 @@ function createSimplifiedCardHTML(chord, index, key) {
             </div>
 
             <!-- Duration controls (dangling below card) -->
-            <div class="flex items-center justify-center gap-1 mt-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-xs">
+            <div class="flex items-center justify-center gap-1 mt-1 px-2 py-1 rounded-md text-xs" style="background: #1a1a2e; border: 1px solid #2a2a4e;">
                 <span class="text-gray-300 text-[10px]">Dur:</span>
                 <select class="duration-whole-select bg-gray-800 text-white border border-gray-600 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" title="Whole beats" data-card-index="${index}">
                     ${[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map(n =>

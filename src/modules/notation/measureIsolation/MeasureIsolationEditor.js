@@ -156,13 +156,13 @@ export class MeasureIsolationEditor {
         this.currentVoice = 0;  // 0 or 1
 
         // Mode state: Alt-based switching with optional sticky toggle
-        // When noteEntryModeSticky is OFF (default):
+        // When noteEntryModeSticky is OFF:
         //   - Normal click = Select mode
         //   - Alt+Click = Note Entry mode
-        // When noteEntryModeSticky is ON:
+        // When noteEntryModeSticky is ON (default):
         //   - Normal click = Note Entry mode
         //   - Alt+Click = Select mode (inverted)
-        this.noteEntryModeSticky = false;  // The toggle state
+        this.noteEntryModeSticky = true;  // The toggle state - default ON for easier note entry
         this.isAltPressed = false;         // Tracks Alt key state for ghost note
 
         // Multi-selection state (replaces single selectedNote for multi-measure)
@@ -296,8 +296,14 @@ export class MeasureIsolationEditor {
                         <button class="mie-acc-btn px-2 py-1 border rounded hover:bg-gray-200" data-accidental="b" title="Flat (F)">♭</button>
                     </div>
 
-                    <!-- Rest mode -->
-                    <button id="mie-rest-btn" class="px-3 py-1.5 border rounded hover:bg-gray-200 text-lg" title="Rest Mode (R)">𝄽</button>
+                    <!-- Rest mode toggle -->
+                    <div class="flex items-center gap-1">
+                        <span class="text-xs text-gray-500 mr-1">Mode:</span>
+                        <button id="mie-rest-btn" class="px-3 py-1.5 border rounded hover:bg-amber-100 text-lg flex items-center gap-1" title="Toggle Rest Mode (R)">
+                            <span class="text-base">𝄽</span>
+                            <span class="text-xs font-medium">Rest</span>
+                        </button>
+                    </div>
 
                     <!-- Voice selector -->
                     <div class="flex items-center gap-1">
@@ -314,16 +320,16 @@ export class MeasureIsolationEditor {
                 <div class="px-4 py-2 bg-gray-50 border-b flex items-center gap-6">
                     <!-- Sticky Entry Mode Toggle -->
                     <div class="flex items-center gap-2 ml-auto">
-                        <span class="text-xs text-gray-500" title="When ON, default is Entry mode. When OFF, hold Alt for Entry mode.">Entry Mode:</span>
+                        <span class="text-xs text-gray-500" title="When ON, click to add notes. When OFF, hold Alt to add notes.">Entry Mode:</span>
                         <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="mie-sticky-toggle" class="sr-only peer">
+                            <input type="checkbox" id="mie-sticky-toggle" class="sr-only peer" checked>
                             <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer
                                         peer-checked:after:translate-x-full peer-checked:after:border-white
                                         after:content-[''] after:absolute after:top-[2px] after:left-[2px]
                                         after:bg-white after:border-gray-300 after:border after:rounded-full
                                         after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
                         </label>
-                        <span id="mie-sticky-status" class="text-xs text-gray-500">Hold Alt</span>
+                        <span id="mie-sticky-status" class="text-xs text-gray-500">Click to Add</span>
                     </div>
                     <!-- Previous/Next Measure Toggles -->
                     <div class="flex items-center gap-2 ml-4 pl-4 border-l border-gray-300">
@@ -341,10 +347,10 @@ export class MeasureIsolationEditor {
 
                 <!-- Instructions -->
                 <div class="px-4 py-2 bg-blue-50 text-sm text-blue-800 border-b">
-                    <strong>Select Mode</strong> (default): click notes to select.
-                    <strong>Hold <kbd class="px-1 bg-white rounded">Alt</kbd></strong> for Entry Mode (click to add notes).
+                    <strong>Click to add notes</strong> at the selected duration.
+                    <strong>Hold <kbd class="px-1 bg-white rounded">Alt</kbd></strong> to select existing notes.
                     When selected: <kbd class="px-1 bg-white rounded">←→</kbd> move, <kbd class="px-1 bg-white rounded">↑↓</kbd> transpose, <kbd class="px-1 bg-white rounded">1-6</kbd> duration, <kbd class="px-1 bg-white rounded">S/F/N/K</kbd> accidentals, <kbd class="px-1 bg-white rounded">R</kbd> rest, <kbd class="px-1 bg-white rounded">Del</kbd> delete.
-                    <kbd class="px-1 bg-white rounded">.</kbd> dotted, <kbd class="px-1 bg-white rounded">Space</kbd> play.
+                    <kbd class="px-1 bg-white rounded">.</kbd> dotted, <kbd class="px-1 bg-white rounded">Space</kbd> play, <kbd class="px-1 bg-white rounded">Ctrl+←→</kbd> prev/next measure.
                 </div>
 
                 <!-- Main Content: The two staves -->
@@ -524,6 +530,9 @@ export class MeasureIsolationEditor {
             this._reloadMeasures();
         });
 
+        // Note: Measure navigation buttons are now created dynamically in _updateMeasureNumbers()
+        // and their listeners are attached in _attachNavigationButtonListeners()
+
         // Keyboard shortcuts - use document level handler since canvas clicks don't maintain focus
         // Store the bound handler so we can remove it later
         // Use capture phase (true) to intercept events BEFORE they reach other handlers
@@ -700,12 +709,18 @@ export class MeasureIsolationEditor {
             }
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            if (this.selectedNote) {
+            if (e.ctrlKey || e.metaKey) {
+                // Ctrl+Left: navigate to previous measure
+                this._navigateToPreviousMeasure();
+            } else if (this.selectedNote) {
                 this._moveSelectedNoteHorizontally(-1);  // Move left one slot
             }
         } else if (e.key === 'ArrowRight') {
             e.preventDefault();
-            if (this.selectedNote) {
+            if (e.ctrlKey || e.metaKey) {
+                // Ctrl+Right: navigate to next measure
+                this._navigateToNextMeasure();
+            } else if (this.selectedNote) {
                 this._moveSelectedNoteHorizontally(1);  // Move right one slot
             }
         } else if (e.key === 't' || e.key === 'T') {
@@ -1594,7 +1609,7 @@ export class MeasureIsolationEditor {
     _updateStickyToggleStatus() {
         const statusEl = this.modal.querySelector('#mie-sticky-status');
         if (statusEl) {
-            statusEl.textContent = this.noteEntryModeSticky ? 'Always On' : 'Hold Alt';
+            statusEl.textContent = this.noteEntryModeSticky ? 'Click to Add' : 'Hold Alt';
         }
     }
 
@@ -1687,6 +1702,8 @@ export class MeasureIsolationEditor {
         if (prevCheckbox) prevCheckbox.checked = false;
         if (nextCheckbox) nextCheckbox.checked = false;
         this._updatePrevNextToggles();
+
+        // Note: Navigation buttons are created in _updateMeasureNumbers() which runs after canvas init
 
         // Show modal
         this.modal.classList.remove('hidden');
@@ -2455,9 +2472,11 @@ export class MeasureIsolationEditor {
 
     /**
      * Draw vertical slot grid lines
+     * Handles both simple and compound meters with appropriate beat groupings
      */
     _drawSlotGrid(ctx) {
         const totalSlots = this.slotGrid.totalSlots;
+        const isCompound = this.slotGrid.isCompoundMeter();
 
         for (let s = 0; s <= totalSlots; s++) {
             const x = this.START_X + (s * this.SLOT_WIDTH);
@@ -2465,13 +2484,20 @@ export class MeasureIsolationEditor {
 
             // Different styles for beat markers - DARKER colors
             if (beatInfo.isDownbeat) {
-                ctx.strokeStyle = '#6b7280';  // Darker gray for downbeats
+                ctx.strokeStyle = '#6b7280';  // Darker gray for downbeats (felt beats)
                 ctx.lineWidth = 1.5;
-            } else if (beatInfo.isHalfBeat) {
-                ctx.strokeStyle = '#9ca3af';  // Medium gray for half beats
+            } else if (isCompound && beatInfo.isTripletBeat) {
+                // In compound meter, show triplet divisions (eighth notes) more prominently
+                ctx.strokeStyle = '#9ca3af';  // Medium gray for triplet eighth notes
                 ctx.lineWidth = 1;
+            } else if (!isCompound && beatInfo.isHalfBeat) {
+                ctx.strokeStyle = '#9ca3af';  // Medium gray for half beats (simple meter)
+                ctx.lineWidth = 1;
+            } else if (beatInfo.isQuarterBeat) {
+                ctx.strokeStyle = '#c9cdd4';  // Lighter gray for subdivisions
+                ctx.lineWidth = 0.75;
             } else {
-                ctx.strokeStyle = '#d1d5db';  // Light gray for subdivisions
+                ctx.strokeStyle = '#d1d5db';  // Light gray for fine subdivisions
                 ctx.lineWidth = 0.5;
             }
 
@@ -2490,13 +2516,12 @@ export class MeasureIsolationEditor {
                 ctx.fillStyle = '#1f2937';  // Dark gray
                 ctx.font = 'bold 12px Arial';
 
-                // Calculate beat number relative to measure (restart at 1 for each measure)
-                const slotsPerMeasure = this.slotGrid.slotsPerMeasure;
-                const localSlot = s % slotsPerMeasure;
-                const localBeat = Math.floor(localSlot / SLOTS_PER_BEAT) + 1;
+                // For compound meters, use felt beat numbers (1, 2 for 6/8; 1, 2, 3 for 9/8; etc.)
+                // For simple meters, use quarter note beat numbers
+                const beatNumber = beatInfo.beat;
 
                 // Offset to the right to avoid overlap with bar lines
-                ctx.fillText(localBeat.toString(), x + 8, 18);
+                ctx.fillText(beatNumber.toString(), x + 8, 18);
             }
         }
     }
@@ -3469,6 +3494,64 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Navigate to the previous measure
+     * Saves current changes first, then loads the previous measure
+     */
+    _navigateToPreviousMeasure() {
+        if (this.centerMeasureIndex <= 0) return;
+
+        // Apply current changes before navigating
+        this._applyChangesToCompositionState();
+
+        // Move to previous measure
+        this.centerMeasureIndex--;
+        this.measureIndex = this.centerMeasureIndex;
+
+        // Clear selection
+        this.selectedNote = null;
+
+        // Reload with new center measure
+        this._reloadMeasures();
+        this._updateNavigationButtons();
+        this._updateStatus(`Navigated to Measure ${this.centerMeasureIndex + 1}`);
+    }
+
+    /**
+     * Navigate to the next measure
+     * Saves current changes first, then loads the next measure
+     */
+    _navigateToNextMeasure() {
+        const totalMeasures = this.compositionState?.measures?.length || 0;
+        if (this.centerMeasureIndex >= totalMeasures - 1) return;
+
+        // Apply current changes before navigating
+        this._applyChangesToCompositionState();
+
+        // Move to next measure
+        this.centerMeasureIndex++;
+        this.measureIndex = this.centerMeasureIndex;
+
+        // Clear selection
+        this.selectedNote = null;
+
+        // Reload with new center measure
+        this._reloadMeasures();
+        this._updateNavigationButtons();
+        this._updateStatus(`Navigated to Measure ${this.centerMeasureIndex + 1}`);
+    }
+
+    /**
+     * Update the enabled/disabled state of navigation buttons
+     * Since buttons are now part of measure numbers HTML, this just updates measure numbers
+     */
+    _updateNavigationButtons() {
+        // Navigation buttons are now embedded in measure numbers, so refresh them
+        this._updateMeasureNumbers();
+        // Also update prev/next checkboxes as the new center measure changes context
+        this._updatePrevNextToggles();
+    }
+
+    /**
      * Reload measures when Previous/Next toggles change
      * Re-creates the SlotGrid and re-renders
      */
@@ -3522,6 +3605,7 @@ export class MeasureIsolationEditor {
     /**
      * Update the measure numbers display above the staves
      * Shows measure numbers with visual distinction for selected vs prev/next
+     * Includes navigation arrows flanking the center measure pill
      */
     _updateMeasureNumbers() {
         const container = this.modal?.querySelector('#mie-measure-numbers');
@@ -3555,13 +3639,10 @@ export class MeasureIsolationEditor {
         const startX = this.START_X || 100;
         container.style.marginLeft = `${startX}px`;
 
-        console.log('[MIE] Updating measure numbers:', {
-            measureIndices,
-            measureWidth,
-            SLOT_WIDTH: this.SLOT_WIDTH,
-            START_X: startX,
-            centerMeasureIndex: this.centerMeasureIndex
-        });
+        // Check navigation button states
+        const totalMeasures = this.compositionState?.measures?.length || 0;
+        const canGoPrev = this.centerMeasureIndex > 0;
+        const canGoNext = this.centerMeasureIndex < totalMeasures - 1;
 
         // Build measure number labels
         let html = '';
@@ -3573,21 +3654,71 @@ export class MeasureIsolationEditor {
             const bgClass = isCenter
                 ? 'bg-indigo-600 text-white'
                 : 'bg-gray-300 text-gray-700';
-            const label = isCenter
-                ? `Measure ${measureNum}`
-                : (measureIndex < this.centerMeasureIndex ? `← M${measureNum}` : `M${measureNum} →`);
 
-            html += `
-                <div class="flex-shrink-0 text-center" style="width: ${measureWidth}px;">
-                    <span class="inline-block px-4 py-1.5 rounded-full text-sm font-bold ${bgClass} shadow-sm">
-                        ${label}
-                    </span>
-                </div>
-            `;
+            if (isCenter) {
+                // Center measure with navigation arrows
+                const prevBtnClass = canGoPrev
+                    ? 'hover:bg-indigo-100 text-indigo-600 cursor-pointer'
+                    : 'text-gray-300 cursor-not-allowed';
+                const nextBtnClass = canGoNext
+                    ? 'hover:bg-indigo-100 text-indigo-600 cursor-pointer'
+                    : 'text-gray-300 cursor-not-allowed';
+
+                html += `
+                    <div class="flex-shrink-0 flex items-center justify-center gap-2" style="width: ${measureWidth}px;">
+                        <button id="mie-prev-measure-btn"
+                                class="p-1.5 rounded-full transition-colors ${prevBtnClass}"
+                                title="Previous Measure (Ctrl+←)"
+                                ${canGoPrev ? '' : 'disabled'}>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
+                        <span class="inline-block px-4 py-1.5 rounded-full text-sm font-bold ${bgClass} shadow-sm">
+                            Measure ${measureNum}
+                        </span>
+                        <button id="mie-next-measure-btn"
+                                class="p-1.5 rounded-full transition-colors ${nextBtnClass}"
+                                title="Next Measure (Ctrl+→)"
+                                ${canGoNext ? '' : 'disabled'}>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Non-center measure (prev/next context)
+                const label = measureIndex < this.centerMeasureIndex ? `← M${measureNum}` : `M${measureNum} →`;
+                html += `
+                    <div class="flex-shrink-0 text-center" style="width: ${measureWidth}px;">
+                        <span class="inline-block px-4 py-1.5 rounded-full text-sm font-bold ${bgClass} shadow-sm">
+                            ${label}
+                        </span>
+                    </div>
+                `;
+            }
         });
 
         container.innerHTML = html;
-        console.log('[MIE] Measure numbers HTML set:', html.substring(0, 200) + '...');
+
+        // Re-attach event listeners to the newly created buttons
+        this._attachNavigationButtonListeners();
+    }
+
+    /**
+     * Attach click listeners to navigation buttons (called after updating measure numbers)
+     */
+    _attachNavigationButtonListeners() {
+        const prevBtn = this.modal?.querySelector('#mie-prev-measure-btn');
+        const nextBtn = this.modal?.querySelector('#mie-next-measure-btn');
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => this._navigateToPreviousMeasure());
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => this._navigateToNextMeasure());
+        }
     }
 
     /**
@@ -3650,11 +3781,11 @@ export class MeasureIsolationEditor {
     }
 
     /**
-     * Apply changes and close
+     * Apply changes to composition state without closing the modal
+     * Used when navigating between measures to save before switching
      */
-    apply() {
+    _applyChangesToCompositionState() {
         if (!this.slotGrid || this.centerMeasureIndex === null) {
-            this.cancel();
             return;
         }
 
@@ -3677,19 +3808,32 @@ export class MeasureIsolationEditor {
                 // Update notation
                 measure.notation.treble = editedNotation.treble;
                 measure.notation.bass = editedNotation.bass;
-
-                console.log('[MeasureIsolationEditor] Applied changes to measure', measureIndex);
             }
         });
 
-        console.log('[MeasureIsolationEditor] Applied changes to measures:', measureIndices);
+        // Trigger refresh of notation display (without closing modal)
+        if (this.onApplyCallback) {
+            this.onApplyCallback();
+        }
+    }
+
+    /**
+     * Apply changes and close
+     */
+    apply() {
+        if (!this.slotGrid || this.centerMeasureIndex === null) {
+            this.cancel();
+            return;
+        }
+
+        // Apply changes
+        this._applyChangesToCompositionState();
+
+        console.log('[MeasureIsolationEditor] Applied changes and closing');
 
         // Close modal
         this.modal.classList.add('hidden');
         this.slotGrid = null;
-
-        // Callback triggers refresh
-        this.onApplyCallback();
     }
 }
 
