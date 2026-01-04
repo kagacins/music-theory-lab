@@ -20,8 +20,11 @@ import { pitchToLine } from '../staffLayouter.js';
 import { KEY_SIGNATURES, noteToMidi, CLEF_RANGES } from '../vexFlowRenderer.js';
 import { getPiano, getAudioIsReady, initAudio } from '../../audio/audioEngine.js';
 import { getCurrentTempo } from '../../audio/melodyGenerator.js';
-import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../../analysis/chordToneAnalyzer.js';
+import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS, getChordTones } from '../../analysis/chordToneAnalyzer.js';
+import { CHORD_DEFINITIONS } from '../../../data/music-data.js';
+import { scoreVoiceLeadingQuick, analyzeSopranoContour, detectParallelMotion, detectVoiceCrossing, checkTendencyToneResolution } from '../../features/enhancedVoiceLeading.js';
 import { showToast } from '../../ui/toastNotifications.js';
+import { generateBuildingBlockBass, BASS_PATTERN_OCTAVE_DEFAULTS } from '../../integration/bassAutoFill.js';
 
 // VexFlow globals (loaded via CDN)
 const VF = typeof Vex !== 'undefined' ? Vex.Flow : null;
@@ -156,13 +159,13 @@ export class MeasureIsolationEditor {
         this.currentVoice = 0;  // 0 or 1
 
         // Mode state: Alt-based switching with optional sticky toggle
-        // When noteEntryModeSticky is OFF:
+        // When noteEntryModeSticky is OFF (default):
         //   - Normal click = Select mode
         //   - Alt+Click = Note Entry mode
-        // When noteEntryModeSticky is ON (default):
+        // When noteEntryModeSticky is ON:
         //   - Normal click = Note Entry mode
         //   - Alt+Click = Select mode (inverted)
-        this.noteEntryModeSticky = true;  // The toggle state - default ON for easier note entry
+        this.noteEntryModeSticky = false;  // The toggle state - default OFF for safer editing
         this.isAltPressed = false;         // Tracks Alt key state for ghost note
 
         // Multi-selection state (replaces single selectedNote for multi-measure)
@@ -177,6 +180,13 @@ export class MeasureIsolationEditor {
         // Track last mouse position for each clef (to restore ghost note when Alt is pressed)
         this.lastMousePosition = { treble: null, bass: null };  // { x, y, slotIndex, pitch }
 
+        // Smart Suggestions panel state
+        this.suggestionsPanelExpanded = true;  // Panel expanded by default
+        this.focusedClef = 'treble';           // Track which clef user is interacting with
+
+        // Musical context hints state (leading tone arrows, etc.)
+        this.showMusicalHints = true;          // Show musical context hints by default
+
         // Canvas and rendering
         this.trebleCanvas = null;
         this.bassCanvas = null;
@@ -184,7 +194,7 @@ export class MeasureIsolationEditor {
         // Layout constants matching VexFlow
         this.BASE_MEASURE_WIDTH = 900; // Width per measure (excluding clef/key sig area)
         this.STAFF_WIDTH = 1000;       // Total canvas width (dynamically updated for multi-measure)
-        this.TREBLE_CANVAS_HEIGHT = 110; // Treble: room above for ledger lines, less below
+        this.TREBLE_CANVAS_HEIGHT = 135; // Treble: room above for 8va brackets, room below for 8vb brackets
         this.BASS_CANVAS_HEIGHT = 140;   // Bass: less above, more room below for low notes
         this.CANVAS_HEIGHT = 140;      // Legacy fallback
         this.SLOT_WIDTH = null;        // Calculated based on time signature
@@ -343,6 +353,23 @@ export class MeasureIsolationEditor {
                             <span class="text-sm text-gray-700">Next</span>
                         </label>
                     </div>
+                    <!-- Musical Hints Toggle & Legend -->
+                    <div class="flex items-center gap-2 ml-4 pl-4 border-l border-gray-300">
+                        <div class="flex items-center gap-1.5" title="Show tendency tone hints (leading tones, tritones, chord tones, etc.)">
+                            <span class="text-xs text-gray-600">Hints</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="mie-show-hints" class="sr-only peer" checked>
+                                <div class="w-8 h-4 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer
+                                            peer-checked:after:translate-x-full peer-checked:after:border-white
+                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                            after:bg-white after:border-gray-300 after:border after:rounded-full
+                                            after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-500"></div>
+                            </label>
+                        </div>
+                        <button id="mie-hints-legend-btn" class="px-2 py-0.5 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition-colors" title="View hint legend">
+                            <span class="font-medium">?</span> Legend
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Instructions -->
@@ -351,6 +378,238 @@ export class MeasureIsolationEditor {
                     <strong>Hold <kbd class="px-1 bg-white rounded">Alt</kbd></strong> to select existing notes.
                     When selected: <kbd class="px-1 bg-white rounded">←→</kbd> move, <kbd class="px-1 bg-white rounded">↑↓</kbd> transpose, <kbd class="px-1 bg-white rounded">1-6</kbd> duration, <kbd class="px-1 bg-white rounded">S/F/N/K</kbd> accidentals, <kbd class="px-1 bg-white rounded">R</kbd> rest, <kbd class="px-1 bg-white rounded">Del</kbd> delete.
                     <kbd class="px-1 bg-white rounded">.</kbd> dotted, <kbd class="px-1 bg-white rounded">Space</kbd> play, <kbd class="px-1 bg-white rounded">Ctrl+←→</kbd> prev/next measure.
+                </div>
+
+                <!-- Smart Suggestions Panel -->
+                <div id="mie-suggestions-panel" class="border-b bg-gradient-to-r from-purple-50 to-indigo-50">
+                    <!-- Collapsible Header -->
+                    <div id="mie-suggestions-header" class="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-purple-100/50 transition-colors">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                            <span class="text-sm font-semibold text-purple-800">Smart Suggestions</span>
+                            <span id="mie-suggestions-chord-context" class="text-xs text-purple-600 font-medium px-2 py-0.5 bg-white/60 rounded-full"></span>
+                        </div>
+                        <button id="mie-suggestions-toggle" class="p-1 hover:bg-purple-200/50 rounded transition-colors" title="Toggle suggestions panel">
+                            <svg id="mie-suggestions-chevron" class="w-4 h-4 text-purple-600 transform rotate-0 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Collapsible Content -->
+                    <div id="mie-suggestions-content" class="px-4 pb-3">
+                        <div class="flex flex-wrap gap-4">
+                            <!-- Chord Tones Section -->
+                            <div class="flex-shrink-0">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                    Chord Tones
+                                </div>
+                                <div id="mie-chord-tones" class="flex gap-1 flex-wrap">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Scale Tones Section -->
+                            <div class="flex-shrink-0">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                                    Scale Tones
+                                </div>
+                                <div id="mie-scale-tones" class="flex gap-1 flex-wrap">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Tensions/Extensions Section -->
+                            <div id="mie-tensions-section" class="flex-shrink-0">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                                    Tensions
+                                </div>
+                                <div id="mie-tensions" class="flex gap-1 flex-wrap">
+                                    <!-- Populated dynamically -->
+                                </div>
+                                <div id="mie-select-note-hint" class="text-xs text-gray-400 italic mt-1">
+                                    Select a note to see next note suggestions →
+                                </div>
+                            </div>
+
+                            <!-- Bass Patterns Section (shown when bass clef is focused) -->
+                            <div id="mie-bass-patterns-section" class="flex-shrink-0 hidden">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                    Bass Patterns
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <select id="mie-bass-pattern-select" class="text-xs border rounded px-2 py-1 bg-white" style="max-width: 140px;">
+                                        <optgroup label="─── Basic ───">
+                                            <option value="whole-note">Whole Note</option>
+                                            <option value="root-fifth">Root-Fifth</option>
+                                            <option value="pedal">Pedal Point</option>
+                                        </optgroup>
+                                        <optgroup label="─── Arpeggiated ───">
+                                            <option value="arpeggio">Arpeggio (Quarter)</option>
+                                            <option value="arpeggio-8th">Arpeggio (8th)</option>
+                                            <option value="alberti">Alberti</option>
+                                            <option value="tremolo">Tremolo</option>
+                                        </optgroup>
+                                        <optgroup label="─── Walking & Jazz ───">
+                                            <option value="walking">Walking Bass</option>
+                                            <option value="bebop">Bebop</option>
+                                            <option value="shell-voicing">Shell Voicing</option>
+                                            <option value="chromatic-approach">Chromatic Approach</option>
+                                            <option value="scalar-walk">Scalar Walk</option>
+                                        </optgroup>
+                                        <optgroup label="─── Stride & Piano ───">
+                                            <option value="stride">Stride</option>
+                                            <option value="arpeggio-stride">Arpeggio Stride</option>
+                                            <option value="ballad-stride">Ballad Stride</option>
+                                            <option value="ragtime">Ragtime</option>
+                                            <option value="tenths">Tenths</option>
+                                        </optgroup>
+                                        <optgroup label="─── Boogie & Blues ───">
+                                            <option value="boogie">Boogie</option>
+                                            <option value="boogie-woogie">Boogie-Woogie</option>
+                                            <option value="shuffle">Shuffle</option>
+                                        </optgroup>
+                                        <optgroup label="─── Rock & Pop ───">
+                                            <option value="driving-rock">Driving Rock</option>
+                                            <option value="power-chord">Power Chord</option>
+                                            <option value="rock-power">Rock Power</option>
+                                            <option value="disco-octave">Disco Octave</option>
+                                            <option value="motown">Motown</option>
+                                            <option value="funk">Funk</option>
+                                        </optgroup>
+                                        <optgroup label="─── Latin & World ───">
+                                            <option value="bossa-nova">Bossa Nova</option>
+                                            <option value="tango">Tango</option>
+                                            <option value="montuno">Montuno</option>
+                                            <option value="reggae">Reggae</option>
+                                            <option value="habanera">Habanera</option>
+                                        </optgroup>
+                                        <optgroup label="─── Country & Folk ───">
+                                            <option value="country">Country</option>
+                                            <option value="ballad">Ballad</option>
+                                            <option value="waltz">Waltz</option>
+                                        </optgroup>
+                                        <optgroup label="─── Classical & Hymn ───">
+                                            <option value="hymn">Hymn Style</option>
+                                            <option value="romantic">Romantic</option>
+                                            <option value="counterpoint">Counterpoint</option>
+                                            <option value="lament">Lament (Descending)</option>
+                                            <option value="descant">Descant</option>
+                                        </optgroup>
+                                        <optgroup label="─── Gospel & Soul ───">
+                                            <option value="gospel">Gospel</option>
+                                            <option value="gospel-run">Gospel Run</option>
+                                        </optgroup>
+                                        <optgroup label="─── Rhythmic ───">
+                                            <option value="syncopated">Syncopated</option>
+                                            <option value="dotted-rhythm">Dotted Rhythm</option>
+                                            <option value="anticipation">Anticipation</option>
+                                            <option value="half-time">Half-Time</option>
+                                            <option value="staccato">Staccato</option>
+                                        </optgroup>
+                                        <optgroup label="─── Polyphonic ───">
+                                            <option value="broken-octave">Broken Octave</option>
+                                            <option value="octave-doubling">Octave Doubling</option>
+                                            <option value="open-fifth">Open Fifth</option>
+                                        </optgroup>
+                                        <optgroup label="─── Special ───">
+                                            <option value="ostinato">Ostinato</option>
+                                            <option value="call-response">Call & Response</option>
+                                            <option value="call-answer">Call & Answer</option>
+                                            <option value="comp">Comp (Jazz)</option>
+                                        </optgroup>
+                                    </select>
+                                    <button id="mie-apply-bass-pattern" class="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
+                                        Apply
+                                    </button>
+                                </div>
+
+                                <!-- Bass Voice Leading Hints (approach notes to next chord) -->
+                                <div id="mie-bass-voice-leading" class="mt-2 pt-2 border-t border-gray-200">
+                                    <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                                        Approach Notes
+                                    </div>
+                                    <div id="mie-bass-approach-notes" class="flex gap-1 flex-wrap text-xs">
+                                        <!-- Populated dynamically with approach note suggestions -->
+                                    </div>
+                                </div>
+
+                                <!-- Contrary Motion Helper -->
+                                <div id="mie-contrary-motion" class="mt-2 pt-2 border-t border-gray-200">
+                                    <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+                                        <svg class="w-3 h-3 rotate-180" fill="currentColor" viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+                                        Contrary Motion
+                                    </div>
+                                    <div id="mie-contrary-motion-hint" class="text-xs text-gray-600">
+                                        <!-- Shows contrary motion suggestions based on melody -->
+                                    </div>
+                                </div>
+
+                                <!-- Common Bass Progressions -->
+                                <div id="mie-common-bass-progressions" class="mt-2 pt-2 border-t border-gray-200">
+                                    <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                        Common Patterns
+                                    </div>
+                                    <div id="mie-bass-progression-hints" class="text-xs text-gray-600">
+                                        <!-- Shows common bass line patterns for this chord progression -->
+                                    </div>
+                                </div>
+
+                                <!-- Bass Role & Range Guide -->
+                                <div id="mie-bass-tips" class="mt-2 pt-2 border-t border-gray-200">
+                                    <div id="mie-bass-role-indicator" class="text-xs text-gray-600 mb-1">
+                                        <!-- Shows bass role warnings like "Avoid doubling 3rd" -->
+                                    </div>
+                                    <div id="mie-bass-range-guide" class="text-xs text-gray-500">
+                                        <!-- Shows bass range guidance -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Next Note Suggestions Section (shown when a note is selected) -->
+                            <div id="mie-next-note-section" class="flex-shrink-0 hidden">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                                    Next Note <span class="text-gray-400 font-normal">(Tab to accept)</span>
+                                </div>
+                                <div id="mie-next-note-suggestions" class="flex gap-1 flex-wrap">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Melodic Pattern Section (shows contour analysis and suggestions) -->
+                            <div id="mie-melodic-pattern-section" class="flex-shrink-0">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+                                    Melody Pattern
+                                    <span id="mie-contour-indicator" class="text-gray-400 font-normal"></span>
+                                </div>
+                                <div id="mie-melodic-patterns" class="flex gap-1 flex-wrap">
+                                    <!-- Populated dynamically with pattern suggestions -->
+                                </div>
+                            </div>
+
+                            <!-- Rest Suggestions Section -->
+                            <div id="mie-rest-suggestions-section" class="flex-shrink-0 mt-2 pt-2 border-t border-gray-200">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <span class="text-lg leading-none">𝄽</span>
+                                    Rest Suggestions
+                                </div>
+                                <div id="mie-rest-suggestions" class="text-xs text-gray-600">
+                                    <!-- Populated dynamically with rest placement suggestions -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Main Content: The two staves -->
@@ -404,6 +663,151 @@ export class MeasureIsolationEditor {
                     <div class="flex gap-2">
                         <button id="mie-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
                         <button id="mie-apply-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Apply Changes</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Musical Hints Legend Modal -->
+            <div id="mie-hints-legend-modal" class="hidden absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden max-h-[90vh] flex flex-col">
+                    <div class="px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between flex-shrink-0">
+                        <h3 class="font-semibold">Musical Context Hints</h3>
+                        <button id="mie-legend-close-btn" class="p-1 hover:bg-white/20 rounded transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-4 space-y-2 overflow-y-auto flex-1">
+                        <p class="text-sm text-gray-600 mb-3">These hints appear on notes to help you make informed compositional decisions:</p>
+
+                        <!-- Section: Tendency Tones -->
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-2 mb-1">Tendency Tones</div>
+
+                        <!-- Leading Tone -->
+                        <div class="flex items-center gap-2 p-1.5 bg-red-50 rounded border border-red-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded border border-red-300 whitespace-nowrap">→ C</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-red-800 text-xs">Leading Tone</span>
+                                <span class="text-[10px] text-red-600 ml-1">– resolves up to tonic (e.g., B → C)</span>
+                            </div>
+                        </div>
+
+                        <!-- Chord 7th -->
+                        <div class="flex items-center gap-2 p-1.5 bg-purple-50 rounded border border-purple-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-purple-100 text-purple-700 rounded border border-purple-300 whitespace-nowrap">7↓</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-purple-800 text-xs">Chord 7th</span>
+                                <span class="text-[10px] text-purple-600 ml-1">– typically resolves down by step</span>
+                            </div>
+                        </div>
+
+                        <!-- Tritone -->
+                        <div class="flex items-center gap-2 p-1.5 bg-red-50 rounded border border-red-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded border border-red-300 whitespace-nowrap">⟷</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-red-800 text-xs">Tritone</span>
+                                <span class="text-[10px] text-red-600 ml-1">– unstable, resolve inward or outward</span>
+                            </div>
+                        </div>
+
+                        <!-- Scale Degree 4 -->
+                        <div class="flex items-center gap-2 p-1.5 bg-amber-50 rounded border border-amber-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded border border-amber-300 whitespace-nowrap">↓ E</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-amber-800 text-xs">Scale Degree 4</span>
+                                <span class="text-[10px] text-amber-600 ml-1">– often resolves down to 3rd</span>
+                            </div>
+                        </div>
+
+                        <!-- Suspension -->
+                        <div class="flex items-center gap-2 p-1.5 bg-amber-50 rounded border border-amber-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded border border-amber-300 whitespace-nowrap">4→3</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-amber-800 text-xs">Suspension</span>
+                                <span class="text-[10px] text-amber-600 ml-1">– resolve 4 down to 3</span>
+                            </div>
+                        </div>
+
+                        <!-- Section: Minor Key -->
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3 mb-1">Minor Key Hints</div>
+
+                        <!-- Raised 6th -->
+                        <div class="flex items-center gap-2 p-1.5 bg-cyan-50 rounded border border-cyan-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cyan-100 text-cyan-700 rounded border border-cyan-300 whitespace-nowrap">↑ G#</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-cyan-800 text-xs">Raised 6th</span>
+                                <span class="text-[10px] text-cyan-600 ml-1">– continue up (melodic minor)</span>
+                            </div>
+                        </div>
+
+                        <!-- Subtonic -->
+                        <div class="flex items-center gap-2 p-1.5 bg-cyan-50 rounded border border-cyan-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cyan-100 text-cyan-700 rounded border border-cyan-300 whitespace-nowrap">↓ F</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-cyan-800 text-xs">Subtonic (♭7)</span>
+                                <span class="text-[10px] text-cyan-600 ml-1">– descend (natural minor)</span>
+                            </div>
+                        </div>
+
+                        <!-- Section: Approach Notes -->
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3 mb-1">Approach Notes</div>
+
+                        <!-- Chromatic Approach -->
+                        <div class="flex items-center gap-2 p-1.5 bg-emerald-50 rounded border border-emerald-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded border border-emerald-300 whitespace-nowrap">↑ E</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-emerald-800 text-xs">Chromatic Approach</span>
+                                <span class="text-[10px] text-emerald-600 ml-1">– half step to chord tone</span>
+                            </div>
+                        </div>
+
+                        <!-- Section: Chord Tones -->
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3 mb-1">Chord Tone Functions</div>
+
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <!-- Root -->
+                            <div class="flex items-center gap-1.5 p-1.5 bg-green-50 rounded border border-green-200">
+                                <span class="px-1.5 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded border border-green-300">R</span>
+                                <span class="font-medium text-green-800 text-[10px]">Root</span>
+                            </div>
+                            <!-- 3rd -->
+                            <div class="flex items-center gap-1.5 p-1.5 bg-blue-50 rounded border border-blue-200">
+                                <span class="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded border border-blue-300">3rd</span>
+                                <span class="font-medium text-blue-800 text-[10px]">Third</span>
+                            </div>
+                            <!-- 5th -->
+                            <div class="flex items-center gap-1.5 p-1.5 bg-slate-50 rounded border border-slate-200">
+                                <span class="px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded border border-slate-300">5th</span>
+                                <span class="font-medium text-slate-800 text-[10px]">Fifth</span>
+                            </div>
+                        </div>
+
+                        <!-- Section: Color Notes -->
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3 mb-1">Color Notes</div>
+
+                        <!-- Blue Notes -->
+                        <div class="flex items-center gap-2 p-1.5 bg-purple-50 rounded border border-purple-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-purple-100 text-purple-700 rounded border border-purple-300 whitespace-nowrap">♭3 / ♭7</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-purple-800 text-xs">Blue Notes</span>
+                                <span class="text-[10px] text-purple-600 ml-1">– adds blues/jazz color</span>
+                            </div>
+                        </div>
+
+                        <!-- Section: Non-Chord Tones -->
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3 mb-1">Non-Chord Tones</div>
+
+                        <!-- NCT -->
+                        <div class="flex items-center gap-2 p-1.5 bg-gray-50 rounded border border-gray-200">
+                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-gray-200 text-gray-700 rounded border border-gray-300 whitespace-nowrap">NCT</span>
+                            <div class="flex-1 min-w-0">
+                                <span class="font-medium text-gray-800 text-xs">Non-Chord Tone</span>
+                                <span class="text-[10px] text-gray-600 ml-1">– consider resolving to chord tone</span>
+                            </div>
+                        </div>
+
+                        <p class="text-[10px] text-gray-500 mt-3 pt-2 border-t">Tip: Use the Hints toggle to show/hide these annotations.</p>
                     </div>
                 </div>
             </div>
@@ -530,6 +934,29 @@ export class MeasureIsolationEditor {
             this._reloadMeasures();
         });
 
+        // Musical hints toggle
+        this.modal.querySelector('#mie-show-hints')?.addEventListener('change', (e) => {
+            this.showMusicalHints = e.target.checked;
+            this._renderStaves();  // Re-render to show/hide hints
+        });
+
+        // Musical hints legend button
+        this.modal.querySelector('#mie-hints-legend-btn')?.addEventListener('click', () => {
+            this._showHintsLegend();
+        });
+
+        // Legend modal close button
+        this.modal.querySelector('#mie-legend-close-btn')?.addEventListener('click', () => {
+            this._hideHintsLegend();
+        });
+
+        // Close legend when clicking backdrop
+        this.modal.querySelector('#mie-hints-legend-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'mie-hints-legend-modal') {
+                this._hideHintsLegend();
+            }
+        });
+
         // Note: Measure navigation buttons are now created dynamically in _updateMeasureNumbers()
         // and their listeners are attached in _attachNavigationButtonListeners()
 
@@ -562,6 +989,24 @@ export class MeasureIsolationEditor {
             if (e.target === this.modal) {
                 this.cancel();
             }
+        });
+
+        // Smart Suggestions Panel: collapse/expand
+        const suggestionsHeader = this.modal.querySelector('#mie-suggestions-header');
+        const suggestionsToggle = this.modal.querySelector('#mie-suggestions-toggle');
+        if (suggestionsHeader) {
+            suggestionsHeader.addEventListener('click', () => this._toggleSuggestionsPanel());
+        }
+        if (suggestionsToggle) {
+            suggestionsToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._toggleSuggestionsPanel();
+            });
+        }
+
+        // Bass pattern apply button
+        this.modal.querySelector('#mie-apply-bass-pattern')?.addEventListener('click', () => {
+            this._applyBassPattern();
         });
     }
 
@@ -727,6 +1172,10 @@ export class MeasureIsolationEditor {
             e.preventDefault();
             // Toggle tie on selected notes (works with multi-selection)
             this._toggleTieOnSelected();
+        } else if (e.key === 'Tab') {
+            // Tab: accept top next note suggestion (always prevent default to avoid opening rec modal)
+            e.preventDefault();
+            this._handleTabForNextNote();
         }
     }
 
@@ -841,6 +1290,1451 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Toggle the Smart Suggestions panel expanded/collapsed
+     */
+    _toggleSuggestionsPanel() {
+        this.suggestionsPanelExpanded = !this.suggestionsPanelExpanded;
+        const content = this.modal.querySelector('#mie-suggestions-content');
+        const chevron = this.modal.querySelector('#mie-suggestions-chevron');
+
+        if (content) {
+            content.classList.toggle('hidden', !this.suggestionsPanelExpanded);
+        }
+        if (chevron) {
+            chevron.classList.toggle('rotate-180', !this.suggestionsPanelExpanded);
+        }
+    }
+
+    /**
+     * Get chord degree labels (1, 3, 5, 7, etc.) for chord tones
+     * Maps chord intervals to their traditional degree names
+     * @param {object} chord - Chord object with type
+     * @returns {string[]} Array of degree labels corresponding to chord tones
+     */
+    _getChordDegrees(chord) {
+        // Map interval to degree label
+        const INTERVAL_TO_DEGREE = {
+            0: '1',    // Root
+            2: '2',    // Major 2nd (sus2)
+            3: 'b3',   // Minor 3rd
+            4: '3',    // Major 3rd
+            5: '4',    // Perfect 4th (sus4)
+            6: 'b5',   // Diminished 5th
+            7: '5',    // Perfect 5th
+            8: '#5',   // Augmented 5th
+            9: '6',    // Major 6th
+            10: 'b7',  // Minor 7th (dominant)
+            11: '7',   // Major 7th
+            14: '9',   // 9th (octave + 2nd)
+            17: '11',  // 11th (octave + 4th)
+            18: '#11', // Augmented 11th
+            21: '13',  // 13th (octave + 6th)
+        };
+
+        const chordDef = CHORD_DEFINITIONS[chord.type];
+        if (!chordDef?.intervals) return [];
+
+        return chordDef.intervals.map(interval => INTERVAL_TO_DEGREE[interval] || String(interval));
+    }
+
+    /**
+     * Get scale degree labels for scale tones
+     * @param {string[]} scaleTones - Array of scale tone note names
+     * @param {string} keyRoot - Root of the key
+     * @returns {string[]} Array of degree labels (1, 2, 3, 4, 5, 6, 7)
+     */
+    _getScaleDegrees(scaleTones, keyRoot) {
+        const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const ENHARMONIC_MAP = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
+        // Normalize key root
+        let normalizedRoot = keyRoot;
+        if (ENHARMONIC_MAP[keyRoot]) {
+            normalizedRoot = ENHARMONIC_MAP[keyRoot];
+        }
+        const rootIndex = ALL_NOTES.indexOf(normalizedRoot);
+        if (rootIndex === -1) return scaleTones.map(() => '');
+
+        // Scale degrees in semitones from root (for major scale)
+        const MAJOR_SCALE_DEGREES = {
+            0: '1', 2: '2', 4: '3', 5: '4', 7: '5', 9: '6', 11: '7'
+        };
+
+        return scaleTones.map(tone => {
+            let normalizedTone = tone;
+            if (ENHARMONIC_MAP[tone]) {
+                normalizedTone = ENHARMONIC_MAP[tone];
+            }
+            const toneIndex = ALL_NOTES.indexOf(normalizedTone);
+            if (toneIndex === -1) return '';
+
+            const interval = (toneIndex - rootIndex + 12) % 12;
+            return MAJOR_SCALE_DEGREES[interval] || String(interval);
+        });
+    }
+
+    /**
+     * Update the Smart Suggestions panel based on current chord context
+     */
+    _updateSuggestionsPanel() {
+        if (!this.measureChord) return;
+
+        const chord = this.measureChord;
+        const key = this.currentKey || 'C';
+
+        // Update chord context display
+        const contextEl = this.modal.querySelector('#mie-suggestions-chord-context');
+        if (contextEl) {
+            contextEl.textContent = `${chord.root} ${chord.type || 'Major'}`;
+        }
+
+        // Get chord tones and scale tones
+        const chordTones = getChordTones(chord);
+
+        // Detect if key is minor and get appropriate scale tones
+        const isMinorKey = /m$|min$|Minor$/i.test(key);
+        const keyRoot = key.replace(/m$|maj$|min$|Major$|Minor$/i, '');
+        const scaleTones = this._getScaleTonesForKey(keyRoot, isMinorKey);
+
+        // Filter scale tones to exclude chord tones (show only non-chord scale tones)
+        // Also keep track of which scale degrees are excluded
+        const nonChordScaleTones = [];
+        const nonChordScaleDegrees = [];
+        const allScaleDegrees = this._getScaleDegrees(scaleTones, keyRoot);
+
+        // Must compare full pitch names including accidentals (C# != C)
+        const ENHARMONIC = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+        scaleTones.forEach((tone, index) => {
+            const toneNorm = ENHARMONIC[tone] || tone;
+            const isChordTone = chordTones.some(ct => {
+                const ctNorm = ENHARMONIC[ct] || ct;
+                return ctNorm === toneNorm;
+            });
+            if (!isChordTone) {
+                nonChordScaleTones.push(tone);
+                nonChordScaleDegrees.push(allScaleDegrees[index]);
+            }
+        });
+
+        // Get chord degrees for display
+        const chordDegrees = this._getChordDegrees(chord);
+
+        // Render chord tone buttons with degree info
+        this._renderToneButtons('mie-chord-tones', chordTones, 'chord', { degrees: chordDegrees });
+
+        // Render scale tone buttons with degree info
+        this._renderToneButtons('mie-scale-tones', nonChordScaleTones, 'scale', { degrees: nonChordScaleDegrees });
+
+        // Get and render tension buttons
+        const tensions = this._getAvailableTensions(chord);
+        this._renderTensionButtons('mie-tensions', tensions, chord.root);
+
+        // Show/hide bass patterns section based on focused clef
+        const bassPatternsSection = this.modal.querySelector('#mie-bass-patterns-section');
+        if (bassPatternsSection) {
+            bassPatternsSection.classList.toggle('hidden', this.focusedClef !== 'bass');
+        }
+
+        // Update bass-specific hints when bass clef is focused
+        if (this.focusedClef === 'bass') {
+            this._updateBassHints();
+        }
+
+        // Update rest suggestions for both clefs
+        this._renderRestSuggestions();
+    }
+
+    /**
+     * Update bass-specific hints: approach notes, role indicators, range guide
+     */
+    _updateBassHints() {
+        const chord = this.measureChord;
+        if (!chord) return;
+
+        // Get next chord for approach note suggestions
+        const nextChord = this.nextMeasureChord;
+
+        // Update approach notes section
+        this._renderBassApproachNotes(chord, nextChord);
+
+        // Update contrary motion helper
+        this._renderContraryMotionHint();
+
+        // Update common bass progressions
+        this._renderCommonBassProgressions(chord, nextChord);
+
+        // Update bass role indicator
+        this._renderBassRoleIndicator(chord);
+
+        // Update bass range guide
+        this._renderBassRangeGuide();
+    }
+
+    /**
+     * Render bass approach notes - suggests notes that lead smoothly to the next chord's root
+     */
+    _renderBassApproachNotes(currentChord, nextChord) {
+        const container = this.modal.querySelector('#mie-bass-approach-notes');
+        if (!container) return;
+
+        if (!nextChord || !nextChord.root) {
+            container.innerHTML = '<span class="text-gray-400 italic">Last measure - no next chord</span>';
+            return;
+        }
+
+        const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const ENHARMONIC_MAP = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
+        // Get the next chord's root (target)
+        let nextRoot = nextChord.root;
+        if (ENHARMONIC_MAP[nextRoot]) {
+            nextRoot = ENHARMONIC_MAP[nextRoot];
+        }
+        const targetIndex = ALL_NOTES.indexOf(nextRoot);
+        if (targetIndex === -1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        // Calculate approach notes
+        const approaches = [];
+
+        // Half-step below (leading tone approach)
+        const halfStepBelow = ALL_NOTES[(targetIndex - 1 + 12) % 12];
+        approaches.push({
+            note: halfStepBelow,
+            label: `↑${nextChord.root}`,
+            type: 'chromatic',
+            description: 'Half-step below (leading tone)'
+        });
+
+        // Half-step above (chromatic approach from above)
+        const halfStepAbove = ALL_NOTES[(targetIndex + 1) % 12];
+        approaches.push({
+            note: halfStepAbove,
+            label: `↓${nextChord.root}`,
+            type: 'chromatic',
+            description: 'Half-step above'
+        });
+
+        // Fifth above (dominant approach)
+        const fifthAbove = ALL_NOTES[(targetIndex + 7) % 12];
+        approaches.push({
+            note: fifthAbove,
+            label: `V→I`,
+            type: 'dominant',
+            description: 'Fifth above (dominant motion)'
+        });
+
+        // Whole-step below (scale degree approach)
+        const wholeStepBelow = ALL_NOTES[(targetIndex - 2 + 12) % 12];
+        approaches.push({
+            note: wholeStepBelow,
+            label: `2↑`,
+            type: 'scale',
+            description: 'Whole-step below'
+        });
+
+        // Render approach note buttons
+        container.innerHTML = approaches.map(approach => {
+            const colorClass = approach.type === 'chromatic' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                              approach.type === 'dominant' ? 'bg-amber-100 text-amber-700 border-amber-300' :
+                              'bg-blue-100 text-blue-700 border-blue-300';
+            return `
+                <button class="px-2 py-1 rounded border ${colorClass} hover:opacity-80 transition-opacity"
+                        onclick="window.mieInstance && window.mieInstance._playAndPlaceNote('${approach.note}2')"
+                        title="${approach.description} → ${nextChord.root}">
+                    <span class="font-medium">${approach.note}</span>
+                    <span class="text-[10px] opacity-70">${approach.label}</span>
+                </button>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Render contrary motion hint based on melody direction
+     * Suggests moving bass in opposite direction to melody for good voice leading
+     */
+    _renderContraryMotionHint() {
+        const container = this.modal.querySelector('#mie-contrary-motion-hint');
+        if (!container) return;
+
+        // Get melody notes from treble clef
+        const trebleNotes = this._getNotesInClef('treble');
+
+        if (trebleNotes.length < 2) {
+            container.innerHTML = '<span class="text-gray-400 italic">Add 2+ melody notes to see contrary motion suggestions</span>';
+            return;
+        }
+
+        // Analyze melody direction (look at last few notes)
+        const recentNotes = trebleNotes.slice(-3); // Last 3 notes
+        const melodyDirection = this._analyzeMelodyDirection(recentNotes);
+
+        // Get chord tones for suggestions
+        const chord = this.measureChord;
+        const chordTones = chord ? getChordTones(chord) : [];
+
+        let suggestion = '';
+        let buttonHtml = '';
+
+        if (melodyDirection === 'ascending') {
+            suggestion = `<span class="text-blue-600">↑ Melody rising → <span class="font-medium">move bass ↓</span></span>`;
+            // Suggest descending bass notes (lower octave options)
+            const descendingOptions = chordTones.map(tone => ({
+                note: tone,
+                pitch: `${tone}2`,
+                label: '↓'
+            }));
+            buttonHtml = descendingOptions.map(opt => `
+                <button class="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200"
+                        onclick="window.mieInstance && window.mieInstance._playAndPlaceNote('${opt.pitch}')"
+                        title="Play ${opt.note} (contrary motion down)">
+                    ${opt.note}${opt.label}
+                </button>
+            `).join('');
+        } else if (melodyDirection === 'descending') {
+            suggestion = `<span class="text-green-600">↓ Melody falling → <span class="font-medium">move bass ↑</span></span>`;
+            // Suggest ascending bass notes (higher octave options)
+            const ascendingOptions = chordTones.map(tone => ({
+                note: tone,
+                pitch: `${tone}3`,
+                label: '↑'
+            }));
+            buttonHtml = ascendingOptions.map(opt => `
+                <button class="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 border border-green-300 rounded hover:bg-green-200"
+                        onclick="window.mieInstance && window.mieInstance._playAndPlaceNote('${opt.pitch}')"
+                        title="Play ${opt.note} (contrary motion up)">
+                    ${opt.note}${opt.label}
+                </button>
+            `).join('');
+        } else {
+            suggestion = '<span class="text-gray-500">○ Melody static → bass can move freely</span>';
+        }
+
+        container.innerHTML = `
+            <div class="mb-1">${suggestion}</div>
+            ${buttonHtml ? `<div class="flex gap-1 flex-wrap">${buttonHtml}</div>` : ''}
+        `;
+    }
+
+    /**
+     * Analyze melody direction from recent notes
+     * @param {Array} notes - Array of note objects with pitches
+     * @returns {string} 'ascending', 'descending', or 'static'
+     */
+    _analyzeMelodyDirection(notes) {
+        if (notes.length < 2) return 'static';
+
+        // Get MIDI values for comparison
+        let totalDirection = 0;
+        for (let i = 1; i < notes.length; i++) {
+            const prevPitch = notes[i - 1].pitches?.[0] || notes[i - 1].pitch;
+            const currPitch = notes[i].pitches?.[0] || notes[i].pitch;
+
+            if (!prevPitch || !currPitch) continue;
+
+            const prevMidi = noteToMidi(prevPitch);
+            const currMidi = noteToMidi(currPitch);
+
+            if (currMidi > prevMidi) totalDirection++;
+            else if (currMidi < prevMidi) totalDirection--;
+        }
+
+        if (totalDirection > 0) return 'ascending';
+        if (totalDirection < 0) return 'descending';
+        return 'static';
+    }
+
+    /**
+     * Get notes from a specific clef in the current measure
+     * @param {string} clef - 'treble' or 'bass'
+     * @returns {Array} Array of note objects
+     */
+    _getNotesInClef(clef) {
+        if (!this.slotGrid) return [];
+
+        const notes = [];
+        const totalSlots = this.slotGrid.totalSlots;
+
+        for (let i = 0; i < totalSlots; i++) {
+            const slot = this.slotGrid.getSlot(clef, 0, i);
+            if (slot && slot.type === SLOT_TYPES.NOTE_START && slot.pitches && slot.pitches.length > 0) {
+                notes.push({
+                    slotIndex: i,
+                    pitches: slot.pitches,
+                    pitch: slot.pitches[0],
+                    duration: slot.duration
+                });
+            }
+        }
+
+        return notes;
+    }
+
+    /**
+     * Render common bass progression patterns based on current and next chord
+     */
+    _renderCommonBassProgressions(currentChord, nextChord) {
+        const container = this.modal.querySelector('#mie-bass-progression-hints');
+        if (!container) return;
+
+        const patterns = [];
+
+        // Get interval between current and next chord roots
+        if (nextChord && nextChord.root) {
+            const interval = this._getIntervalBetweenRoots(currentChord.root, nextChord.root);
+
+            // Suggest patterns based on the harmonic motion
+            if (interval === 5 || interval === 7) {
+                // Perfect 4th/5th motion (most common)
+                patterns.push({
+                    name: 'V-I Motion',
+                    description: `Strong bass: ${currentChord.root}→${nextChord.root}`,
+                    icon: '⬇',
+                    color: 'emerald'
+                });
+                patterns.push({
+                    name: 'Walking',
+                    description: 'Fill with passing tones',
+                    icon: '🚶',
+                    color: 'blue'
+                });
+            } else if (interval === 2 || interval === 10) {
+                // Step motion (ascending/descending)
+                patterns.push({
+                    name: 'Stepwise',
+                    description: `Smooth: ${currentChord.root}→${nextChord.root}`,
+                    icon: '➡',
+                    color: 'blue'
+                });
+            } else if (interval === 3 || interval === 4 || interval === 8 || interval === 9) {
+                // Third motion
+                patterns.push({
+                    name: '3rd Motion',
+                    description: 'Consider passing tone',
+                    icon: '↗',
+                    color: 'purple'
+                });
+            } else if (interval === 0) {
+                // Same chord
+                patterns.push({
+                    name: 'Pedal',
+                    description: 'Hold root or octave leap',
+                    icon: '⏸',
+                    color: 'gray'
+                });
+            }
+        }
+
+        // Add generic suggestions based on current chord
+        const chordType = currentChord.type || 'Major';
+        if (chordType.includes('7') || chordType.includes('Dominant')) {
+            patterns.push({
+                name: 'Dominant',
+                description: 'Strong resolution expected',
+                icon: '⚡',
+                color: 'amber'
+            });
+        }
+
+        if (patterns.length === 0) {
+            patterns.push({
+                name: 'Root-5th',
+                description: 'Classic bass foundation',
+                icon: '🎵',
+                color: 'indigo'
+            });
+        }
+
+        // Render pattern hints
+        container.innerHTML = patterns.map(p => {
+            const colorClasses = {
+                emerald: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+                blue: 'bg-blue-100 text-blue-700 border-blue-300',
+                purple: 'bg-purple-100 text-purple-700 border-purple-300',
+                amber: 'bg-amber-100 text-amber-700 border-amber-300',
+                gray: 'bg-gray-100 text-gray-700 border-gray-300',
+                indigo: 'bg-indigo-100 text-indigo-700 border-indigo-300'
+            };
+            return `
+                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded border ${colorClasses[p.color] || colorClasses.gray}" title="${p.description}">
+                    <span>${p.icon}</span>
+                    <span class="font-medium">${p.name}</span>
+                </div>
+            `;
+        }).join(' ');
+    }
+
+    /**
+     * Get semitone interval between two note roots
+     */
+    _getIntervalBetweenRoots(root1, root2) {
+        const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const ENHARMONIC_MAP = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
+        let n1 = root1;
+        let n2 = root2;
+        if (ENHARMONIC_MAP[n1]) n1 = ENHARMONIC_MAP[n1];
+        if (ENHARMONIC_MAP[n2]) n2 = ENHARMONIC_MAP[n2];
+
+        const idx1 = ALL_NOTES.indexOf(n1);
+        const idx2 = ALL_NOTES.indexOf(n2);
+
+        if (idx1 === -1 || idx2 === -1) return 0;
+
+        return (idx2 - idx1 + 12) % 12;
+    }
+
+    /**
+     * Render rest suggestions based on musical context
+     * Suggests where rests might improve phrasing, breathing, or rhythmic interest
+     */
+    _renderRestSuggestions() {
+        const container = this.modal.querySelector('#mie-rest-suggestions');
+        if (!container) return;
+
+        const clef = this.focusedClef;
+        const notes = this._getNotesInClef(clef);
+        const beatsPerMeasure = this.beatsPerMeasure || 4;
+        const totalSlots = this.slotGrid?.totalSlots || 16;
+
+        const suggestions = [];
+
+        // Check fill status
+        const filledSlots = this._countFilledSlots(clef);
+        const fillPercentage = (filledSlots / totalSlots) * 100;
+
+        // Suggestion 1: If measure is very full, suggest adding rhythmic variety with rests
+        if (fillPercentage > 80) {
+            suggestions.push({
+                text: 'Measure is dense - consider replacing some notes with rests for breathing room',
+                type: 'density',
+                icon: '💨',
+                color: 'amber'
+            });
+        }
+
+        // Suggestion 2: Check for beat alignment - suggest rests on weak beats
+        if (notes.length > 0 && fillPercentage < 75) {
+            // Find gaps in the measure
+            const gaps = this._findGapsInMeasure(clef);
+            if (gaps.length > 0) {
+                const beatGaps = gaps.filter(g => g.slot % SLOTS_PER_BEAT === 0);
+                if (beatGaps.length > 0) {
+                    suggestions.push({
+                        text: `Gap on beat ${Math.floor(beatGaps[0].slot / SLOTS_PER_BEAT) + 1} - add rest for clarity`,
+                        type: 'gap',
+                        icon: '🎯',
+                        color: 'blue',
+                        action: () => this._placeRestAtSlot(clef, beatGaps[0].slot)
+                    });
+                }
+            }
+        }
+
+        // Suggestion 3: For bass, suggest rests for rhythmic patterns
+        if (clef === 'bass') {
+            if (notes.length >= 3 && fillPercentage > 50) {
+                suggestions.push({
+                    text: 'Try staccato effect: shorten notes with rests between',
+                    type: 'rhythm',
+                    icon: '🥁',
+                    color: 'purple'
+                });
+            }
+            // Pickup/anacrusis suggestion
+            if (notes.length === 0 || (notes.length > 0 && notes[0].slotIndex > 2 * SLOTS_PER_BEAT)) {
+                suggestions.push({
+                    text: 'Rest at start creates pickup/anacrusis feel',
+                    type: 'anacrusis',
+                    icon: '⏩',
+                    color: 'green'
+                });
+            }
+        }
+
+        // Suggestion 4: For melody, suggest phrase breathing
+        if (clef === 'treble') {
+            if (notes.length >= 4) {
+                // Check if all notes are back-to-back
+                const allConsecutive = this._areNotesConsecutive(notes);
+                if (allConsecutive) {
+                    suggestions.push({
+                        text: 'Long phrase - consider rest for breath/phrasing',
+                        type: 'phrase',
+                        icon: '🎵',
+                        color: 'indigo'
+                    });
+                }
+            }
+
+            // Cadential rest suggestion
+            if (beatsPerMeasure >= 4 && notes.length > 0) {
+                const lastNote = notes[notes.length - 1];
+                const lastBeat = Math.floor(lastNote.slotIndex / SLOTS_PER_BEAT);
+                if (lastBeat === beatsPerMeasure - 2) {
+                    suggestions.push({
+                        text: 'Rest on final beat creates anticipation',
+                        type: 'cadence',
+                        icon: '✨',
+                        color: 'pink'
+                    });
+                }
+            }
+        }
+
+        // Suggestion 5: Syncopation suggestion
+        if (notes.length >= 2 && fillPercentage > 40 && fillPercentage < 70) {
+            suggestions.push({
+                text: 'Add rest on strong beat for syncopation',
+                type: 'syncopation',
+                icon: '🎹',
+                color: 'orange'
+            });
+        }
+
+        // Render suggestions
+        if (suggestions.length === 0) {
+            container.innerHTML = '<span class="text-gray-400 italic">Add notes to see rest suggestions</span>';
+            return;
+        }
+
+        const colorClasses = {
+            amber: 'bg-amber-50 border-amber-200 text-amber-700',
+            blue: 'bg-blue-50 border-blue-200 text-blue-700',
+            purple: 'bg-purple-50 border-purple-200 text-purple-700',
+            green: 'bg-green-50 border-green-200 text-green-700',
+            indigo: 'bg-indigo-50 border-indigo-200 text-indigo-700',
+            pink: 'bg-pink-50 border-pink-200 text-pink-700',
+            orange: 'bg-orange-50 border-orange-200 text-orange-700'
+        };
+
+        container.innerHTML = suggestions.slice(0, 3).map(s => `
+            <div class="flex items-start gap-1 mb-1 p-1 rounded border ${colorClasses[s.color] || 'bg-gray-50'}">
+                <span>${s.icon}</span>
+                <span>${s.text}</span>
+            </div>
+        `).join('');
+    }
+
+    /**
+     * Count filled slots in a clef
+     */
+    _countFilledSlots(clef) {
+        if (!this.slotGrid) return 0;
+
+        let count = 0;
+        const totalSlots = this.slotGrid.totalSlots;
+
+        for (let i = 0; i < totalSlots; i++) {
+            const slot = this.slotGrid.getSlot(clef, 0, i);
+            if (slot && (slot.type === SLOT_TYPES.NOTE_START || slot.type === SLOT_TYPES.NOTE_CONT || slot.type === SLOT_TYPES.REST)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Find gaps (empty slots) in the measure
+     */
+    _findGapsInMeasure(clef) {
+        if (!this.slotGrid) return [];
+
+        const gaps = [];
+        const totalSlots = this.slotGrid.totalSlots;
+
+        for (let i = 0; i < totalSlots; i++) {
+            const slot = this.slotGrid.getSlot(clef, 0, i);
+            if (slot && slot.type === SLOT_TYPES.EMPTY) {
+                gaps.push({ slot: i });
+            }
+        }
+
+        return gaps;
+    }
+
+    /**
+     * Check if notes are all consecutive (no gaps between them)
+     */
+    _areNotesConsecutive(notes) {
+        if (notes.length < 2) return false;
+
+        for (let i = 1; i < notes.length; i++) {
+            const prevEnd = notes[i - 1].slotIndex + durationToSlots(notes[i - 1].duration, notes[i - 1].dotted);
+            const currStart = notes[i].slotIndex;
+
+            if (currStart > prevEnd) {
+                return false; // There's a gap
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Place a rest at a specific slot
+     */
+    _placeRestAtSlot(clef, slotIndex) {
+        if (!this.slotGrid) return;
+
+        this.slotGrid.setNote(clef, 0, slotIndex, {
+            pitches: [],
+            duration: this.currentDuration,
+            dotted: this.isDotted,
+            isRest: true
+        });
+
+        this._renderStaves();
+        this._updateFillStats();
+        showToast('Rest placed', 'success');
+    }
+
+    /**
+     * Render bass role indicator - warns about common mistakes
+     */
+    _renderBassRoleIndicator(chord) {
+        const container = this.modal.querySelector('#mie-bass-role-indicator');
+        if (!container) return;
+
+        const warnings = [];
+        const tips = [];
+
+        // Get chord 3rd (to warn about doubling)
+        const chordTones = getChordTones(chord);
+        if (chordTones.length >= 2) {
+            const third = chordTones[1]; // Second chord tone is usually the 3rd
+            warnings.push(`<span class="text-amber-600">⚠️ Avoid doubling ${third} (chord 3rd)</span>`);
+        }
+
+        // Tip about root in bass
+        tips.push(`<span class="text-green-600">✓ Root (${chord.root}) is strongest in bass</span>`);
+
+        // Tip about 5th
+        if (chordTones.length >= 3) {
+            tips.push(`<span class="text-blue-600">○ Fifth (${chordTones[2]}) is safe alternate</span>`);
+        }
+
+        // Check if chord has inversion that affects bass
+        if (chord.inversion && chord.inversion > 0) {
+            const inversionNote = chordTones[chord.inversion] || chordTones[0];
+            tips.push(`<span class="text-purple-600">⤵ Inversion ${chord.inversion}: ${inversionNote} in bass</span>`);
+        }
+
+        container.innerHTML = [...warnings, ...tips].join('<br>');
+    }
+
+    /**
+     * Render bass range guide
+     */
+    _renderBassRangeGuide() {
+        const container = this.modal.querySelector('#mie-bass-range-guide');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="flex items-center gap-2">
+                <span class="font-medium">Range:</span>
+                <span class="bg-green-100 text-green-700 px-1 rounded">E1-E3</span>
+                <span class="text-gray-400">optimal</span>
+                <span class="bg-yellow-100 text-yellow-700 px-1 rounded">C1-G3</span>
+                <span class="text-gray-400">extended</span>
+            </div>
+        `;
+    }
+
+    /**
+     * Get scale tones for a key, supporting both major and minor
+     * @param {string} keyRoot - Root note of the key (e.g., "E", "Bb")
+     * @param {boolean} isMinor - Whether the key is minor
+     * @returns {string[]} Array of note names in the scale
+     */
+    _getScaleTonesForKey(keyRoot, isMinor) {
+        // Note names in chromatic order
+        const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const ENHARMONIC_MAP = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
+        // Scale intervals (semitones from root)
+        const MAJOR_SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
+        const NATURAL_MINOR_SCALE_STEPS = [0, 2, 3, 5, 7, 8, 10];
+
+        // Normalize the key root to find its index
+        let normalizedRoot = keyRoot;
+        if (ENHARMONIC_MAP[keyRoot]) {
+            normalizedRoot = ENHARMONIC_MAP[keyRoot];
+        }
+        const rootIndex = ALL_NOTES.indexOf(normalizedRoot);
+        if (rootIndex === -1) return [];
+
+        // Select appropriate scale steps
+        const scaleSteps = isMinor ? NATURAL_MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+
+        // Build scale tones
+        return scaleSteps.map(step => ALL_NOTES[(rootIndex + step) % 12]);
+    }
+
+    /**
+     * Render tone buttons in a container with Note (Number) format
+     * @param {string} containerId - ID of the container element
+     * @param {string[]} tones - Array of tone names (without octaves)
+     * @param {string} type - 'chord' or 'scale' for styling
+     * @param {object} degreeInfo - Optional object with {root, degrees} for showing degree numbers
+     */
+    _renderToneButtons(containerId, tones, type, degreeInfo = null) {
+        const container = this.modal.querySelector(`#${containerId}`);
+        if (!container) return;
+
+        const colorClass = type === 'chord'
+            ? 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300'
+            : 'bg-orange-100 hover:bg-orange-200 text-orange-800 border-orange-300';
+
+        const subtextColorClass = type === 'chord' ? 'text-green-600' : 'text-orange-600';
+
+        container.innerHTML = tones.map((tone, index) => {
+            // Get degree number if degreeInfo is provided
+            const degree = degreeInfo?.degrees?.[index] || '';
+            const displayDegree = degree ? ` <span class="${subtextColorClass} font-normal">(${degree})</span>` : '';
+
+            return `
+                <button class="mie-tone-btn px-2 py-1 text-xs font-medium border rounded transition-colors ${colorClass}"
+                        data-tone="${tone}" data-type="${type}" title="Click to add ${tone}${degree ? ` (${degree})` : ''}">
+                    ${tone}${displayDegree}
+                </button>
+            `;
+        }).join('');
+
+        // Attach click handlers
+        container.querySelectorAll('.mie-tone-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tone = btn.dataset.tone;
+                this._placeNoteFromSuggestion(tone);
+            });
+        });
+    }
+
+    /**
+     * Get available tensions/extensions for a chord
+     * Simple data lookup - no complex engine needed
+     * @param {object} chord - Chord object with type property
+     * @returns {string[]} Array of tension names (e.g., ['9', '#11', '13'])
+     */
+    _getAvailableTensions(chord) {
+        const TENSIONS_BY_TYPE = {
+            'Major': ['9', '#11', '13'],
+            'Major 7th': ['9', '#11', '13'],
+            'Minor': ['9', '11', '13'],
+            'Minor 7th': ['9', '11', '13'],
+            'Minor-Major 7th': ['9', '11', '13'],
+            'Dominant 7th': ['b9', '9', '#9', '#11', 'b13', '13'],
+            'Dominant 9th': ['#11', 'b13', '13'],
+            'Dominant 11th': ['b9', '9', '#9', 'b13', '13'],
+            'Dominant 13th': ['b9', '9', '#9', '#11'],
+            'Diminished': ['9', '11', 'b13'],
+            'Diminished 7th': ['9', '11', 'b13'],
+            'Half-Diminished 7th': ['9', '11', '13'],
+            'Augmented': ['9', '#11'],
+            'Augmented 7th': ['9', '#11'],
+            'Sus2': ['11', '13'],
+            'Sus4': ['9', '13'],
+            'Add9': ['11', '13'],
+            'Major 9th': ['#11', '13'],
+            'Minor 9th': ['11', '13'],
+            '6/9': ['#11', '13'],
+        };
+
+        return TENSIONS_BY_TYPE[chord.type] || ['9', '11', '13'];
+    }
+
+    /**
+     * Render tension buttons in a container with Note (Number) format
+     * @param {string} containerId - ID of the container element
+     * @param {string[]} tensions - Array of tension names (e.g., ['9', '#11'])
+     * @param {string} chordRoot - Root note of the chord for calculating actual pitches
+     */
+    _renderTensionButtons(containerId, tensions, chordRoot) {
+        const container = this.modal.querySelector(`#${containerId}`);
+        if (!container) return;
+
+        // Map tension names to semitone intervals from root
+        const TENSION_INTERVALS = {
+            'b9': 1,   // minor 9th
+            '9': 2,    // major 9th
+            '#9': 3,   // augmented 9th
+            '11': 5,   // perfect 11th
+            '#11': 6,  // augmented 11th
+            'b13': 8,  // minor 13th
+            '13': 9,   // major 13th
+        };
+
+        const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const ENHARMONIC_MAP = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
+        // Get root index
+        let normalizedRoot = chordRoot;
+        if (ENHARMONIC_MAP[chordRoot]) {
+            normalizedRoot = ENHARMONIC_MAP[chordRoot];
+        }
+        const rootIndex = ALL_NOTES.indexOf(normalizedRoot);
+
+        container.innerHTML = tensions.map(tension => {
+            const interval = TENSION_INTERVALS[tension];
+            const pitch = interval !== undefined && rootIndex !== -1
+                ? ALL_NOTES[(rootIndex + interval) % 12]
+                : tension;
+
+            // Format: Note (Number) - e.g., "D (9)" not "9 (D)"
+            return `
+                <button class="mie-tension-btn px-2 py-1 text-xs font-medium border rounded transition-colors bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300"
+                        data-tension="${tension}" data-pitch="${pitch}" title="Add ${pitch} (${tension})">
+                    ${pitch} <span class="text-purple-600 font-normal">(${tension})</span>
+                </button>
+            `;
+        }).join('');
+
+        // Attach click handlers
+        container.querySelectorAll('.mie-tension-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const pitch = btn.dataset.pitch;
+                this._placeNoteFromSuggestion(pitch);
+            });
+        });
+    }
+
+    /**
+     * Generate next note suggestions based on voice leading and chord context
+     * Uses existing voice leading engines - no new logic needed
+     * @param {string} fromPitch - Current pitch (e.g., "C4")
+     * @param {object} chord - Current chord context
+     * @param {object} options - Options like maxInterval, count
+     * @returns {Array} Array of suggestion objects with pitch, score, reason
+     */
+    _suggestNextNotes(fromPitch, chord, options = {}) {
+        const { maxInterval = 7, count = 5 } = options;
+
+        if (!fromPitch) return [];
+
+        // Parse the current pitch to get MIDI value
+        const fromMidi = noteToMidi(fromPitch);
+        if (fromMidi === null) return [];
+
+        // Generate candidate pitches within range (stepwise + nearby)
+        const candidates = [];
+        for (let offset = -maxInterval; offset <= maxInterval; offset++) {
+            if (offset === 0) continue; // Skip same note
+            const candidateMidi = fromMidi + offset;
+            if (candidateMidi < 21 || candidateMidi > 108) continue; // Piano range
+
+            // Convert MIDI back to pitch name
+            const pitchName = this._midiToPitch(candidateMidi);
+            if (pitchName) {
+                candidates.push({ pitch: pitchName, midi: candidateMidi, offset });
+            }
+        }
+
+        // Score each candidate using existing voice leading engine
+        const scored = candidates.map(candidate => {
+            // Use quick voice leading scoring (lightweight)
+            const vlScore = scoreVoiceLeadingQuick([fromMidi], [candidate.midi]);
+
+            // Check if it's a chord tone for bonus
+            // Must compare full pitch names including accidentals (C# != C)
+            const pitchWithoutOctave = candidate.pitch.replace(/\d+$/, '');
+            const chordTones = chord ? getChordTones(chord) : [];
+            const isChordTone = chordTones.some(ct => {
+                // Normalize enharmonics for comparison (Db = C#, etc.)
+                const ENHARMONIC = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+                const ctNorm = ENHARMONIC[ct] || ct;
+                const pitchNorm = ENHARMONIC[pitchWithoutOctave] || pitchWithoutOctave;
+                return ctNorm === pitchNorm;
+            });
+
+            // Determine direction for contour analysis
+            const direction = candidate.offset > 0 ? 'ascending' : 'descending';
+            const isStepwise = Math.abs(candidate.offset) <= 2;
+
+            // Calculate final score
+            let score = vlScore.totalScore || 50;
+            if (isChordTone) score += 25;
+            if (isStepwise) score += 15;
+
+            // Determine reason
+            let reason = isStepwise ? 'Step' : 'Leap';
+            if (isChordTone) reason = 'Chord tone';
+
+            return {
+                pitch: candidate.pitch,
+                midi: candidate.midi,
+                score,
+                reason,
+                direction,
+                isChordTone,
+                isStepwise
+            };
+        });
+
+        // Sort by score and return top candidates
+        return scored
+            .sort((a, b) => b.score - a.score)
+            .slice(0, count);
+    }
+
+    /**
+     * Convert MIDI note number to pitch string (e.g., 60 -> "C4")
+     * @param {number} midi - MIDI note number
+     * @returns {string} Pitch string
+     */
+    _midiToPitch(midi) {
+        const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const octave = Math.floor(midi / 12) - 1;
+        const noteIndex = midi % 12;
+        return `${NOTE_NAMES[noteIndex]}${octave}`;
+    }
+
+    /**
+     * Render next note suggestions in the UI
+     * Shows when a note is selected in the slot grid
+     */
+    _renderNextNoteSuggestions() {
+        const section = this.modal.querySelector('#mie-next-note-section');
+        const container = this.modal.querySelector('#mie-next-note-suggestions');
+        const hint = this.modal.querySelector('#mie-select-note-hint');
+        if (!section || !container) return;
+
+        // Check if we have a selected note
+        const selectedNote = this._getSelectedNote();
+        if (!selectedNote || !selectedNote.pitch) {
+            section.classList.add('hidden');
+            if (hint) hint.classList.remove('hidden');
+            return;
+        }
+
+        // Hide the hint when showing suggestions
+        if (hint) hint.classList.add('hidden');
+
+        // Get suggestions
+        const suggestions = this._suggestNextNotes(selectedNote.pitch, this.measureChord);
+        if (suggestions.length === 0) {
+            section.classList.add('hidden');
+            return;
+        }
+
+        // Store suggestions for Tab key access
+        this._nextNoteSuggestions = suggestions;
+
+        // Show section
+        section.classList.remove('hidden');
+
+        // Render suggestion buttons
+        container.innerHTML = suggestions.map((suggestion, index) => {
+            const pitchWithoutOctave = suggestion.pitch.replace(/\d+$/, '');
+            const isFirst = index === 0;
+            const colorClass = suggestion.isChordTone
+                ? 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300'
+                : 'bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300';
+            const arrow = suggestion.direction === 'ascending' ? '↑' : '↓';
+
+            return `
+                <button class="mie-next-note-btn px-2 py-1 text-xs font-medium border rounded transition-colors ${colorClass} ${isFirst ? 'ring-2 ring-offset-1 ring-blue-400' : ''}"
+                        data-pitch="${suggestion.pitch}" data-index="${index}"
+                        title="${suggestion.reason} - Score: ${Math.round(suggestion.score)}">
+                    ${arrow} ${pitchWithoutOctave} <span class="opacity-60">(${suggestion.reason})</span>
+                </button>
+            `;
+        }).join('');
+
+        // Attach click handlers
+        container.querySelectorAll('.mie-next-note-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const pitch = btn.dataset.pitch;
+                this._acceptNextNoteSuggestion(pitch);
+            });
+        });
+    }
+
+    /**
+     * Get the currently selected note from the slot grid
+     * @returns {object|null} Selected note object or null
+     */
+    _getSelectedNote() {
+        if (!this.selectedSlot) return null;
+
+        const { clef, voice = 0, slotIndex, pitch: selectedPitch } = this.selectedSlot;
+        const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+
+        if (slot && slot.type === SLOT_TYPES.NOTE_START && slot.pitches && slot.pitches.length > 0) {
+            return {
+                // Use the specific selected pitch if available, otherwise first pitch
+                pitch: selectedPitch || slot.pitches[0],
+                clef,
+                voice,
+                slotIndex
+            };
+        }
+        return null;
+    }
+
+    /**
+     * Accept a next note suggestion and place it
+     * @param {string} pitch - The pitch to place
+     */
+    _acceptNextNoteSuggestion(pitch) {
+        if (!this.selectedSlot) return;
+
+        // Find the next available slot after the selected one
+        const { clef, voice = 0, slotIndex } = this.selectedSlot;
+        const nextSlotIndex = this._findNextAvailableSlotAfter(slotIndex, clef, voice);
+
+        if (nextSlotIndex !== null) {
+            // Place the note
+            this._placeNote(clef, nextSlotIndex, pitch, voice);
+            this._renderStaves();
+            this._updateFillStats();
+
+            // Select the new note (with the pitch we just placed)
+            this.selectedSlot = { clef, voice, slotIndex: nextSlotIndex, pitch };
+
+            // Play the note for feedback
+            this._playNotePreview(pitch);
+
+            // Update suggestions for the new note
+            this._renderNextNoteSuggestions();
+        } else {
+            showToast('No available slot after selected note', 'warning');
+        }
+    }
+
+    /**
+     * Find the next available slot after a given slot index
+     * @param {number} afterSlotIndex - Slot index to start searching after
+     * @param {string} clef - Clef to search in (defaults to focusedClef)
+     * @param {number} voice - Voice to search in (defaults to 0)
+     * @returns {number|null} Next available slot index or null
+     */
+    _findNextAvailableSlotAfter(afterSlotIndex, clef = this.focusedClef, voice = 0) {
+        const totalSlots = this.slotGrid.totalSlots;
+
+        for (let s = afterSlotIndex + 1; s < totalSlots; s++) {
+            const slot = this.slotGrid.getSlot(clef, voice, s);
+            if (slot && slot.type === SLOT_TYPES.EMPTY) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Handle Tab key to accept top next note suggestion
+     */
+    _handleTabForNextNote() {
+        if (this._nextNoteSuggestions && this._nextNoteSuggestions.length > 0) {
+            const topSuggestion = this._nextNoteSuggestions[0];
+            this._acceptNextNoteSuggestion(topSuggestion.pitch);
+            return true; // Handled
+        }
+        return false; // Not handled
+    }
+
+    /**
+     * Check voice leading issues after a note is placed
+     * Uses existing voice leading detection functions from enhancedVoiceLeading.js
+     * @param {string} clef - The clef where note was placed ('treble' or 'bass')
+     * @param {number} slotIndex - The slot index where note was placed
+     * @param {string} newPitch - The pitch that was placed
+     */
+    _checkVoiceLeadingIssues(clef, slotIndex, newPitch) {
+        const warnings = [];
+
+        // Get the previous slot with a note in the same voice
+        const prevSlotData = this._findPreviousNoteSlot(clef, this.currentVoice, slotIndex);
+
+        if (!prevSlotData) {
+            // No previous note to compare - no warnings possible
+            return;
+        }
+
+        const prevPitches = prevSlotData.slot.pitches || [];
+        const newPitchMidi = noteToMidi(newPitch);
+
+        if (newPitchMidi === null || prevPitches.length === 0) return;
+
+        // Convert previous pitches to MIDI
+        const prevMidi = prevPitches.map(p => noteToMidi(p)).filter(m => m !== null).sort((a, b) => a - b);
+        const newMidi = [newPitchMidi]; // Currently just the single new pitch
+
+        // For more comprehensive checking, gather all notes at the current slot
+        const currentSlotMidi = this._getAllNotesAtSlot(slotIndex);
+
+        // 1. Check for parallel fifths and octaves
+        if (prevMidi.length >= 1 && currentSlotMidi.length >= 2) {
+            // Need at least 2 voices in both chords for parallel motion
+            const parallelIssues = detectParallelMotion(prevMidi, currentSlotMidi);
+
+            if (parallelIssues.parallelFifths) {
+                warnings.push({
+                    type: 'parallel_fifths',
+                    severity: 'warning',
+                    message: `⚠️ Parallel 5ths detected`
+                });
+            }
+            if (parallelIssues.parallelOctaves) {
+                warnings.push({
+                    type: 'parallel_octaves',
+                    severity: 'warning',
+                    message: `⚠️ Parallel 8ves detected`
+                });
+            }
+        }
+
+        // 2. Check for voice crossing
+        if (currentSlotMidi.length >= 2) {
+            const crossingIssues = detectVoiceCrossing(prevMidi, currentSlotMidi);
+
+            if (crossingIssues.count > 0) {
+                warnings.push({
+                    type: 'voice_crossing',
+                    severity: 'info',
+                    message: `ℹ️ Voice crossing`
+                });
+            }
+        }
+
+        // 3. Check for unresolved tendency tones (leading tone, etc.)
+        if (this.currentKey && prevMidi.length > 0) {
+            const tendencyResult = checkTendencyToneResolution(prevMidi, newMidi, this.currentKey);
+
+            if (tendencyResult.unresolved && tendencyResult.unresolved.length > 0) {
+                tendencyResult.unresolved.forEach(issue => {
+                    warnings.push({
+                        type: 'tendency_unresolved',
+                        severity: 'info',
+                        message: `ℹ️ ${issue.description || 'Unresolved tendency tone'}`
+                    });
+                });
+            }
+        }
+
+        // Display warnings if any
+        if (warnings.length > 0) {
+            // Show most severe warning in status, collect all for toast
+            const severeWarning = warnings.find(w => w.severity === 'warning') || warnings[0];
+
+            // Update status with the warning
+            setTimeout(() => {
+                // Delayed to show after the "Added note" message
+                this._updateStatus(severeWarning.message);
+            }, 100);
+
+            // Show toast for all warnings
+            if (warnings.some(w => w.severity === 'warning')) {
+                const warningMessages = warnings.filter(w => w.severity === 'warning').map(w => w.message.replace(/^[⚠️ℹ️]\s*/, '')).join(', ');
+                showToast(warningMessages, { type: 'warning', duration: 3000 });
+            }
+        }
+    }
+
+    /**
+     * Find the previous note slot before a given slot index
+     * @param {string} clef - The clef to search
+     * @param {number} voice - The voice to search
+     * @param {number} beforeSlotIndex - Search before this slot index
+     * @returns {object|null} { slot, slotIndex } or null
+     */
+    _findPreviousNoteSlot(clef, voice, beforeSlotIndex) {
+        for (let s = beforeSlotIndex - 1; s >= 0; s--) {
+            const slot = this.slotGrid.getSlot(clef, voice, s);
+            if (slot && slot.type === SLOT_TYPES.NOTE_START) {
+                return { slot, slotIndex: s };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get all notes (MIDI values) at a given slot index across both clefs
+     * @param {number} slotIndex - The slot index
+     * @returns {number[]} Array of MIDI values, sorted low to high
+     */
+    _getAllNotesAtSlot(slotIndex) {
+        const midiValues = [];
+
+        // Check both clefs and both voices
+        ['bass', 'treble'].forEach(clef => {
+            [0, 1].forEach(voice => {
+                const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+                if (slot && (slot.type === SLOT_TYPES.NOTE_START || slot.type === SLOT_TYPES.CONTINUATION)) {
+                    const pitches = slot.pitches || [];
+                    pitches.forEach(p => {
+                        const midi = noteToMidi(p);
+                        if (midi !== null) midiValues.push(midi);
+                    });
+                }
+            });
+        });
+
+        return midiValues.sort((a, b) => a - b);
+    }
+
+    /**
+     * Place a note from a suggestion button click
+     * @param {string} tone - The tone name (without octave)
+     */
+    _placeNoteFromSuggestion(tone) {
+        // Determine octave based on focused clef
+        const octave = this.focusedClef === 'bass' ? 3 : 4;
+        const pitch = `${tone}${octave}`;
+
+        // Find the next available slot position
+        const slotIndex = this._findNextAvailableSlot();
+
+        if (slotIndex !== null) {
+            // Place the note
+            this._placeNote(this.focusedClef, slotIndex, pitch, 0);  // measureOffset 0 = center measure
+            this._renderStaves();
+            this._updateFillStats();
+
+            // Play the note for feedback
+            this._playNotePreview(pitch);
+        } else {
+            showToast('Measure is full', 'warning');
+        }
+    }
+
+    /**
+     * Play and place a note with full pitch (including octave)
+     * Used by bass approach note buttons
+     * @param {string} fullPitch - Full pitch like "B2" or "C#3"
+     */
+    _playAndPlaceNote(fullPitch) {
+        // Find the next available slot position
+        const slotIndex = this._findNextAvailableSlot();
+
+        if (slotIndex !== null) {
+            // Place the note (using bass clef since this is for bass approach notes)
+            this._placeNote('bass', slotIndex, fullPitch, 0);
+            this._renderStaves();
+            this._updateFillStats();
+
+            // Play the note for feedback
+            this._playNotePreview(fullPitch);
+        } else {
+            showToast('Measure is full', 'warning');
+        }
+    }
+
+    /**
+     * Play a single note preview for audio feedback
+     * @param {string} pitch - Pitch like "C4"
+     */
+    async _playNotePreview(pitch) {
+        // Ensure audio is ready
+        if (!getAudioIsReady()) {
+            await initAudio();
+        }
+
+        const piano = getPiano();
+        if (!piano) return;
+
+        // Play a short preview of the note
+        try {
+            piano.triggerAttackRelease(pitch, '8n', Tone.now());
+        } catch (e) {
+            // Ignore audio errors - non-critical
+        }
+    }
+
+    /**
+     * Find the next available slot in the current measure
+     * @returns {number|null} Slot index or null if measure is full
+     */
+    _findNextAvailableSlot() {
+        if (!this.slotGrid) return 0;
+
+        // Iterate through slots to find the first empty one
+        const totalSlots = this.slotGrid.totalSlots;
+        for (let i = 0; i < totalSlots; i++) {
+            const slot = this.slotGrid.getSlot(this.focusedClef, this.currentVoice, i);
+            if (slot && slot.type === SLOT_TYPES.EMPTY) {
+                return i;
+            }
+        }
+
+        // Measure is full
+        return null;
+    }
+
+    /**
+     * Apply the selected bass pattern to visible measures
+     */
+    _applyBassPattern() {
+        const patternSelect = this.modal.querySelector('#mie-bass-pattern-select');
+        if (!patternSelect) return;
+
+        const pattern = patternSelect.value;
+        const chord = this.measureChord;
+
+        if (!chord || !chord.root) {
+            showToast('No chord context available', 'warning');
+            return;
+        }
+
+        // Get beats per measure
+        const beatsPerMeasure = this.beatsPerMeasure || 4;
+
+        // Generate bass pattern
+        const bassNotes = generateBuildingBlockBass(chord, null, beatsPerMeasure, {
+            bassPattern: pattern,
+            bassOctave: BASS_PATTERN_OCTAVE_DEFAULTS[pattern] || 2
+        });
+
+        if (!bassNotes || bassNotes.length === 0) {
+            showToast('Could not generate bass pattern', 'warning');
+            return;
+        }
+
+        // Clear existing bass notes in center measure
+        if (this.slotGrid) {
+            // Clear all bass slots for voice 0
+            const totalSlots = this.slotGrid.totalSlots;
+            for (let i = 0; i < totalSlots; i++) {
+                this.slotGrid.clearSlot('bass', 0, i);
+            }
+
+            // Add the generated notes
+            let currentSlot = 0;
+            for (const note of bassNotes) {
+                if (note.isRest) continue;  // Skip rests for now
+
+                const slots = durationToSlots(note.duration, note.dotted);
+                const pitches = Array.isArray(note.pitches) ? note.pitches : [note.pitches];
+
+                this.slotGrid.setNote('bass', 0, currentSlot, {
+                    pitches: pitches,
+                    duration: note.duration,
+                    dotted: note.dotted || false,
+                    isRest: false
+                });
+
+                currentSlot += slots;
+            }
+        }
+
+        this._renderStaves();
+        this._updateFillStats();
+        showToast(`Applied ${pattern} bass pattern`, 'success');
+    }
+
+    /**
+     * Set the focused clef and update UI accordingly
+     * @param {string} clef - 'treble' or 'bass'
+     */
+    _setFocusedClef(clef) {
+        this.focusedClef = clef;
+        this._updateSuggestionsPanel();
+        this._renderMelodicPatterns();  // Update melodic suggestions for new clef
+    }
+
+    /**
      * Update delete button enabled state
      */
     _updateDeleteButton() {
@@ -897,9 +2791,17 @@ export class MeasureIsolationEditor {
         this.selectedNote = null;
         this.selectedNotes.clear();
         this.lastSelectedNote = null;
+        this.selectedSlot = null;
+        this._nextNoteSuggestions = null;
         this._updateDeleteButton();
         this._renderStaves();
         this._updateStatus('Click on staff to add notes');
+
+        // Hide next note suggestions section and show hint
+        const nextNoteSection = this.modal.querySelector('#mie-next-note-section');
+        if (nextNoteSection) nextNoteSection.classList.add('hidden');
+        const hint = this.modal.querySelector('#mie-select-note-hint');
+        if (hint) hint.classList.remove('hidden');
     }
 
     /**
@@ -948,6 +2850,7 @@ export class MeasureIsolationEditor {
         this._updateToolbarForSelection();
         this._renderStaves();
         this._updateFillStats();
+        this._renderMelodicPatterns();  // Update after deletion
     }
 
     /**
@@ -967,9 +2870,15 @@ export class MeasureIsolationEditor {
         this.selectedNote = { clef, voice, slotIndex, pitch };
         this.lastSelectedNote = { clef, voice, slotIndex, pitch };
 
+        // Set selectedSlot for next note suggestions (include voice and pitch)
+        this.selectedSlot = { clef, voice, slotIndex, pitch };
+
         this._updateDeleteButton();
         this._updateToolbarForSelection();
         this._renderStaves();
+
+        // Update next note suggestions based on selected note
+        this._renderNextNoteSuggestions();
 
         const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
         if (slot.type === SLOT_TYPES.REST) {
@@ -978,7 +2887,7 @@ export class MeasureIsolationEditor {
             this._updateStatus(`Selected ${pitch} in chord - ←→ move, ↑↓ transpose, S/F/N/K accidentals, R rest, Del`);
         } else {
             const pitchInfo = pitch || slot.pitches?.join(', ') || 'note';
-            this._updateStatus(`Selected ${pitchInfo} - ←→ move, ↑↓ transpose, S/F/N/K accidentals, R rest, Del`);
+            this._updateStatus(`Selected ${pitchInfo} - ←→ move, ↑↓ transpose, S/F/N/K accidentals, R rest, Del, Tab=next`);
         }
     }
 
@@ -1614,6 +3523,26 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Show the musical hints legend modal
+     */
+    _showHintsLegend() {
+        const legendModal = this.modal.querySelector('#mie-hints-legend-modal');
+        if (legendModal) {
+            legendModal.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * Hide the musical hints legend modal
+     */
+    _hideHintsLegend() {
+        const legendModal = this.modal.querySelector('#mie-hints-legend-modal');
+        if (legendModal) {
+            legendModal.classList.add('hidden');
+        }
+    }
+
+    /**
      * Open the editor for a specific measure
      */
     open(measureIndex) {
@@ -1654,6 +3583,11 @@ export class MeasureIsolationEditor {
         // Get the chord for this measure (for harmonic function coloring)
         this.measureChord = measure.chord || null;
         console.log('[MIE] Measure chord:', this.measureChord);
+
+        // Get the next measure's chord for bass approach note suggestions
+        const nextMeasure = this.compositionState.getMeasure(measureIndex + 1);
+        this.nextMeasureChord = nextMeasure?.chord || null;
+        console.log('[MIE] Next measure chord:', this.nextMeasureChord);
 
         const timeSignature = this.compositionState.getTimeSignature();
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
@@ -1703,6 +3637,9 @@ export class MeasureIsolationEditor {
         if (nextCheckbox) nextCheckbox.checked = false;
         this._updatePrevNextToggles();
 
+        // Update Smart Suggestions panel with chord context
+        this._updateSuggestionsPanel();
+
         // Note: Navigation buttons are created in _updateMeasureNumbers() which runs after canvas init
 
         // Show modal
@@ -1714,6 +3651,7 @@ export class MeasureIsolationEditor {
             this._updateMeasureNumbers();
             this._renderStaves();
             this._updateFillStats();
+            this._renderMelodicPatterns();  // Initialize melodic pattern suggestions
         }, 50);
     }
 
@@ -1746,6 +3684,9 @@ export class MeasureIsolationEditor {
      * Handle canvas click - determine slot and pitch from position
      */
     _handleCanvasClick(event, clef) {
+        // Update focused clef for Smart Suggestions panel
+        this._setFocusedClef(clef);
+
         // Set clef-specific STAFF_TOP_Y for pitch calculations
         this.STAFF_TOP_Y = clef === 'treble' ? this.TREBLE_STAFF_TOP_Y : this.BASS_STAFF_TOP_Y;
 
@@ -2263,6 +4204,12 @@ export class MeasureIsolationEditor {
 
         this._renderStaves();
         this._updateFillStats();
+
+        // Check for voice leading issues after placing the note
+        this._checkVoiceLeadingIssues(clef, slotIndex, pitch);
+
+        // Update melodic pattern suggestions
+        this._renderMelodicPatterns();
     }
 
     /**
@@ -2342,6 +4289,7 @@ export class MeasureIsolationEditor {
         this._updateStatus('Cleared slot');
         this._renderStaves();
         this._updateFillStats();
+        this._renderMelodicPatterns();  // Update after erase
     }
 
     /**
@@ -3079,6 +5027,23 @@ export class MeasureIsolationEditor {
                 ctx.arc(x + 12, y, 2, 0, Math.PI * 2);
                 ctx.fill();
             }
+
+            // Draw musical context hint for notes with tendency tones
+            // Only show if hints are enabled via toggle
+            // Show important hints (leading tone, tritone) on ALL notes
+            // Show NCT hints only when selected (to avoid clutter)
+            if (this.showMusicalHints) {
+                const hint = this._getMusicalContextHint(pitch, clef);
+                if (hint) {
+                    const isImportantHint = hint.type === 'leading_tone' || hint.type === 'tritone' || hint.type === 'fourth_degree';
+                    if (isImportantHint || isPitchSelected) {
+                        // Determine stem direction for hint placement
+                        const middleY = this.STAFF_TOP_Y + (this.STAFF_HEIGHT / 2);
+                        const stemUp = slot.stemDirection !== undefined ? slot.stemDirection > 0 : y > middleY;
+                        this._drawMusicalContextHint(ctx, x, y, hint, stemUp);
+                    }
+                }
+            }
         }
     }
 
@@ -3093,6 +5058,528 @@ export class MeasureIsolationEditor {
             case '64n': return 4;
             default: return 0;
         }
+    }
+
+    /**
+     * Get musical context hint for a pitch (leading tone, chord tone, etc.)
+     * Shows helpful annotations for composers
+     * @param {string} pitch - The pitch (e.g., "B4")
+     * @param {string} clef - 'treble' or 'bass'
+     * @returns {object|null} Hint object with text, color, and suggestion
+     */
+    _getMusicalContextHint(pitch, clef) {
+        if (!this.currentKey || !this.measureChord) return null;
+
+        const pitchMidi = noteToMidi(pitch);
+        if (pitchMidi === null) return null;
+
+        const pitchClass = pitchMidi % 12;
+        const keyRoot = this.currentKey.replace(/m$/, ''); // Remove minor suffix if present
+        const isMinorKey = this.currentKey.endsWith('m');
+        const keyMidi = noteToMidi(keyRoot + '4');
+        if (keyMidi === null) return null;
+        const keyPitchClass = keyMidi % 12;
+
+        // Calculate scale degree (in semitones from tonic)
+        const scaleDegree = ((pitchClass - keyPitchClass + 12) % 12);
+
+        // Note names for resolution targets
+        const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const tonicName = NOTE_NAMES[keyPitchClass];
+
+        // Get chord information
+        const chordTones = getChordTones(this.measureChord);
+        const pitchName = pitch.replace(/\d+$/, ''); // Remove octave
+        const ENHARMONIC = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#',
+                            'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
+        const pitchNorm = ENHARMONIC[pitchName] || pitchName;
+        const isChordTone = chordTones.some(ct => {
+            const ctNorm = ENHARMONIC[ct] || ct;
+            return ctNorm === pitchNorm || ct === pitchName;
+        });
+
+        // Determine chord tone function (root, 3rd, 5th, 7th)
+        let chordToneFunction = null;
+        if (isChordTone && chordTones.length > 0) {
+            const chordRoot = this.measureChord.root;
+            const chordRootNorm = ENHARMONIC[chordRoot] || chordRoot;
+
+            // Check if this is the root
+            if (pitchNorm === chordRootNorm || pitchName === chordRoot) {
+                chordToneFunction = 'root';
+            } else if (chordTones.length >= 2) {
+                const thirdTone = chordTones[1];
+                const thirdNorm = ENHARMONIC[thirdTone] || thirdTone;
+                if (pitchNorm === thirdNorm || pitchName === thirdTone) {
+                    chordToneFunction = 'third';
+                }
+            }
+            if (!chordToneFunction && chordTones.length >= 3) {
+                const fifthTone = chordTones[2];
+                const fifthNorm = ENHARMONIC[fifthTone] || fifthTone;
+                if (pitchNorm === fifthNorm || pitchName === fifthTone) {
+                    chordToneFunction = 'fifth';
+                }
+            }
+            if (!chordToneFunction && chordTones.length >= 4) {
+                const seventhTone = chordTones[3];
+                const seventhNorm = ENHARMONIC[seventhTone] || seventhTone;
+                if (pitchNorm === seventhNorm || pitchName === seventhTone) {
+                    chordToneFunction = 'seventh';
+                }
+            }
+        }
+
+        // Check for tendency tones - priority order matters!
+        const hints = [];
+
+        // 1. Leading tone (scale degree 7 = 11 semitones above tonic) - HIGHEST PRIORITY
+        if (scaleDegree === 11) {
+            hints.push({
+                text: `→ ${tonicName}`,
+                fullText: `Leading tone: resolves up to ${tonicName}`,
+                color: '#dc2626', // Red
+                type: 'leading_tone',
+                direction: 'up',
+                priority: 1
+            });
+        }
+
+        // 2. Chord 7th - resolves down (very important for voice leading)
+        if (chordToneFunction === 'seventh') {
+            // 7th typically resolves down by step
+            const resolveTarget = NOTE_NAMES[(pitchClass - 1 + 12) % 12];
+            hints.push({
+                text: `7↓`,
+                fullText: `Chord 7th: typically resolves down to ${resolveTarget}`,
+                color: '#7c3aed', // Purple
+                type: 'chord_seventh',
+                direction: 'down',
+                priority: 2
+            });
+        }
+
+        // 3. Tritone (6 semitones from tonic) - unstable, wants resolution
+        if (scaleDegree === 6) {
+            hints.push({
+                text: '⟷',
+                fullText: 'Tritone: unstable, resolve inward or outward',
+                color: '#ef4444', // Red
+                type: 'tritone',
+                direction: 'resolve',
+                priority: 3
+            });
+        }
+
+        // 4. Scale degree 4 (5 semitones above tonic) - tendency to resolve down to 3
+        if (scaleDegree === 5) {
+            const thirdName = NOTE_NAMES[(keyPitchClass + 4) % 12];
+            hints.push({
+                text: `↓ ${thirdName}`,
+                fullText: `Scale degree 4: often resolves down to ${thirdName}`,
+                color: '#f59e0b', // Amber
+                type: 'fourth_degree',
+                direction: 'down',
+                priority: 4
+            });
+        }
+
+        // 5. Raised 6th in minor (melodic minor ascending)
+        if (isMinorKey && scaleDegree === 9) {
+            // Raised 6th in minor typically continues up to raised 7th
+            const raisedSeventh = NOTE_NAMES[(keyPitchClass + 11) % 12];
+            hints.push({
+                text: `↑ ${raisedSeventh}`,
+                fullText: `Raised 6th: continue up to ${raisedSeventh} (melodic minor)`,
+                color: '#0891b2', // Cyan
+                type: 'raised_sixth',
+                direction: 'up',
+                priority: 5
+            });
+        }
+
+        // 6. Lowered 7th in minor (natural minor / descending melodic)
+        if (isMinorKey && scaleDegree === 10) {
+            const sixthDegree = NOTE_NAMES[(keyPitchClass + 8) % 12];
+            hints.push({
+                text: `↓ ${sixthDegree}`,
+                fullText: `Subtonic: descend to ${sixthDegree} (natural minor)`,
+                color: '#0891b2', // Cyan
+                type: 'subtonic',
+                direction: 'down',
+                priority: 5
+            });
+        }
+
+        // 7. Chromatic approach note (half step to chord tone)
+        if (!isChordTone) {
+            // Check if this note is a half step away from a chord tone
+            for (const ct of chordTones) {
+                const ctMidi = noteToMidi(ct + '4');
+                if (ctMidi !== null) {
+                    const ctPitchClass = ctMidi % 12;
+                    const distance = Math.abs(pitchClass - ctPitchClass);
+                    if (distance === 1 || distance === 11) {
+                        const direction = ((ctPitchClass - pitchClass + 12) % 12) === 1 ? '↑' : '↓';
+                        hints.push({
+                            text: `${direction} ${ct}`,
+                            fullText: `Chromatic approach: resolve to ${ct}`,
+                            color: '#059669', // Emerald
+                            type: 'chromatic_approach',
+                            direction: direction === '↑' ? 'up' : 'down',
+                            priority: 6
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 8. Suspension indicator (4-3, 7-6, 9-8 patterns)
+        if (!isChordTone && chordTones.length >= 2) {
+            const thirdTone = chordTones[1];
+            const thirdMidi = noteToMidi(thirdTone + '4');
+            if (thirdMidi !== null) {
+                const thirdPitchClass = thirdMidi % 12;
+                // Sus4 (one step above the 3rd)
+                if (((pitchClass - thirdPitchClass + 12) % 12) === 1) {
+                    hints.push({
+                        text: `4→3`,
+                        fullText: `Suspension: resolve 4 down to 3 (${thirdTone})`,
+                        color: '#d97706', // Amber-600
+                        type: 'suspension_4_3',
+                        direction: 'down',
+                        priority: 7
+                    });
+                }
+            }
+        }
+
+        // 9. Chord 5th indicator (can often be omitted)
+        if (chordToneFunction === 'fifth' && hints.length === 0) {
+            hints.push({
+                text: '5th',
+                fullText: 'Chord 5th: stable, but can be omitted if needed',
+                color: '#64748b', // Slate
+                type: 'chord_fifth',
+                direction: null,
+                priority: 10
+            });
+        }
+
+        // 10. Chord 3rd indicator (defines quality - important!)
+        if (chordToneFunction === 'third' && hints.length === 0) {
+            hints.push({
+                text: '3rd',
+                fullText: 'Chord 3rd: defines major/minor quality (important!)',
+                color: '#2563eb', // Blue
+                type: 'chord_third',
+                direction: null,
+                priority: 10
+            });
+        }
+
+        // 11. Root indicator
+        if (chordToneFunction === 'root' && hints.length === 0) {
+            hints.push({
+                text: 'R',
+                fullText: 'Chord root: foundational tone',
+                color: '#16a34a', // Green
+                type: 'chord_root',
+                direction: null,
+                priority: 10
+            });
+        }
+
+        // 12. Blue note detection (♭3, ♭5, ♭7 for blues/jazz feel)
+        // Only show if not already a chord tone and not already hinted
+        if (!isChordTone && hints.length === 0) {
+            // ♭3 (3 semitones), ♭5 (6 semitones - also tritone), ♭7 (10 semitones)
+            if (scaleDegree === 3) {
+                hints.push({
+                    text: '♭3',
+                    fullText: 'Blue note (♭3): adds blues/jazz color',
+                    color: '#7c3aed', // Purple
+                    type: 'blue_note',
+                    direction: null,
+                    priority: 8
+                });
+            } else if (scaleDegree === 10 && !isMinorKey) {
+                hints.push({
+                    text: '♭7',
+                    fullText: 'Blue note (♭7): adds blues/dominant color',
+                    color: '#7c3aed', // Purple
+                    type: 'blue_note',
+                    direction: null,
+                    priority: 8
+                });
+            }
+        }
+
+        // 13. Non-chord tone (lowest priority, only if nothing else)
+        if (!isChordTone && hints.length === 0) {
+            hints.push({
+                text: 'NCT',
+                fullText: 'Non-chord tone: consider resolving to chord tone',
+                color: '#6b7280', // Gray
+                type: 'non_chord_tone',
+                direction: null,
+                priority: 20
+            });
+        }
+
+        // Sort by priority and return the highest priority hint
+        hints.sort((a, b) => (a.priority || 99) - (b.priority || 99));
+        return hints.length > 0 ? hints[0] : null;
+    }
+
+    /**
+     * Draw musical context hint annotation near a note
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {number} x - X position
+     * @param {number} y - Y position of note
+     * @param {object} hint - Hint object from _getMusicalContextHint
+     * @param {boolean} stemUp - Whether stem goes up (affects hint placement)
+     */
+    _drawMusicalContextHint(ctx, x, y, hint, stemUp) {
+        if (!hint) return;
+
+        ctx.save();
+
+        // Position hint above or below note based on stem direction
+        const hintY = stemUp ? y + 25 : y - 20;
+
+        // Draw background pill
+        ctx.font = 'bold 9px Arial';
+        const textWidth = ctx.measureText(hint.text).width;
+        const pillPadding = 3;
+        const pillWidth = textWidth + pillPadding * 2;
+        const pillHeight = 14;
+
+        // Background
+        ctx.fillStyle = hint.color + '20'; // 20% opacity
+        ctx.strokeStyle = hint.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x - pillWidth / 2, hintY - pillHeight / 2, pillWidth, pillHeight, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        // Text
+        ctx.fillStyle = hint.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(hint.text, x, hintY);
+
+        ctx.restore();
+    }
+
+    /**
+     * Analyze the melodic contour of existing notes in the focused clef
+     * Returns contour info and suggests continuation patterns
+     * @returns {object} Analysis with contour direction, intervals, and suggestions
+     */
+    _analyzeMelodicContour() {
+        // Collect all notes from the focused clef
+        const notes = [];
+
+        for (let s = 0; s < this.slotGrid.totalSlots; s++) {
+            const slot = this.slotGrid.getSlot(this.focusedClef, 0, s); // Voice 0
+            if (slot && slot.type === SLOT_TYPES.NOTE_START && slot.pitches && slot.pitches.length > 0) {
+                const midi = noteToMidi(slot.pitches[0]); // Use top pitch
+                if (midi !== null) {
+                    notes.push({ slotIndex: s, midi, pitch: slot.pitches[0] });
+                }
+            }
+        }
+
+        if (notes.length < 2) {
+            return { hasContour: false, notes, suggestions: [] };
+        }
+
+        // Calculate intervals between consecutive notes
+        const intervals = [];
+        for (let i = 1; i < notes.length; i++) {
+            const interval = notes[i].midi - notes[i - 1].midi;
+            intervals.push(interval);
+        }
+
+        // Analyze contour characteristics
+        const lastInterval = intervals[intervals.length - 1];
+        const lastNote = notes[notes.length - 1];
+
+        // Determine overall contour direction
+        let ascendingCount = 0, descendingCount = 0, staticCount = 0;
+        intervals.forEach(i => {
+            if (i > 0) ascendingCount++;
+            else if (i < 0) descendingCount++;
+            else staticCount++;
+        });
+
+        let overallDirection = 'mixed';
+        if (ascendingCount > descendingCount + staticCount) overallDirection = 'ascending';
+        else if (descendingCount > ascendingCount + staticCount) overallDirection = 'descending';
+
+        // Generate suggestions based on contour rules
+        const suggestions = [];
+        const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // Rule 1: After a large leap (> 4 semitones), suggest stepwise motion in opposite direction
+        if (Math.abs(lastInterval) > 4) {
+            const recoveryDirection = lastInterval > 0 ? -1 : 1; // Opposite direction
+            const recoveryMidi = lastNote.midi + recoveryDirection * 2; // Step
+            const recoveryPitch = this._midiToPitch(recoveryMidi);
+            const recoveryNoteName = recoveryPitch.replace(/\d+$/, '');
+            suggestions.push({
+                pattern: 'leap_recovery',
+                description: `Step back → ${recoveryNoteName}`,
+                pitches: [recoveryPitch],
+                emoji: lastInterval > 0 ? '↘' : '↗',
+                color: '#10b981' // Green
+            });
+        }
+
+        // Rule 2: Suggest continuing stepwise in same direction
+        if (Math.abs(lastInterval) <= 2 && lastInterval !== 0) {
+            const continueMidi = lastNote.midi + (lastInterval > 0 ? 2 : -2);
+            const continuePitch = this._midiToPitch(continueMidi);
+            const continueNoteName = continuePitch.replace(/\d+$/, '');
+            suggestions.push({
+                pattern: 'continue_step',
+                description: `Continue ${lastInterval > 0 ? 'up' : 'down'} → ${continueNoteName}`,
+                pitches: [continuePitch],
+                emoji: lastInterval > 0 ? '↑' : '↓',
+                color: '#3b82f6' // Blue
+            });
+        }
+
+        // Rule 3: Suggest chord tone resolution
+        if (this.measureChord) {
+            const chordTones = getChordTones(this.measureChord);
+            const lastPitchName = lastNote.pitch.replace(/\d+$/, '');
+            // Must compare full pitch names including accidentals (C# != C)
+            const ENHARMONIC = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+            const lastPitchNorm = ENHARMONIC[lastPitchName] || lastPitchName;
+            const isOnChordTone = chordTones.some(ct => (ENHARMONIC[ct] || ct) === lastPitchNorm);
+
+            if (!isOnChordTone) {
+                // Find nearest chord tone
+                const octave = parseInt(lastNote.pitch.match(/\d+$/)?.[0] || '4');
+                for (const ct of chordTones) {
+                    const ctMidi = noteToMidi(ct + octave);
+                    if (ctMidi && Math.abs(ctMidi - lastNote.midi) <= 4) {
+                        const direction = ctMidi > lastNote.midi ? '↑' : '↓';
+                        suggestions.push({
+                            pattern: 'chord_tone',
+                            description: `To chord tone ${ct}`,
+                            pitches: [ct + octave],
+                            emoji: '♪',
+                            color: '#8b5cf6' // Purple
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Rule 4: Suggest returning to tonic for phrase endings
+        if (this.currentKey && notes.length >= 4) {
+            const keyRoot = this.currentKey.replace(/m$/, '');
+            const octave = parseInt(lastNote.pitch.match(/\d+$/)?.[0] || '4');
+            const tonicPitch = keyRoot + octave;
+            const tonicMidi = noteToMidi(tonicPitch);
+
+            if (tonicMidi && Math.abs(tonicMidi - lastNote.midi) <= 7 && tonicMidi !== lastNote.midi) {
+                suggestions.push({
+                    pattern: 'tonic_return',
+                    description: `Return to ${keyRoot}`,
+                    pitches: [tonicPitch],
+                    emoji: '🏠',
+                    color: '#f59e0b' // Amber
+                });
+            }
+        }
+
+        return {
+            hasContour: true,
+            notes,
+            intervals,
+            lastInterval,
+            overallDirection,
+            suggestions: suggestions.slice(0, 4) // Max 4 suggestions
+        };
+    }
+
+    /**
+     * Render melodic pattern suggestions in the UI
+     */
+    _renderMelodicPatterns() {
+        const container = this.modal.querySelector('#mie-melodic-patterns');
+        const indicator = this.modal.querySelector('#mie-contour-indicator');
+        if (!container) return;
+
+        const analysis = this._analyzeMelodicContour();
+
+        // Update contour indicator
+        if (indicator) {
+            if (analysis.hasContour) {
+                const dirIcon = analysis.overallDirection === 'ascending' ? '📈' :
+                               analysis.overallDirection === 'descending' ? '📉' : '〰️';
+                indicator.textContent = `${dirIcon} ${analysis.notes.length} notes`;
+            } else {
+                indicator.textContent = analysis.notes.length > 0 ? '(add more notes)' : '(no notes yet)';
+            }
+        }
+
+        if (!analysis.hasContour || analysis.suggestions.length === 0) {
+            container.innerHTML = '<span class="text-xs text-gray-400 italic">Add 2+ notes to see pattern suggestions</span>';
+            return;
+        }
+
+        // Render suggestion buttons
+        container.innerHTML = analysis.suggestions.map((suggestion, index) => `
+            <button class="mie-melodic-pattern-btn px-2 py-1 text-xs font-medium border rounded transition-colors hover:opacity-80"
+                    style="background-color: ${suggestion.color}15; border-color: ${suggestion.color}; color: ${suggestion.color};"
+                    data-pitches="${suggestion.pitches.join(',')}" data-index="${index}"
+                    title="${suggestion.description}">
+                ${suggestion.emoji} ${suggestion.description}
+            </button>
+        `).join('');
+
+        // Attach click handlers
+        container.querySelectorAll('.mie-melodic-pattern-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const pitches = btn.dataset.pitches.split(',');
+                this._applyMelodicPattern(pitches);
+            });
+        });
+    }
+
+    /**
+     * Apply a melodic pattern suggestion (place the suggested note)
+     * @param {string[]} pitches - Array of pitches to place
+     */
+    _applyMelodicPattern(pitches) {
+        if (!pitches || pitches.length === 0) return;
+
+        // Find next available slot
+        const nextSlot = this._findNextAvailableSlot();
+        if (nextSlot === null) {
+            showToast('No available slot for pattern', 'warning');
+            return;
+        }
+
+        // Place the first pitch (for now, just single note patterns)
+        const pitch = pitches[0];
+        this._placeNote(this.focusedClef, nextSlot, pitch, 0);
+        this._renderStaves();
+        this._updateFillStats();
+
+        // Play the note for feedback
+        this._playNotePreview(pitch);
+
+        // Update the melodic patterns display
+        this._renderMelodicPatterns();
     }
 
     /**

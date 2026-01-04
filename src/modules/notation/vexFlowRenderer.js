@@ -171,11 +171,11 @@ export const CLEF_RANGES = {
   },
   bass: {
     min: 36,    // C2 - notes below get 8vb
-    max: 71,    // B4 - notes above get 8va
+    max: 64,    // E4 - notes at F4 (65) and above get 8va (was B4/71, lowered for readability)
     min16: 24,  // C1 - notes below get 16vb
-    max16: 83,  // B5 - notes above get 16va
+    max16: 76,  // E5 - notes at F5 and above get 16va (adjusted proportionally)
     min32: 12,  // C0 - notes below get 32vb
-    max32: 95   // B6 - notes above get 32va
+    max32: 88   // E6 - notes at F6 and above get 32va (adjusted proportionally)
   },
 };
 
