@@ -49,7 +49,8 @@
       "Bash(npm search:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",
-      "Bash(timeout 8 npm run dev:*)"
+      "Bash(timeout 8 npm run dev:*)",
+      "Bash(timeout 10 npm run build-css:*)"
     ],
     "deny": [],
     "ask": []

@@ -382,7 +382,7 @@ export class MeasureIsolationEditor {
 
                 <!-- Smart Suggestions Panel -->
                 <div id="mie-suggestions-panel" class="border-b bg-gradient-to-r from-purple-50 to-indigo-50">
-                    <!-- Collapsible Header -->
+                    <!-- Collapsible Header with Clef Toggle -->
                     <div id="mie-suggestions-header" class="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-purple-100/50 transition-colors">
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,6 +390,17 @@ export class MeasureIsolationEditor {
                             </svg>
                             <span class="text-sm font-semibold text-purple-800">Smart Suggestions</span>
                             <span id="mie-suggestions-chord-context" class="text-xs text-purple-600 font-medium px-2 py-0.5 bg-white/60 rounded-full"></span>
+                            <!-- Clef Toggle -->
+                            <div id="mie-clef-toggle" class="flex items-center gap-0.5 ml-2 bg-white/70 rounded-full p-0.5 border border-purple-200" onclick="event.stopPropagation()">
+                                <button id="mie-clef-treble-btn" class="px-2 py-0.5 text-xs font-medium rounded-full transition-colors bg-purple-600 text-white"
+                                        onclick="window.mieInstance && window.mieInstance._setClefToggle('treble')" title="Show treble suggestions">
+                                    𝄞 Treble
+                                </button>
+                                <button id="mie-clef-bass-btn" class="px-2 py-0.5 text-xs font-medium rounded-full transition-colors text-purple-600 hover:bg-purple-100"
+                                        onclick="window.mieInstance && window.mieInstance._setClefToggle('bass')" title="Show bass suggestions">
+                                    𝄢 Bass
+                                </button>
+                            </div>
                         </div>
                         <button id="mie-suggestions-toggle" class="p-1 hover:bg-purple-200/50 rounded transition-colors" title="Toggle suggestions panel">
                             <svg id="mie-suggestions-chevron" class="w-4 h-4 text-purple-600 transform rotate-0 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -400,8 +411,8 @@ export class MeasureIsolationEditor {
 
                     <!-- Collapsible Content -->
                     <div id="mie-suggestions-content" class="px-4 pb-3">
-                        <div class="flex flex-wrap gap-4">
-                            <!-- Chord Tones Section -->
+                        <div class="flex flex-wrap gap-4 items-start">
+                            <!-- Chord Tones Section (both clefs) -->
                             <div class="flex-shrink-0">
                                 <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                                     <span class="w-2 h-2 rounded-full bg-green-500"></span>
@@ -412,7 +423,7 @@ export class MeasureIsolationEditor {
                                 </div>
                             </div>
 
-                            <!-- Scale Tones Section -->
+                            <!-- Scale Tones Section (both clefs) -->
                             <div class="flex-shrink-0">
                                 <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                                     <span class="w-2 h-2 rounded-full bg-orange-500"></span>
@@ -423,7 +434,7 @@ export class MeasureIsolationEditor {
                                 </div>
                             </div>
 
-                            <!-- Tensions/Extensions Section -->
+                            <!-- Tensions Section (both clefs) -->
                             <div id="mie-tensions-section" class="flex-shrink-0">
                                 <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                                     <span class="w-2 h-2 rounded-full bg-purple-500"></span>
@@ -432,161 +443,9 @@ export class MeasureIsolationEditor {
                                 <div id="mie-tensions" class="flex gap-1 flex-wrap">
                                     <!-- Populated dynamically -->
                                 </div>
-                                <div id="mie-select-note-hint" class="text-xs text-gray-400 italic mt-1">
-                                    Select a note to see next note suggestions →
-                                </div>
                             </div>
 
-                            <!-- Bass Patterns Section (shown when bass clef is focused) -->
-                            <div id="mie-bass-patterns-section" class="flex-shrink-0 hidden">
-                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                                    Bass Patterns
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <select id="mie-bass-pattern-select" class="text-xs border rounded px-2 py-1 bg-white" style="max-width: 140px;">
-                                        <optgroup label="─── Basic ───">
-                                            <option value="whole-note">Whole Note</option>
-                                            <option value="root-fifth">Root-Fifth</option>
-                                            <option value="pedal">Pedal Point</option>
-                                        </optgroup>
-                                        <optgroup label="─── Arpeggiated ───">
-                                            <option value="arpeggio">Arpeggio (Quarter)</option>
-                                            <option value="arpeggio-8th">Arpeggio (8th)</option>
-                                            <option value="alberti">Alberti</option>
-                                            <option value="tremolo">Tremolo</option>
-                                        </optgroup>
-                                        <optgroup label="─── Walking & Jazz ───">
-                                            <option value="walking">Walking Bass</option>
-                                            <option value="bebop">Bebop</option>
-                                            <option value="shell-voicing">Shell Voicing</option>
-                                            <option value="chromatic-approach">Chromatic Approach</option>
-                                            <option value="scalar-walk">Scalar Walk</option>
-                                        </optgroup>
-                                        <optgroup label="─── Stride & Piano ───">
-                                            <option value="stride">Stride</option>
-                                            <option value="arpeggio-stride">Arpeggio Stride</option>
-                                            <option value="ballad-stride">Ballad Stride</option>
-                                            <option value="ragtime">Ragtime</option>
-                                            <option value="tenths">Tenths</option>
-                                        </optgroup>
-                                        <optgroup label="─── Boogie & Blues ───">
-                                            <option value="boogie">Boogie</option>
-                                            <option value="boogie-woogie">Boogie-Woogie</option>
-                                            <option value="shuffle">Shuffle</option>
-                                        </optgroup>
-                                        <optgroup label="─── Rock & Pop ───">
-                                            <option value="driving-rock">Driving Rock</option>
-                                            <option value="power-chord">Power Chord</option>
-                                            <option value="rock-power">Rock Power</option>
-                                            <option value="disco-octave">Disco Octave</option>
-                                            <option value="motown">Motown</option>
-                                            <option value="funk">Funk</option>
-                                        </optgroup>
-                                        <optgroup label="─── Latin & World ───">
-                                            <option value="bossa-nova">Bossa Nova</option>
-                                            <option value="tango">Tango</option>
-                                            <option value="montuno">Montuno</option>
-                                            <option value="reggae">Reggae</option>
-                                            <option value="habanera">Habanera</option>
-                                        </optgroup>
-                                        <optgroup label="─── Country & Folk ───">
-                                            <option value="country">Country</option>
-                                            <option value="ballad">Ballad</option>
-                                            <option value="waltz">Waltz</option>
-                                        </optgroup>
-                                        <optgroup label="─── Classical & Hymn ───">
-                                            <option value="hymn">Hymn Style</option>
-                                            <option value="romantic">Romantic</option>
-                                            <option value="counterpoint">Counterpoint</option>
-                                            <option value="lament">Lament (Descending)</option>
-                                            <option value="descant">Descant</option>
-                                        </optgroup>
-                                        <optgroup label="─── Gospel & Soul ───">
-                                            <option value="gospel">Gospel</option>
-                                            <option value="gospel-run">Gospel Run</option>
-                                        </optgroup>
-                                        <optgroup label="─── Rhythmic ───">
-                                            <option value="syncopated">Syncopated</option>
-                                            <option value="dotted-rhythm">Dotted Rhythm</option>
-                                            <option value="anticipation">Anticipation</option>
-                                            <option value="half-time">Half-Time</option>
-                                            <option value="staccato">Staccato</option>
-                                        </optgroup>
-                                        <optgroup label="─── Polyphonic ───">
-                                            <option value="broken-octave">Broken Octave</option>
-                                            <option value="octave-doubling">Octave Doubling</option>
-                                            <option value="open-fifth">Open Fifth</option>
-                                        </optgroup>
-                                        <optgroup label="─── Special ───">
-                                            <option value="ostinato">Ostinato</option>
-                                            <option value="call-response">Call & Response</option>
-                                            <option value="call-answer">Call & Answer</option>
-                                            <option value="comp">Comp (Jazz)</option>
-                                        </optgroup>
-                                    </select>
-                                    <button id="mie-apply-bass-pattern" class="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
-                                        Apply
-                                    </button>
-                                </div>
-
-                                <!-- Bass Voice Leading Hints (approach notes to next chord) -->
-                                <div id="mie-bass-voice-leading" class="mt-2 pt-2 border-t border-gray-200">
-                                    <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
-                                        Approach Notes
-                                    </div>
-                                    <div id="mie-bass-approach-notes" class="flex gap-1 flex-wrap text-xs">
-                                        <!-- Populated dynamically with approach note suggestions -->
-                                    </div>
-                                </div>
-
-                                <!-- Contrary Motion Helper -->
-                                <div id="mie-contrary-motion" class="mt-2 pt-2 border-t border-gray-200">
-                                    <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
-                                        <svg class="w-3 h-3 rotate-180" fill="currentColor" viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
-                                        Contrary Motion
-                                    </div>
-                                    <div id="mie-contrary-motion-hint" class="text-xs text-gray-600">
-                                        <!-- Shows contrary motion suggestions based on melody -->
-                                    </div>
-                                </div>
-
-                                <!-- Common Bass Progressions -->
-                                <div id="mie-common-bass-progressions" class="mt-2 pt-2 border-t border-gray-200">
-                                    <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                        Common Patterns
-                                    </div>
-                                    <div id="mie-bass-progression-hints" class="text-xs text-gray-600">
-                                        <!-- Shows common bass line patterns for this chord progression -->
-                                    </div>
-                                </div>
-
-                                <!-- Bass Role & Range Guide -->
-                                <div id="mie-bass-tips" class="mt-2 pt-2 border-t border-gray-200">
-                                    <div id="mie-bass-role-indicator" class="text-xs text-gray-600 mb-1">
-                                        <!-- Shows bass role warnings like "Avoid doubling 3rd" -->
-                                    </div>
-                                    <div id="mie-bass-range-guide" class="text-xs text-gray-500">
-                                        <!-- Shows bass range guidance -->
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Next Note Suggestions Section (shown when a note is selected) -->
-                            <div id="mie-next-note-section" class="flex-shrink-0 hidden">
-                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
-                                    Next Note <span class="text-gray-400 font-normal">(Tab to accept)</span>
-                                </div>
-                                <div id="mie-next-note-suggestions" class="flex gap-1 flex-wrap">
-                                    <!-- Populated dynamically -->
-                                </div>
-                            </div>
-
-                            <!-- Melodic Pattern Section (shows contour analysis and suggestions) -->
+                            <!-- TREBLE-SPECIFIC: Melody Pattern Section -->
                             <div id="mie-melodic-pattern-section" class="flex-shrink-0">
                                 <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
@@ -598,8 +457,94 @@ export class MeasureIsolationEditor {
                                 </div>
                             </div>
 
-                            <!-- Rest Suggestions Section -->
-                            <div id="mie-rest-suggestions-section" class="flex-shrink-0 mt-2 pt-2 border-t border-gray-200">
+                            <!-- BASS-SPECIFIC: Bass Tools Section -->
+                            <div id="mie-bass-patterns-section" class="flex-shrink-0 hidden" title="Auto-generate a complete bass line for this measure based on the selected pattern style">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1 cursor-help"
+                                     title="Choose a pattern style, then click Apply to fill this measure with bass notes matching that style">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                    Bass Pattern
+                                </div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <select id="mie-bass-pattern-select" class="text-xs border rounded px-2 py-1 bg-white cursor-help" style="max-width: 120px;"
+                                            title="Whole Note: Single sustained root note&#10;Root-Fifth: Alternates root and 5th&#10;Arpeggio: Plays chord tones in sequence&#10;Walking: Jazz-style stepwise motion&#10;Stride: Left-hand piano style (bass-chord)">
+                                        <optgroup label="─ Basic ─">
+                                            <option value="whole-note" title="Single sustained root note for the entire measure">Whole Note</option>
+                                            <option value="root-fifth" title="Alternates between root and 5th - classic rock/pop pattern">Root-Fifth</option>
+                                            <option value="pedal" title="Repeats the root note - creates drive and momentum">Pedal</option>
+                                        </optgroup>
+                                        <optgroup label="─ Arpeggiated ─">
+                                            <option value="arpeggio" title="Plays chord tones in ascending/descending sequence">Arpeggio</option>
+                                            <option value="alberti" title="Classical broken chord pattern (low-high-mid-high)">Alberti</option>
+                                        </optgroup>
+                                        <optgroup label="─ Jazz ─">
+                                            <option value="walking" title="Stepwise motion connecting chord tones - jazz standard">Walking</option>
+                                            <option value="stride" title="Alternates bass note with chord voicing - stride piano">Stride</option>
+                                        </optgroup>
+                                        <optgroup label="─ Pop/Rock ─">
+                                            <option value="driving-rock" title="Driving eighth notes on root - energetic rock feel">Rock</option>
+                                            <option value="motown" title="Syncopated rhythm with chromatic approaches">Motown</option>
+                                            <option value="funk" title="Syncopated 16th note grooves with ghost notes">Funk</option>
+                                        </optgroup>
+                                        <optgroup label="─ Other ─">
+                                            <option value="bossa-nova" title="Brazilian syncopated pattern - bossa nova rhythm">Bossa</option>
+                                            <option value="country" title="Root-fifth alternating bass - country/folk style">Country</option>
+                                            <option value="waltz" title="Oom-pah-pah pattern for 3/4 time">Waltz</option>
+                                        </optgroup>
+                                    </select>
+                                    <button id="mie-apply-bass-pattern" class="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                                            title="Replace current bass notes with the selected pattern. This will overwrite any existing bass notes in this measure.">
+                                        Apply
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- BASS-SPECIFIC: Approach Notes Section -->
+                            <div id="mie-bass-approach-section" class="flex-shrink-0 hidden"
+                                 title="Approach notes lead smoothly into the next chord. Place these near the end of the measure to create smooth voice leading.">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1 cursor-help"
+                                     title="Click a note to add it. These notes resolve stepwise to the next chord's root, creating smooth bass motion.">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                                    Approach → Next
+                                </div>
+                                <div id="mie-bass-approach-notes" class="flex gap-1 text-xs">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- BASS-SPECIFIC: Tips Section -->
+                            <div id="mie-bass-tips-section" class="flex-shrink-0 hidden"
+                                 title="Context-aware suggestions based on chord function and melody direction">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1 cursor-help"
+                                     title="Tips based on harmonic function and voice leading principles">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                                    Tips
+                                </div>
+                                <div id="mie-bass-tips-content" class="flex gap-2 text-xs flex-wrap">
+                                    <!-- Populated dynamically: role indicator, contrary motion hint -->
+                                </div>
+                            </div>
+
+                            <!-- Next Note Suggestions Section (shown when a note is selected) -->
+                            <div id="mie-next-note-section" class="flex-shrink-0 hidden">
+                                <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                                    Next Note <span class="text-gray-400 font-normal">(Tab)</span>
+                                </div>
+                                <div id="mie-next-note-suggestions" class="flex gap-1 flex-wrap">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Hidden legacy containers -->
+                            <div id="mie-bass-voice-leading" class="hidden"></div>
+                            <div id="mie-bass-tips" class="hidden"></div>
+                            <div id="mie-contrary-motion" class="hidden"><div id="mie-contrary-motion-hint"></div></div>
+                            <div id="mie-common-bass-progressions" class="hidden"><div id="mie-bass-progression-hints"></div></div>
+                            <div id="mie-bass-role-indicator" class="hidden"></div>
+                            <div id="mie-bass-range-guide" class="hidden"></div>
+
+                            <!-- Rest Suggestions Section - Hidden for now (too simplistic) -->
+                            <div id="mie-rest-suggestions-section" class="flex-shrink-0 hidden">
                                 <div class="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                                     <span class="text-lg leading-none">𝄽</span>
                                     Rest Suggestions
@@ -661,8 +606,9 @@ export class MeasureIsolationEditor {
                         </button>
                     </div>
                     <div class="flex gap-2">
-                        <button id="mie-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-200 transition-colors">Cancel</button>
-                        <button id="mie-apply-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Apply Changes</button>
+                        <button id="mie-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-200 transition-colors" title="Discard all changes and close">Cancel</button>
+                        <button id="mie-apply-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors" title="Apply changes (stays open)">Apply</button>
+                        <button id="mie-close-apply-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors" title="Apply and close">Close</button>
                     </div>
                 </div>
             </div>
@@ -821,14 +767,17 @@ export class MeasureIsolationEditor {
      * Attach all event listeners
      */
     _attachEventListeners() {
-        // Close button
-        this.modal.querySelector('#mie-close-btn')?.addEventListener('click', () => this.cancel());
-
-        // Cancel button
+        // Cancel button - discards changes and closes
         this.modal.querySelector('#mie-cancel-btn')?.addEventListener('click', () => this.cancel());
 
-        // Apply button
-        this.modal.querySelector('#mie-apply-btn')?.addEventListener('click', () => this.apply());
+        // Apply button - applies changes but keeps modal open
+        this.modal.querySelector('#mie-apply-btn')?.addEventListener('click', () => this.applyWithoutClose());
+
+        // Close button (header X) - applies changes and closes modal
+        this.modal.querySelector('#mie-close-btn')?.addEventListener('click', () => this.apply());
+
+        // Close button (footer) - applies changes and closes modal
+        this.modal.querySelector('#mie-close-apply-btn')?.addEventListener('click', () => this.apply());
 
         // Duration buttons
         this.modal.querySelectorAll('.mie-dur-btn').forEach(btn => {
@@ -1429,14 +1378,29 @@ export class MeasureIsolationEditor {
         const tensions = this._getAvailableTensions(chord);
         this._renderTensionButtons('mie-tensions', tensions, chord.root);
 
-        // Show/hide bass patterns section based on focused clef
+        // Show/hide clef-specific sections based on toggle
+        const isBass = this.focusedClef === 'bass';
+        const isTreble = !isBass;
+
+        // Treble-specific sections (hide when bass is selected)
+        const melodicPatternSection = this.modal.querySelector('#mie-melodic-pattern-section');
+        if (melodicPatternSection) melodicPatternSection.classList.toggle('hidden', !isTreble);
+
+        // Tensions - hide for bass (tensions like 9, 11, 13 are melodic, not bass notes)
+        const tensionsSection = this.modal.querySelector('#mie-tensions-section');
+        if (tensionsSection) tensionsSection.classList.toggle('hidden', isBass);
+
+        // Bass-specific sections (hide when treble is selected)
         const bassPatternsSection = this.modal.querySelector('#mie-bass-patterns-section');
-        if (bassPatternsSection) {
-            bassPatternsSection.classList.toggle('hidden', this.focusedClef !== 'bass');
-        }
+        const bassApproachSection = this.modal.querySelector('#mie-bass-approach-section');
+        const bassTipsSection = this.modal.querySelector('#mie-bass-tips-section');
+
+        if (bassPatternsSection) bassPatternsSection.classList.toggle('hidden', !isBass);
+        if (bassApproachSection) bassApproachSection.classList.toggle('hidden', !isBass);
+        if (bassTipsSection) bassTipsSection.classList.toggle('hidden', !isBass);
 
         // Update bass-specific hints when bass clef is focused
-        if (this.focusedClef === 'bass') {
+        if (isBass) {
             this._updateBassHints();
         }
 
@@ -1445,7 +1409,7 @@ export class MeasureIsolationEditor {
     }
 
     /**
-     * Update bass-specific hints: approach notes, role indicators, range guide
+     * Update bass-specific hints: approach notes and tips (role, contrary motion)
      */
     _updateBassHints() {
         const chord = this.measureChord;
@@ -1457,98 +1421,148 @@ export class MeasureIsolationEditor {
         // Update approach notes section
         this._renderBassApproachNotes(chord, nextChord);
 
-        // Update contrary motion helper
-        this._renderContraryMotionHint();
-
-        // Update common bass progressions
-        this._renderCommonBassProgressions(chord, nextChord);
-
-        // Update bass role indicator
-        this._renderBassRoleIndicator(chord);
-
-        // Update bass range guide
-        this._renderBassRangeGuide();
+        // Update tips section (role + contrary motion)
+        this._renderBassTips(chord);
     }
 
     /**
-     * Render bass approach notes - suggests notes that lead smoothly to the next chord's root
+     * Render bass tips section with role indicator and contrary motion hint
+     */
+    _renderBassTips(chord) {
+        const container = this.modal.querySelector('#mie-bass-tips-content');
+        if (!container) return;
+
+        const tips = [];
+
+        // 1. Chord function/role indicator with detailed tooltip
+        const roleInfo = this._getChordRoleInfo(chord);
+        if (roleInfo) {
+            tips.push(`<span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200 cursor-help"
+                             title="${roleInfo.tooltip}">${roleInfo.label}</span>`);
+        }
+
+        // 2. Contrary motion hint based on melody direction
+        const trebleNotes = this._getNotesInClef('treble');
+        if (trebleNotes.length >= 2) {
+            const melodyDirection = this._analyzeMelodyDirection(trebleNotes.slice(-3));
+            if (melodyDirection === 'ascending') {
+                tips.push(`<span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 cursor-help"
+                                 title="Contrary Motion: Your melody is rising. Moving the bass DOWN creates contrary motion - the strongest type of voice leading. Try stepping down to a lower chord tone.">↑mel → ↓bass</span>`);
+            } else if (melodyDirection === 'descending') {
+                tips.push(`<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700 border border-green-200 cursor-help"
+                                 title="Contrary Motion: Your melody is falling. Moving the bass UP creates contrary motion - the strongest type of voice leading. Try stepping up to a higher chord tone.">↓mel → ↑bass</span>`);
+            }
+        } else {
+            tips.push(`<span class="px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 border border-gray-200 cursor-help"
+                             title="Add 2+ melody notes to see contrary motion suggestions. Contrary motion (bass moves opposite to melody) creates the strongest voice leading.">No melody yet</span>`);
+        }
+
+        // 3. Range reminder with detailed tooltip
+        tips.push(`<span class="text-gray-400 text-[10px] cursor-help"
+                         title="Bass clef comfortable range: E1 (lowest) to C4 (highest). The sweet spot is E2-G3. Notes below E2 can sound muddy; notes above G3 may clash with the melody.">Range: E1–C4</span>`);
+
+        container.innerHTML = tips.join('');
+    }
+
+    /**
+     * Get chord role info with label and detailed tooltip
+     */
+    _getChordRoleInfo(chord) {
+        if (!chord || !chord.root) return null;
+
+        const key = this.currentKey || 'C';
+        const keyRoot = key.replace(/m$|maj$|min$|Major$|Minor$/i, '');
+
+        const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const ENHARMONIC = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
+        let chordRoot = chord.root;
+        if (ENHARMONIC[chordRoot]) chordRoot = ENHARMONIC[chordRoot];
+        let keyNote = keyRoot;
+        if (ENHARMONIC[keyNote]) keyNote = ENHARMONIC[keyNote];
+
+        const chordIndex = ALL_NOTES.indexOf(chordRoot);
+        const keyIndex = ALL_NOTES.indexOf(keyNote);
+
+        if (chordIndex === -1 || keyIndex === -1) return null;
+
+        const interval = (chordIndex - keyIndex + 12) % 12;
+
+        // Map to scale degree function with detailed explanations
+        const roleData = {
+            0: {
+                label: 'I - Tonic',
+                tooltip: 'TONIC (I): Home base. The bass should feel grounded here. Root position is strongest. This chord provides resolution and stability.'
+            },
+            2: {
+                label: 'ii - Pre-Dom',
+                tooltip: 'PRE-DOMINANT (ii): Sets up the dominant. Bass often moves by step (ii→V) or by fifth. Creates forward motion toward the V chord.'
+            },
+            4: {
+                label: 'iii',
+                tooltip: 'MEDIANT (iii): Tonic substitute or passing chord. Bass can move by step in either direction. Often connects I and IV or vi.'
+            },
+            5: {
+                label: 'IV - Subdom',
+                tooltip: 'SUBDOMINANT (IV): Creates gentle tension. Bass often moves to V (up a step) or back to I. The "amen" chord in plagal cadences.'
+            },
+            7: {
+                label: 'V - Dominant',
+                tooltip: 'DOMINANT (V): Maximum tension, wants to resolve to I. The bass on the 5th scale degree creates strong pull. Root position is most powerful.'
+            },
+            9: {
+                label: 'vi',
+                tooltip: 'SUBMEDIANT (vi): Tonic substitute, relative minor. Creates softer feel than I. Bass often moves by step to V or IV.'
+            },
+            11: {
+                label: 'vii°',
+                tooltip: 'LEADING TONE (vii°): Dominant substitute, very unstable. Bass usually moves up by half step to I. Rarely used in root position.'
+            }
+        };
+
+        return roleData[interval] || null;
+    }
+
+    /**
+     * Render bass approach notes - compact inline display of approach notes to next chord
      */
     _renderBassApproachNotes(currentChord, nextChord) {
         const container = this.modal.querySelector('#mie-bass-approach-notes');
         if (!container) return;
 
         if (!nextChord || !nextChord.root) {
-            container.innerHTML = '<span class="text-gray-400 italic">Last measure - no next chord</span>';
+            container.innerHTML = '<span class="text-gray-400 italic text-[10px] cursor-help" title="This is the last measure in your progression. Approach notes help connect to the NEXT chord.">No next chord</span>';
             return;
         }
 
         const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const ENHARMONIC_MAP = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
 
-        // Get the next chord's root (target)
         let nextRoot = nextChord.root;
-        if (ENHARMONIC_MAP[nextRoot]) {
-            nextRoot = ENHARMONIC_MAP[nextRoot];
-        }
+        if (ENHARMONIC_MAP[nextRoot]) nextRoot = ENHARMONIC_MAP[nextRoot];
         const targetIndex = ALL_NOTES.indexOf(nextRoot);
         if (targetIndex === -1) {
             container.innerHTML = '';
             return;
         }
 
-        // Calculate approach notes
-        const approaches = [];
-
-        // Half-step below (leading tone approach)
+        // Show just the 2 most useful approach notes (half-step below + fifth above)
         const halfStepBelow = ALL_NOTES[(targetIndex - 1 + 12) % 12];
-        approaches.push({
-            note: halfStepBelow,
-            label: `↑${nextChord.root}`,
-            type: 'chromatic',
-            description: 'Half-step below (leading tone)'
-        });
-
-        // Half-step above (chromatic approach from above)
-        const halfStepAbove = ALL_NOTES[(targetIndex + 1) % 12];
-        approaches.push({
-            note: halfStepAbove,
-            label: `↓${nextChord.root}`,
-            type: 'chromatic',
-            description: 'Half-step above'
-        });
-
-        // Fifth above (dominant approach)
         const fifthAbove = ALL_NOTES[(targetIndex + 7) % 12];
-        approaches.push({
-            note: fifthAbove,
-            label: `V→I`,
-            type: 'dominant',
-            description: 'Fifth above (dominant motion)'
-        });
 
-        // Whole-step below (scale degree approach)
-        const wholeStepBelow = ALL_NOTES[(targetIndex - 2 + 12) % 12];
-        approaches.push({
-            note: wholeStepBelow,
-            label: `2↑`,
-            type: 'scale',
-            description: 'Whole-step below'
-        });
-
-        // Render approach note buttons
-        container.innerHTML = approaches.map(approach => {
-            const colorClass = approach.type === 'chromatic' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                              approach.type === 'dominant' ? 'bg-amber-100 text-amber-700 border-amber-300' :
-                              'bg-blue-100 text-blue-700 border-blue-300';
-            return `
-                <button class="px-2 py-1 rounded border ${colorClass} hover:opacity-80 transition-opacity"
-                        onclick="window.mieInstance && window.mieInstance._playAndPlaceNote('${approach.note}2')"
-                        title="${approach.description} → ${nextChord.root}">
-                    <span class="font-medium">${approach.note}</span>
-                    <span class="text-[10px] opacity-70">${approach.label}</span>
-                </button>
-            `;
-        }).join('');
+        container.innerHTML = `
+            <button class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200"
+                    onclick="window.mieInstance && window.mieInstance._playAndPlaceNote('${halfStepBelow}2')"
+                    title="CHROMATIC APPROACH: ${halfStepBelow} is a half-step below ${nextChord.root}. Place this on the last beat to create smooth chromatic voice leading into the next measure. The ↑ indicates it resolves upward.">
+                ${halfStepBelow}↑
+            </button>
+            <button class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+                    onclick="window.mieInstance && window.mieInstance._playAndPlaceNote('${fifthAbove}2')"
+                    title="DOMINANT APPROACH: ${fifthAbove} is the 5th above ${nextChord.root} (V→I relationship). This creates the strongest harmonic pull - the classic 'dominant to tonic' bass motion.">
+                ${fifthAbove}
+            </button>
+            <span class="text-gray-400 text-[10px] cursor-help" title="These notes lead smoothly into ${nextChord.root} (the next chord's root). Place them near the end of this measure.">→${nextChord.root}</span>
+        `;
     }
 
     /**
@@ -2730,8 +2744,42 @@ export class MeasureIsolationEditor {
      */
     _setFocusedClef(clef) {
         this.focusedClef = clef;
+        this._updateClefToggleUI();
         this._updateSuggestionsPanel();
         this._renderMelodicPatterns();  // Update melodic suggestions for new clef
+    }
+
+    /**
+     * Handle clef toggle button click from Smart Suggestions header
+     * @param {string} clef - 'treble' or 'bass'
+     */
+    _setClefToggle(clef) {
+        this.focusedClef = clef;
+        this._updateClefToggleUI();
+        this._updateSuggestionsPanel();
+        this._renderMelodicPatterns();
+    }
+
+    /**
+     * Update the clef toggle button UI to reflect current focusedClef state
+     */
+    _updateClefToggleUI() {
+        const trebleBtn = this.modal.querySelector('#mie-clef-treble-btn');
+        const bassBtn = this.modal.querySelector('#mie-clef-bass-btn');
+
+        if (!trebleBtn || !bassBtn) return;
+
+        const isTreble = this.focusedClef === 'treble';
+
+        // Active button: purple bg, white text
+        // Inactive button: text only, hover effect
+        if (isTreble) {
+            trebleBtn.className = 'px-2 py-0.5 text-xs font-medium rounded-full transition-colors bg-purple-600 text-white';
+            bassBtn.className = 'px-2 py-0.5 text-xs font-medium rounded-full transition-colors text-purple-600 hover:bg-purple-100';
+        } else {
+            trebleBtn.className = 'px-2 py-0.5 text-xs font-medium rounded-full transition-colors text-purple-600 hover:bg-purple-100';
+            bassBtn.className = 'px-2 py-0.5 text-xs font-medium rounded-full transition-colors bg-purple-600 text-white';
+        }
     }
 
     /**
@@ -6305,6 +6353,32 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Apply changes without closing - allows user to continue editing
+     */
+    applyWithoutClose() {
+        if (!this.slotGrid || this.centerMeasureIndex === null) {
+            return;
+        }
+
+        // Apply changes
+        this._applyChangesToCompositionState();
+
+        // Show confirmation
+        this._updateStatus('✓ Changes applied');
+
+        // Reset status after a moment
+        setTimeout(() => {
+            if (this.selectedNote) {
+                this._updateStatusForSelectedNote();
+            } else {
+                this._updateStatus('Click on staff to add notes');
+            }
+        }, 1500);
+
+        console.log('[MeasureIsolationEditor] Applied changes (staying open)');
+    }
+
+    /**
      * Apply changes and close
      */
     apply() {
@@ -6336,6 +6410,8 @@ let editorInstance = null;
 export function getMeasureIsolationEditor(options = {}) {
     if (!editorInstance) {
         editorInstance = new MeasureIsolationEditor(options);
+        // Expose on window for inline onclick handlers
+        window.mieInstance = editorInstance;
     } else if (options.compositionState) {
         editorInstance.compositionState = options.compositionState;
     }
@@ -6347,6 +6423,8 @@ export function getMeasureIsolationEditor(options = {}) {
  */
 export function openMeasureIsolationEditor(measureIndex, options = {}) {
     const editor = getMeasureIsolationEditor(options);
+    // Ensure window reference is set (in case editor was created differently)
+    window.mieInstance = editor;
     if (options.onApply) editor.onApplyCallback = options.onApply;
     if (options.onCancel) editor.onCancelCallback = options.onCancel;
     editor.open(measureIndex);
