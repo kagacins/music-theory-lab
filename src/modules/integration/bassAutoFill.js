@@ -266,7 +266,8 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
     // Set module-level key for enharmonic preference in note generation
     currentBassKey = key;
 
-    if (!chord || !chord.root) {
+    // Return empty notes for missing chord data or "No Chord" type
+    if (!chord || !chord.root || chord.type === 'No Chord') {
         return { notes: [] };
     }
 
@@ -301,6 +302,11 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
  */
 function getChordNotesInBassRegister(chord, baseOctave = 2) {
     const upperOctave = baseOctave + 1;
+
+    // Handle No Chord or missing root - return empty array
+    if (!chord.root || chord.type === 'No Chord') {
+        return [];
+    }
 
     if (!chord.notes || chord.notes.length === 0) {
         // Fallback: just use root note
@@ -995,7 +1001,8 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
     // Set module-level key for enharmonic preference in note generation
     currentBassKey = key;
 
-    if (!chord || !chord.root) {
+    // Return empty array for missing chord data or "No Chord" type
+    if (!chord || !chord.root || chord.type === 'No Chord') {
         return [];
     }
 

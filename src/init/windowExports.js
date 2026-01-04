@@ -1911,7 +1911,14 @@ export function setupWindowExports() {
             }
         }
 
-        // Regenerate all bass
+        // Force rebuild of chord segments to ensure they're current
+        if (typeof compositionState.buildChordSegments === 'function') {
+            compositionState.buildChordSegments();
+        }
+
+        // Regenerate all bass - this writes directly to measures
+        // Do NOT call renderBassBlocksToMeasures() after this as it would overwrite
+        // the generated notes with the (unchanged) building block contents
         if (typeof compositionState.regenerateAllAutoBassByBuildingBlock === 'function') {
             compositionState.regenerateAllAutoBassByBuildingBlock();
         }
@@ -1948,6 +1955,11 @@ export function setupWindowExports() {
 
         const trainerState = window.getTrainerState ? window.getTrainerState() : null;
 
+        // Force rebuild of chord segments to ensure they're current
+        if (typeof compositionState.buildChordSegments === 'function') {
+            compositionState.buildChordSegments();
+        }
+
         let successCount = 0;
         for (const chordIndex of selectedIndices) {
             if (compositionState.setChordBassPattern(chordIndex, bassPattern)) {
@@ -1957,6 +1969,10 @@ export function setupWindowExports() {
                 successCount++;
             }
         }
+
+        // setChordBassPattern already calls regenerateAutoBassByChordIndex which writes
+        // directly to measures. Do NOT call renderBassBlocksToMeasures() as it would
+        // overwrite the generated notes with the (unchanged) building block contents.
 
         window.refreshNotationFromProgression && window.refreshNotationFromProgression();
         window.renderProgressionDisplay && window.renderProgressionDisplay();
@@ -1984,6 +2000,11 @@ export function setupWindowExports() {
 
         const trainerState = window.getTrainerState ? window.getTrainerState() : null;
 
+        // Force rebuild of chord segments to ensure they're current
+        if (typeof compositionState.buildChordSegments === 'function') {
+            compositionState.buildChordSegments();
+        }
+
         let successCount = 0;
         for (const chordIndex of selectedIndices) {
             // Clear per-chord pattern
@@ -2001,6 +2022,9 @@ export function setupWindowExports() {
                 }
             }
         }
+
+        // placeChordVoicingInBassForChord writes directly to measures.
+        // Do NOT call renderBassBlocksToMeasures() as it would overwrite.
 
         window.refreshNotationFromProgression && window.refreshNotationFromProgression();
         window.renderProgressionDisplay && window.renderProgressionDisplay();
@@ -2034,6 +2058,11 @@ export function setupWindowExports() {
 
         const trainerState = window.getTrainerState ? window.getTrainerState() : null;
 
+        // Force rebuild of chord segments to ensure they're current
+        if (typeof compositionState.buildChordSegments === 'function') {
+            compositionState.buildChordSegments();
+        }
+
         // Clear all per-chord patterns
         if (compositionState.storedProgressionData) {
             for (let i = 0; i < compositionState.storedProgressionData.length; i++) {
@@ -2054,6 +2083,9 @@ export function setupWindowExports() {
                 compositionState.placeChordVoicingInBassForChord(i);
             }
         }
+
+        // placeChordVoicingInBassForChord writes directly to measures.
+        // Do NOT call renderBassBlocksToMeasures() as it would overwrite.
 
         window.refreshNotationFromProgression && window.refreshNotationFromProgression();
         window.renderProgressionDisplay && window.renderProgressionDisplay();

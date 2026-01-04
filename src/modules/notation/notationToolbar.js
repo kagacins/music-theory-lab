@@ -170,6 +170,10 @@ export class NotationToolbar {
     this.selectionTied = null;  // null = no selection, 'mixed' = multiple, true/false = all same
     this.selectionTuplet = null;  // null = no tuplet, 'triplet'/'quintuplet'/'sextuplet' = all same tuplet type
     this.selectionMeasureIndices = new Set();  // Measure indices of selected notes (for volta highlighting)
+    this.selectionOrnament = null;  // null = none, 'mixed' = multiple, 'trill'/'mordent'/etc = all same
+    this.selectionHasSlur = false;  // true if all selected notes are part of a slur
+    this.selectionHasHairpin = null;  // null = none, 'crescendo'/'decrescendo' = all same, 'mixed' = multiple
+    this.selectionGraceNote = null;  // null = none, 'acciaccatura'/'appoggiatura' = all same, 'mixed' = multiple
 
     // Callbacks
     this.onDurationChange = options.onDurationChange || (() => {});
@@ -553,7 +557,7 @@ export class NotationToolbar {
         <!-- TIER 2: EXPANDED (Click to Show) -->
         <div class="toolbar-tier toolbar-tier-2 ${this.isTier2Expanded ? 'expanded' : 'collapsed'}">
           <!-- Voice Selection (grouped with V2 Rests) -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-voice">
             <span class="group-label">Voice</span>
             <div class="toolbar-group-content">
               <select class="voice-select" title="Voice (V to cycle)">
@@ -564,7 +568,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Voice 2 Rest Display (grouped with Voice) -->
-          <div class="toolbar-group tier2-group rest-display-section">
+          <div class="toolbar-group tier2-group rest-display-section group-voice">
             <span class="group-label">V2 Rests</span>
             <div class="toolbar-group-content">
               <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean mode - hide redundant rests">Clean</button>
@@ -573,7 +577,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Edit Actions -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-edit">
             <span class="group-label">Edit</span>
             <div class="toolbar-group-content">
               <button class="toolbar-btn undo-btn" data-action="undo" title="Undo (Ctrl+Z)">↩</button>
@@ -583,7 +587,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Copy/Paste -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-edit">
             <span class="group-label">Clip</span>
             <div class="toolbar-group-content">
               <button class="toolbar-btn copy-btn" data-action="copy" title="Copy (Ctrl+C)">📋</button>
@@ -593,7 +597,7 @@ export class NotationToolbar {
           </div>
 
           <!-- View Options -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-view">
             <span class="group-label">View</span>
             <div class="toolbar-group-content">
               <select class="time-signature-select" title="Time signature">
@@ -611,7 +615,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Tuplets -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-rhythm">
             <span class="group-label">Tuplet</span>
             <div class="toolbar-group-content">
               <button class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'triplet' ? 'active' : ''}" data-tuplet="triplet" title="Triplet">3</button>
@@ -621,7 +625,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Articulations -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-expression">
             <span class="group-label">Artic.</span>
             <div class="toolbar-group-content">
               ${ARTICULATIONS.map(a => `
@@ -631,7 +635,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Dynamics -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-expression">
             <span class="group-label">Dynamics</span>
             <div class="toolbar-group-content dynamics-buttons">
               ${DYNAMICS.map(d => `
@@ -641,7 +645,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Hairpins -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-expression">
             <span class="group-label">Hairpin</span>
             <div class="toolbar-group-content">
               ${HAIRPINS.map(h => `
@@ -652,7 +656,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Tie Button -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-connect">
             <span class="group-label">Tie</span>
             <div class="toolbar-group-content">
               <button class="toolbar-btn tie-btn" data-action="tie" title="Tie notes (T)">⁀</button>
@@ -660,7 +664,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Slur Button -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-connect">
             <span class="group-label">Slur</span>
             <div class="toolbar-group-content">
               <button class="toolbar-btn slur-btn" data-action="slur" title="Slur (select 2+ notes)">⌢</button>
@@ -669,7 +673,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Ornaments -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-ornament">
             <span class="group-label">Ornament</span>
             <div class="toolbar-group-content ornament-buttons">
               ${ORNAMENTS.map(o => `
@@ -680,7 +684,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Grace Notes -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-ornament">
             <span class="group-label">Grace</span>
             <div class="toolbar-group-content grace-note-buttons">
               ${GRACE_NOTES.map(g => `
@@ -693,7 +697,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Tempo Markings -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-structure">
             <span class="group-label">Tempo</span>
             <div class="toolbar-group-content tempo-buttons">
               <select class="tempo-select" title="Select tempo marking">
@@ -706,7 +710,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Repeat Signs -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-structure">
             <span class="group-label">Repeat</span>
             <div class="toolbar-group-content repeat-buttons">
               ${REPEAT_SIGNS.map(r => `
@@ -716,7 +720,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Volta Brackets (1st/2nd Endings) -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group group-structure">
             <span class="group-label">Endings</span>
             <div class="toolbar-group-content volta-buttons">
               ${VOLTA_BRACKETS.map(v => `
@@ -732,7 +736,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Chord Symbol (in Tier 2) -->
-          <div class="toolbar-group tier2-group chord-group">
+          <div class="toolbar-group tier2-group group-text chord-group">
             <span class="group-label">Chord</span>
             <div class="toolbar-group-content">
               <input type="text" class="chord-symbol-input" placeholder="Cmaj7" title="Chord symbol">
@@ -741,7 +745,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Lyric Input (in Tier 2) -->
-          <div class="toolbar-group tier2-group lyric-group">
+          <div class="toolbar-group tier2-group group-text lyric-group">
             <span class="group-label">Lyric</span>
             <div class="toolbar-group-content">
               <input type="text" class="lyric-input" placeholder="la" title="Lyric syllable">
@@ -756,7 +760,7 @@ export class NotationToolbar {
           </div>
 
           <!-- Pedal Markings (in Tier 2) -->
-          <div class="toolbar-group tier2-group pedal-group">
+          <div class="toolbar-group tier2-group group-piano pedal-group">
             <span class="group-label">Pedal</span>
             <div class="toolbar-group-content">
               <button class="toolbar-btn pedal-btn" data-pedal="down" title="Pedal down (Ped.)">Ped</button>
@@ -767,13 +771,14 @@ export class NotationToolbar {
           </div>
 
           <!-- Beam Controls (in Tier 2) -->
-          <div class="toolbar-group tier2-group beam-group">
+          <div class="toolbar-group tier2-group group-rhythm beam-group">
             <span class="group-label">Beam</span>
             <div class="toolbar-group-content">
-              <button class="toolbar-btn beam-btn" data-beam="start" title="Start beam group">[</button>
-              <button class="toolbar-btn beam-btn" data-beam="end" title="End beam group">]</button>
-              <button class="toolbar-btn beam-btn" data-beam="break" title="Break beam (force separate beams)">⊘</button>
-              <button class="toolbar-btn beam-btn beam-clear" data-beam="clear" title="Clear manual beaming">✕</button>
+              <button class="toolbar-btn beam-btn" data-beam="start" title="Force start of new beam group here">[</button>
+              <button class="toolbar-btn beam-btn" data-beam="end" title="Force end of beam group here">]</button>
+              <button class="toolbar-btn beam-btn" data-beam="breakBetween" title="Break beams between selected notes (select 2+ notes)">⊥</button>
+              <button class="toolbar-btn beam-btn" data-beam="unbeam" title="Remove this note from beaming entirely">⊘</button>
+              <button class="toolbar-btn beam-btn beam-clear" data-beam="clear" title="Clear manual beam settings">✕</button>
             </div>
           </div>
         </div>
@@ -1095,25 +1100,40 @@ export class NotationToolbar {
          ORIGINAL STYLES (preserved)
          ================================================================ */
 
-      /* Toolbar groups with labels */
+      /* Toolbar groups with labels - enhanced visual grouping */
       .toolbar-group {
         display: flex;
         flex-direction: column;
         gap: 2px;
-        padding: 4px 6px;
-        background: rgba(255,255,255,0.03);
-        border-radius: 4px;
-        border: 1px solid rgba(255,255,255,0.05);
+        padding: 5px 8px;
+        background: rgba(255,255,255,0.04);
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,0.12);
+        position: relative;
+        margin: 0 1px;
+      }
+
+      /* Subtle top accent line for all groups (neutral gray for non-specialized) */
+      .toolbar-group::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 6px;
+        right: 6px;
+        height: 2px;
+        border-radius: 1px;
+        background: linear-gradient(90deg, rgba(255,255,255,0.25), rgba(255,255,255,0.15));
+        opacity: 0.5;
       }
 
       .group-label {
         font-size: 9px;
-        font-weight: 600;
-        color: var(--text-muted, #888);
+        font-weight: 700;
+        color: #a8a8a8;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.7px;
         text-align: center;
-        margin-bottom: 2px;
+        margin-bottom: 3px;
       }
 
       .toolbar-group-content {
@@ -1146,7 +1166,7 @@ export class NotationToolbar {
       .notation-floating-palette .toolbar-btn {
         width: 32px;
         height: 32px;
-        border: none;
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 4px;
         background: var(--bg-tertiary, #333);
         color: var(--text-primary, #fff);
@@ -1161,6 +1181,7 @@ export class NotationToolbar {
       .notation-toolbar .toolbar-btn:hover,
       .notation-floating-palette .toolbar-btn:hover {
         background: var(--bg-hover, #444);
+        border-color: rgba(255, 255, 255, 0.2);
       }
 
       .notation-toolbar .toolbar-btn:focus,
@@ -1468,55 +1489,71 @@ export class NotationToolbar {
         padding: 0;
         font-size: 12px;
         font-weight: 600;
+        background: linear-gradient(135deg, #4a4a4a, #3a3a3a);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.15s ease;
       }
 
-      /* Pedal button styles */
-      .pedal-btn {
-        min-width: 28px;
-        padding: 4px 8px;
-        font-size: 11px;
-        font-weight: 600;
+      .apply-lyric-btn:hover {
+        background: linear-gradient(135deg, #5a5a5a, #4a4a4a);
+        border-color: rgba(255, 255, 255, 0.2);
       }
 
-      .pedal-btn[data-pedal="down"] {
-        background: linear-gradient(135deg, #4ade80, #22c55e);
+      .apply-lyric-btn.active {
+        background: linear-gradient(135deg, #ec4899, #db2777);
+        border-color: #ec4899;
       }
 
+      /* ============================================
+         CATEGORY-BASED GROUP COLORING
+         Unified color scheme for all toolbar groups
+         ============================================ */
+
+      /* Voice groups - Cyan/Teal */
+      .group-voice::before { background: linear-gradient(90deg, #22d3d8, #14b8a6) !important; }
+      .group-voice .group-label { color: #5eead4 !important; }
+
+      /* Edit groups - Red/Coral */
+      .group-edit::before { background: linear-gradient(90deg, #ef4444, #dc2626) !important; }
+      .group-edit .group-label { color: #fca5a5 !important; }
+
+      /* View groups - Blue */
+      .group-view::before { background: linear-gradient(90deg, #3b82f6, #2563eb) !important; }
+      .group-view .group-label { color: #93c5fd !important; }
+
+      /* Rhythm groups (Tuplet, Beam) - Purple/Violet */
+      .group-rhythm::before { background: linear-gradient(90deg, #8b5cf6, #7c3aed) !important; }
+      .group-rhythm .group-label { color: #c4b5fd !important; }
+
+      /* Expression groups (Artic, Dynamics, Hairpin) - Orange/Amber */
+      .group-expression::before { background: linear-gradient(90deg, #f59e0b, #d97706) !important; }
+      .group-expression .group-label { color: #fcd34d !important; }
+
+      /* Connection groups (Tie, Slur) - Rose/Pink */
+      .group-connect::before { background: linear-gradient(90deg, #f43f5e, #e11d48) !important; }
+      .group-connect .group-label { color: #fda4af !important; }
+
+      /* Ornament groups (Ornament, Grace) - Emerald/Green */
+      .group-ornament::before { background: linear-gradient(90deg, #10b981, #059669) !important; }
+      .group-ornament .group-label { color: #6ee7b7 !important; }
+
+      /* Structure groups (Tempo, Repeat, Endings) - Indigo/Blue */
+      .group-structure::before { background: linear-gradient(90deg, #6366f1, #4f46e5) !important; }
+      .group-structure .group-label { color: #a5b4fc !important; }
+
+      /* Text groups (Chord, Lyric) - Pink/Magenta */
+      .group-text::before { background: linear-gradient(90deg, #ec4899, #db2777) !important; }
+      .group-text .group-label { color: #f9a8d4 !important; }
+
+      /* Piano groups (Pedal) - Lime/Green */
+      .group-piano::before { background: linear-gradient(90deg, #84cc16, #65a30d) !important; }
+      .group-piano .group-label { color: #bef264 !important; }
+
+      /* Pedal/Beam/Lyric buttons - use standard toolbar-btn styling
+         Active state uses category accent color (group-piano for pedal, group-rhythm for beam)
+         This ensures consistency with all other toolbar buttons */
       .pedal-btn[data-pedal="up"] {
-        background: linear-gradient(135deg, #f87171, #ef4444);
         font-size: 14px;
-      }
-
-      .pedal-btn[data-pedal="change"] {
-        background: linear-gradient(135deg, #60a5fa, #3b82f6);
-      }
-
-      .pedal-btn[data-pedal="half"] {
-        background: linear-gradient(135deg, #fbbf24, #f59e0b);
-      }
-
-      /* Beam button styles */
-      .beam-btn {
-        min-width: 28px;
-        padding: 4px 8px;
-        font-size: 14px;
-        font-weight: 600;
-      }
-
-      .beam-btn[data-beam="start"] {
-        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
-      }
-
-      .beam-btn[data-beam="end"] {
-        background: linear-gradient(135deg, #c084fc, #a855f7);
-      }
-
-      .beam-btn[data-beam="break"] {
-        background: linear-gradient(135deg, #fb923c, #f97316);
-      }
-
-      .beam-btn[data-beam="clear"] {
-        background: linear-gradient(135deg, #6b7280, #4b5563);
       }
 
       /* 2nd Voice options group - subtle highlight */
@@ -1529,14 +1566,9 @@ export class NotationToolbar {
         color: var(--accent-color, #4a9eff);
       }
 
-      /* Rest display mode section */
+      /* Rest display mode section - inherits group-voice coloring */
       .rest-display-section {
-        border-left: none;
-        padding-left: 0;
-      }
-
-      .rest-display-section::before {
-        display: none;
+        /* Uses group-voice accent color */
       }
 
       /* Override .toolbar-btn font-size for rest display buttons */
@@ -2886,6 +2918,14 @@ export class NotationToolbar {
       this.selectionAccidental = null;
       this.selectionTied = null;
       this.selectionTuplet = null;
+      this.selectionPedal = null;
+      this.selectionBeam = { start: false, end: false, break: false };
+      this.selectionHasLyric = false;
+      this.selectionOrnament = null;
+      this.selectionHasSlur = false;
+      this.selectionHasHairpin = null;
+      this.selectionGraceNote = null;
+      this.selectionDynamic = null;
 
       // Hide selection indicator
       const indicator = this.container?.querySelector('.selection-indicator');
@@ -2901,9 +2941,22 @@ export class NotationToolbar {
       this.updateTieButtonForSelection();
       this.updateTupletButtonsForSelection();
 
-      // Clear volta button highlighting when no selection
+      // Clear volta/repeat button highlighting when no selection
       this.selectionMeasureIndices = new Set();
       this.updateVoltaButtonsForSelection();
+      this.updateRepeatButtonsForSelection();
+
+      // Clear pedal/beam/lyric button highlights when no selection
+      this.updatePedalButtonsForSelection();
+      this.updateBeamButtonsForSelection();
+      this.updateLyricButtonsForSelection();
+
+      // Clear ornament/dynamic/slur/hairpin/grace button highlights when no selection
+      this.updateOrnamentButtonsForSelection();
+      this.updateDynamicButtonsForSelection();
+      this.updateSlurButtonsForSelection();
+      this.updateHairpinButtonsForSelection();
+      this.updateGraceButtonsForSelection();
 
       return;
     }
@@ -2916,6 +2969,14 @@ export class NotationToolbar {
     const accidentals = new Set();
     const tiedStates = new Set();
     const tupletTypes = new Set();
+    const pedalStates = new Set();
+    const beamStates = { start: new Set(), end: new Set(), unbeam: new Set() };
+    const lyricStates = new Set();
+    const ornamentStates = new Set();
+    const dynamicStates = new Set();
+    const slurStates = new Set();
+    const hairpinStates = new Set();
+    const graceStates = new Set();
 
     selectedNotes.forEach(note => {
       if (note.duration) {
@@ -2929,6 +2990,47 @@ export class NotationToolbar {
       accidentals.add(note.accidental || 'none');
       tiedStates.add(note.tied || note.isTied || false);
       tupletTypes.add(note.tuplet?.type || 'none');
+
+      // Track pedal state
+      pedalStates.add(note.pedal || 'none');
+
+      // Track beam state (each property independently)
+      beamStates.start.add(note.beam?.start || false);
+      beamStates.end.add(note.beam?.end || false);
+      // Support both 'unbeam' (new) and 'break' (legacy) property names
+      beamStates.unbeam.add(note.beam?.unbeam || note.beam?.break || false);
+
+      // Track lyric state
+      lyricStates.add(note.lyric ? 'has-lyric' : 'none');
+
+      // Track ornament state
+      ornamentStates.add(note.ornament || 'none');
+
+      // Track dynamic state
+      dynamicStates.add(note.dynamic || 'none');
+
+      // Track slur state (check if note is part of any slur)
+      slurStates.add(note.slurStart || note.slurEnd || note.inSlur ? 'has-slur' : 'none');
+
+      // Track hairpin state (check if note is part of any hairpin)
+      if (note.hairpin) {
+        hairpinStates.add(note.hairpin);
+      } else if (note.inHairpin) {
+        hairpinStates.add(note.inHairpin);
+      } else {
+        hairpinStates.add('none');
+      }
+
+      // Track grace note state
+      // Check for type property first, then infer from slash property
+      // acciaccatura = slashed (crushed), appoggiatura = not slashed (leaning)
+      if (note.graceNotes && note.graceNotes.length > 0) {
+        const graceNote = note.graceNotes[0];
+        const graceType = graceNote.type || (graceNote.slash ? 'acciaccatura' : 'appoggiatura');
+        graceStates.add(graceType);
+      } else {
+        graceStates.add('none');
+      }
     });
 
     // Set selection state
@@ -2939,6 +3041,22 @@ export class NotationToolbar {
     this.selectionAccidental = accidentals.size === 1 ? ([...accidentals][0] === 'none' ? null : [...accidentals][0]) : 'mixed';
     this.selectionTied = tiedStates.size === 1 ? [...tiedStates][0] : 'mixed';
     this.selectionTuplet = tupletTypes.size === 1 ? ([...tupletTypes][0] === 'none' ? null : [...tupletTypes][0]) : 'mixed';
+
+    // Set pedal/beam/lyric selection state
+    this.selectionPedal = pedalStates.size === 1 ? ([...pedalStates][0] === 'none' ? null : [...pedalStates][0]) : 'mixed';
+    this.selectionBeam = {
+      start: beamStates.start.size === 1 && [...beamStates.start][0] === true,
+      end: beamStates.end.size === 1 && [...beamStates.end][0] === true,
+      unbeam: beamStates.unbeam.size === 1 && [...beamStates.unbeam][0] === true
+    };
+    this.selectionHasLyric = lyricStates.size === 1 && [...lyricStates][0] === 'has-lyric';
+
+    // Set ornament/dynamic/slur/hairpin/grace selection state
+    this.selectionOrnament = ornamentStates.size === 1 ? ([...ornamentStates][0] === 'none' ? null : [...ornamentStates][0]) : 'mixed';
+    this.selectionDynamic = dynamicStates.size === 1 ? ([...dynamicStates][0] === 'none' ? null : [...dynamicStates][0]) : 'mixed';
+    this.selectionHasSlur = slurStates.size === 1 && [...slurStates][0] === 'has-slur';
+    this.selectionHasHairpin = hairpinStates.size === 1 ? ([...hairpinStates][0] === 'none' ? null : [...hairpinStates][0]) : 'mixed';
+    this.selectionGraceNote = graceStates.size === 1 ? ([...graceStates][0] === 'none' ? null : [...graceStates][0]) : 'mixed';
 
     // CRITICAL FIX: Sync internal state to match what's being shown visually
     // This ensures that if the user adds a new note while something is selected,
@@ -2985,6 +3103,15 @@ export class NotationToolbar {
     this.updateTieButtonForSelection();
     this.updateTupletButtonsForSelection();
     this.updateVoltaButtonsForSelection();
+    this.updateRepeatButtonsForSelection();
+    this.updatePedalButtonsForSelection();
+    this.updateBeamButtonsForSelection();
+    this.updateLyricButtonsForSelection();
+    this.updateOrnamentButtonsForSelection();
+    this.updateDynamicButtonsForSelection();
+    this.updateSlurButtonsForSelection();
+    this.updateHairpinButtonsForSelection();
+    this.updateGraceButtonsForSelection();
   }
 
   /**
@@ -3226,6 +3353,203 @@ export class NotationToolbar {
       } else {
         btn.title = `Add ${voltaId === '1' ? '1st' : '2nd'} ending to selected measure`;
       }
+    });
+  }
+
+  /**
+   * Update repeat sign buttons to show which repeat applies to selected measure(s)
+   * Highlights the repeat button when the selected note is in a measure with a repeat sign
+   */
+  updateRepeatButtonsForSelection() {
+    if (!this.container) return;
+
+    // Get composition state to check repeat signs
+    const compositionState = window.getCompositionState?.();
+
+    // Find which repeat types apply to the selected measure(s)
+    const activeRepeatTypes = new Set();
+
+    if (compositionState && this.selectionMeasureIndices && this.selectionMeasureIndices.size > 0) {
+      for (const measureIndex of this.selectionMeasureIndices) {
+        const repeat = compositionState.getRepeatSignForMeasure?.(measureIndex);
+        if (repeat) {
+          activeRepeatTypes.add(repeat.type);
+        }
+      }
+    }
+
+    // Update button states
+    this.container.querySelectorAll('.repeat-btn').forEach(btn => {
+      const repeatType = btn.dataset.repeat;
+      const isActive = activeRepeatTypes.has(repeatType);
+
+      btn.classList.toggle('active', isActive);
+
+      // Update title based on state
+      const labels = {
+        'repeatStart': 'Repeat Start |:',
+        'repeatEnd': 'Repeat End :|',
+        'repeatBoth': 'Repeat Both :|:'
+      };
+      if (isActive) {
+        btn.title = `Remove ${labels[repeatType] || repeatType} from this measure`;
+      } else {
+        btn.title = `Add ${labels[repeatType] || repeatType} to selected measure`;
+      }
+    });
+  }
+
+  /**
+   * Update pedal buttons to reflect the selected note's pedal state
+   */
+  updatePedalButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.pedal-btn').forEach(btn => {
+      const pedalType = btn.dataset.pedal;
+      const isActive = this.selectionPedal === pedalType;
+      btn.classList.toggle('active', isActive);
+    });
+  }
+
+  /**
+   * Update beam buttons to reflect the selected note's beam state
+   */
+  updateBeamButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.beam-btn').forEach(btn => {
+      const beamType = btn.dataset.beam;
+      let isActive = false;
+
+      if (beamType === 'start' && this.selectionBeam?.start) {
+        isActive = true;
+      } else if (beamType === 'end' && this.selectionBeam?.end) {
+        isActive = true;
+      } else if (beamType === 'unbeam' && this.selectionBeam?.unbeam) {
+        isActive = true;
+      }
+      // 'clear' and 'breakBetween' buttons are action buttons - never shown as "active"
+
+      btn.classList.toggle('active', isActive);
+    });
+  }
+
+  /**
+   * Update lyric indicator to show if selected note has a lyric
+   */
+  updateLyricButtonsForSelection() {
+    if (!this.container) return;
+
+    // Update lyric apply button or indicator to show if note has lyric
+    const applyBtn = this.container.querySelector('.apply-lyric-btn');
+    if (applyBtn) {
+      applyBtn.classList.toggle('active', this.selectionHasLyric);
+    }
+  }
+
+  /**
+   * Update ornament buttons to reflect the selected note's ornament state
+   */
+  updateOrnamentButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.ornament-btn').forEach(btn => {
+      const ornamentType = btn.dataset.ornament;
+      const isActive = this.selectionOrnament === ornamentType;
+      const isMixed = this.selectionOrnament === 'mixed';
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('mixed', isMixed);
+    });
+
+    // Remove button shows active if any ornament exists
+    const removeBtn = this.container.querySelector('.ornament-remove-btn');
+    if (removeBtn) {
+      removeBtn.classList.toggle('active', this.selectionOrnament && this.selectionOrnament !== 'mixed');
+    }
+  }
+
+  /**
+   * Update dynamic buttons to reflect the selected note's dynamic state
+   */
+  updateDynamicButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.dynamic-btn').forEach(btn => {
+      const dynamicType = btn.dataset.dynamic;
+      // When no selection, show toolbar default; when selection, show selection state
+      let isActive, isMixed;
+      if (this.selectedNotesCount > 0) {
+        isActive = this.selectionDynamic === dynamicType;
+        isMixed = this.selectionDynamic === 'mixed';
+      } else {
+        isActive = dynamicType === this.currentDynamic;
+        isMixed = false;
+      }
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('mixed', isMixed);
+    });
+  }
+
+  /**
+   * Update slur buttons to reflect the selected note's slur state
+   */
+  updateSlurButtonsForSelection() {
+    if (!this.container) return;
+
+    const slurBtn = this.container.querySelector('.slur-btn');
+    if (slurBtn) {
+      slurBtn.classList.toggle('active', this.selectionHasSlur);
+    }
+
+    const removeBtn = this.container.querySelector('.slur-remove-btn');
+    if (removeBtn) {
+      removeBtn.classList.toggle('active', this.selectionHasSlur);
+    }
+  }
+
+  /**
+   * Update hairpin buttons to reflect the selected note's hairpin state
+   */
+  updateHairpinButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.hairpin-btn').forEach(btn => {
+      const hairpinType = btn.dataset.hairpin;
+      const isActive = this.selectionHasHairpin === hairpinType;
+      const isMixed = this.selectionHasHairpin === 'mixed';
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('mixed', isMixed);
+    });
+
+    const removeBtn = this.container.querySelector('.hairpin-remove-btn');
+    if (removeBtn) {
+      removeBtn.classList.toggle('active', this.selectionHasHairpin && this.selectionHasHairpin !== 'mixed');
+    }
+  }
+
+  /**
+   * Update grace note buttons to reflect the selected note's grace note state
+   */
+  updateGraceButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.grace-note-btn').forEach(btn => {
+      const graceType = btn.dataset.grace;
+      const isActive = this.selectionGraceNote === graceType;
+      const isMixed = this.selectionGraceNote === 'mixed';
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('mixed', isMixed);
+    });
+
+    const removeBtn = this.container.querySelector('.grace-remove-btn');
+    if (removeBtn) {
+      removeBtn.classList.toggle('active', this.selectionGraceNote && this.selectionGraceNote !== 'mixed');
+    }
+
+    // Transpose buttons show active when grace note exists
+    this.container.querySelectorAll('.grace-transpose-btn').forEach(btn => {
+      btn.classList.toggle('active', this.selectionGraceNote && this.selectionGraceNote !== 'mixed');
     });
   }
 

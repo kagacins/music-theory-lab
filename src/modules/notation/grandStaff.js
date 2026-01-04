@@ -99,7 +99,7 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
 
   // Group consecutive non-tuplet beamable notes, breaking at:
   // - Rests
-  // - Notes with _beamControl.break = true
+  // - Notes with _beamControl.unbeam = true (removes note from beaming entirely)
   // - After notes with _beamControl.end = true
   // - Before notes with _beamControl.start = true
   const beamGroups = [];
@@ -118,14 +118,15 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
 
     const beamControl = note._beamControl;
 
-    // Check if this note should break beaming entirely
-    if (beamControl?.break) {
+    // Check if this note should be unbeamed entirely (removed from any beam group)
+    // Support both 'unbeam' (new) and 'break' (legacy) property names
+    if (beamControl?.unbeam || beamControl?.break) {
       // End current group before this note
       if (currentGroup.length >= 2) {
         beamGroups.push(currentGroup);
       }
       currentGroup = [];
-      // This note is not beamed - skip it
+      // This note is not beamed - skip it (it will render with individual flag)
       continue;
     }
 
@@ -499,6 +500,11 @@ function formatChordNameForDisplay(chord) {
   // The 'name' property can be stale if only root/type were updated
   const root = chord.root || '';
   const type = chord.type || '';
+
+  // Handle "No Chord" specially - return N.C.
+  if (type === 'No Chord') {
+    return 'N.C.';
+  }
 
   // If we have root, build the display name from root + type
   if (root) {
@@ -1865,36 +1871,71 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
   }
 
   // Helper to get note position for slur endpoint
+  // Uses getYs() for accurate note head Y positions (excludes grace notes)
   function getNoteSlurPosition(vexNote, direction) {
     if (!vexNote) return { x: 0, y: 0 };
 
     try {
-      const bbox = vexNote.getBoundingBox();
-      const x = vexNote.getAbsoluteX() + (bbox?.getW() || 0) / 2;
+      // Get X position - use getAbsoluteX which gives the note head X
+      // Add half the glyph width to center on the note head
+      let x = vexNote.getAbsoluteX ? vexNote.getAbsoluteX() : 0;
+      const glyphWidth = vexNote.getGlyphWidth ? vexNote.getGlyphWidth() : 12;
+      x += glyphWidth / 2;
 
-      // Get Y based on direction
-      if (direction === 'above') {
-        // Position above the note head
-        const topY = bbox?.getY() || 0;
-        return { x, y: topY - 8 };
-      } else {
-        // Position below the note head
-        const bottomY = (bbox?.getY() || 0) + (bbox?.getH() || 0);
-        return { x, y: bottomY + 8 };
+      // Get Y position from note head Ys (more reliable than bounding box)
+      // getYs() returns array of Y coordinates for each note head
+      const ys = vexNote.getYs ? vexNote.getYs() : null;
+
+      if (ys && ys.length > 0) {
+        // Use top or bottom note head Y based on direction
+        if (direction === 'above') {
+          const topY = Math.min(...ys);
+          return { x, y: topY - 12 };  // Position above the highest note head
+        } else {
+          const bottomY = Math.max(...ys);
+          return { x, y: bottomY + 12 };  // Position below the lowest note head
+        }
       }
+
+      // Fallback to bounding box if getYs not available
+      const bbox = vexNote.getBoundingBox ? vexNote.getBoundingBox() : null;
+      if (bbox && typeof bbox.getY === 'function') {
+        const bboxY = bbox.getY();
+        const bboxH = bbox.getH();
+        if (direction === 'above') {
+          return { x, y: bboxY - 8 };
+        } else {
+          return { x, y: bboxY + bboxH + 8 };
+        }
+      }
+
+      // Ultimate fallback
+      return { x, y: direction === 'above' ? 50 : 150 };
     } catch (e) {
-      return { x: vexNote.getAbsoluteX(), y: 100 };
+      // Fallback on any error
+      const x = vexNote.getAbsoluteX ? vexNote.getAbsoluteX() : 0;
+      return { x, y: direction === 'above' ? 50 : 150 };
     }
   }
 
   // Helper to draw a complete slur curve
   function drawSlurCurve(startX, startY, endX, endY, direction) {
+    // Validate positions - check for invalid coordinates
+    // X should be positive (on canvas), Y can be 0 but not negative
+    if (!startX || startX <= 0 || !endX || endX <= 0 ||
+        startY === undefined || startY < 0 || endY === undefined || endY < 0) {
+      console.warn('[drawSlurCurve] Invalid positions - skipping slur draw', { startX, startY, endX, endY });
+      return;
+    }
+
     const controlPointOffset = direction === 'below' ? 20 : -20;
 
     // Control point at midpoint, offset for curve
     const controlX = (startX + endX) / 2;
     const controlY = (direction === 'below' ?
       Math.max(startY, endY) : Math.min(startY, endY)) + controlPointOffset;
+
+    console.log('[drawSlurCurve] Drawing slur curve:', { startX, startY, endX, endY, controlX, controlY, direction });
 
     ctx.save();
     ctx.strokeStyle = '#000000';
@@ -1931,6 +1972,9 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
     ctx.restore();
   }
 
+  // Debug: Log slurs and available measures
+  console.log('[drawSlurs] Drawing slurs:', slurs.length, 'slurs, renderedMeasures:', renderedMeasures.map(m => m.index));
+
   for (const slur of slurs) {
     try {
       // Find the start and end rendered measures
@@ -1940,28 +1984,41 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
       const hasStart = !!startMeasureData;
       const hasEnd = !!endMeasureData;
 
+      console.log('[drawSlurs] Processing slur:', { slur, hasStart, hasEnd, startMeasureIndex: slur.startMeasure, endMeasureIndex: slur.endMeasure });
+
       if (!hasStart && !hasEnd) {
         // Neither start nor end visible - skip for now
+        console.warn('[drawSlurs] Skipping slur - neither start nor end measure found');
         continue;
       }
 
       const clefKey = slur.clef === 'treble' ? 'trebleNotes' : 'bassNotes';
-      const notesKey = slur.clef === 'treble' ? 'trebleNotes' : 'bassNotes';
+      // Use voice-specific VexFlow notes array: trebleNotes for voice 0, trebleNotes2 for voice 1
+      const voiceIndex = slur.voiceIndex || 0;
+      const notesKey = slur.clef === 'treble'
+        ? (voiceIndex === 0 ? 'trebleNotes' : 'trebleNotes2')
+        : (voiceIndex === 0 ? 'bassNotes' : 'bassNotes2');
 
       if (hasStart && hasEnd && areMeasuresOnSameRow(startMeasureData, endMeasureData)) {
         // Same row - draw complete slur
-        const startNotes = startMeasureData[notesKey];
-        const endNotes = endMeasureData[notesKey];
-        if (!startNotes?.length || !endNotes?.length) continue;
+        const startNotes = startMeasureData[notesKey] || startMeasureData[clefKey];
+        const endNotes = endMeasureData[notesKey] || endMeasureData[clefKey];
+        if (!startNotes?.length || !endNotes?.length) {
+          console.warn('[drawSlurs] No VexFlow notes found for slur', { slur, notesKey, startNotesLen: startNotes?.length, endNotesLen: endNotes?.length });
+          continue;
+        }
 
         // Find the note at the start beat
         const startMeasureNotesData = measures[slur.startMeasure];
         const endMeasureNotesData = measures[slur.endMeasure];
-        const startNoteData = startMeasureNotesData?.[clefKey] || [];
-        const endNoteData = endMeasureNotesData?.[clefKey] || [];
+        // Filter input note data by voiceIndex to get correct indices
+        const startNoteDataAll = startMeasureNotesData?.[clefKey] || [];
+        const endNoteDataAll = endMeasureNotesData?.[clefKey] || [];
+        const startNoteData = startNoteDataAll.filter(n => (n?.voiceIndex || 0) === voiceIndex);
+        const endNoteData = endNoteDataAll.filter(n => (n?.voiceIndex || 0) === voiceIndex);
 
-        // Find start note index by beat
-        let startNoteIndex = 0;
+        // Find start note index by beat within the voice
+        let startNoteIndex = -1;
         for (let i = 0; i < startNoteData.length; i++) {
           if (Math.abs((startNoteData[i]?.beat || 0) - slur.startBeat) < 0.01) {
             startNoteIndex = i;
@@ -1969,8 +2026,8 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
           }
         }
 
-        // Find end note index by beat
-        let endNoteIndex = 0;
+        // Find end note index by beat within the voice
+        let endNoteIndex = -1;
         for (let i = 0; i < endNoteData.length; i++) {
           if (Math.abs((endNoteData[i]?.beat || 0) - slur.endBeat) < 0.01) {
             endNoteIndex = i;
@@ -1978,9 +2035,42 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
           }
         }
 
+        // Debug: log if note indices weren't found by beat match
+        if (startNoteIndex === -1 || endNoteIndex === -1) {
+          console.warn('[drawSlurs] Could not find note by beat match', {
+            slur,
+            voiceIndex,
+            startNoteIndex,
+            endNoteIndex,
+            startNoteDataBeats: startNoteData.map(n => n?.beat),
+            endNoteDataBeats: endNoteData.map(n => n?.beat),
+            vexNoteCounts: { start: startNotes.length, end: endNotes.length }
+          });
+          // Fall back to index 0 if not found
+          if (startNoteIndex === -1) startNoteIndex = 0;
+          if (endNoteIndex === -1) endNoteIndex = 0;
+        }
+
         const startVexNote = startNotes[startNoteIndex];
         const endVexNote = endNotes[endNoteIndex];
-        if (!startVexNote || !endVexNote) continue;
+        if (!startVexNote || !endVexNote) {
+          console.warn('[drawSlurs] VexFlow note not found at index', { startNoteIndex, endNoteIndex, startNotesLen: startNotes.length, endNotesLen: endNotes.length });
+          continue;
+        }
+
+        // Debug: Log VexFlow note details including getYs for accurate positioning
+        const startYs = startVexNote?.getYs?.();
+        const endYs = endVexNote?.getYs?.();
+        console.log('[drawSlurs] Found VexFlow notes:', {
+          startVexNote: startVexNote?.constructor?.name,
+          endVexNote: endVexNote?.constructor?.name,
+          startHasModifiers: startVexNote?.getModifiers?.()?.length,
+          endHasModifiers: endVexNote?.getModifiers?.()?.length,
+          startAbsoluteX: startVexNote?.getAbsoluteX?.(),
+          endAbsoluteX: endVexNote?.getAbsoluteX?.(),
+          startYs: startYs,
+          endYs: endYs,
+        });
 
         // Determine slur direction based on stem direction
         const direction = getSlurDirection(startVexNote, slur.clef);
@@ -1988,16 +2078,20 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
         const startPos = getNoteSlurPosition(startVexNote, direction);
         const endPos = getNoteSlurPosition(endVexNote, direction);
 
+        console.log('[drawSlurs] Slur positions:', { startPos, endPos, direction });
+
         drawSlurCurve(startPos.x, startPos.y, endPos.x, endPos.y, direction);
 
       } else {
         // Cross-row slur - draw partial segments
 
         if (hasStart) {
-          const startNotes = startMeasureData[notesKey];
+          const startNotes = startMeasureData[notesKey] || startMeasureData[clefKey];
           if (startNotes?.length) {
             const startMeasureNotesData = measures[slur.startMeasure];
-            const startNoteData = startMeasureNotesData?.[clefKey] || [];
+            const startNoteDataAll = startMeasureNotesData?.[clefKey] || [];
+            // Filter by voiceIndex for correct note mapping
+            const startNoteData = startNoteDataAll.filter(n => (n?.voiceIndex || 0) === voiceIndex);
 
             let startNoteIndex = 0;
             for (let i = 0; i < startNoteData.length; i++) {
@@ -2028,10 +2122,12 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
         }
 
         if (hasEnd) {
-          const endNotes = endMeasureData[notesKey];
+          const endNotes = endMeasureData[notesKey] || endMeasureData[clefKey];
           if (endNotes?.length) {
             const endMeasureNotesData = measures[slur.endMeasure];
-            const endNoteData = endMeasureNotesData?.[clefKey] || [];
+            const endNoteDataAll = endMeasureNotesData?.[clefKey] || [];
+            // Filter by voiceIndex for correct note mapping
+            const endNoteData = endNoteDataAll.filter(n => (n?.voiceIndex || 0) === voiceIndex);
 
             let endNoteIndex = 0;
             for (let i = 0; i < endNoteData.length; i++) {
@@ -4552,13 +4648,18 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       buildingBlockStartMeasures.add(startMeasure);
       // Store the beat offset within the measure (for positioning chord symbol)
       const beatInMeasure = segment.startBeat % beatsPerMeasureForSymbols;
+      // Determine chord symbol - handle No Chord specially
+      let chordSymbol = null;
+      if (segment.chord?.type === 'No Chord') {
+        chordSymbol = 'N.C.';  // Show "N.C." for No Chord
+      } else if (segment.chord?.root) {
+        chordSymbol = segment.chord.selectionMode === 'interval'
+          ? `${segment.chord.root} ${segment.chord.simpleName || segment.chord.type}`
+          : `${segment.chord.root}${getChordTypeSuffix(segment.chord.type)}`;
+      }
       chordStartBeatInMeasure.set(startMeasure, {
         beatOffset: beatInMeasure,
-        chordSymbol: segment.chord?.root
-          ? (segment.chord.selectionMode === 'interval'
-              ? `${segment.chord.root} ${segment.chord.simpleName || segment.chord.type}`
-              : `${segment.chord.root}${getChordTypeSuffix(segment.chord.type)}`)
-          : null,
+        chordSymbol,
         segmentIndex
       });
     });

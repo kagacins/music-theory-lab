@@ -150,7 +150,13 @@ export function createProjectData(compositionState) {
         repeatSigns: compositionState.repeatSigns ? [...compositionState.repeatSigns] : [],
 
         // Hairpins - crescendo/decrescendo (stored separately from measures)
-        hairpins: compositionState.hairpins ? [...compositionState.hairpins] : []
+        hairpins: compositionState.hairpins ? [...compositionState.hairpins] : [],
+
+        // Slurs (stored separately from measures)
+        slurs: compositionState.slurs ? [...compositionState.slurs] : [],
+
+        // Volta brackets - 1st/2nd endings (stored separately from measures)
+        voltaBrackets: compositionState.voltaBrackets ? [...compositionState.voltaBrackets] : []
     };
 }
 
@@ -464,12 +470,36 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             compositionState.hairpins = [...projectData.hairpins];
         }
 
-        // 11. Trigger notation refresh
+        // 11. Restore slurs
+        if (projectData.slurs && Array.isArray(projectData.slurs)) {
+            console.log('[projectManager] Restoring slurs:', projectData.slurs.length);
+            compositionState.slurs = [...projectData.slurs];
+            // Update the next ID counter to avoid collisions
+            const maxSlurId = projectData.slurs.reduce((max, s) => {
+                const idNum = parseInt(s.id?.replace('sl_', '') || '0', 10);
+                return Math.max(max, idNum);
+            }, 0);
+            compositionState._nextSlurId = maxSlurId + 1;
+        }
+
+        // 12. Restore volta brackets (1st/2nd endings)
+        if (projectData.voltaBrackets && Array.isArray(projectData.voltaBrackets)) {
+            console.log('[projectManager] Restoring volta brackets:', projectData.voltaBrackets.length);
+            compositionState.voltaBrackets = [...projectData.voltaBrackets];
+            // Update the next ID counter to avoid collisions
+            const maxVoltaId = projectData.voltaBrackets.reduce((max, v) => {
+                const idNum = parseInt(v.id?.replace('volta_', '') || '0', 10);
+                return Math.max(max, idNum);
+            }, 0);
+            compositionState._nextVoltaId = maxVoltaId + 1;
+        }
+
+        // 13. Trigger notation refresh
         if (callbacks.onNotationRefresh) {
             callbacks.onNotationRefresh();
         }
 
-        // 11. Update UI elements (tempo, key display, etc.)
+        // 14. Update UI elements (tempo, key display, etc.)
         if (callbacks.onMetadataUpdated) {
             callbacks.onMetadataUpdated(projectData.metadata);
         }

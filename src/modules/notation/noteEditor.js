@@ -3973,6 +3973,8 @@ export class NoteEditor {
       }
 
       this.composerIntegration.render(true); // Force immediate render
+      // Update toolbar to reflect the new dynamic state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -4059,6 +4061,8 @@ export class NoteEditor {
 
     // Re-render to show the hairpin
     this.composerIntegration.render(true);
+    // Update toolbar to reflect the new hairpin state
+    this.composerIntegration.updateToolbarSelectionState();
   }
 
   /**
@@ -4130,6 +4134,8 @@ export class NoteEditor {
     if (removedCount > 0) {
       console.log(`[removeHairpinFromSelected] Removed ${removedCount} hairpin(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the cleared hairpin state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -4214,6 +4220,8 @@ export class NoteEditor {
 
     // Re-render to show the slur
     this.composerIntegration.render(true);
+    // Update toolbar to reflect the new slur state
+    this.composerIntegration.updateToolbarSelectionState();
   }
 
   /**
@@ -4285,6 +4293,8 @@ export class NoteEditor {
     if (removedCount > 0) {
       console.log(`[removeSlurFromSelected] Removed ${removedCount} slur(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the cleared slur state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -4334,6 +4344,8 @@ export class NoteEditor {
     if (changedCount > 0) {
       console.log(`[applyOrnamentToSelected] Applied/toggled '${ornamentType}' on ${changedCount} note(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the new ornament state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -4376,6 +4388,8 @@ export class NoteEditor {
     if (removedCount > 0) {
       console.log(`[removeOrnamentFromSelected] Removed ornaments from ${removedCount} note(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the cleared ornament state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -4426,6 +4440,7 @@ export class NoteEditor {
       const graceNote = {
         pitch: gracePitch,
         duration: '8n',  // Eighth note is standard for grace notes
+        type: graceType,  // 'acciaccatura' or 'appoggiatura' for toolbar toggle tracking
         slash: graceType === 'acciaccatura',  // Acciaccatura has a slash through it
       };
 
@@ -4441,6 +4456,8 @@ export class NoteEditor {
     if (changedCount > 0) {
       console.log(`[addGraceNoteToSelected] Added ${graceType} to ${changedCount} note(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the new grace note state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -4483,6 +4500,8 @@ export class NoteEditor {
     if (removedCount > 0) {
       console.log(`[removeGraceNotesFromSelected] Removed grace notes from ${removedCount} note(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the cleared grace note state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -4698,6 +4717,8 @@ export class NoteEditor {
     }
 
     this.composerIntegration.render(true);
+    // Update toolbar to reflect the new repeat sign state
+    this.composerIntegration.updateToolbarSelectionState();
   }
 
   /**
@@ -4733,6 +4754,8 @@ export class NoteEditor {
     }
 
     this.composerIntegration.render(true);
+    // Update toolbar to reflect the new volta bracket state
+    this.composerIntegration.updateToolbarSelectionState();
   }
 
   // ============================================================================
@@ -9109,6 +9132,8 @@ export class NoteEditor {
     if (changedCount > 0) {
       console.log(`[applyLyricToSelected] Applied lyric "${lyricData.text}" to ${changedCount} note(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the new lyric state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -9197,6 +9222,8 @@ export class NoteEditor {
     if (changedCount > 0) {
       console.log(`[applyPedalToSelected] Applied/toggled '${pedalType}' pedal on ${changedCount} note(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the new pedal state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 
@@ -9244,12 +9271,20 @@ export class NoteEditor {
 
   /**
    * Apply beam control to selected notes
-   * @param {string} beamAction - 'start', 'end', 'break', or 'clear'
+   * @param {string} beamAction - 'start', 'end', 'unbeam', 'breakBetween', or 'clear'
    *
-   * Beam property format: { start: boolean, end: boolean, break: boolean }
+   * Beam property format: { start: boolean, end: boolean, unbeam: boolean }
    * - start: true = force start of a new beam group here
    * - end: true = force end of beam group here
-   * - break: true = prevent this note from being beamed with neighbors
+   * - unbeam: true = this note gets individual flags, not beamed at all
+   *
+   * Actions:
+   * - 'start': Toggle forcing a new beam to start at this note
+   * - 'end': Toggle forcing the beam to end at this note
+   * - 'unbeam': Toggle removing this note from beaming entirely (gets flags)
+   * - 'breakBetween': When 2+ notes selected, break beams between them
+   *                   First note gets 'end', last note gets 'start'
+   * - 'clear': Remove all manual beam settings
    */
   applyBeamToSelected(beamAction) {
     if (this.selectedNotes.size === 0) {
@@ -9267,7 +9302,7 @@ export class NoteEditor {
 
     let changedCount = 0;
 
-    // Sort selected notes by position (measure, then beat)
+    // Sort selected notes by position (measure, then beat, then note index)
     const sortedNotes = [...this.selectedNotes].sort((a, b) => {
       const [mA, , , nA] = this.parseNoteId(a);
       const [mB, , , nB] = this.parseNoteId(b);
@@ -9275,6 +9310,75 @@ export class NoteEditor {
       return nA - nB;
     });
 
+    // Special handling for 'breakBetween' - needs at least 2 notes
+    if (beamAction === 'breakBetween') {
+      if (sortedNotes.length < 2) {
+        console.log('[applyBeamToSelected] breakBetween requires 2+ notes selected');
+        return;
+      }
+
+      // Get first and last notes
+      const firstNoteId = sortedNotes[0];
+      const lastNoteId = sortedNotes[sortedNotes.length - 1];
+
+      // Apply 'end' to first note (end the beam before the break)
+      const [mFirst, staffFirst, vFirst, nFirst] = this.parseNoteId(firstNoteId);
+      const measureFirst = compositionState.measures[mFirst];
+      if (measureFirst) {
+        const voiceKeyFirst = staffFirst === 'treble' ? 'treble' : 'bass';
+        const voiceFirst = measureFirst.notation?.[voiceKeyFirst]?.voices?.[vFirst] || this.getVoice(measureFirst, staffFirst);
+        if (voiceFirst?.notes?.[nFirst] && !voiceFirst.notes[nFirst].isRest) {
+          const noteFirst = voiceFirst.notes[nFirst];
+          if (!noteFirst.beam) noteFirst.beam = { start: false, end: false, unbeam: false };
+          noteFirst.beam.end = true;
+          noteFirst.beam.unbeam = false;
+          changedCount++;
+        }
+      }
+
+      // Apply 'start' to last note (start a new beam after the break)
+      const [mLast, staffLast, vLast, nLast] = this.parseNoteId(lastNoteId);
+      const measureLast = compositionState.measures[mLast];
+      if (measureLast) {
+        const voiceKeyLast = staffLast === 'treble' ? 'treble' : 'bass';
+        const voiceLast = measureLast.notation?.[voiceKeyLast]?.voices?.[vLast] || this.getVoice(measureLast, staffLast);
+        if (voiceLast?.notes?.[nLast] && !voiceLast.notes[nLast].isRest) {
+          const noteLast = voiceLast.notes[nLast];
+          if (!noteLast.beam) noteLast.beam = { start: false, end: false, unbeam: false };
+          noteLast.beam.start = true;
+          noteLast.beam.unbeam = false;
+          changedCount++;
+        }
+      }
+
+      // For notes in between, mark them as unbeamed (they get individual flags)
+      for (let i = 1; i < sortedNotes.length - 1; i++) {
+        const noteId = sortedNotes[i];
+        const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+        const measure = compositionState.measures[measureIndex];
+        if (!measure) continue;
+
+        const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+        const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+        if (!voice?.notes?.[noteIndex] || voice.notes[noteIndex].isRest) continue;
+
+        const note = voice.notes[noteIndex];
+        if (!note.beam) note.beam = { start: false, end: false, unbeam: false };
+        note.beam.unbeam = true;
+        note.beam.start = false;
+        note.beam.end = false;
+        changedCount++;
+      }
+
+      if (changedCount > 0) {
+        console.log(`[applyBeamToSelected] Applied 'breakBetween' on ${changedCount} note(s)`);
+        this.composerIntegration.render(true);
+        this.composerIntegration.updateToolbarSelectionState();
+      }
+      return;
+    }
+
+    // Standard handling for other beam actions
     for (const noteId of sortedNotes) {
       const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
       const measure = compositionState.measures[measureIndex];
@@ -9291,27 +9395,28 @@ export class NoteEditor {
 
       // Initialize beam object if needed
       if (!note.beam) {
-        note.beam = { start: false, end: false, break: false };
+        note.beam = { start: false, end: false, unbeam: false };
       }
 
       switch (beamAction) {
         case 'start':
           // Toggle start flag
           note.beam.start = !note.beam.start;
-          // If setting start, clear break
-          if (note.beam.start) note.beam.break = false;
+          // If setting start, clear unbeam
+          if (note.beam.start) note.beam.unbeam = false;
           break;
         case 'end':
           // Toggle end flag
           note.beam.end = !note.beam.end;
-          // If setting end, clear break
-          if (note.beam.end) note.beam.break = false;
+          // If setting end, clear unbeam
+          if (note.beam.end) note.beam.unbeam = false;
           break;
-        case 'break':
-          // Toggle break flag (note won't be beamed)
-          note.beam.break = !note.beam.break;
-          // If setting break, clear start/end
-          if (note.beam.break) {
+        case 'unbeam':
+        case 'break': // Legacy support
+          // Toggle unbeam flag (note gets individual flags, not beamed)
+          note.beam.unbeam = !note.beam.unbeam;
+          // If setting unbeam, clear start/end
+          if (note.beam.unbeam) {
             note.beam.start = false;
             note.beam.end = false;
           }
@@ -9328,6 +9433,8 @@ export class NoteEditor {
     if (changedCount > 0) {
       console.log(`[applyBeamToSelected] Applied '${beamAction}' beam action on ${changedCount} note(s)`);
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the new beam state
+      this.composerIntegration.updateToolbarSelectionState();
     }
   }
 

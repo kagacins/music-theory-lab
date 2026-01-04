@@ -840,6 +840,14 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
                 compositionState.updateSectionsAfterChordReorder(oldChordIndex, newChordIndex, true);
             }
 
+            // CRITICAL: Use compositionState.reorderChord() instead of manual splice
+            // This properly reorders bass blocks BEFORE sync, preserving user edits
+            if (typeof compositionState.reorderChord === 'function') {
+                console.log(`[handleCardDragWithinSection] Using compositionState.reorderChord(${oldChordIndex}, ${newChordIndex})`);
+                compositionState.reorderChord(oldChordIndex, newChordIndex);
+            }
+
+            // Also update trainerState arrays to stay in sync
             const progressionData = [...trainerState.progressionData];
             const progressionRomans = [...trainerState.progressionRomans];
 
@@ -849,8 +857,9 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
             const [movedRoman] = progressionRomans.splice(oldChordIndex, 1);
             progressionRomans.splice(newChordIndex, 0, movedRoman);
 
-            setProgressionData(progressionData);
-            setProgressionRomans(progressionRomans);
+            // Use direct assignment to avoid triggering another sync
+            trainerState.progressionData = progressionData;
+            trainerState.progressionRomans = progressionRomans;
         }
 
         // CRITICAL: Remove the dragged item from DOM before re-rendering
@@ -988,6 +997,13 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
                 compositionState.updateSectionsAfterChordReorder(oldChordIndex, targetChordIndex);
             }
 
+            // CRITICAL: Use compositionState.reorderChord() instead of manual splice
+            // This properly reorders bass blocks BEFORE sync, preserving user edits
+            if (typeof compositionState.reorderChord === 'function') {
+                console.log(`[handleCardDragWithinSection] Cross-section: Using compositionState.reorderChord(${oldChordIndex}, ${targetChordIndex})`);
+                compositionState.reorderChord(oldChordIndex, targetChordIndex);
+            }
+
             const trainerState = getTrainerState();
             const progressionData = [...trainerState.progressionData];
             const progressionRomans = [...trainerState.progressionRomans];
@@ -999,9 +1015,9 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
             const [movedRoman] = progressionRomans.splice(oldChordIndex, 1);
             progressionRomans.splice(targetChordIndex, 0, movedRoman);
 
-            // Update state
-            setProgressionData(progressionData);
-            setProgressionRomans(progressionRomans);
+            // Use direct assignment to avoid triggering another sync
+            trainerState.progressionData = progressionData;
+            trainerState.progressionRomans = progressionRomans;
         }
 
         // CRITICAL: Remove the dragged item from DOM before re-rendering

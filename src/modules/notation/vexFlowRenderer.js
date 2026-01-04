@@ -852,22 +852,39 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
 
   // Add ornament if specified
   if (!isRest && ornament) {
-    // VexFlow ornament codes
+    // VexFlow 5 ornament codes - all use VF.Ornament class
+    // See: https://github.com/vexflow/vexflow/blob/master/src/tables.ts
+    // Ornament names are camelCase: mordentInverted, turnInverted (not a.mordent_inverted)
     const ornamentMap = {
       'trill': 'tr',
       'mordent': 'mordent',
-      'invertedMordent': 'mordent_inverted',
+      'invertedMordent': 'mordentInverted',  // VexFlow 5 uses camelCase ornament names
       'turn': 'turn',
-      'invertedTurn': 'turn_inverted',
+      'invertedTurn': 'turnInverted',  // VexFlow 5 uses camelCase ornament names
     };
 
-    const vexOrnament = ornamentMap[ornament];
-    if (vexOrnament) {
+    // Unicode fallback symbols for ornaments
+    const unicodeSymbols = {
+      'trill': 'tr',
+      'mordent': '𝆰',
+      'invertedMordent': '𝆱',
+      'turn': '𝆗',
+      'invertedTurn': '𝆘',
+    };
+
+    const vexOrnamentCode = ornamentMap[ornament];
+    if (vexOrnamentCode) {
       try {
-        const ornamentObj = new VF.Ornament(vexOrnament);
+        const ornamentObj = new VF.Ornament(vexOrnamentCode);
         staveNote.addModifier(ornamentObj, 0);
       } catch (error) {
-        console.warn('[VexFlowRenderer] Error adding ornament:', error.message);
+        // If VexFlow doesn't recognize the ornament, fall back to text annotation
+        console.warn('[VexFlowRenderer] Error adding ornament, using Unicode fallback:', error.message);
+        const symbol = unicodeSymbols[ornament] || ornament;
+        const textAnnotation = new VF.Annotation(symbol)
+          .setFont('Times New Roman', 14, 'normal')
+          .setVerticalJustification(VF.Annotation.VerticalJustify.TOP);
+        staveNote.addModifier(textAnnotation, 0);
       }
     }
   }
@@ -912,31 +929,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     }
   }
 
-  // Add lyric syllable if specified
-  // Lyrics appear below the bass staff (for treble clef notes, use BOTTOM with extra offset)
-  if (!isRest && lyric && lyric.text) {
-    try {
-      // Format lyric text based on syllabic position
-      let lyricText = lyric.text;
-      if (lyric.syllabic === 'begin' || lyric.syllabic === 'middle') {
-        lyricText += '-';  // Add hyphen for continuing syllables
-      }
-      if (lyric.syllabic === 'middle' || lyric.syllabic === 'end') {
-        lyricText = '-' + lyricText;  // Prefix hyphen for continued syllables
-      }
-
-      // Lyrics always go below the staff system
-      const lyricAnnotation = new VF.Annotation(lyricText)
-        .setFont('Times New Roman', 11, 'normal')
-        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
-
-      staveNote.addModifier(lyricAnnotation, 0);
-    } catch (error) {
-      console.warn('[VexFlowRenderer] Error adding lyric annotation:', error.message);
-    }
-  }
-
-  // Add pedal marking if specified
+  // Add pedal marking FIRST (appears closer to staff, above lyrics)
   // Pedal markings appear below bass staff notes
   if (!isRest && pedal) {
     try {
@@ -956,6 +949,47 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
       staveNote.addModifier(pedalAnnotation, 0);
     } catch (error) {
       console.warn('[VexFlowRenderer] Error adding pedal annotation:', error.message);
+    }
+  }
+
+  // Add lyric syllable SECOND (appears below pedal marking)
+  // Lyrics appear at the bottom of the staff system at a consistent Y position
+  if (!isRest && lyric && lyric.text) {
+    try {
+      // Format lyric text based on syllabic position
+      let lyricText = lyric.text;
+      if (lyric.syllabic === 'begin' || lyric.syllabic === 'middle') {
+        lyricText += '-';  // Add hyphen for continuing syllables
+      }
+      if (lyric.syllabic === 'middle' || lyric.syllabic === 'end') {
+        lyricText = '-' + lyricText;  // Prefix hyphen for continued syllables
+      }
+
+      // Calculate pitch-dependent Y shift for consistent lyric baseline
+      // Reference pitch E4 (MIDI 64) = bottom line of treble staff
+      // Higher notes need larger Y shift to push lyrics down to consistent level
+      // Lower notes need smaller Y shift
+      // Each semitone ≈ 2.5 pixels in VexFlow (half of a staff space)
+      const REFERENCE_MIDI = 64;  // E4 - bottom line of treble staff
+      const BASE_Y_SHIFT = 55;    // Base shift from reference pitch
+      const PIXELS_PER_SEMITONE = 2.5;
+
+      const noteMidi = noteToMidi(pitch);
+      const midiDiff = noteMidi - REFERENCE_MIDI;
+      const pitchAdjustment = midiDiff * PIXELS_PER_SEMITONE;
+
+      // Higher notes (positive midiDiff) need more Y shift to push lyric down
+      const lyricYShift = BASE_Y_SHIFT + pitchAdjustment;
+
+      const lyricAnnotation = new VF.Annotation(lyricText)
+        .setFont('Times New Roman', 11, 'normal')
+        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
+
+      lyricAnnotation.setYShift(lyricYShift);
+
+      staveNote.addModifier(lyricAnnotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding lyric annotation:', error.message);
     }
   }
 
@@ -1069,22 +1103,39 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   }
 
   // Add ornament if specified (applied to the top note of the chord)
+  // VexFlow 5 ornament codes - all use VF.Ornament class
+  // See: https://github.com/vexflow/vexflow/blob/master/src/tables.ts
   if (ornament) {
     const ornamentMap = {
       'trill': 'tr',
       'mordent': 'mordent',
-      'invertedMordent': 'mordent_inverted',
+      'invertedMordent': 'mordentInverted',  // VexFlow 5 uses camelCase ornament names
       'turn': 'turn',
-      'invertedTurn': 'turn_inverted',
+      'invertedTurn': 'turnInverted',  // VexFlow 5 uses camelCase ornament names
     };
 
-    const vexOrnament = ornamentMap[ornament];
-    if (vexOrnament) {
+    // Unicode fallback symbols for ornaments
+    const unicodeSymbols = {
+      'trill': 'tr',
+      'mordent': '𝆰',
+      'invertedMordent': '𝆱',
+      'turn': '𝆗',
+      'invertedTurn': '𝆘',
+    };
+
+    const vexOrnamentCode = ornamentMap[ornament];
+    if (vexOrnamentCode) {
       try {
-        const ornamentObj = new VF.Ornament(vexOrnament);
+        const ornamentObj = new VF.Ornament(vexOrnamentCode);
         staveNote.addModifier(ornamentObj, pitches.length - 1);
       } catch (error) {
-        console.warn('[VexFlowRenderer] Error adding ornament to chord:', error.message);
+        // Fall back to Unicode symbol if VexFlow ornament fails
+        console.warn('[VexFlowRenderer] Error adding ornament to chord, using Unicode fallback:', error.message);
+        const symbol = unicodeSymbols[ornament] || ornament;
+        const textAnnotation = new VF.Annotation(symbol)
+          .setFont('Times New Roman', 14, 'normal')
+          .setVerticalJustification(VF.Annotation.VerticalJustify.TOP);
+        staveNote.addModifier(textAnnotation, pitches.length - 1);
       }
     }
   }
@@ -1128,30 +1179,7 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
     }
   }
 
-  // Add lyric syllable if specified
-  if (lyric && lyric.text) {
-    try {
-      // Format lyric text based on syllabic position
-      let lyricText = lyric.text;
-      if (lyric.syllabic === 'begin' || lyric.syllabic === 'middle') {
-        lyricText += '-';  // Add hyphen for continuing syllables
-      }
-      if (lyric.syllabic === 'middle' || lyric.syllabic === 'end') {
-        lyricText = '-' + lyricText;  // Prefix hyphen for continued syllables
-      }
-
-      // Lyrics always go below the staff system
-      const lyricAnnotation = new VF.Annotation(lyricText)
-        .setFont('Times New Roman', 11, 'normal')
-        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
-
-      staveNote.addModifier(lyricAnnotation, 0);
-    } catch (error) {
-      console.warn('[VexFlowRenderer] Error adding lyric annotation to chord:', error.message);
-    }
-  }
-
-  // Add pedal marking if specified
+  // Add pedal marking FIRST (appears closer to staff, above lyrics)
   if (pedal) {
     try {
       // Map pedal type to display symbol
@@ -1170,6 +1198,49 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
       staveNote.addModifier(pedalAnnotation, 0);
     } catch (error) {
       console.warn('[VexFlowRenderer] Error adding pedal annotation to chord:', error.message);
+    }
+  }
+
+  // Add lyric syllable SECOND (appears below pedal marking)
+  if (lyric && lyric.text) {
+    try {
+      // Format lyric text based on syllabic position
+      let lyricText = lyric.text;
+      if (lyric.syllabic === 'begin' || lyric.syllabic === 'middle') {
+        lyricText += '-';  // Add hyphen for continuing syllables
+      }
+      if (lyric.syllabic === 'middle' || lyric.syllabic === 'end') {
+        lyricText = '-' + lyricText;  // Prefix hyphen for continued syllables
+      }
+
+      // Calculate pitch-dependent Y shift for consistent lyric baseline
+      // Use the lowest pitch in the chord for positioning reference
+      // Reference pitch E4 (MIDI 64) = bottom line of treble staff
+      const REFERENCE_MIDI = 64;  // E4 - bottom line of treble staff
+      const BASE_Y_SHIFT = 55;    // Base shift from reference pitch
+      const PIXELS_PER_SEMITONE = 2.5;
+
+      // Find the lowest pitch in the chord for lyric positioning
+      let lowestMidi = Infinity;
+      for (const p of pitches) {
+        const midi = noteToMidi(p);
+        if (midi < lowestMidi) lowestMidi = midi;
+      }
+      if (lowestMidi === Infinity) lowestMidi = REFERENCE_MIDI;
+
+      const midiDiff = lowestMidi - REFERENCE_MIDI;
+      const pitchAdjustment = midiDiff * PIXELS_PER_SEMITONE;
+      const lyricYShift = BASE_Y_SHIFT + pitchAdjustment;
+
+      const lyricAnnotation = new VF.Annotation(lyricText)
+        .setFont('Times New Roman', 11, 'normal')
+        .setVerticalJustification(VF.Annotation.VerticalJustify.BOTTOM);
+
+      lyricAnnotation.setYShift(lyricYShift);
+
+      staveNote.addModifier(lyricAnnotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding lyric annotation to chord:', error.message);
     }
   }
 

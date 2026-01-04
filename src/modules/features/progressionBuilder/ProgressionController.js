@@ -2036,6 +2036,56 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
 }
 
 /**
+ * Add a "No Chord" (N.C.) placeholder to the progression.
+ * This reserves time in the composition without specifying harmony.
+ * The bass clef will be empty/rest during this time.
+ */
+export function addNoChordToProgression() {
+    // Save current state for undo
+    if (window.captureProgressionState && window.pushToUndoStack) {
+        const currentState = window.captureProgressionState();
+        pushToUndoStack(currentState);
+    }
+
+    // Get default beats based on current time signature
+    let defaultBeats = 4;
+    const compositionState = getCompositionState();
+    if (compositionState && compositionState.metadata && compositionState.metadata.timeSignature) {
+        const ts = compositionState.metadata.timeSignature;
+        const num = ts.num || 4;
+        const denom = ts.denom || 4;
+        defaultBeats = num * (4 / denom);
+    }
+
+    // Create No Chord data with empty notes
+    const noChordData = {
+        name: 'N.C.',
+        simpleName: 'N.C.',
+        notes: [],              // Empty - no chord tones
+        root: '',               // No root
+        type: 'No Chord',
+        inversion: 0,
+        selectionMode: 'chord',
+        omittedNotes: [],
+        octaveShift: 0,
+        lhType: 'off',          // No left hand
+        lhInversion: 0,
+        lhOctaveShift: 0,
+        lhNotes: [],            // Empty bass notes
+        lhOmittedNotes: [],
+        roman: '',              // No roman numeral
+        beats: defaultBeats
+    };
+
+    // Add using the standard add function
+    if (window.addToProgressionData) {
+        window.addToProgressionData(noChordData);
+    }
+
+    console.log('[addNoChordToProgression] Added No Chord placeholder');
+}
+
+/**
  * Add a chord to the progression data
  * Handles enharmonic respelling, borrowed chord detection, position-based insertion,
  * and multi-display rendering.

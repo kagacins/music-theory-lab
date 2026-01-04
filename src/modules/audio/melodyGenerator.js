@@ -140,6 +140,181 @@ function getDurationInSeconds(duration, tempo, tuplet = null, dotted = false) {
 }
 
 // ============================================================================
+// ORNAMENT PLAYBACK EXPANSION
+// ============================================================================
+
+/**
+ * Get the diatonic neighbor note (upper or lower) for a given pitch in a key
+ * @param {string} pitch - Note with octave like 'C4', 'D#5'
+ * @param {string} key - Key like 'C', 'G', 'F#', 'Bb'
+ * @param {string} direction - 'upper' or 'lower'
+ * @returns {string} - The neighbor note with octave
+ */
+function getDiatonicNeighbor(pitch, key, direction = 'upper') {
+    if (!pitch) return pitch;
+
+    // Parse pitch into note name and octave
+    const match = pitch.match(/^([A-Ga-g][#b]?)(\d+)$/);
+    if (!match) return pitch;
+
+    const [, noteName, octaveStr] = match;
+    const octave = parseInt(octaveStr, 10);
+
+    // Normalize note name to find its position
+    const noteUpper = noteName.charAt(0).toUpperCase() + noteName.slice(1);
+
+    // Get the chromatic index of the current note
+    const chromaticIndex = ALL_NOTES.indexOf(noteUpper) !== -1
+        ? ALL_NOTES.indexOf(noteUpper)
+        : ALL_NOTES.indexOf(noteUpper.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#').replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#'));
+
+    if (chromaticIndex === -1) return pitch;
+
+    // Normalize key to get root index
+    const keyUpper = key.charAt(0).toUpperCase() + key.slice(1);
+    let keyIndex = ALL_NOTES.indexOf(keyUpper);
+    if (keyIndex === -1) {
+        // Handle flat keys
+        const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+        keyIndex = ALL_NOTES.indexOf(flatToSharp[keyUpper] || keyUpper);
+    }
+    if (keyIndex === -1) keyIndex = 0; // Default to C
+
+    // Build scale notes for this key
+    const scaleNotes = MAJOR_SCALE_STEPS.map(step => (keyIndex + step) % 12);
+
+    // Find current note's position relative to scale
+    // Look for the nearest scale degree
+    let currentScaleIndex = scaleNotes.indexOf(chromaticIndex);
+
+    if (currentScaleIndex === -1) {
+        // Note is not in scale - find nearest scale tone
+        // For chromatic notes, find the closest scale degree
+        for (let i = 0; i < scaleNotes.length; i++) {
+            if (scaleNotes[i] > chromaticIndex || (scaleNotes[i] === 0 && chromaticIndex === 11)) {
+                currentScaleIndex = direction === 'upper' ? i : (i - 1 + 7) % 7;
+                break;
+            }
+        }
+        if (currentScaleIndex === -1) currentScaleIndex = 0;
+    }
+
+    // Get neighbor scale degree
+    let neighborScaleIndex;
+    let neighborOctave = octave;
+
+    if (direction === 'upper') {
+        neighborScaleIndex = (currentScaleIndex + 1) % 7;
+        // If we wrapped around (went from degree 7 to degree 1), increase octave
+        if (neighborScaleIndex === 0 || scaleNotes[neighborScaleIndex] < chromaticIndex) {
+            neighborOctave = octave + 1;
+        }
+    } else {
+        neighborScaleIndex = (currentScaleIndex - 1 + 7) % 7;
+        // If we wrapped around (went from degree 1 to degree 7), decrease octave
+        if (neighborScaleIndex === 6 || scaleNotes[neighborScaleIndex] > chromaticIndex) {
+            neighborOctave = octave - 1;
+        }
+    }
+
+    const neighborChromatic = scaleNotes[neighborScaleIndex];
+    const neighborNoteName = ALL_NOTES[neighborChromatic];
+
+    return `${neighborNoteName}${neighborOctave}`;
+}
+
+/**
+ * Expand an ornament into a sequence of notes to play
+ * @param {string} pitch - The principal note pitch (e.g., 'C4')
+ * @param {string} ornament - Type: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
+ * @param {number} totalDuration - Total duration in seconds for the ornament
+ * @param {string} key - Current key for diatonic intervals
+ * @param {number} tempo - Current tempo in BPM
+ * @returns {Array} Array of { pitch, duration, offset } objects
+ */
+function expandOrnament(pitch, ornament, totalDuration, key, tempo) {
+    if (!pitch || !ornament) return [{ pitch, duration: totalDuration, offset: 0 }];
+
+    const upperNeighbor = getDiatonicNeighbor(pitch, key, 'upper');
+    const lowerNeighbor = getDiatonicNeighbor(pitch, key, 'lower');
+
+    // Ornament note duration depends on tempo - faster at higher tempos
+    const baseOrnamentDuration = Math.max(0.04, Math.min(0.08, 60 / tempo / 4));
+
+    switch (ornament) {
+        case 'trill': {
+            // Trill: rapid alternation between principal and upper neighbor
+            // Number of alternations based on duration
+            const trillNoteDuration = baseOrnamentDuration;
+            const numAlternations = Math.max(4, Math.floor(totalDuration / trillNoteDuration));
+            const actualNoteDuration = totalDuration / numAlternations;
+
+            const notes = [];
+            for (let i = 0; i < numAlternations; i++) {
+                notes.push({
+                    pitch: i % 2 === 0 ? pitch : upperNeighbor,
+                    duration: actualNoteDuration,
+                    offset: i * actualNoteDuration
+                });
+            }
+            return notes;
+        }
+
+        case 'mordent': {
+            // Mordent: principal → lower → principal (quickly)
+            const mordentDuration = baseOrnamentDuration;
+            const principalDuration = totalDuration - (mordentDuration * 2);
+
+            return [
+                { pitch: pitch, duration: mordentDuration, offset: 0 },
+                { pitch: lowerNeighbor, duration: mordentDuration, offset: mordentDuration },
+                { pitch: pitch, duration: principalDuration, offset: mordentDuration * 2 }
+            ];
+        }
+
+        case 'invertedMordent': {
+            // Inverted Mordent: principal → upper → principal (quickly)
+            const mordentDuration = baseOrnamentDuration;
+            const principalDuration = totalDuration - (mordentDuration * 2);
+
+            return [
+                { pitch: pitch, duration: mordentDuration, offset: 0 },
+                { pitch: upperNeighbor, duration: mordentDuration, offset: mordentDuration },
+                { pitch: pitch, duration: principalDuration, offset: mordentDuration * 2 }
+            ];
+        }
+
+        case 'turn': {
+            // Turn: upper → principal → lower → principal
+            const turnNoteDuration = totalDuration / 4;
+
+            return [
+                { pitch: upperNeighbor, duration: turnNoteDuration, offset: 0 },
+                { pitch: pitch, duration: turnNoteDuration, offset: turnNoteDuration },
+                { pitch: lowerNeighbor, duration: turnNoteDuration, offset: turnNoteDuration * 2 },
+                { pitch: pitch, duration: turnNoteDuration, offset: turnNoteDuration * 3 }
+            ];
+        }
+
+        case 'invertedTurn': {
+            // Inverted Turn: lower → principal → upper → principal
+            const turnNoteDuration = totalDuration / 4;
+
+            return [
+                { pitch: lowerNeighbor, duration: turnNoteDuration, offset: 0 },
+                { pitch: pitch, duration: turnNoteDuration, offset: turnNoteDuration },
+                { pitch: upperNeighbor, duration: turnNoteDuration, offset: turnNoteDuration * 2 },
+                { pitch: pitch, duration: turnNoteDuration, offset: turnNoteDuration * 3 }
+            ];
+        }
+
+        default:
+            // Unknown ornament - just play the principal note
+            return [{ pitch, duration: totalDuration, offset: 0 }];
+    }
+}
+
+// ============================================================================
 // REPEAT SIGN PLAYBACK SUPPORT
 // ============================================================================
 
@@ -3247,26 +3422,64 @@ export function playFromSelectedMeasure() {
         if (notesFromStart.length > 0) {
             melodyPart = new Tone.Part((time, noteData) => {
                 const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
+                const currentKey = getCurrentKey() || 'C';
 
-                pitches.forEach(pitch => {
-                    synth.triggerAttackRelease(pitch, noteData.duration, time);
+                // Handle ornaments if present
+                if (noteData.ornament && pitches.length > 0) {
+                    const topPitch = pitches[pitches.length - 1];
+                    const sustainPitches = pitches.slice(0, -1);
+                    const durationSeconds = Tone.Time(noteData.duration).toSeconds();
+                    const expandedNotes = expandOrnament(topPitch, noteData.ornament, durationSeconds, currentKey, tempo);
 
-                    Tone.Draw.schedule(() => {
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) keyEl.classList.add('active-melody-playback');
-                    }, time);
+                    // Play sustained lower notes
+                    sustainPitches.forEach(pitch => {
+                        synth.triggerAttackRelease(pitch, noteData.duration, time);
+                    });
 
-                    const noteDuration = Tone.Time(noteData.duration).toSeconds();
-                    Tone.Draw.schedule(() => {
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) keyEl.classList.remove('active-melody-playback');
-                    }, time + noteDuration);
-                });
+                    // Play expanded ornament
+                    expandedNotes.forEach(ornamentNote => {
+                        const ornamentTime = time + ornamentNote.offset;
+                        if (ornamentTime >= 0) {
+                            synth.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
+                        }
+                    });
+
+                    // Visual feedback for all pitches
+                    pitches.forEach(pitch => {
+                        Tone.Draw.schedule(() => {
+                            const keyEl = document.getElementById(getNoteKeyId(pitch));
+                            if (keyEl) keyEl.classList.add('active-melody-playback');
+                        }, time);
+
+                        const noteDuration = Tone.Time(noteData.duration).toSeconds();
+                        Tone.Draw.schedule(() => {
+                            const keyEl = document.getElementById(getNoteKeyId(pitch));
+                            if (keyEl) keyEl.classList.remove('active-melody-playback');
+                        }, time + noteDuration);
+                    });
+                } else {
+                    // No ornament - play normally
+                    pitches.forEach(pitch => {
+                        synth.triggerAttackRelease(pitch, noteData.duration, time);
+
+                        Tone.Draw.schedule(() => {
+                            const keyEl = document.getElementById(getNoteKeyId(pitch));
+                            if (keyEl) keyEl.classList.add('active-melody-playback');
+                        }, time);
+
+                        const noteDuration = Tone.Time(noteData.duration).toSeconds();
+                        Tone.Draw.schedule(() => {
+                            const keyEl = document.getElementById(getNoteKeyId(pitch));
+                            if (keyEl) keyEl.classList.remove('active-melody-playback');
+                        }, time + noteDuration);
+                    });
+                }
             }, notesFromStart.map(note => ({
                 time: ((note.measure - startMeasure) * measureDuration) + (note.beat * beatDuration),
                 pitch: note.pitch,
                 pitches: note.pitches,
-                duration: note.duration
+                duration: note.duration,
+                ornament: note.ornament
             })));
         }
     }
@@ -3898,7 +4111,8 @@ export function playInteractiveMelodyWithChords() {
                 time: (note.measure * measureDuration) + (note.beat * beatDuration),
                 pitch: note.pitch, // Legacy single pitch
                 pitches: note.pitches, // Polyphonic format
-                duration: note.duration
+                duration: note.duration,
+                ornament: note.ornament
             }));
         console.log(`[playInteractiveMelodyWithChords] Got ${melodyNotesToPlay.length} melody notes from compositionState (after filtering ties)`);
     }
@@ -3907,21 +4121,57 @@ export function playInteractiveMelodyWithChords() {
     const melodyPart = new Tone.Part((time, noteData) => {
         // Handle polyphony - play all pitches
         const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
+        const currentKey = getCurrentKey() || 'C';
 
-        pitches.forEach(pitch => {
-            synth.triggerAttackRelease(pitch, noteData.duration, time);
+        // Handle ornaments if present
+        if (noteData.ornament && pitches.length > 0) {
+            const topPitch = pitches[pitches.length - 1];
+            const sustainPitches = pitches.slice(0, -1);
+            const durationSeconds = Tone.Time(noteData.duration).toSeconds();
+            const expandedNotes = expandOrnament(topPitch, noteData.ornament, durationSeconds, currentKey, tempo);
+
+            // Play sustained lower notes
+            sustainPitches.forEach(pitch => {
+                synth.triggerAttackRelease(pitch, noteData.duration, time);
+            });
+
+            // Play expanded ornament
+            expandedNotes.forEach(ornamentNote => {
+                const ornamentTime = time + ornamentNote.offset;
+                if (ornamentTime >= 0) {
+                    synth.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
+                }
+            });
 
             // Visual feedback
-            Tone.Draw.schedule(() => {
-                const keyEl = document.getElementById(getNoteKeyId(pitch));
-                if (keyEl) keyEl.classList.add('active-melody-playback');
-            }, time);
+            pitches.forEach(pitch => {
+                Tone.Draw.schedule(() => {
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) keyEl.classList.add('active-melody-playback');
+                }, time);
 
-            Tone.Draw.schedule(() => {
-                const keyEl = document.getElementById(getNoteKeyId(pitch));
-                if (keyEl) keyEl.classList.remove('active-melody-playback');
-            }, time + 0.4);
-        });
+                Tone.Draw.schedule(() => {
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) keyEl.classList.remove('active-melody-playback');
+                }, time + 0.4);
+            });
+        } else {
+            // No ornament - play normally
+            pitches.forEach(pitch => {
+                synth.triggerAttackRelease(pitch, noteData.duration, time);
+
+                // Visual feedback
+                Tone.Draw.schedule(() => {
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) keyEl.classList.add('active-melody-playback');
+                }, time);
+
+                Tone.Draw.schedule(() => {
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) keyEl.classList.remove('active-melody-playback');
+                }, time + 0.4);
+            });
+        }
     }, melodyNotesToPlay);
 
     // Schedule chord whole notes
@@ -4302,10 +4552,37 @@ export function playAllMelody() {
         }
 
         // Use the passed-in time parameter directly (Tone.js handles timing)
-        // Play all pitches in the chord
-        notesToPlay.forEach(pitch => {
-            synth.triggerAttackRelease(pitch, noteData.duration, principalNoteTime);
-        });
+        // Handle ornaments if present - expand into multiple notes
+        const ornament = noteData.ornament;
+        const currentKey = getCurrentKey() || 'C';
+
+        if (ornament && notesToPlay.length > 0) {
+            // For chords with ornaments, apply ornament to the top (melody) note only
+            // Other notes in the chord sustain normally
+            const topPitch = notesToPlay[notesToPlay.length - 1]; // Top note gets ornament
+            const sustainPitches = notesToPlay.slice(0, -1); // Lower notes sustain
+
+            // Expand ornament into note sequence
+            const expandedNotes = expandOrnament(topPitch, ornament, noteData.duration, currentKey, tempo);
+
+            // Play sustained lower notes (if any) for full duration
+            sustainPitches.forEach(pitch => {
+                synth.triggerAttackRelease(pitch, noteData.duration, principalNoteTime);
+            });
+
+            // Play expanded ornament notes on top pitch
+            expandedNotes.forEach(ornamentNote => {
+                const ornamentTime = principalNoteTime + ornamentNote.offset;
+                if (ornamentTime >= 0) {
+                    synth.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
+                }
+            });
+        } else {
+            // No ornament - play all pitches normally
+            notesToPlay.forEach(pitch => {
+                synth.triggerAttackRelease(pitch, noteData.duration, principalNoteTime);
+            });
+        }
 
         // Create note identifier: "measure-beat-pitch" for each pitch in the chord
         const measureNum = typeof noteData.measure === 'number' ? noteData.measure : parseInt(noteData.measure, 10);
@@ -4499,6 +4776,7 @@ export function playAllMelody() {
                     beat: note.beat || 0,
                     dynamic: note.dynamic,      // Include stored dynamic (may be null if inherited)
                     graceNotes: note.graceNotes, // Grace notes to play before principal note
+                    ornament: note.ornament,    // Ornament: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
                     noteIndex: exportedIndex    // Index into this filtered/merged list
                 });
 

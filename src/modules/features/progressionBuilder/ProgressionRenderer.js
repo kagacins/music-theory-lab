@@ -5827,15 +5827,16 @@ function createUnifiedSectionContainer(section, progressionData, key) {
  * Returns HTML string for simplified chord card display
  */
 function createSimplifiedCardHTML(chord, index, key) {
-    const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
-    const colors = getFunctionColors(roman);
+    const isNoChord = chord.type === 'No Chord';
+    const roman = isNoChord ? '' : (chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key));
+    const colors = isNoChord ? { romanColor: 'text-gray-500', hexColor: '#6b7280' } : getFunctionColors(roman);
 
     // Check if this is an interval (not a chord)
     const isInterval = chord.selectionMode === 'interval';
 
     // Use simpleName for accurate chord symbol (e.g., "Gm9" for G Minor 9th)
     // Falls back to building symbol if simpleName not available
-    let chordSymbol = chord.simpleName || chord.root;
+    let chordSymbol = isNoChord ? 'N.C.' : (chord.simpleName || chord.root);
 
     // If no simpleName, build it manually (backup)
     if (!chord.simpleName && !isInterval) {
@@ -5952,6 +5953,7 @@ function createSimplifiedCardHTML(chord, index, key) {
 function getChordTypeOptions(currentType) {
     // Organized by chord groups for better UX
     const chordGroups = [
+        { label: 'Special', types: ['No Chord'] },
         { label: 'Triads', types: ['Major', 'Minor', 'Diminished', 'Augmented', 'Sus2', 'Sus4', 'Power Chord'] },
         { label: '7th Chords', types: ['Dominant 7th', 'Major 7th', 'Minor 7th', 'Minor-Major 7th', 'Diminished 7th', 'Half-Diminished 7th', 'Augmented 7th'] },
         { label: '6th Chords', types: ['Major 6th', 'Minor 6th'] },
@@ -5998,12 +6000,13 @@ function getRootNoteOptions(currentRoot) {
  * @returns {string} HTML string for detailed card
  */
 export function createDetailedCardHTML(chord, index, key) {
-    const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
-    const colors = getFunctionColors(roman);
+    const isNoChord = chord.type === 'No Chord';
+    const roman = isNoChord ? '' : (chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key));
+    const colors = isNoChord ? { romanColor: 'text-gray-500', hexColor: '#6b7280' } : getFunctionColors(roman);
     const isInterval = chord.selectionMode === 'interval';
-    const chordSymbol = chord.simpleName || chord.name || `${chord.root}${chord.type}`;
+    const chordSymbol = isNoChord ? 'N.C.' : (chord.simpleName || chord.name || `${chord.root}${chord.type}`);
     const intervalSymbol = isInterval ? (chord.simpleName || chord.type) : null;
-    const functionLabel = getChordFunction(roman);
+    const functionLabel = isNoChord ? 'No Chord' : getChordFunction(roman);
 
     // Get scale notes for highlighting
     const scaleNotes = getScaleNotesForKey(key);

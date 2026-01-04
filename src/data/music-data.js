@@ -77,6 +77,9 @@ const CHORD_DEFINITIONS = {
     'Major 7th #11': { intervals: [0, 4, 7, 11, 18], symbol: 'maj7#11', description: 'A major 7th chord with a raised 11th (R, M3, P5, M7, #11). The #11 creates a Lydian flavor - dreamy and floating. Common in jazz and film scores.' },
     'Power Chord': { intervals: [0, 7], symbol: '5', description: 'Contains only the root and the 5th (R, P5). The 3rd is omitted, making it neither major nor minor. Common in rock music.' },
 
+    // Special: No Chord (N.C.) - reserves time in composition without specifying harmony
+    'No Chord': { intervals: [], symbol: 'N.C.', description: 'No chord - silence or melody without harmonic accompaniment. Reserves time in the composition without specifying any chord. The bass clef will be empty during this time.' },
+
     // Aliases for backwards compatibility (non-hyphenated and long form names)
     'Half Diminished 7th': { intervals: [0, 3, 6, 10], symbol: 'm7b5', description: 'Alias for Half-Diminished 7th' },
     'Minor Major 7th': { intervals: [0, 3, 7, 11], symbol: 'm(maj7)', description: 'Alias for Minor-Major 7th' },

@@ -134,6 +134,7 @@ import {
 
     // Chord Management
     addChordToProgressionByParams,
+    addNoChordToProgression,
     addToProgressionData,
     removeChordFromProgression,
     toggleProgressionNote,
@@ -454,6 +455,7 @@ if (typeof window !== 'undefined') {
     // Chord Management
     window.showProgressionChordSuggestions = showProgressionChordSuggestions;
     window.addChordToProgressionByParams = addChordToProgressionByParams;
+    window.addNoChordToProgression = addNoChordToProgression;
     window.addChordToSection = addChordToSection;
     window.clearProgression = clearProgression;
 
