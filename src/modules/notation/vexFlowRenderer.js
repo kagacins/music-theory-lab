@@ -1457,14 +1457,69 @@ export function generateBeams(notes, options = {}) {
 
   const {
     groups = null, // Custom beam groups
-    stemDirection = null, // Force stem direction
+    stemDirection = null, // Force stem direction for all notes in the beam
+    maintainStemDirections = true, // Preserve stem directions set on notes (for multi-voice)
   } = options;
 
   try {
-    if (groups) {
-      return VF.Beam.generateBeams(notes, { groups });
+    // When explicit stem direction is provided (multi-voice mode):
+    // 1. Set stem direction on ALL beamable notes FIRST
+    // 2. Then use VF.Beam.generateBeams with maintain_stem_directions: true
+    // This gives us intelligent beat-based grouping WHILE preserving our stem directions
+
+    if (stemDirection !== null) {
+      // Force stem direction on all beamable notes BEFORE calling generateBeams
+      const beamableNotes = notes.filter(note => {
+        const durationType = note.getDuration ? note.getDuration() : '';
+        return ['8', '16', '32', '64'].includes(durationType);
+      });
+
+      beamableNotes.forEach(note => {
+        if (note.setStemDirection) {
+          note.setStemDirection(stemDirection);
+        }
+      });
     }
-    return VF.Beam.generateBeams(notes);
+
+    // Use generateBeams for intelligent grouping (beat-based beam groups)
+    const beamOptions = {
+      maintain_stem_directions: true,
+    };
+    if (stemDirection !== null) {
+      beamOptions.stem_direction = stemDirection;
+    }
+    if (groups) {
+      beamOptions.groups = groups;
+    }
+
+    const beams = VF.Beam.generateBeams(notes, beamOptions);
+
+    // Process each beam to:
+    // 1. Force stem direction for multi-voice scenarios
+    // 2. Suppress flags (VexFlow doesn't auto-suppress in this version)
+    beams.forEach(beam => {
+      const beamNotes = beam.getNotes ? beam.getNotes() : (beam.notes || []);
+
+      beamNotes.forEach(note => {
+        // Force stem direction for multi-voice
+        if (stemDirection !== null && note.setStemDirection) {
+          note.setStemDirection(stemDirection);
+        }
+
+        // Suppress flag drawing by overriding draw methods on the original flag
+        // Keep the original object intact so all VexFlow methods work
+        if (note.flag) {
+          note.flag.draw = () => {};
+          note.flag.drawWithStyle = () => {};
+          note.flag.render = () => {};
+        }
+      });
+    });
+
+    // Note: calculateSlope() and applyStemExtensions() are called automatically
+    // during beam.draw() -> postFormat() when notes have TickContext.
+
+    return beams;
   } catch (e) {
     console.warn('Error generating beams:', e);
     return [];

@@ -86,8 +86,15 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
 
     if (beamableNotes.length >= 2) {
       try {
-        const beam = new VF.Beam(beamableNotes);
-        beams.push(beam);
+        // Get stem direction from the first note in the tuplet group
+        let tupletStemDirection = null;
+        if (beamableNotes[0].getStemDirection) {
+          tupletStemDirection = beamableNotes[0].getStemDirection();
+        }
+        // Use generateBeams helper which handles stem direction preservation
+        // while also providing intelligent beat-based grouping
+        const tupletBeams = generateBeams(beamableNotes, { stemDirection: tupletStemDirection });
+        beams.push(...tupletBeams);
       } catch (e) {
         console.warn('[generateBeamsWithTuplets] Error creating tuplet beam:', e);
       }
@@ -167,7 +174,14 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
   // Generate beams for each group
   for (const group of beamGroups) {
     try {
-      const groupBeams = generateBeams(group);
+      // Get stem direction from the first note in the group
+      // This ensures beams respect multi-voice stem directions
+      let groupStemDirection = null;
+      if (group.length > 0 && group[0].getStemDirection) {
+        groupStemDirection = group[0].getStemDirection();
+      }
+
+      const groupBeams = generateBeams(group, { stemDirection: groupStemDirection });
       beams.push(...groupBeams);
     } catch (e) {
       console.warn('[generateBeamsWithTuplets] Error creating standard beams:', e);
@@ -2585,7 +2599,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // Separate notes by voice index
   let primaryTrebleVoiceNotes = trebleNotes.filter(n => (n.voiceIndex || 0) === 0);
   let secondaryTrebleVoiceNotes = trebleNotes.filter(n => n.voiceIndex === 1);
-  let hasMultipleVoices = secondaryTrebleVoiceNotes.length > 0;
+  let hasMultipleVoicesInMeasure = secondaryTrebleVoiceNotes.length > 0;
 
   // Track if we swapped voices (for correct voiceIndex in regions)
   let primaryVoiceIndex = 0;
@@ -2597,15 +2611,15 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     primaryTrebleVoiceNotes = secondaryTrebleVoiceNotes;
     primaryVoiceIndex = 1;  // These notes are actually from voice 1
     secondaryTrebleVoiceNotes = [];
-    hasMultipleVoices = false;
+    hasMultipleVoicesInMeasure = false;
   }
 
-  // Stem direction: only set explicit directions when multiple voices are present
+  // Stem direction: only set explicit directions when multiple voices are present in THIS measure
   // Single voice: let VexFlow use auto-stemming (based on pitch position)
   // Multiple voices: voice 0 = up (1), voice 1 = down (-1)
 
   // Apply smart rest visibility for multi-voice notation
-  if (hasMultipleVoices) {
+  if (hasMultipleVoicesInMeasure) {
     // Fill gaps with rests so smart rest analysis has rests to analyze
     // Pass voiceIndex so auto-generated rests are properly tagged
     primaryTrebleVoiceNotes = fillGapsWithRests(primaryTrebleVoiceNotes, timeSignature, 'treble', primaryVoiceIndex);
@@ -2621,8 +2635,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   }
 
   // Create notes for voice 0 (primary voice)
-  // Only pass stemDirection when we have multiple voices
-  const trebleResult = hasMultipleVoices
+  // Only pass stemDirection when we have multiple voices in this measure
+  const trebleResult = hasMultipleVoicesInMeasure
     ? createNotesForStaff(primaryTrebleVoiceNotes, keySignature, 'treble', timeSignature, {
         stemDirection: VOICE_STEM_DIRECTIONS.primary,
         voiceIndex: 0,
@@ -2632,19 +2646,21 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const trebleOttavaBrackets = trebleResult.ottavaBrackets;
   const trebleTies = trebleResult.ties;
   const trebleTupletGroups = trebleResult.tupletGroups;
+
   const trebleBeams = generateBeamsWithTuplets(vexTrebleNotes, trebleTupletGroups);
 
-  // Create notes for voice 1 (secondary voice) if present
+  // Create notes for voice 1 (secondary voice) if present in THIS measure
   let vexTrebleNotes2 = [];
   let trebleBeams2 = [];
   let trebleTupletGroups2 = {};
-  if (hasMultipleVoices) {
+  if (hasMultipleVoicesInMeasure) {
     const trebleResult2 = createNotesForStaff(secondaryTrebleVoiceNotes, keySignature, 'treble', timeSignature, {
       stemDirection: VOICE_STEM_DIRECTIONS.secondary,
       voiceIndex: 1,
     });
     vexTrebleNotes2 = trebleResult2.notes;
     trebleTupletGroups2 = trebleResult2.tupletGroups;
+
     trebleBeams2 = generateBeamsWithTuplets(vexTrebleNotes2, trebleTupletGroups2);
   }
 
@@ -2652,7 +2668,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // Separate notes by voice index
   let primaryBassVoiceNotes = bassNotes.filter(n => (n.voiceIndex || 0) === 0);
   let secondaryBassVoiceNotes = bassNotes.filter(n => n.voiceIndex === 1);
-  let hasBassMultipleVoices = secondaryBassVoiceNotes.length > 0;
+  let hasBassMultipleVoicesInMeasure = secondaryBassVoiceNotes.length > 0;
 
   // Track if we swapped voices (for correct voiceIndex in regions)
   let primaryBassVoiceIndex = 0;
@@ -2663,11 +2679,11 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     primaryBassVoiceNotes = secondaryBassVoiceNotes;
     primaryBassVoiceIndex = 1;
     secondaryBassVoiceNotes = [];
-    hasBassMultipleVoices = false;
+    hasBassMultipleVoicesInMeasure = false;
   }
 
   // Apply smart rest visibility for multi-voice bass notation
-  if (hasBassMultipleVoices) {
+  if (hasBassMultipleVoicesInMeasure) {
     // Fill gaps with rests so smart rest analysis has rests to analyze
     // Pass voiceIndex so auto-generated rests are properly tagged
     primaryBassVoiceNotes = fillGapsWithRests(primaryBassVoiceNotes, timeSignature, 'bass', primaryBassVoiceIndex);
@@ -2683,7 +2699,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   }
 
   // Create notes for bass voice 0 (primary voice)
-  const bassResult = hasBassMultipleVoices
+  const bassResult = hasBassMultipleVoicesInMeasure
     ? createNotesForStaff(primaryBassVoiceNotes, keySignature, 'bass', timeSignature, {
         stemDirection: VOICE_STEM_DIRECTIONS.primary,
         voiceIndex: 0,
@@ -2695,11 +2711,11 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const bassTupletGroups = bassResult.tupletGroups;
   const bassBeams = generateBeamsWithTuplets(vexBassNotes, bassTupletGroups);
 
-  // Create notes for bass voice 1 (secondary voice) if present
+  // Create notes for bass voice 1 (secondary voice) if present in THIS measure
   let vexBassNotes2 = [];
   let bassBeams2 = [];
   let bassTupletGroups2 = {};
-  if (hasBassMultipleVoices) {
+  if (hasBassMultipleVoicesInMeasure) {
     const bassResult2 = createNotesForStaff(secondaryBassVoiceNotes, keySignature, 'bass', timeSignature, {
       stemDirection: VOICE_STEM_DIRECTIONS.secondary,
       voiceIndex: 1,
@@ -2720,7 +2736,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     clef: 'treble',
   });
 
-  if (hasMultipleVoices && vexTrebleNotes2.length > 0) {
+  if (hasMultipleVoicesInMeasure && vexTrebleNotes2.length > 0) {
     applyNoteColoring(vexTrebleNotes2, secondaryTrebleVoiceNotes, {
       measureIndex,
       chord,
@@ -2744,7 +2760,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     isAutoGeneratedBass,  // Only color blue if auto-generated
   });
 
-  if (hasBassMultipleVoices && vexBassNotes2.length > 0) {
+  if (hasBassMultipleVoicesInMeasure && vexBassNotes2.length > 0) {
     applyNoteColoring(vexBassNotes2, secondaryBassVoiceNotes, {
       measureIndex,
       chord,
@@ -2888,7 +2904,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // === Step 1: Align Voice 1 and Voice 2 within TREBLE clef ===
   let alignedTrebleNotes1 = vexTrebleNotes;
   let alignedTrebleNotes2 = vexTrebleNotes2;
-  if (hasMultipleVoices && vexTrebleNotes2.length > 0) {
+  if (hasMultipleVoicesInMeasure && vexTrebleNotes2.length > 0) {
     const trebleAligned = alignVoicesWithGhostNotes(
       primaryTrebleVoiceNotes, vexTrebleNotes,
       secondaryTrebleVoiceNotes, vexTrebleNotes2,
@@ -2901,7 +2917,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // === Step 2: Align Voice 1 and Voice 2 within BASS clef ===
   let alignedBassNotes1 = vexBassNotes;
   let alignedBassNotes2 = vexBassNotes2;
-  if (hasBassMultipleVoices && vexBassNotes2.length > 0) {
+  if (hasBassMultipleVoicesInMeasure && vexBassNotes2.length > 0) {
     const bassAligned = alignVoicesWithGhostNotes(
       primaryBassVoiceNotes, vexBassNotes,
       secondaryBassVoiceNotes, vexBassNotes2,
@@ -2959,13 +2975,13 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
 
   // Create second treble voice if we have multi-voice content (already aligned)
   let alignedTrebleVoice2 = null;
-  if (hasMultipleVoices && alignedTrebleNotes2.length > 0) {
+  if (hasMultipleVoicesInMeasure && alignedTrebleNotes2.length > 0) {
     alignedTrebleVoice2 = createVoice(alignedTrebleNotes2, voiceOptions);
   }
 
   // Create second bass voice if we have multi-voice content (already aligned)
   let alignedBassVoice2 = null;
-  if (hasBassMultipleVoices && alignedBassNotes2.length > 0) {
+  if (hasBassMultipleVoicesInMeasure && alignedBassNotes2.length > 0) {
     alignedBassVoice2 = createVoice(alignedBassNotes2, voiceOptions);
   }
 
@@ -3012,11 +3028,11 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
 
   // Draw beams
   drawBeams(context, trebleBeams);
-  if (hasMultipleVoices) {
+  if (hasMultipleVoicesInMeasure) {
     drawBeams(context, trebleBeams2);
   }
   drawBeams(context, bassBeams);
-  if (hasBassMultipleVoices) {
+  if (hasBassMultipleVoicesInMeasure) {
     drawBeams(context, bassBeams2);
   }
 
@@ -3029,7 +3045,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   drawTuplets(context, trebleTuplets);
 
   // Draw tuplets for second treble voice
-  if (hasMultipleVoices) {
+  if (hasMultipleVoicesInMeasure) {
     const trebleTuplets2 = Object.values(trebleTupletGroups2)
       .filter(group => group.notes.length >= 2)
       .map(group => createTuplet(group.notes, group.info, { location: 'bottom' }))
@@ -3044,7 +3060,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   drawTuplets(context, bassTuplets);
 
   // Draw tuplets for second bass voice
-  if (hasBassMultipleVoices) {
+  if (hasBassMultipleVoicesInMeasure) {
     const bassTuplets2 = Object.values(bassTupletGroups2)
       .filter(group => group.notes.length >= 2)
       .map(group => createTuplet(group.notes, group.info, { location: 'top' }))
@@ -3200,7 +3216,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   };
 
   appendTrebleRegions(vexTrebleNotes, primaryTrebleVoiceNotes, primaryVoiceIndex);
-  if (hasMultipleVoices && vexTrebleNotes2.length > 0) {
+  if (hasMultipleVoicesInMeasure && vexTrebleNotes2.length > 0) {
     appendTrebleRegions(vexTrebleNotes2, secondaryTrebleVoiceNotes, secondaryVoiceIndex);
   }
 
@@ -3293,7 +3309,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   };
 
   appendBassRegions(vexBassNotes, primaryBassVoiceNotes, primaryBassVoiceIndex);
-  if (hasBassMultipleVoices && vexBassNotes2.length > 0) {
+  if (hasBassMultipleVoicesInMeasure && vexBassNotes2.length > 0) {
     appendBassRegions(vexBassNotes2, secondaryBassVoiceNotes, secondaryBassVoiceIndex);
   }
 
@@ -3413,7 +3429,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     trebleOttavaBrackets,
     bassOttavaBrackets,
     noteRegions,
-    hasMultipleVoices, // Flag indicating if multi-voice is active
+    hasMultipleVoicesInMeasure, // Flag indicating if multi-voice is active
   };
 }
 

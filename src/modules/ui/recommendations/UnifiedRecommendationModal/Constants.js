@@ -186,6 +186,36 @@ export const TEXTURE_TYPES = {
         name: 'Arpeggiated Harmony',
         description: 'Broken chord accompaniment following melody rhythm',
         icon: '🎹'
+    },
+    SUSPENSION: {
+        id: 'suspension',
+        name: 'Suspension/Resolution',
+        description: 'Creates tension by holding notes, then resolves stepwise',
+        icon: '⏸️'
+    },
+    PASSING_TONES: {
+        id: 'passing_tones',
+        name: 'Passing Tones',
+        description: 'Fills melodic gaps with scale-wise motion',
+        icon: '🚶'
+    },
+    NEIGHBOR_TONES: {
+        id: 'neighbor_tones',
+        name: 'Neighbor Tones',
+        description: 'Embellishes melody with upper/lower neighbors',
+        icon: '🔄'
+    },
+    PEDAL_WITH_MOTION: {
+        id: 'pedal_motion',
+        name: 'Pedal + Motion',
+        description: 'Bass pedal while inner voice moves melodically',
+        icon: '🎚️'
+    },
+    IMITATION: {
+        id: 'imitation',
+        name: 'Imitation/Canon',
+        description: 'Delayed melodic imitation at a different pitch',
+        icon: '🪞'
     }
 };
 

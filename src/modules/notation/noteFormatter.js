@@ -155,7 +155,7 @@ function getNoteBeats(note) {
  * @param {string} timeSignature - Time signature
  * @returns {Array} - Array of VexFlow Beam objects
  */
-export function generateSmartBeams(notes, timeSignature = '4/4') {
+export function generateSmartBeams(notes, timeSignature = '4/4', maintainStemDirections = true) {
   if (!VF) return [];
 
   const beamGroups = getBeamGroups(timeSignature);
@@ -163,7 +163,7 @@ export function generateSmartBeams(notes, timeSignature = '4/4') {
   try {
     return VF.Beam.generateBeams(notes, {
       groups: beamGroups,
-      maintain_stem_directions: false,
+      maintain_stem_directions: maintainStemDirections,
     });
   } catch (e) {
     console.warn('Error generating smart beams:', e);

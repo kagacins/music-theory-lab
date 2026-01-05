@@ -1553,6 +1553,86 @@ export function setupWindowExports() {
     window.validateProjectData = validateProjectData;
     window.PROJECT_FORMAT_VERSION = PROJECT_FORMAT_VERSION;
 
+    // Complete load project function - combines loadProjectFromFile + applyProjectToState
+    window.loadProject = async function loadProject() {
+        try {
+            // Get the project file
+            const result = await loadProjectFromFile();
+            if (!result.success) {
+                if (result.error !== 'Load cancelled') {
+                    if (window.showToast) {
+                        window.showToast(result.error || 'Failed to load project', { type: 'error' });
+                    } else {
+                        alert(result.error || 'Failed to load project');
+                    }
+                }
+                return { success: false, error: result.error };
+            }
+
+            // Get current state instances
+            const compositionState = getCompositionState();
+            const trainerState = getTrainerState();
+
+            if (!compositionState || !trainerState) {
+                const error = 'Application state not ready. Please wait for the app to fully load.';
+                if (window.showToast) {
+                    window.showToast(error, { type: 'error' });
+                } else {
+                    alert(error);
+                }
+                return { success: false, error };
+            }
+
+            // Apply the project to state
+            const applyResult = applyProjectToState(result.project, compositionState, trainerState, {
+                onProgressionLoaded: (progressionData) => {
+                    // Refresh progression display after loading
+                    if (window.renderProgressionDisplay) {
+                        window.renderProgressionDisplay('melody-progression-visualization', true);
+                        window.renderProgressionDisplay('progression-visualization', true);
+                        window.renderProgressionDisplay('builder-progression-visualization', true);
+                    }
+                },
+                onNotationRefresh: () => {
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
+                    }
+                }
+            });
+
+            if (!applyResult.success) {
+                if (window.showToast) {
+                    window.showToast(applyResult.error || 'Failed to apply project', { type: 'error' });
+                } else {
+                    alert(applyResult.error || 'Failed to apply project');
+                }
+                return { success: false, error: applyResult.error };
+            }
+
+            // Update title display
+            const projectTitle = result.project.metadata?.title || result.filename || 'Untitled Project';
+            if (window.showToast) {
+                window.showToast(`Loaded: ${projectTitle}`, { type: 'success' });
+            }
+
+            // Trigger final refresh
+            if (window.refreshNotationFromProgression) {
+                window.refreshNotationFromProgression();
+            }
+
+            return { success: true, project: result.project, filename: result.filename };
+        } catch (error) {
+            console.error('[loadProject] Error:', error);
+            const errorMessage = error.message || 'Failed to load project';
+            if (window.showToast) {
+                window.showToast(errorMessage, { type: 'error' });
+            } else {
+                alert(errorMessage);
+            }
+            return { success: false, error: errorMessage };
+        }
+    };
+
     // Auto-save functions
     window.markDirty = markAutoSaveDirty;
     window.saveNow = saveAutoSaveNow;
