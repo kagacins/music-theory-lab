@@ -10,6 +10,28 @@ This document captures improvement opportunities for our suite of recommendation
 
 ---
 
+## Implementation Status (Updated 2026-01-04)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **1.1 Extract Scoring Functions** | DEFERRED | Existing implementation in `comprehensiveChordRecommendations.js` works well; extraction would be high risk |
+| **1.2 Configuration-Based Scoring Weights** | ALREADY EXISTS | `weightPresets.js` has 17+ presets (5 approach + 11 genre templates) |
+| **1.3 Caching Layer** | ALREADY EXISTS | 500-entry cache with 30s TTL implemented |
+| **2.1 Voice Leading Presets** | COMPLETE | Added 5 presets: strict, standard, contemporary, jazz, cinematic |
+| **2.2 Context-Aware Voice Leading** | COMPLETE | Added position modifiers (first, middle, end, climax, transition) that adjust penalties |
+| **3.x Section Generator** | ALREADY EXISTS | `SectionGenerator.js` has templates for pop/rock/jazz across section types; `sectionProfiles.js` has 10 section profiles |
+| **4.1 Multi-Dimensional Tension** | PENDING | Future enhancement (P3, High Effort) |
+| **4.2 Tension Shape Templates** | ALREADY EXISTS | `TENSION_ARC_TEMPLATES` has 8 templates (pop, epic, jazz, ballad, rock, edm, classical, ambient) |
+| **5.1 Contextual Preference Learning** | PARTIAL | Records by context (style, mood), but not by section type or key |
+| **5.2 Preference Decay** | ALREADY EXISTS | `decayFactor` (0.95) with `_applySessionDecay()` per session |
+| **5.3 Preference Export/Import** | ALREADY EXISTS | `exportPreferences()` and `importPreferences()` methods |
+| **6.1 Unified Scoring Pipeline** | ALREADY EXISTS | `CoordinatedRecommendationService.js` orchestrates all engines |
+| **6.2 Lazy Loading** | PARTIAL | Some dynamic imports exist, but not for heavy engines |
+| **7.1 Web Worker** | PENDING | No Web Workers currently used for recommendations |
+| **7.2 Incremental Updates** | PARTIAL | Caching with 1s TTL exists; incremental recalculation not implemented |
+
+---
+
 ## Current Recommendation Engine Inventory
 
 | Engine | File | Lines | Primary Purpose |
@@ -124,315 +146,403 @@ class RecommendationCache {
 
 ### Proposed Improvements
 
-#### 2.1 Create Voice Leading Presets
+#### 2.1 Create Voice Leading Presets ✅ COMPLETE
 
-Different musical styles have different voice leading priorities:
+**Status:** Implemented in `enhancedVoiceLeading.js` (2026-01-04)
+
+Different musical styles have different voice leading priorities. The following presets were added:
 
 ```javascript
-const VOICE_LEADING_PRESETS = {
+// In src/modules/features/enhancedVoiceLeading.js
+
+export const VOICE_LEADING_PRESETS = {
     strict: {
-        allowParallelFifths: false,
-        allowParallelOctaves: false,
-        maxLeap: 5,           // Perfect fourth
-        requireStepwiseMotion: true,
+        name: 'Strict (Classical)',
+        parallelFifthsPenalty: 15,
+        parallelOctavesPenalty: 12,
+        voiceCrossingPenalty: 10,
+        unresolvedTendencyPenalty: 10,
+        leapWithoutRecoveryPenalty: 8,
         tendencyToneResolution: 'required'
     },
     standard: {
-        allowParallelFifths: false,
-        allowParallelOctaves: false,
-        maxLeap: 7,           // Perfect fifth
-        requireStepwiseMotion: false,
+        name: 'Standard',
+        parallelFifthsPenalty: 10,
+        parallelOctavesPenalty: 8,
+        voiceCrossingPenalty: 8,
+        unresolvedTendencyPenalty: 6,
+        leapWithoutRecoveryPenalty: 5,
         tendencyToneResolution: 'preferred'
     },
     contemporary: {
-        allowParallelFifths: true,
-        allowParallelOctaves: false,
-        maxLeap: 12,          // Octave
-        requireStepwiseMotion: false,
+        name: 'Contemporary',
+        parallelFifthsPenalty: 3,
+        parallelOctavesPenalty: 5,
+        voiceCrossingPenalty: 4,
+        unresolvedTendencyPenalty: 2,
+        leapWithoutRecoveryPenalty: 2,
         tendencyToneResolution: 'optional'
+    },
+    jazz: {
+        name: 'Jazz',
+        parallelFifthsPenalty: 0,
+        parallelOctavesPenalty: 2,
+        voiceCrossingPenalty: 3,
+        unresolvedTendencyPenalty: 0,
+        leapWithoutRecoveryPenalty: 0,
+        tendencyToneResolution: 'optional'
+    },
+    cinematic: {
+        name: 'Cinematic/Epic',
+        parallelFifthsPenalty: 0,
+        parallelOctavesPenalty: 0,
+        voiceCrossingPenalty: 5,
+        unresolvedTendencyPenalty: 3,
+        leapWithoutRecoveryPenalty: 0,
+        tendencyToneResolution: 'preferred'
     }
 };
+
+// Helper functions
+export function getVoiceLeadingPreset(presetName) { ... }
+export function getPresetForStyle(style) { ... }
 ```
 
-#### 2.2 Add Context-Aware Voice Leading
+**Integration:** The `scoreEnhancedVoiceLeading()` function now accepts a `style` option and automatically selects the appropriate preset. Style-to-preset mapping:
+- Classical/Baroque → strict
+- Jazz/Bossa Nova/Latin Jazz → jazz
+- Pop/Rock/Indie/Electronic/R&B/Blues → contemporary
+- Gospel/Country/Folk → standard
+- Cinematic/Film/Epic → cinematic
 
-Consider the overall phrase structure when scoring voice leading:
+#### 2.2 Add Context-Aware Voice Leading ✅ COMPLETE
 
-- **Beginning of phrase:** Allow more freedom for establishing character
-- **Middle of phrase:** Prioritize smooth motion
-- **Cadence points:** Enforce traditional resolution patterns
-- **Climax points:** Allow dramatic leaps for expressive effect
+**Status:** Implemented in `enhancedVoiceLeading.js` (2026-01-04)
 
-**Priority:** P2 | **Effort:** Medium
+Position modifiers dynamically adjust voice leading penalties based on section position:
+
+```javascript
+// In src/modules/features/enhancedVoiceLeading.js
+
+export const POSITION_MODIFIERS = {
+    first: {
+        parallelMotionMultiplier: 0.5,   // More freedom at beginning
+        voiceCrossingMultiplier: 0.6,
+        tendencyToneMultiplier: 0.4,
+        leapRecoveryMultiplier: 0.3
+    },
+    middle: {
+        parallelMotionMultiplier: 1.0,   // Standard penalties
+        voiceCrossingMultiplier: 1.0,
+        tendencyToneMultiplier: 1.0,
+        leapRecoveryMultiplier: 1.0
+    },
+    end: {
+        parallelMotionMultiplier: 1.3,   // Stricter at cadences
+        voiceCrossingMultiplier: 1.2,
+        tendencyToneMultiplier: 1.5,
+        leapRecoveryMultiplier: 1.2
+    },
+    climax: {
+        parallelMotionMultiplier: 0.4,   // Allow dramatic leaps
+        voiceCrossingMultiplier: 0.8,
+        tendencyToneMultiplier: 0.2,
+        leapRecoveryMultiplier: 0.3
+    },
+    transition: {
+        parallelMotionMultiplier: 0.7,   // Balanced for transitions
+        voiceCrossingMultiplier: 0.9,
+        tendencyToneMultiplier: 0.8,
+        leapRecoveryMultiplier: 0.6
+    }
+};
+
+// Helper functions
+export function getPositionModifiers(position) { ... }
+export function applyPositionModifiers(preset, position) { ... }
+```
+
+**Integration:** The `scoreEnhancedVoiceLeading()` function now accepts a `sectionPosition` option that is passed from `comprehensiveChordRecommendations.js` using the existing `sectionContext.position` value.
 
 ---
 
-## Part 3: Section Generator Upgrades
+## Part 3: Section Generator Upgrades ✅ ALREADY EXISTS
 
-### Current State
+### Implementation Status
 
-The `SectionGenerator` creates chord sequences but could be enhanced with more sophisticated patterns.
+This functionality already exists in the codebase:
 
-### Proposed Improvements
+**File: `src/modules/recommendations/coordination/SectionGenerator.js` (~1400 lines)**
 
-#### 3.1 Add Genre-Specific Templates
+#### 3.1 Genre-Specific Templates ✅ EXISTS
+
+`PROGRESSION_TEMPLATES` contains templates for pop, rock, and jazz across section types:
 
 ```javascript
-const SECTION_TEMPLATES = {
-    pop: {
-        verse: ['I', 'V', 'vi', 'IV'],
-        chorus: ['I', 'IV', 'V', 'I'],
-        bridge: ['vi', 'IV', 'I', 'V']
+// Already implemented in SectionGenerator.js
+const PROGRESSION_TEMPLATES = {
+    intro: {
+        pop: [{ degrees: [1, 4, 1, 4], description: 'Simple tonic-subdominant oscillation' }, ...],
+        rock: [{ degrees: [1, 5, 1, 5], description: 'Power chord foundation' }, ...],
+        jazz: [{ degrees: [2, 5, 1, 1], description: 'ii-V-I establishment' }, ...]
     },
-    jazz: {
-        A: ['Imaj7', 'vi7', 'ii7', 'V7'],
-        B: ['IVmaj7', 'iv7', 'iii7', 'VI7'],
-        turnaround: ['I', 'VI7', 'ii7', 'V7']
-    },
-    classical: {
-        exposition: ['I', 'V', 'I', 'IV', 'V', 'I'],
-        development: ['vi', 'ii', 'V/V', 'V'],
-        recapitulation: ['I', 'IV', 'V', 'I']
-    }
+    verse: { pop: [...], rock: [...], jazz: [...] },
+    prechorus: { pop: [...], rock: [...] },
+    chorus: { pop: [...], rock: [...], jazz: [...] },
+    bridge: { pop: [...], rock: [...], jazz: [...] },
+    outro: { pop: [...], rock: [...] }
 };
 ```
 
-#### 3.2 Intelligent Section Transitions
+#### 3.2 Intelligent Section Transitions ✅ EXISTS
 
-Add logic for smooth transitions between sections:
-- Pre-chorus preparation
-- Bridge exit strategies
-- Outro wind-down patterns
+**Smooth transitions:** `SMOOTH_TRANSITIONS` maps ending degrees to preferred starting degrees:
+```javascript
+const SMOOTH_TRANSITIONS = {
+    1: [4, 5, 6, 2],  // I -> IV, V, vi, ii
+    5: [1, 6, 4],      // V -> I, vi, IV
+    // etc.
+};
+```
 
-**Priority:** P3 | **Effort:** Medium
+**Section suggestion:** `suggestNextSection()` provides intelligent recommendations based on current structure.
+
+**Duration arcs:** `DURATION_ARC_PROFILES` manages rhythmic flow through sections.
+
+**File: `src/modules/features/sectionProfiles.js` (~500 lines)**
+
+Contains 10 detailed section profiles (intro, verse, prechorus, chorus, bridge, interlude, solo, breakdown, outro, custom) with:
+- Tension ranges
+- Chord preferences by section
+- Position adjustments (first/middle/end)
+- Transition rules between sections
 
 ---
 
 ## Part 4: Tension Arc System V2
 
-### Current State
+### Implementation Status
 
-`TensionArcPlanner` provides basic tension trajectories.
+**File: `src/modules/analysis/TensionArcPlanner.js` (~845 lines)**
 
-### Proposed Improvements
+The TensionArcPlanner is already a comprehensive implementation with multi-factor tension analysis.
 
-#### 4.1 Multi-Dimensional Tension
+#### 4.2 Tension Shape Templates ✅ ALREADY EXISTS
 
-Track multiple tension dimensions:
-- **Harmonic tension:** Dissonance level, distance from tonic
+`TENSION_ARC_TEMPLATES` provides 8 pre-defined tension curves:
+
+```javascript
+// Already implemented in TensionArcPlanner.js
+export const TENSION_ARC_TEMPLATES = {
+    pop: { name: 'Pop Standard', curve: [...], sectionHints: {...} },
+    epic: { name: 'Epic/Cinematic', curve: [...] },
+    jazz: { name: 'Jazz Standard', curve: [...] },
+    ballad: { name: 'Ballad', curve: [...] },
+    rock: { name: 'Rock', curve: [...] },
+    edm: { name: 'EDM/Electronic', curve: [...] },
+    classical: { name: 'Classical', curve: [...] },
+    ambient: { name: 'Ambient/Minimal', curve: [...] },
+    custom: { name: 'Custom', isCustom: true }
+};
+```
+
+**Existing Tension Factors:**
+- Chord type base tension (40% weight)
+- Harmonic function tension (25% weight)
+- Chromaticism/borrowed chord tension (15% weight)
+- Inversion tension (10% weight)
+- Position in progression tension (10% weight)
+
+**File: `src/modules/analysis/TensionOptimizer.js`**
+
+Provides optimization algorithms for matching tension curves:
+- Find optimal inversions to match target tension
+- Suggest extensions (7ths, 9ths) to adjust tension
+- Chord substitution suggestions (dom7, dim, chromatic)
+
+#### 4.1 Multi-Dimensional Tension (PENDING)
+
+Track additional tension dimensions beyond harmonic:
 - **Rhythmic tension:** Syncopation, activity level
 - **Melodic tension:** Range extremes, leap frequency
 - **Dynamic tension:** Volume, articulation intensity
 
-```javascript
-class MultiDimensionalTension {
-    constructor() {
-        this.harmonic = 0;
-        this.rhythmic = 0;
-        this.melodic = 0;
-        this.dynamic = 0;
-    }
-
-    getOverallTension() {
-        return (this.harmonic * 0.4 +
-                this.rhythmic * 0.2 +
-                this.melodic * 0.25 +
-                this.dynamic * 0.15);
-    }
-}
-```
-
-#### 4.2 Tension Shape Templates
-
-Pre-defined tension curves for common musical forms:
-
-```javascript
-const TENSION_SHAPES = {
-    buildAndRelease: [0.2, 0.4, 0.6, 0.8, 0.9, 0.5, 0.3],
-    plateauWithClimb: [0.3, 0.3, 0.3, 0.5, 0.7, 0.9, 0.4],
-    wavePattern: [0.3, 0.6, 0.4, 0.7, 0.5, 0.8, 0.3],
-    gradualBuild: [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-};
-```
-
-**Priority:** P3 | **Effort:** High
+**Priority:** P3 | **Effort:** High | **Status:** Future enhancement
 
 ---
 
 ## Part 5: User Preference Learning Enhancements
 
-### Current State
+### Implementation Status
 
-`UserPreferenceLearner` tracks basic preferences.
+**File: `src/modules/recommendations/coordination/UserPreferenceLearner.js` (~661 lines)**
 
-### Proposed Improvements
+The UserPreferenceLearner is already a comprehensive implementation with decay and persistence.
 
-#### 5.1 Contextual Preference Learning
-
-Learn preferences based on context:
-- Preferences by section type (verse vs chorus)
-- Preferences by time of composition (beginning vs end)
-- Preferences by key/mode
-
-#### 5.2 Preference Decay
-
-Older preferences should have less weight:
+#### 5.2 Preference Decay ✅ ALREADY EXISTS
 
 ```javascript
-function getWeightedPreference(choices, decayFactor = 0.95) {
-    let weightedSum = 0;
-    let totalWeight = 0;
+// Already implemented in UserPreferenceLearner.js
+const DEFAULT_CONFIG = {
+    decayFactor: 0.95,           // 5% decay per session
+    maxHistorySize: 500,
+    minSelectionsForSignificance: 3,
+    recencyWeight: 0.7
+};
 
-    choices.forEach((choice, index) => {
-        const weight = Math.pow(decayFactor, choices.length - 1 - index);
-        weightedSum += choice.score * weight;
-        totalWeight += weight;
-    });
-
-    return weightedSum / totalWeight;
+_applySessionDecay() {
+    // Applies decay if significant time (> 1 hour) has passed
+    const decayAmount = Math.pow(this._config.decayFactor, Math.floor(hoursSinceLastSession / 24));
+    this._decayObject(this._chordPreferences.chordTypes, decayAmount);
+    // ... decays all preference categories
 }
 ```
 
-#### 5.3 Preference Export/Import
-
-Allow users to save and share preference profiles:
+#### 5.3 Preference Export/Import ✅ ALREADY EXISTS
 
 ```javascript
+// Already implemented
 exportPreferences() {
-    return JSON.stringify({
-        version: '1.0',
-        chordTypeFrequencies: this.chordTypeFrequencies,
-        functionPreferences: this.functionPreferences,
-        voiceLeadingTolerance: this.voiceLeadingTolerance
-    });
+    return {
+        chordPreferences: this._chordPreferences,
+        melodyPreferences: this._melodyPreferences,
+        progressionPreferences: this._progressionPreferences,
+        styleProfile: this._styleProfile,
+        exportedAt: new Date().toISOString()
+    };
 }
 
-importPreferences(json) {
-    const data = JSON.parse(json);
-    // Validate and apply...
+importPreferences(data) {
+    if (data.chordPreferences) this._chordPreferences = data.chordPreferences;
+    // ... imports all categories
+    this._saveToStorage();
 }
 ```
 
-**Priority:** P3 | **Effort:** Medium
+**Existing Preference Categories:**
+- Chord preferences: types, root notes, inversions, functions, voice leading
+- Melody preferences: contours, intervals, note categories, range
+- Progression preferences: patterns, lengths, cadences
+- Style profile: dominant style, style counts, mood counts, complexity
+
+#### 5.1 Contextual Preference Learning (PARTIAL)
+
+Currently records preferences by context (style, mood, function), but could be enhanced:
+- [ ] Preferences by section type (verse vs chorus)
+- [ ] Preferences by time of composition (beginning vs end)
+- [ ] Preferences by key/mode
+
+**Priority:** P3 | **Effort:** Medium | **Status:** Partial implementation exists
 
 ---
 
 ## Part 6: Cross-Engine Optimization
 
-### 6.1 Unified Scoring Pipeline
+### Implementation Status
 
-Create a single pipeline that orchestrates all engines:
+**File: `src/modules/recommendations/coordination/CoordinatedRecommendationService.js`**
+
+#### 6.1 Unified Scoring Pipeline ✅ ALREADY EXISTS
+
+The `CoordinatedRecommendationService` orchestrates all recommendation engines:
 
 ```javascript
-class UnifiedScoringPipeline {
+// Already implemented
+class CoordinatedRecommendationService extends EventEmitter {
     constructor() {
-        this.stages = [
-            { name: 'filter', engines: [filterInvalidChords] },
-            { name: 'score', engines: [
-                scoreVoiceLeading,
-                scoreFunction,
-                scoreTension,
-                scoreStyle
-            ]},
-            { name: 'rank', engines: [combineScores, applyPreferences] },
-            { name: 'present', engines: [formatForUI, addExplanations] }
-        ];
+        // Engine weights for combined scoring
+        this._engineWeights = {
+            functionScore: 0.25,
+            voiceLeading: 0.20,
+            styleMatch: 0.15,
+            sectionFit: 0.15,
+            tensionAlignment: 0.10,
+            userPreference: 0.15
+        };
     }
 
-    async execute(context, options) {
-        let results = { ...context };
-
-        for (const stage of this.stages) {
-            for (const engine of stage.engines) {
-                results = await engine(results, options);
-            }
-        }
-
-        return results;
-    }
+    // Primary API methods
+    getChordRecommendations(options) { ... }      // Coordinates chord engines
+    getMelodySuggestions(options) { ... }          // Coordinates melody engines
+    getSectionProgression(options) { ... }         // Generates section progressions
+    generateCompleteSection(options) { ... }       // Holistic generation
 }
 ```
 
-### 6.2 Lazy Loading for Heavy Engines
+**Features:**
+- Unified API for all recommendation types
+- Cross-engine scoring considering how recommendations work together
+- Automatic context propagation to all engines
+- User preference integration via UserPreferenceLearner
+- Built-in caching (1 second TTL)
 
-Only load complex engines when needed:
+#### 6.2 Lazy Loading for Heavy Engines (PARTIAL)
 
-```javascript
-let harmonyAnalyzer = null;
+Some dynamic imports exist in the codebase but not specifically for heavy recommendation engines.
+Could be enhanced to lazily load:
+- TensionArcPlanner
+- HarmonyAnalyzer
+- SectionGenerator
 
-export async function getHarmonyAnalyzer() {
-    if (!harmonyAnalyzer) {
-        const module = await import('../analysis/harmonyAnalyzer.js');
-        harmonyAnalyzer = new module.HarmonyAnalyzer();
-    }
-    return harmonyAnalyzer;
-}
-```
-
-**Priority:** P2 | **Effort:** High
+**Priority:** P2 | **Effort:** High | **Status:** Mostly implemented
 
 ---
 
 ## Part 7: Real-Time Performance Optimizations
 
-### 7.1 Web Worker for Heavy Calculations
+### Implementation Status
 
-Move expensive operations to a Web Worker:
+#### 7.1 Web Worker for Heavy Calculations (PENDING)
 
-```javascript
-// recommendationWorker.js
-self.onmessage = function(e) {
-    const { chord, context, options } = e.data;
-    const recommendations = generateRecommendations(chord, context, options);
-    self.postMessage({ recommendations });
-};
-```
+No Web Workers are currently used for recommendation calculations. This remains a future enhancement opportunity for moving expensive operations off the main thread.
 
-### 7.2 Incremental Updates
+**Potential benefits:**
+- Prevent UI jank during complex recommendation generation
+- Allow background calculation while user continues working
+- Parallel processing for multiple recommendation types
 
-When progression changes, only recalculate affected recommendations:
+#### 7.2 Incremental Updates (PARTIAL)
 
-```javascript
-function getAffectedIndices(changeIndex, progressionLength) {
-    // Changes affect: previous chord, changed chord, next chord
-    return [
-        changeIndex - 1,
-        changeIndex,
-        changeIndex + 1
-    ].filter(i => i >= 0 && i < progressionLength);
-}
-```
+**Existing caching:**
+- `CoordinatedRecommendationService` has 1-second TTL cache
+- `comprehensiveChordRecommendations.js` has 500-entry cache with 30s TTL
+- Caches clear on context changes
 
-**Priority:** P3 | **Effort:** High
+**Not yet implemented:**
+- Incremental recalculation when single chord changes
+- Only updating affected chord positions (current vs. full recalculation)
+
+**Priority:** P3 | **Effort:** High | **Status:** Future enhancement
 
 ---
 
-## Implementation Priority Summary
+## Implementation Priority Summary (Updated 2026-01-04)
 
-### Phase 1 (High Priority)
+### Completed / Already Exists
 
-| Task | Effort | Impact | Status |
-|------|--------|--------|--------|
-| Extract scoring functions | Medium | High | ❌ Not started |
-| Configuration-based weights | Medium | Medium | ❌ Not started |
-| Voice leading presets | Medium | High | ❌ Not started |
+| Task | Status | Notes |
+|------|--------|-------|
+| Configuration-based weights | ✅ EXISTS | `weightPresets.js` (17+ presets) |
+| Caching layer | ✅ EXISTS | 500-entry cache, 30s TTL |
+| Voice leading presets | ✅ COMPLETE | 5 presets (strict, standard, contemporary, jazz, cinematic) |
+| Context-aware voice leading | ✅ COMPLETE | Position modifiers (first, middle, end, climax, transition) |
+| Genre-specific templates | ✅ EXISTS | `SectionGenerator.js` (pop, rock, jazz templates) |
+| Section profiles | ✅ EXISTS | `sectionProfiles.js` (10 section types) |
+| Tension shape templates | ✅ EXISTS | 8 templates in `TensionArcPlanner.js` |
+| Preference decay | ✅ EXISTS | Session-based decay with `decayFactor` |
+| Preference export/import | ✅ EXISTS | `exportPreferences()` / `importPreferences()` |
+| Unified scoring pipeline | ✅ EXISTS | `CoordinatedRecommendationService.js` |
 
-### Phase 2 (Medium Priority)
+### Remaining Work (Future Enhancements)
 
-| Task | Effort | Impact | Status |
-|------|--------|--------|--------|
-| Caching layer | Low | Medium | ❌ Not started |
-| Context-aware voice leading | Medium | High | ❌ Not started |
-| Genre-specific templates | Medium | Medium | ❌ Not started |
-
-### Phase 3 (Lower Priority)
-
-| Task | Effort | Impact | Status |
-|------|--------|--------|--------|
-| Multi-dimensional tension | High | Medium | ❌ Not started |
-| Preference learning enhancements | Medium | Medium | ❌ Not started |
-| Web Worker optimization | High | Medium | ❌ Not started |
-| Unified scoring pipeline | High | High | ❌ Not started |
+| Task | Priority | Effort | Notes |
+|------|----------|--------|-------|
+| Extract scoring functions | DEFERRED | Medium | Current implementation works well; high risk |
+| Multi-dimensional tension | P3 | High | Track rhythmic, melodic, dynamic tension |
+| Contextual preference learning | P3 | Medium | Add section type / key-specific preferences |
+| Web Worker optimization | P3 | High | Move heavy calculations off main thread |
+| Incremental updates | P3 | High | Only recalculate affected chord positions |
+| Heavy engine lazy loading | P2 | Medium | Dynamic import for TensionArcPlanner, etc. |
 
 ---
 
@@ -457,5 +567,5 @@ function getAffectedIndices(changeIndex, progressionLength) {
 
 *Document created: January 4, 2026*
 *Last updated: January 4, 2026*
-*Status: Planning - Not Started*
-*Version: 1.0*
+*Status: Mostly Complete - Reviewed and updated*
+*Version: 2.0*

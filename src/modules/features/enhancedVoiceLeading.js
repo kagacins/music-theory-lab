@@ -12,6 +12,219 @@
 
 import { ALL_NOTES } from '../../data/music-data.js';
 
+// ============================================================================
+// VOICE LEADING PRESETS
+// Different musical styles have different voice leading priorities
+// ============================================================================
+
+/**
+ * Voice leading presets for different musical contexts
+ * Each preset configures how strictly voice leading rules are applied
+ */
+export const VOICE_LEADING_PRESETS = {
+    strict: {
+        name: 'Strict (Classical)',
+        description: 'Traditional classical voice leading rules',
+        allowParallelFifths: false,
+        allowParallelOctaves: false,
+        maxLeap: 5,                    // Perfect fourth (5 semitones)
+        requireStepwiseMotion: true,
+        tendencyToneResolution: 'required',
+        parallelFifthsPenalty: 15,     // Heavy penalty
+        parallelOctavesPenalty: 12,    // Heavy penalty
+        voiceCrossingPenalty: 10,      // Heavy penalty
+        unresolvedTendencyPenalty: 10, // Heavy penalty
+        leapWithoutRecoveryPenalty: 8  // Significant penalty
+    },
+    standard: {
+        name: 'Standard',
+        description: 'Balanced voice leading for most styles',
+        allowParallelFifths: false,
+        allowParallelOctaves: false,
+        maxLeap: 7,                    // Perfect fifth (7 semitones)
+        requireStepwiseMotion: false,
+        tendencyToneResolution: 'preferred',
+        parallelFifthsPenalty: 10,     // Moderate penalty
+        parallelOctavesPenalty: 8,     // Moderate penalty
+        voiceCrossingPenalty: 8,       // Moderate penalty
+        unresolvedTendencyPenalty: 6,  // Moderate penalty
+        leapWithoutRecoveryPenalty: 5  // Moderate penalty
+    },
+    contemporary: {
+        name: 'Contemporary',
+        description: 'Relaxed rules for modern styles (pop, rock, jazz)',
+        allowParallelFifths: true,
+        allowParallelOctaves: false,
+        maxLeap: 12,                   // Octave (12 semitones)
+        requireStepwiseMotion: false,
+        tendencyToneResolution: 'optional',
+        parallelFifthsPenalty: 3,      // Minimal penalty
+        parallelOctavesPenalty: 5,     // Light penalty
+        voiceCrossingPenalty: 4,       // Light penalty
+        unresolvedTendencyPenalty: 2,  // Minimal penalty
+        leapWithoutRecoveryPenalty: 2  // Minimal penalty
+    },
+    jazz: {
+        name: 'Jazz',
+        description: 'Jazz-specific voice leading with chromatic motion',
+        allowParallelFifths: true,
+        allowParallelOctaves: true,    // Jazz often uses parallel voicings
+        maxLeap: 12,                   // Octave
+        requireStepwiseMotion: false,
+        tendencyToneResolution: 'optional',
+        parallelFifthsPenalty: 0,      // No penalty - common in jazz
+        parallelOctavesPenalty: 2,     // Minimal penalty
+        voiceCrossingPenalty: 3,       // Light penalty
+        unresolvedTendencyPenalty: 0,  // No penalty - jazz embraces tension
+        leapWithoutRecoveryPenalty: 0  // No penalty - jazz uses large intervals
+    },
+    cinematic: {
+        name: 'Cinematic/Epic',
+        description: 'Dramatic voice leading for film scores',
+        allowParallelFifths: true,     // Parallel motion creates power
+        allowParallelOctaves: true,    // Octave doubling for impact
+        maxLeap: 14,                   // Major 9th for dramatic effect
+        requireStepwiseMotion: false,
+        tendencyToneResolution: 'preferred',
+        parallelFifthsPenalty: 0,      // Actually desirable for power
+        parallelOctavesPenalty: 0,     // Octave doubling is common
+        voiceCrossingPenalty: 5,       // Some penalty to maintain clarity
+        unresolvedTendencyPenalty: 3,  // Light penalty - tension is OK
+        leapWithoutRecoveryPenalty: 0  // Large leaps are dramatic
+    }
+};
+
+/**
+ * Get a voice leading preset by name
+ * @param {string} presetName - Name of the preset ('strict', 'standard', 'contemporary', 'jazz', 'cinematic')
+ * @returns {Object} The preset configuration, or standard preset if not found
+ */
+export function getVoiceLeadingPreset(presetName) {
+    return VOICE_LEADING_PRESETS[presetName] || VOICE_LEADING_PRESETS.standard;
+}
+
+/**
+ * Get the recommended voice leading preset for a given musical style
+ * @param {string} style - Musical style ('classical', 'jazz', 'pop', 'rock', 'indie', etc.)
+ * @returns {Object} The recommended preset configuration
+ */
+export function getPresetForStyle(style) {
+    const styleToPreset = {
+        'classical': 'strict',
+        'baroque': 'strict',
+        'romantic': 'standard',
+        'jazz': 'jazz',
+        'jazzStandard': 'jazz',
+        'bossaNova': 'jazz',
+        'latinJazz': 'jazz',
+        'pop': 'contemporary',
+        'rock': 'contemporary',
+        'indie': 'contemporary',
+        'electronic': 'contemporary',
+        'rnbSoul': 'contemporary',
+        'gospel': 'standard',
+        'country': 'standard',
+        'folk': 'standard',
+        'blues': 'contemporary',
+        'cinematic': 'cinematic',
+        'film': 'cinematic',
+        'epic': 'cinematic',
+        'balanced': 'standard'
+    };
+
+    const presetName = styleToPreset[style] || 'standard';
+    return VOICE_LEADING_PRESETS[presetName];
+}
+
+// ============================================================================
+// SECTION POSITION MODIFIERS
+// Adjusts voice leading strictness based on position within a section
+// ============================================================================
+
+/**
+ * Position-based penalty multipliers for voice leading
+ * These modify the preset penalties based on where we are in the musical phrase
+ */
+export const POSITION_MODIFIERS = {
+    first: {
+        // Beginning of phrase: Allow more freedom for establishing character
+        parallelMotionMultiplier: 0.5,      // Reduce parallel motion penalties
+        voiceCrossingMultiplier: 0.6,       // More tolerant of voice crossing
+        tendencyToneMultiplier: 0.4,        // Less strict on tendency tone resolution
+        leapRecoveryMultiplier: 0.3,        // Allow dramatic opening leaps
+        description: 'Opening allows more freedom'
+    },
+    middle: {
+        // Middle of phrase: Prioritize smooth motion (use preset defaults)
+        parallelMotionMultiplier: 1.0,
+        voiceCrossingMultiplier: 1.0,
+        tendencyToneMultiplier: 1.0,
+        leapRecoveryMultiplier: 1.0,
+        description: 'Standard voice leading'
+    },
+    end: {
+        // Cadence points: Enforce traditional resolution patterns
+        parallelMotionMultiplier: 1.3,      // Stricter on parallel motion
+        voiceCrossingMultiplier: 1.2,       // Less tolerant of voice crossing
+        tendencyToneMultiplier: 1.5,        // Much stricter - tendency tones should resolve
+        leapRecoveryMultiplier: 0.8,        // Slightly more forgiving (final chord can leap)
+        description: 'Cadential voice leading'
+    },
+    climax: {
+        // Climax points: Allow dramatic leaps for expressive effect
+        parallelMotionMultiplier: 0.7,      // More tolerant (parallel motion can be powerful)
+        voiceCrossingMultiplier: 0.8,       // Slightly more tolerant
+        tendencyToneMultiplier: 0.6,        // Less strict - tension is acceptable
+        leapRecoveryMultiplier: 0.2,        // Very tolerant - dramatic leaps are expressive
+        description: 'Dramatic voice leading'
+    },
+    transition: {
+        // Section transitions: Balance between drama and resolution
+        parallelMotionMultiplier: 0.9,
+        voiceCrossingMultiplier: 1.0,
+        tendencyToneMultiplier: 1.2,        // Somewhat strict - want forward motion
+        leapRecoveryMultiplier: 0.6,        // Allow some dramatic movement
+        description: 'Transitional voice leading'
+    }
+};
+
+/**
+ * Get position modifiers for a given section position
+ * @param {string} position - Position in section ('first', 'middle', 'end', 'climax', 'transition')
+ * @returns {Object} Position modifier configuration
+ */
+export function getPositionModifiers(position) {
+    return POSITION_MODIFIERS[position] || POSITION_MODIFIERS.middle;
+}
+
+/**
+ * Apply position modifiers to a preset's penalties
+ * @param {Object} preset - Voice leading preset
+ * @param {string} position - Position in section
+ * @returns {Object} Modified preset with adjusted penalties
+ */
+export function applyPositionModifiers(preset, position) {
+    const modifiers = getPositionModifiers(position);
+
+    return {
+        ...preset,
+        // Apply multipliers to penalties
+        parallelFifthsPenalty: Math.round(preset.parallelFifthsPenalty * modifiers.parallelMotionMultiplier),
+        parallelOctavesPenalty: Math.round(preset.parallelOctavesPenalty * modifiers.parallelMotionMultiplier),
+        voiceCrossingPenalty: Math.round(preset.voiceCrossingPenalty * modifiers.voiceCrossingMultiplier),
+        unresolvedTendencyPenalty: Math.round(preset.unresolvedTendencyPenalty * modifiers.tendencyToneMultiplier),
+        leapWithoutRecoveryPenalty: Math.round(preset.leapWithoutRecoveryPenalty * modifiers.leapRecoveryMultiplier),
+        // Include modifier info for debugging
+        _positionModified: true,
+        _positionUsed: position,
+        _positionDescription: modifiers.description
+    };
+}
+
+// ============================================================================
+// BASS INTERVAL SCORES
+// ============================================================================
+
 /**
  * Bass movement quality scores by interval
  * Based on music theory principles:
@@ -390,10 +603,24 @@ export function analyzeSopranoContour(currentMidi, nextMidi) {
  * @param {number[]} nextMidi - Next chord MIDI notes
  * @param {string} key - Musical key
  * @param {Object} options - Additional options
+ * @param {string} options.style - Musical style for preset selection
+ * @param {string} options.presetName - Direct preset name override ('strict', 'standard', 'contemporary', 'jazz', 'cinematic')
+ * @param {Object} options.previousMidi - Previous chord MIDI notes for leap recovery analysis
+ * @param {string} options.sectionPosition - Position in section ('first', 'middle', 'end', 'climax', 'transition')
  * @returns {Object} Comprehensive voice leading analysis
  */
 export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = {}) {
-    const { previousMidi = null, style = 'balanced' } = options;
+    const { previousMidi = null, style = 'balanced', presetName = null, sectionPosition = null } = options;
+
+    // Get the appropriate voice leading preset based on style or explicit preset name
+    let preset = presetName
+        ? getVoiceLeadingPreset(presetName)
+        : getPresetForStyle(style);
+
+    // Apply section position modifiers if provided
+    if (sectionPosition) {
+        preset = applyPositionModifiers(preset, sectionPosition);
+    }
 
     let totalScore = 0;
     const breakdown = {};
@@ -410,7 +637,8 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
             hasParallelFifths: false,
             hasParallelOctaves: false,
             tendencyToneResolved: false,
-            contraryMotion: false
+            contraryMotion: false,
+            presetUsed: preset.name
         };
     }
 
@@ -430,49 +658,71 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
         }
     }
 
-    // 2. Parallel Motion Detection (-15 to 0 points)
+    // 2. Parallel Motion Detection (penalty from preset)
     const parallelMotion = detectParallelMotion(currentMidi, nextMidi);
     let parallelPenalty = 0;
 
     if (parallelMotion.parallelFifths) {
-        // Classical style penalizes parallel fifths heavily, jazz less so
-        parallelPenalty -= style === 'classical' ? 15 : 8;
-        issues.push('Parallel 5ths');
+        // Use preset-defined penalty for parallel fifths
+        parallelPenalty -= preset.parallelFifthsPenalty;
+        if (preset.parallelFifthsPenalty > 0) {
+            issues.push('Parallel 5ths');
+        }
     }
     if (parallelMotion.parallelOctaves) {
-        parallelPenalty -= style === 'classical' ? 12 : 6;
-        issues.push('Parallel 8ves');
+        // Use preset-defined penalty for parallel octaves
+        parallelPenalty -= preset.parallelOctavesPenalty;
+        if (preset.parallelOctavesPenalty > 0) {
+            issues.push('Parallel 8ves');
+        }
     }
 
     breakdown.parallelMotion = parallelPenalty;
     totalScore += parallelPenalty;
 
-    // 3. Voice Crossing Detection (-8 to 0 points per crossing)
+    // 3. Voice Crossing Detection (penalty from preset)
     const voiceCrossing = detectVoiceCrossing(currentMidi, nextMidi);
-    const crossingPenalty = -voiceCrossing.count * 8;
+    const crossingPenalty = -voiceCrossing.count * preset.voiceCrossingPenalty;
     breakdown.voiceCrossing = crossingPenalty;
     totalScore += crossingPenalty;
 
-    if (voiceCrossing.count > 0) {
+    if (voiceCrossing.count > 0 && preset.voiceCrossingPenalty > 0) {
         issues.push(`${voiceCrossing.count} voice crossing(s)`);
     }
 
-    // 4. Tendency Tone Resolution (-8 to +12 points)
+    // 4. Tendency Tone Resolution (scoring adjusted by preset)
     const tendencyResolution = checkTendencyToneResolution(currentMidi, nextMidi, key);
-    breakdown.tendencyTones = tendencyResolution.score;
-    totalScore += tendencyResolution.score;
+    // Apply penalty scaling based on preset's tendency tone resolution setting
+    let tendencyScore = tendencyResolution.score;
+    if (preset.tendencyToneResolution === 'optional') {
+        // Reduce penalty for unresolved tendency tones in contemporary/jazz styles
+        tendencyScore = Math.max(tendencyScore, tendencyScore * 0.3);
+    } else if (preset.tendencyToneResolution === 'required') {
+        // Increase penalty for unresolved tendency tones in strict mode
+        if (tendencyResolution.unresolved.length > 0) {
+            tendencyScore -= preset.unresolvedTendencyPenalty * tendencyResolution.unresolved.length;
+        }
+    }
+    breakdown.tendencyTones = tendencyScore;
+    totalScore += tendencyScore;
 
     if (tendencyResolution.resolved.length > 0) {
         details.push('Proper resolution of tendency tones');
     }
-    if (tendencyResolution.unresolved.length > 0) {
+    if (tendencyResolution.unresolved.length > 0 && preset.tendencyToneResolution !== 'optional') {
         issues.push('Unresolved tendency tone(s)');
     }
 
-    // 5. Leap Recovery Analysis (-5 to +8 points)
+    // 5. Leap Recovery Analysis (penalty from preset)
     const leapRecovery = analyzeLeapRecovery(currentMidi, nextMidi, previousMidi);
-    breakdown.leapRecovery = leapRecovery.score;
-    totalScore += leapRecovery.score;
+    // Scale leap recovery score based on preset
+    let leapScore = leapRecovery.score;
+    if (leapScore < 0 && preset.leapWithoutRecoveryPenalty < 5) {
+        // Reduce penalty for unrecovered leaps in contemporary/jazz styles
+        leapScore = leapScore * (preset.leapWithoutRecoveryPenalty / 5);
+    }
+    breakdown.leapRecovery = leapScore;
+    totalScore += leapScore;
 
     // 6. Soprano Contour (0-12 points)
     const sopranoContour = analyzeSopranoContour(currentMidi, nextMidi);
@@ -528,7 +778,7 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
 
     // Normalize to 0-100 scale
     // Maximum possible: 25 + 0 + 0 + 12 + 8 + 12 + 20 + 20 + 8 = 105
-    // Minimum possible: 6 - 27 - 24 - 8 - 5 + 0 + 0 + 0 + 0 = -58
+    // Minimum possible varies by preset (strict has higher penalties)
     const normalizedScore = Math.max(0, Math.min(100, totalScore + 30));
 
     return {
@@ -540,7 +790,17 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
         parallelMotion,
         voiceCrossing,
         tendencyResolution,
-        sopranoContour
+        sopranoContour,
+        // Include preset info for debugging/transparency
+        presetUsed: preset.name,
+        hasParallelFifths: parallelMotion.parallelFifths,
+        hasParallelOctaves: parallelMotion.parallelOctaves,
+        tendencyToneResolved: tendencyResolution.resolved.length > 0,
+        contraryMotion: breakdown.contraryMotion > 0,
+        // Include position modifier info if used
+        positionModified: preset._positionModified || false,
+        positionUsed: preset._positionUsed || null,
+        positionDescription: preset._positionDescription || null
     };
 }
 

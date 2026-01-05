@@ -736,10 +736,8 @@ export function generateComprehensiveRecommendations(
                     if (useEnhancedScoring) {
                         try {
                             const vlResult = scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, {
-                                checkParallelMotion: true,
-                                checkTendencyTones: true,
-                                checkLeapRecovery: true,
-                                penalizeVoiceCrossing: true
+                                style: style,  // Pass style for voice leading preset selection
+                                sectionPosition: sectionContext?.position || null  // Pass section position for context-aware scoring
                             });
                             voiceLeadingScore = vlResult.score;
                             voiceLeadingDetails = vlResult;
@@ -1578,10 +1576,7 @@ export function analyzeChordTransition(currentChord, nextChord, key, progression
 
     // Enhanced voice leading analysis
     const voiceLeadingResult = scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, {
-        checkParallelMotion: true,
-        checkTendencyTones: true,
-        checkLeapRecovery: true,
-        penalizeVoiceCrossing: true
+        style: style  // Pass style for voice leading preset selection
     });
 
     // Extended harmonic relationships
