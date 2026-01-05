@@ -564,8 +564,14 @@ export class BuildingBlock {
      * @param {number} newBeats - New duration in beats
      */
     setDuration(newBeats) {
+        // Validate newBeats to prevent "Invalid array length" errors
+        if (typeof newBeats !== 'number' || isNaN(newBeats) || newBeats < 0) {
+            console.warn('setDuration: Invalid newBeats value:', newBeats);
+            return;
+        }
+
         const oldTotal = this.units.length;
-        const newTotal = newBeats * UNITS_PER_BEAT;
+        const newTotal = Math.floor(newBeats * UNITS_PER_BEAT);
 
         if (newTotal === oldTotal) {
             return; // No change needed

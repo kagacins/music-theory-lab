@@ -513,6 +513,14 @@ export function initMobileFab() {
                 const exportAudioBtn = document.getElementById('action-export-audio');
                 if (exportAudioBtn) exportAudioBtn.click();
                 break;
+            case 'export-musicxml':
+                const exportMusicXMLBtn = document.getElementById('action-export-musicxml');
+                if (exportMusicXMLBtn) exportMusicXMLBtn.click();
+                break;
+            case 'import-musicxml':
+                const importMusicXMLBtn = document.getElementById('action-import-musicxml');
+                if (importMusicXMLBtn) importMusicXMLBtn.click();
+                break;
 
             // Help actions
             case 'start-here':

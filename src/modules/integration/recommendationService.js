@@ -38,7 +38,6 @@ import { getTensionArcPlanner } from '../analysis/TensionArcPlanner.js';
 
 // Phase 5: Cross-Engine Coordination
 import { getCompositionContext } from '../recommendations/core/CompositionContext.js';
-import { getCoordinatedRecommendationService } from '../recommendations/coordination/CoordinatedRecommendationService.js';
 import { getUserPreferenceLearner } from '../recommendations/coordination/UserPreferenceLearner.js';
 import { getSectionGenerator } from '../recommendations/coordination/SectionGenerator.js';
 
@@ -57,7 +56,6 @@ export class RecommendationService {
 
         // Phase 5: Cross-engine coordination components
         this._compositionContext = null;
-        this._coordinatedService = null;
         this._preferenceLearner = null;
         this._sectionGenerator = null;
         this._phase5Enabled = true; // Can be toggled for A/B testing
@@ -91,11 +89,6 @@ export class RecommendationService {
             // Initialize user preference learner
             this._preferenceLearner = getUserPreferenceLearner();
             this._preferenceLearner.initialize();
-
-            // Initialize coordinated service
-            this._coordinatedService = getCoordinatedRecommendationService();
-            this._coordinatedService.setPreferenceLearner(this._preferenceLearner);
-            this._coordinatedService.initialize();
 
             // Initialize section generator
             this._sectionGenerator = getSectionGenerator();
@@ -495,14 +488,6 @@ export class RecommendationService {
      */
     getSectionGenerator() {
         return this._sectionGenerator;
-    }
-
-    /**
-     * Get the Coordinated Recommendation Service for advanced features
-     * @returns {CoordinatedRecommendationService|null}
-     */
-    getCoordinatedService() {
-        return this._coordinatedService;
     }
 
     /**

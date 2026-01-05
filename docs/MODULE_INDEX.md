@@ -293,7 +293,7 @@ chordTimeline.js → melodySuggestion.js → enhancedMelodyController.js
 
 ---
 
-### ANALYSIS - Music Theory Analysis (5 files)
+### ANALYSIS - Music Theory Analysis (6 files)
 **Location:** `src/modules/analysis/`
 
 **Purpose:** Harmonic analysis, pattern detection, tension planning
@@ -304,12 +304,14 @@ chordTimeline.js → melodySuggestion.js → enhancedMelodyController.js
 | `chordToneAnalyzer.js` | Analyzes notes relative to chord (for coloring) | `analyzeNoteAgainstChord()` |
 | `TensionArcPlanner.js` | Plans harmonic tension curves | `TensionArcPlanner` class |
 | `TensionOptimizer.js` | Optimizes tension flow | `TensionOptimizer` class |
+| `MultiDimensionalTension.js` | 4-dimension tension analysis (harmonic, rhythmic, melodic, dynamic) | `MultiDimensionalTensionAnalyzer` class, `DIMENSION_WEIGHTS` |
 | `patternDetection.js` | Generic pattern matching | `detectPattern()` |
 
 **When to Read:**
 - Progression analysis → `harmonyAnalyzer.js`
 - Note highlighting/labeling → `chordToneAnalyzer.js`
 - Tension optimization → `TensionArcPlanner.js`, `TensionOptimizer.js`
+- Multi-dimensional tension → `MultiDimensionalTension.js`
 
 ---
 

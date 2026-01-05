@@ -621,6 +621,9 @@ if (typeof window !== 'undefined') {
     window.showUnifiedRecommendationModal = showUnifiedRecommendationModal;
     window.closeUnifiedRecommendationModal = closeUnifiedRecommendationModal;
 
+    // Export renderActiveTab for progression bar chord selection updates
+    window.renderActiveTab = renderActiveTab;
+
     // Export tab renderers for old module delegation
     window.renderChordTab = renderChordTab;
     window.renderMelodyTab = renderMelodyTab;

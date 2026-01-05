@@ -463,6 +463,7 @@ export function preWarmAudioContext() {
     playSilentKeepAliveTick();
 }
 
+
 /**
  * Initialize audio context keep-alive listeners
  * Resumes audio context when user returns to the page

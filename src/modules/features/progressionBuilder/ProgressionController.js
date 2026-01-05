@@ -182,7 +182,8 @@ import {
     refreshChordNotationCanvas,
     renderProgressionDisplay,
     highlightTensionPointForSelection,
-    unhighlightAllTensionPoints
+    unhighlightAllTensionPoints,
+    hideAllChordTooltips
 } from './ProgressionRenderer.js';
 
 // Playback functions
@@ -2357,6 +2358,9 @@ export function removeChordFromProgression(index) {
     if (trainerState.isPlaying) {
         handleAutoPlayback();
     }
+
+    // Hide any open tooltips before removing the chord
+    hideAllChordTooltips();
 
     // Save state before removing
     if (window.saveStateBeforeChange) {

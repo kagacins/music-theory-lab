@@ -6,6 +6,7 @@
  * - PDF Lead Sheet export
  * - MIDI export
  * - Audio export (WAV/MP3)
+ * - MusicXML export
  * - Shareable progression links
  */
 
@@ -23,6 +24,17 @@ import {
     cancelExport,
     downloadAudioFile
 } from './audioExporter.js';
+import {
+    exportToMusicXML,
+    canExportMusicXML,
+    getMusicXMLString
+} from './musicXmlExporter.js';
+import {
+    importMusicXMLFromFile,
+    importMusicXMLFromString,
+    showMusicXMLImportPicker,
+    isMusicXMLFile
+} from '../import/musicXmlImporter.js';
 
 // =============================================================================
 // CONSTANTS
@@ -2686,6 +2698,418 @@ export function showAudioExportDialog() {
 // INITIALIZATION
 // =============================================================================
 
+// =============================================================================
+// MUSICXML EXPORT DIALOG
+// =============================================================================
+
+/**
+ * Show the MusicXML export dialog
+ * Allows exporting composition to MusicXML format for professional notation software
+ */
+export function showMusicXMLExportDialog() {
+    const compositionState = getCompositionState();
+    const progressionData = getProgressionData();
+
+    if (!progressionData || progressionData.length === 0) {
+        alert('No progression to export. Add some chords first.');
+        return;
+    }
+
+    // Check if export is possible
+    const { canExport, reason } = canExportMusicXML();
+    if (!canExport) {
+        alert(reason || 'Cannot export to MusicXML.');
+        return;
+    }
+
+    const key = getCurrentKey() || 'C';
+    const measureCount = compositionState?.getMeasureCount() || 0;
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'musicxml-export-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 12px; padding: 24px; width: 450px; max-width: 90vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                </svg>
+                Export MusicXML
+            </h2>
+            <p style="margin: 0 0 20px 0; font-size: 14px; color: #6b7280;">
+                Export your composition in MusicXML format. This file can be opened in professional notation software like MuseScore, Finale, Sibelius, and Dorico.
+            </p>
+
+            <!-- Composition Info -->
+            <div style="margin-bottom: 16px; padding: 12px; background: #ecfdf5; border-radius: 8px; border: 1px solid #a7f3d0;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span style="color: #047857;">Key:</span>
+                    <span style="color: #065f46; font-weight: 500;">${key}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 4px;">
+                    <span style="color: #047857;">Measures:</span>
+                    <span style="color: #065f46; font-weight: 500;">${measureCount}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 4px;">
+                    <span style="color: #047857;">Chords:</span>
+                    <span style="color: #065f46; font-weight: 500;">${progressionData.length}</span>
+                </div>
+            </div>
+
+            <!-- Title Input -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 4px;">Title</label>
+                <input type="text" id="musicxml-title" value="My Composition" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <!-- Composer Input -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 4px;">Composer</label>
+                <input type="text" id="musicxml-composer" value="" placeholder="Optional" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <!-- Options -->
+            <div style="margin-bottom: 20px; padding: 12px; background: #f9fafb; border-radius: 8px;">
+                <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 8px;">Include</label>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #374151;">
+                        <input type="checkbox" id="musicxml-chords" checked style="width: 16px; height: 16px; accent-color: #059669;">
+                        Chord symbols
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #374151;">
+                        <input type="checkbox" id="musicxml-dynamics" checked style="width: 16px; height: 16px; accent-color: #059669;">
+                        Dynamics
+                    </label>
+                </div>
+            </div>
+
+            <!-- Compatibility Note -->
+            <div style="margin-bottom: 20px; padding: 10px 12px; background: #fef3c7; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                <div style="font-size: 12px; color: #92400e;">
+                    <strong>Tip:</strong> MusicXML is the industry-standard format for sharing sheet music between different notation programs.
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="musicxml-cancel-btn" style="padding: 10px 20px; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; font-size: 14px; font-weight: 500; cursor: pointer;">Cancel</button>
+                <button id="musicxml-export-btn" style="padding: 10px 20px; border: none; border-radius: 6px; background: linear-gradient(135deg, #059669, #10b981); color: white; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7,10 12,15 17,10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export MusicXML
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event handlers
+    const cancelBtn = modal.querySelector('#musicxml-cancel-btn');
+    const exportBtn = modal.querySelector('#musicxml-export-btn');
+
+    cancelBtn.addEventListener('click', () => {
+        modal.remove();
+    });
+
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+
+    // Close on Escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    exportBtn.addEventListener('click', () => {
+        const title = modal.querySelector('#musicxml-title').value || 'Untitled';
+        const composer = modal.querySelector('#musicxml-composer').value || 'Music Theory Lab';
+        const includeChordSymbols = modal.querySelector('#musicxml-chords').checked;
+        const includeDynamics = modal.querySelector('#musicxml-dynamics').checked;
+
+        // Create safe filename
+        const filename = title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_') || 'composition';
+
+        try {
+            const result = exportToMusicXML({
+                title,
+                composer,
+                includeChordSymbols,
+                includeDynamics,
+                filename
+            });
+
+            if (result.success) {
+                modal.remove();
+            } else {
+                alert('Export failed: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('[MusicXML Export] Error:', error);
+            alert('Export failed: ' + error.message);
+        }
+    });
+}
+
+/**
+ * Show the MusicXML import dialog
+ * Allows importing MusicXML files from other notation software
+ */
+export function showMusicXMLImportDialog() {
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'musicxml-import-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 12px; padding: 24px; width: 480px; max-width: 90vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                    <polyline points="9,15 12,12 15,15"></polyline>
+                </svg>
+                Import MusicXML
+            </h2>
+            <p style="margin: 0 0 20px 0; font-size: 14px; color: #6b7280;">
+                Import sheet music from MuseScore, Finale, Sibelius, Dorico, or any notation software that exports MusicXML.
+            </p>
+
+            <!-- Drop Zone -->
+            <div id="musicxml-drop-zone" style="
+                border: 2px dashed #d1d5db;
+                border-radius: 12px;
+                padding: 40px 20px;
+                text-align: center;
+                margin-bottom: 20px;
+                cursor: pointer;
+                transition: all 0.2s;
+                background: #f9fafb;
+            ">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin: 0 auto 12px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17,8 12,3 7,8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p style="margin: 0 0 8px 0; font-size: 16px; color: #374151; font-weight: 500;">
+                    Drop your MusicXML file here
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #6b7280;">
+                    or click to browse
+                </p>
+                <input type="file" id="musicxml-file-input" accept=".xml,.musicxml,.mxl" style="display: none;">
+            </div>
+
+            <!-- Supported Formats -->
+            <div style="margin-bottom: 20px; padding: 12px; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+                <div style="font-size: 13px; color: #1e40af; font-weight: 500; margin-bottom: 4px;">Supported formats:</div>
+                <div style="font-size: 12px; color: #3b82f6;">
+                    • .musicxml (uncompressed MusicXML)<br>
+                    • .xml (XML format)<br>
+                    • <span style="color: #9ca3af;">.mxl (compressed) - coming soon</span>
+                </div>
+            </div>
+
+            <!-- Import Options -->
+            <div style="margin-bottom: 20px; padding: 12px; background: #f9fafb; border-radius: 8px;">
+                <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 8px;">Import Options</label>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #374151;">
+                        <input type="checkbox" id="musicxml-replace" checked style="width: 16px; height: 16px; accent-color: #2563eb;">
+                        Replace existing composition
+                    </label>
+                </div>
+            </div>
+
+            <!-- Status Area (hidden initially) -->
+            <div id="musicxml-import-status" style="display: none; margin-bottom: 20px; padding: 12px; border-radius: 8px;">
+            </div>
+
+            <!-- Buttons -->
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="musicxml-import-cancel-btn" style="padding: 10px 20px; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; font-size: 14px; font-weight: 500; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Get elements
+    const dropZone = modal.querySelector('#musicxml-drop-zone');
+    const fileInput = modal.querySelector('#musicxml-file-input');
+    const statusArea = modal.querySelector('#musicxml-import-status');
+    const cancelBtn = modal.querySelector('#musicxml-import-cancel-btn');
+
+    // Helper to show status
+    const showStatus = (message, type = 'info') => {
+        const colors = {
+            info: { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
+            success: { bg: '#ecfdf5', border: '#a7f3d0', text: '#047857' },
+            error: { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' },
+            loading: { bg: '#fefce8', border: '#fef08a', text: '#a16207' }
+        };
+        const c = colors[type] || colors.info;
+        statusArea.style.display = 'block';
+        statusArea.style.background = c.bg;
+        statusArea.style.border = `1px solid ${c.border}`;
+        statusArea.style.color = c.text;
+        statusArea.innerHTML = message;
+    };
+
+    // Handle file selection
+    const handleFile = async (file) => {
+        if (!file) return;
+
+        // Check file type
+        if (!isMusicXMLFile(file)) {
+            showStatus('Please select a valid MusicXML file (.xml, .musicxml)', 'error');
+            return;
+        }
+
+        // Check for compressed format
+        if (file.name.toLowerCase().endsWith('.mxl')) {
+            showStatus('Compressed MusicXML (.mxl) files are not yet supported.<br>Please export as uncompressed .musicxml or .xml from your notation software.', 'error');
+            return;
+        }
+
+        showStatus('Importing...', 'loading');
+
+        try {
+            const replaceExisting = modal.querySelector('#musicxml-replace').checked;
+
+            const result = await importMusicXMLFromFile(file, {
+                replaceExisting,
+                applyToState: true
+            });
+
+            if (result.success) {
+                const data = result.data;
+                const measureCount = data.measures?.length || 0;
+                const chordCount = data.chords?.length || 0;
+                const key = data.keySignature || 'C';
+
+                showStatus(`
+                    <strong>Import successful!</strong><br>
+                    <span style="font-size: 12px;">
+                        ${measureCount} measure${measureCount !== 1 ? 's' : ''} imported
+                        ${chordCount > 0 ? `, ${chordCount} chord symbol${chordCount !== 1 ? 's' : ''}` : ''}
+                        <br>Key: ${key}
+                    </span>
+                `, 'success');
+
+                // Trigger notation refresh
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                }
+                if (window.syncProgressionToMelodyComposer) {
+                    window.syncProgressionToMelodyComposer();
+                }
+
+                // Close modal after brief delay
+                setTimeout(() => {
+                    modal.remove();
+                }, 1500);
+            } else {
+                showStatus(`Import failed: ${result.error || 'Unknown error'}`, 'error');
+            }
+        } catch (error) {
+            console.error('[MusicXML Import] Error:', error);
+            showStatus(`Import failed: ${error.message}`, 'error');
+        }
+    };
+
+    // Drop zone click
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) handleFile(file);
+    });
+
+    // Drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#2563eb';
+        dropZone.style.background = '#eff6ff';
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#d1d5db';
+        dropZone.style.background = '#f9fafb';
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#d1d5db';
+        dropZone.style.background = '#f9fafb';
+
+        const file = e.dataTransfer?.files?.[0];
+        if (file) handleFile(file);
+    });
+
+    // Cancel button
+    cancelBtn.addEventListener('click', () => {
+        modal.remove();
+    });
+
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+
+    // Close on Escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+}
+
 /**
  * Initialize export service and check for shared links
  * Call this on page load
@@ -2714,5 +3138,9 @@ window.copyShareableLink = copyShareableLink;
 window.showPDFExportDialog = showPDFExportDialog;
 window.showMIDIExportDialog = showMIDIExportDialog;
 window.showAudioExportDialog = showAudioExportDialog;
+window.showMusicXMLExportDialog = showMusicXMLExportDialog;
+window.showMusicXMLImportDialog = showMusicXMLImportDialog;
+window.exportToMusicXML = exportToMusicXML;
+window.importMusicXMLFromFile = importMusicXMLFromFile;
 window.initExportService = initExportService;
 window.parseShareableLink = parseShareableLink;

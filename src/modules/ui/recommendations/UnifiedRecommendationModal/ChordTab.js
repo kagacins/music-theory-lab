@@ -62,6 +62,9 @@ import {
 import { getTensionArcPlanner, TensionArcPlanner, TENSION_ARC_TEMPLATES } from '../../../analysis/TensionArcPlanner.js';
 import { analyzeRhythmicContext } from '../../../features/rhythmicContextAnalyzer.js';
 
+// User preference learning
+import { getUserPreferenceLearner } from '../../../recommendations/coordination/UserPreferenceLearner.js';
+
 // Import from parent modal modules
 import { modalState, CHORD_VIEWS, CHORD_INTENTS } from './ModalState.js';
 import {
@@ -5314,6 +5317,25 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
         setInsertAfterIndex(modalState.selectedProgressionIndex);
         // Update the global selected chord index so the progression display stays in sync
         setSelectedChordIndex(modalState.selectedProgressionIndex);
+    }
+
+    // Record user preference for learning
+    // This helps the recommendation system learn what chords the user likes
+    try {
+        const preferenceLearner = getUserPreferenceLearner();
+        preferenceLearner.recordChordChoice(
+            { root: rec.root, type: rec.type, inversion: rec.inversion || 0 },
+            {
+                style: modalState.style || localStorage.getItem('chord-suggestion-style') || 'balanced',
+                mood: modalState.mood || localStorage.getItem('chord-suggestion-mood') || 'bright',
+                function: rec.function || null,
+                voiceLeadingScore: rec.voiceLeadingScore || null,
+                sectionType: intent.mode === INTENT_MODES.NEW_SECTION ? newSectionType : null,
+                key: getCurrentKey() || 'C'
+            }
+        );
+    } catch (e) {
+        // Silent fail - preference learning is non-critical
     }
 
     // Only render if not skipping (for batch operations like "Add All")

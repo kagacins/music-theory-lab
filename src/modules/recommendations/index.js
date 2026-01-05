@@ -6,7 +6,6 @@
  *
  * This module provides:
  * - CompositionContext: Shared state for all engines
- * - CoordinatedRecommendationService: Holistic recommendations orchestrator
  * - UserPreferenceLearner: Adapts to user choices over time
  * - SectionGenerator: Complete section generation
  *
@@ -24,14 +23,6 @@ export {
 } from './core/CompositionContext.js';
 
 // Coordination
-export {
-    getCoordinatedRecommendationService,
-    initializeCoordinatedRecommendationService,
-    ENGINE_IDS,
-    RECOMMENDATION_TYPES,
-    default as CoordinatedRecommendationService
-} from './coordination/CoordinatedRecommendationService.js';
-
 export {
     getUserPreferenceLearner,
     initializeUserPreferenceLearner,
@@ -92,20 +83,15 @@ export function initializeRecommendationSystem(options = {}) {
     // Initialize in order of dependency
     const context = initializeCompositionContext();
     const preferenceLearner = initializeUserPreferenceLearner();
-    const coordinatedService = initializeCoordinatedRecommendationService();
     const sectionGenerator = initializeSectionGenerator();
 
     // Phase 6: Initialize harmony module
     const smartHarmonizer = initializeSmartHarmonizer({ key, style });
 
-    // Connect preference learner to coordinated service
-    coordinatedService.setPreferenceLearner(preferenceLearner);
-
     console.log('[Phase 5 & 6] Recommendation system initialized with harmony features');
 
     return {
         context,
-        coordinatedService,
         preferenceLearner,
         sectionGenerator,
         // Phase 6
@@ -114,9 +100,9 @@ export function initializeRecommendationSystem(options = {}) {
 }
 
 /**
- * Quick access to the main recommendation API
- * Returns the CoordinatedRecommendationService singleton
+ * Quick access to the preference learner for recording user choices
+ * @returns {UserPreferenceLearner}
  */
-export function getRecommendationAPI() {
-    return getCoordinatedRecommendationService();
+export function getPreferenceLearnerAPI() {
+    return getUserPreferenceLearner();
 }

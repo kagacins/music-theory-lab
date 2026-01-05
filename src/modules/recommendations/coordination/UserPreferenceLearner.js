@@ -240,7 +240,7 @@ class UserPreferenceLearner extends EventEmitter {
     }
 
     /**
-     * Generic choice recording (used by CoordinatedRecommendationService)
+     * Generic choice recording for any recommendation type
      */
     recordChoice(type, recommendation, context) {
         switch (type) {

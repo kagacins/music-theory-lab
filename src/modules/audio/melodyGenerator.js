@@ -886,7 +886,7 @@ export function playMelody(melody) {
         stopMelody();
     }, totalDuration);
 
-    Tone.Transport.start();
+    Tone.Transport.start('+0.05');
 }
 
 /**
@@ -3672,7 +3672,7 @@ export function playFromSelectedMeasure() {
         startMetronome(beatsPerMeasure, measuresToPlay);
     }
 
-    Tone.Transport.start();
+    Tone.Transport.start('+0.05');
 
     // Dispatch event for guided mode tutorials
     dispatchBuilderEvent('progressionPlayed', {
@@ -4210,7 +4210,7 @@ export function playInteractiveMelodyWithChords() {
     melodyPart.start(0);
     chordPart.start(0);
 
-    Tone.Transport.start();
+    Tone.Transport.start('+0.05');
 
     // Stop after completion
     const totalDuration = progressionData.length * measureDuration;
@@ -4424,7 +4424,7 @@ function updatePlayAllButton() {
 /**
  * Play all melody notes with proper timing (respecting time signature)
  */
-export function playAllMelody() {
+export async function playAllMelody() {
     // If already playing, stop instead
     if (isPlayAllActive) {
         stopPlayAllMelody();
@@ -5232,8 +5232,9 @@ export function playAllMelody() {
         startMetronome(beatsPerMeasure, totalMeasuresForMetronome);
     }
 
-    // Start transport
-    Tone.Transport.start();
+    // Start transport with offset to ensure all samples are ready
+    // The "+0.1" means "start 100ms from now" which gives buffer decode time
+    Tone.Transport.start('+0.1');
 
     // Dispatch event for guided mode tutorials
     dispatchBuilderEvent('progressionPlayed', {
@@ -5606,7 +5607,7 @@ export function playProgressionOnly() {
         startMetronome(beatsPerMeasure, totalMeasuresForMetronome);
     }
 
-    Tone.Transport.start();
+    Tone.Transport.start('+0.05');
 
     // Dispatch event for guided mode tutorials
     dispatchBuilderEvent('progressionPlayed', {

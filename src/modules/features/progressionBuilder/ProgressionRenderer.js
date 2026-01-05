@@ -7204,6 +7204,17 @@ export function rerenderActiveProgressionDisplay() {
     }
 }
 
+/**
+ * Hide all chord tooltips
+ * Call this when chords are removed to prevent orphaned tooltips
+ */
+export function hideAllChordTooltips() {
+    const tooltips = document.querySelectorAll('.chord-tooltip');
+    tooltips.forEach(tooltip => {
+        tooltip.classList.add('hidden');
+    });
+}
+
 // Main rendering functions (already exported above with 'export' keyword)
 // - renderProgressionDisplay
 // - renderProgressionDisplayForBuilder

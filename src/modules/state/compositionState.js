@@ -5450,6 +5450,10 @@ export class CompositionState {
         this.chordSegments = [];
         this.bassNoteStore.clear();
         this.cursor = { measure: 0, beat: 0, staff: 'treble', voice: 0, trebleVoice: 0, bassVoice: 0 };
+        // CRITICAL: Also clear storedProgressionData and reset bassBlockSequence
+        // This prevents prior state from affecting imports/loads
+        this.storedProgressionData = [];
+        this.bassBlockSequence = new BuildingBlockSequence();
         this.events.emit('cleared');
     }
 

@@ -20,12 +20,12 @@ This document captures improvement opportunities for our suite of recommendation
 | **2.1 Voice Leading Presets** | COMPLETE | Added 5 presets: strict, standard, contemporary, jazz, cinematic |
 | **2.2 Context-Aware Voice Leading** | COMPLETE | Added position modifiers (first, middle, end, climax, transition) that adjust penalties |
 | **3.x Section Generator** | ALREADY EXISTS | `SectionGenerator.js` has templates for pop/rock/jazz across section types; `sectionProfiles.js` has 10 section profiles |
-| **4.1 Multi-Dimensional Tension** | PENDING | Future enhancement (P3, High Effort) |
+| **4.1 Multi-Dimensional Tension** | COMPLETE | 4 dimensions: harmonic, rhythmic, melodic, dynamic |
 | **4.2 Tension Shape Templates** | ALREADY EXISTS | `TENSION_ARC_TEMPLATES` has 8 templates (pop, epic, jazz, ballad, rock, edm, classical, ambient) |
-| **5.1 Contextual Preference Learning** | PARTIAL | Records by context (style, mood), but not by section type or key |
+| **5.1 Contextual Preference Learning** | COMPLETE | Records by context (style, mood); now wired to ChordTab.js selection flow |
 | **5.2 Preference Decay** | ALREADY EXISTS | `decayFactor` (0.95) with `_applySessionDecay()` per session |
 | **5.3 Preference Export/Import** | ALREADY EXISTS | `exportPreferences()` and `importPreferences()` methods |
-| **6.1 Unified Scoring Pipeline** | ALREADY EXISTS | `CoordinatedRecommendationService.js` orchestrates all engines |
+| **6.1 Unified Scoring Pipeline** | REMOVED | `CoordinatedRecommendationService.js` removed (was unused wrapper); recommendations flow directly through `generateComprehensiveRecommendations()` |
 | **6.2 Lazy Loading** | PARTIAL | Some dynamic imports exist, but not for heavy engines |
 | **7.1 Web Worker** | PENDING | No Web Workers currently used for recommendations |
 | **7.2 Incremental Updates** | PARTIAL | Caching with 1s TTL exists; incremental recalculation not implemented |
@@ -360,14 +360,76 @@ Provides optimization algorithms for matching tension curves:
 - Suggest extensions (7ths, 9ths) to adjust tension
 - Chord substitution suggestions (dom7, dim, chromatic)
 
-#### 4.1 Multi-Dimensional Tension (PENDING)
+#### 4.1 Multi-Dimensional Tension ✅ COMPLETE
 
-Track additional tension dimensions beyond harmonic:
-- **Rhythmic tension:** Syncopation, activity level
-- **Melodic tension:** Range extremes, leap frequency
-- **Dynamic tension:** Volume, articulation intensity
+**Status:** Implemented in `MultiDimensionalTension.js` (2026-01-04)
 
-**Priority:** P3 | **Effort:** High | **Status:** Future enhancement
+A new `MultiDimensionalTensionAnalyzer` class tracks 4 tension dimensions:
+
+**Dimensions:**
+- **Harmonic tension:** Chord dissonance, function, chromaticism (from existing TensionArcPlanner)
+- **Rhythmic tension:** Note density, syncopation level, rest ratio
+- **Melodic tension:** Leap sizes, range coverage, contour complexity
+- **Dynamic tension:** Volume levels, articulation intensity, dynamic change rate
+
+**Dimension Weights (5 presets):**
+```javascript
+DIMENSION_WEIGHTS = {
+    balanced: { harmonic: 0.40, rhythmic: 0.25, melodic: 0.20, dynamic: 0.15 },
+    harmonic_focused: { harmonic: 0.60, rhythmic: 0.15, melodic: 0.15, dynamic: 0.10 },
+    rhythmic_focused: { harmonic: 0.25, rhythmic: 0.45, melodic: 0.15, dynamic: 0.15 },
+    melodic_focused: { harmonic: 0.25, rhythmic: 0.15, melodic: 0.45, dynamic: 0.15 },
+    dynamic_focused: { harmonic: 0.30, rhythmic: 0.15, melodic: 0.15, dynamic: 0.40 }
+};
+```
+
+**Style-to-Weight Mapping:**
+- Classical, Baroque, Ballad, Gospel → `harmonic_focused`
+- EDM, Electronic, Funk, Hip Hop, Latin, Reggae → `rhythmic_focused`
+- R&B, Soul → `melodic_focused`
+- Cinematic, Epic, Film, Orchestral → `dynamic_focused`
+- Pop, Rock, Jazz, Indie, Country, Folk, Blues → `balanced`
+
+**Integration with TensionArcPlanner:**
+```javascript
+const planner = getTensionArcPlanner();
+
+// Enable multi-dimensional mode
+planner.setMultiDimensionalMode(true, 'Pop');  // Auto-selects 'balanced' weights
+
+// Calculate multi-dimensional tension for a chord
+const result = planner.calculateMultiDimensionalTension(chord, key, {
+    measureData: { notes: [...] },  // For rhythmic analysis
+    melodyNotes: [...],             // For melodic analysis
+    dynamicData: { volume: 0.7, articulation: 'marcato' }  // For dynamic analysis
+});
+
+// Returns:
+// {
+//   total: 0.52,  // Combined tension
+//   harmonic: { total: 0.45, breakdown: {...} },
+//   dimensions: {
+//     harmonic: { value: 0.45, weight: 0.40, weighted: 0.18 },
+//     rhythmic: { value: 0.55, weight: 0.25, weighted: 0.14, description: 'Active rhythm' },
+//     melodic: { value: 0.40, weight: 0.20, weighted: 0.08, description: 'Balanced movement' },
+//     dynamic: { value: 0.60, weight: 0.15, weighted: 0.09, description: 'Strong dynamics' }
+//   },
+//   isMultiDimensional: true
+// }
+
+// Calculate full curve with per-dimension tracking
+const curve = planner.calculateMultiDimensionalCurve(progression, key, compositionState);
+
+// Get per-dimension adjustment suggestions
+const suggestions = planner.getMultiDimensionalSuggestions(
+    { harmonic: 0.5, rhythmic: 0.7, melodic: 0.3, dynamic: 0.4 },
+    { harmonic: 0.6, rhythmic: 0.5, melodic: 0.5, dynamic: 0.6 }
+);
+```
+
+**Files:**
+- `src/modules/analysis/MultiDimensionalTension.js` - New module (661 lines)
+- `src/modules/analysis/TensionArcPlanner.js` - Updated with integration methods
 
 ---
 
@@ -440,41 +502,18 @@ Currently records preferences by context (style, mood, function), but could be e
 
 ### Implementation Status
 
-**File: `src/modules/recommendations/coordination/CoordinatedRecommendationService.js`**
+#### 6.1 Unified Scoring Pipeline ❌ REMOVED (2026-01-04)
 
-#### 6.1 Unified Scoring Pipeline ✅ ALREADY EXISTS
+**`CoordinatedRecommendationService.js` was removed** because:
+- It was never actually used in the recommendation flow
+- All recommendations went directly to `generateComprehensiveRecommendations()` in `comprehensiveChordRecommendations.js`
+- It was essentially a wrapper that just called the comprehensive engine anyway
+- Having two parallel systems created confusion and maintenance burden
 
-The `CoordinatedRecommendationService` orchestrates all recommendation engines:
-
-```javascript
-// Already implemented
-class CoordinatedRecommendationService extends EventEmitter {
-    constructor() {
-        // Engine weights for combined scoring
-        this._engineWeights = {
-            functionScore: 0.25,
-            voiceLeading: 0.20,
-            styleMatch: 0.15,
-            sectionFit: 0.15,
-            tensionAlignment: 0.10,
-            userPreference: 0.15
-        };
-    }
-
-    // Primary API methods
-    getChordRecommendations(options) { ... }      // Coordinates chord engines
-    getMelodySuggestions(options) { ... }          // Coordinates melody engines
-    getSectionProgression(options) { ... }         // Generates section progressions
-    generateCompleteSection(options) { ... }       // Holistic generation
-}
-```
-
-**Features:**
-- Unified API for all recommendation types
-- Cross-engine scoring considering how recommendations work together
-- Automatic context propagation to all engines
-- User preference integration via UserPreferenceLearner
-- Built-in caching (1 second TTL)
+**Current architecture:**
+- `RecommendationService` (integration layer) → `generateComprehensiveRecommendations()` (actual engine)
+- User preferences wired directly to `ChordTab.js` via `UserPreferenceLearner.recordChordChoice()`
+- All Phase 1-4 improvements (voice leading, tension, sections) connected to `comprehensiveChordRecommendations.js`
 
 #### 6.2 Lazy Loading for Heavy Engines (PARTIAL)
 
@@ -504,7 +543,6 @@ No Web Workers are currently used for recommendation calculations. This remains 
 #### 7.2 Incremental Updates (PARTIAL)
 
 **Existing caching:**
-- `CoordinatedRecommendationService` has 1-second TTL cache
 - `comprehensiveChordRecommendations.js` has 500-entry cache with 30s TTL
 - Caches clear on context changes
 
@@ -526,19 +564,25 @@ No Web Workers are currently used for recommendation calculations. This remains 
 | Caching layer | ✅ EXISTS | 500-entry cache, 30s TTL |
 | Voice leading presets | ✅ COMPLETE | 5 presets (strict, standard, contemporary, jazz, cinematic) |
 | Context-aware voice leading | ✅ COMPLETE | Position modifiers (first, middle, end, climax, transition) |
+| Multi-dimensional tension | ✅ COMPLETE | 4 dimensions (harmonic, rhythmic, melodic, dynamic) |
 | Genre-specific templates | ✅ EXISTS | `SectionGenerator.js` (pop, rock, jazz templates) |
 | Section profiles | ✅ EXISTS | `sectionProfiles.js` (10 section types) |
 | Tension shape templates | ✅ EXISTS | 8 templates in `TensionArcPlanner.js` |
 | Preference decay | ✅ EXISTS | Session-based decay with `decayFactor` |
 | Preference export/import | ✅ EXISTS | `exportPreferences()` / `importPreferences()` |
-| Unified scoring pipeline | ✅ EXISTS | `CoordinatedRecommendationService.js` |
+| User choice recording | ✅ COMPLETE | Wired `UserPreferenceLearner.recordChordChoice()` to `ChordTab.js` |
+
+### Removed
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Unified scoring pipeline | ❌ REMOVED | `CoordinatedRecommendationService.js` deleted - was unused wrapper |
 
 ### Remaining Work (Future Enhancements)
 
 | Task | Priority | Effort | Notes |
 |------|----------|--------|-------|
 | Extract scoring functions | DEFERRED | Medium | Current implementation works well; high risk |
-| Multi-dimensional tension | P3 | High | Track rhythmic, melodic, dynamic tension |
 | Contextual preference learning | P3 | Medium | Add section type / key-specific preferences |
 | Web Worker optimization | P3 | High | Move heavy calculations off main thread |
 | Incremental updates | P3 | High | Only recalculate affected chord positions |

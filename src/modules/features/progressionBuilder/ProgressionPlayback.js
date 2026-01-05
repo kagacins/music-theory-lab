@@ -490,7 +490,7 @@ export function handleAutoPlayback() {
     }
     trainerState.scheduledCallbacks.push(cleanupCallbackId);
 
-    Tone.Transport.start();
+    Tone.Transport.start('+0.05');
 }
 
 /**

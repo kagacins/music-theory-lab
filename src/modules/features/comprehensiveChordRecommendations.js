@@ -658,9 +658,18 @@ export function generateComprehensiveRecommendations(
     let tensionArcPlanner = null;
     let targetTension = null;
     let tensionArcWeight = 0.15; // Default weight for tension arc scoring
+    let useMultiDimensionalTension = false;
     if (tensionArcInfo && tensionArcInfo.enabled) {
         try {
             tensionArcPlanner = getTensionArcPlanner();
+
+            // Enable multi-dimensional tension based on style
+            // This adds rhythmic, melodic, and dynamic tension analysis alongside harmonic
+            useMultiDimensionalTension = tensionArcInfo.multiDimensional !== false; // Default to true
+            if (useMultiDimensionalTension) {
+                tensionArcPlanner.setMultiDimensionalMode(true, style);
+            }
+
             // Calculate normalized position for the next chord
             const nextChordPosition = progressionData.length;
             const totalExpectedChords = Math.max(nextChordPosition + 4, 8); // Estimate total progression length
@@ -825,9 +834,34 @@ export function generateComprehensiveRecommendations(
                 let tensionArcDetails = null;
                 if (tensionArcPlanner && targetTension !== null) {
                     try {
-                        // Get the base tension for this chord type
-                        const chordTensionInfo = CHORD_TENSION_SCORES[nextType] || { baseTension: 0.5 };
-                        const chordTension = chordTensionInfo.baseTension;
+                        let chordTension;
+                        let dimensionBreakdown = null;
+
+                        if (useMultiDimensionalTension) {
+                            // Use multi-dimensional tension (harmonic + rhythmic + melodic + dynamic)
+                            // Context includes measure data when available for rhythmic/melodic analysis
+                            const nextChord = { root: nextRoot, type: nextType, inversion: nextInversion };
+                            const tensionContext = {
+                                positionInProgression: progressionData.length,
+                                totalChords: Math.max(progressionData.length + 4, 8)
+                            };
+
+                            // If rhythmicAnalysis is available, add measure data for rhythmic tension
+                            if (rhythmicAnalysis && rhythmicAnalysis.measureNotes) {
+                                tensionContext.measureData = { notes: rhythmicAnalysis.measureNotes };
+                                tensionContext.melodyNotes = rhythmicAnalysis.measureNotes.filter(n => !n.isRest);
+                            }
+
+                            const mdTensionResult = tensionArcPlanner.calculateMultiDimensionalTension(
+                                nextChord, key, tensionContext
+                            );
+                            chordTension = mdTensionResult.total;
+                            dimensionBreakdown = mdTensionResult.dimensions;
+                        } else {
+                            // Fall back to base harmonic tension only
+                            const chordTensionInfo = CHORD_TENSION_SCORES[nextType] || { baseTension: 0.5 };
+                            chordTension = chordTensionInfo.baseTension;
+                        }
 
                         // Calculate how well this chord's tension aligns with the target
                         const tensionDeviation = Math.abs(chordTension - targetTension);
@@ -841,7 +875,9 @@ export function generateComprehensiveRecommendations(
                             targetTension,
                             tensionAlignment,
                             deviation: tensionDeviation,
-                            direction: chordTension > targetTension ? 'above' : 'below'
+                            direction: chordTension > targetTension ? 'above' : 'below',
+                            isMultiDimensional: useMultiDimensionalTension,
+                            dimensions: dimensionBreakdown
                         };
                     } catch (e) {
                         tensionArcScore = 0;

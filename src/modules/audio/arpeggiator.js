@@ -175,7 +175,8 @@ export function playArpeggio(selectionType, type, direction) {
     }, notesToPlay, speedValue).start(0);
 
     g_arpeggioSequence.loop = false; // Play only once per click
-    Tone.Transport.start();
+
+    Tone.Transport.start('+0.05');
 
     // Schedule cleanup after the sequence finishes
     // Use interval-based calculation to ensure cleanup happens after all notes

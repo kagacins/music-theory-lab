@@ -13,6 +13,7 @@
 import { CHORD_TYPE_PROFILES } from '../features/chordTypeProfiles.js';
 import { SECTION_PROFILES } from '../features/sectionProfiles.js';
 import { getHarmonyAnalyzer } from './harmonyAnalyzer.js';
+import { getMultiDimensionalTensionAnalyzer } from './MultiDimensionalTension.js';
 
 /**
  * Tension Arc Templates
@@ -287,6 +288,39 @@ export class TensionArcPlanner {
         this.customCurve = null;
         this.targetTension = null;  // Per-position target tensions
         this.harmonyAnalyzer = getHarmonyAnalyzer();
+        this.multiDimensionalAnalyzer = null;  // Lazy-loaded
+        this.useMultiDimensional = false;  // Enable multi-dimensional mode
+    }
+
+    /**
+     * Get the multi-dimensional tension analyzer (lazy-loaded)
+     * @returns {MultiDimensionalTensionAnalyzer}
+     */
+    getMultiDimensionalAnalyzer() {
+        if (!this.multiDimensionalAnalyzer) {
+            this.multiDimensionalAnalyzer = getMultiDimensionalTensionAnalyzer();
+        }
+        return this.multiDimensionalAnalyzer;
+    }
+
+    /**
+     * Enable or disable multi-dimensional tension analysis
+     * @param {boolean} enabled - Whether to use multi-dimensional analysis
+     * @param {string} style - Optional style for dimension weighting
+     */
+    setMultiDimensionalMode(enabled, style = null) {
+        this.useMultiDimensional = enabled;
+        if (enabled && style) {
+            this.getMultiDimensionalAnalyzer().setStyle(style);
+        }
+    }
+
+    /**
+     * Check if multi-dimensional mode is enabled
+     * @returns {boolean}
+     */
+    isMultiDimensionalEnabled() {
+        return this.useMultiDimensional;
     }
 
     /**
@@ -433,6 +467,80 @@ export class TensionArcPlanner {
             stability: typeInfo.stability,
             resolvesTonic: typeInfo.resolution
         };
+    }
+
+    /**
+     * Calculate multi-dimensional tension for a chord/measure
+     * Includes harmonic, rhythmic, melodic, and dynamic dimensions
+     * @param {Object} chord - Chord object
+     * @param {string} key - Current key
+     * @param {Object} context - Context with measure data, notes, dynamics
+     * @returns {Object} Multi-dimensional tension analysis
+     */
+    calculateMultiDimensionalTension(chord, key, context = {}) {
+        // Always calculate harmonic tension
+        const harmonicResult = this.calculateChordTension(chord, key, context);
+
+        // If multi-dimensional mode is disabled, return harmonic only
+        if (!this.useMultiDimensional) {
+            return {
+                total: harmonicResult.total,
+                harmonic: harmonicResult,
+                isMultiDimensional: false
+            };
+        }
+
+        const mdAnalyzer = this.getMultiDimensionalAnalyzer();
+
+        // Get measure data for rhythmic analysis
+        const measureData = context.measureData || null;
+
+        // Get melody notes for melodic analysis
+        const melodyNotes = context.melodyNotes || null;
+
+        // Get dynamic data
+        const dynamicData = context.dynamicData || null;
+
+        // Calculate combined multi-dimensional tension
+        const multiDimensional = mdAnalyzer.calculateCombinedTension(
+            harmonicResult,
+            measureData,
+            melodyNotes,
+            dynamicData
+        );
+
+        return {
+            total: multiDimensional.combined,
+            harmonic: harmonicResult,
+            dimensions: multiDimensional.dimensions,
+            weightProfile: multiDimensional.weightProfile,
+            description: multiDimensional.description,
+            isMultiDimensional: true
+        };
+    }
+
+    /**
+     * Get tension adjustment suggestions for all dimensions
+     * @param {Object} currentTensions - Current dimension tensions
+     * @param {Object} targetTensions - Target dimension tensions
+     * @returns {Object} Suggestions keyed by dimension
+     */
+    getMultiDimensionalSuggestions(currentTensions, targetTensions) {
+        if (!this.useMultiDimensional) {
+            return { harmonic: ['Enable multi-dimensional mode for detailed suggestions'] };
+        }
+
+        const mdAnalyzer = this.getMultiDimensionalAnalyzer();
+        const suggestions = {};
+
+        const dimensions = ['harmonic', 'rhythmic', 'melodic', 'dynamic'];
+        for (const dim of dimensions) {
+            const current = currentTensions[dim] || 0.5;
+            const target = targetTensions[dim] || 0.5;
+            suggestions[dim] = mdAnalyzer.getTensionAdjustmentSuggestions(dim, current, target);
+        }
+
+        return suggestions;
     }
 
     /**
@@ -824,6 +932,197 @@ export class TensionArcPlanner {
             description: template.description,
             isCustom: template.isCustom || false
         }));
+    }
+
+    /**
+     * Calculate multi-dimensional tension curve for entire progression
+     * @param {Array} progression - Array of chord objects
+     * @param {string} key - Current key
+     * @param {Object} compositionState - Optional composition state for rhythmic/melodic data
+     * @returns {Object} Multi-dimensional tension curve analysis
+     */
+    calculateMultiDimensionalCurve(progression, key, compositionState = null) {
+        if (!progression || progression.length === 0) {
+            return {
+                curve: [],
+                dimensions: { harmonic: [], rhythmic: [], melodic: [], dynamic: [] },
+                isMultiDimensional: this.useMultiDimensional
+            };
+        }
+
+        const curveData = [];
+        const dimensionCurves = {
+            harmonic: [],
+            rhythmic: [],
+            melodic: [],
+            dynamic: []
+        };
+
+        // Get measures from composition state if available
+        const measures = compositionState?.getMeasures?.() || [];
+
+        progression.forEach((chord, index) => {
+            const context = {
+                positionInProgression: index,
+                totalChords: progression.length
+            };
+
+            // Add measure data if available
+            if (measures[index]) {
+                const measure = measures[index];
+                context.measureData = {
+                    notes: [
+                        ...(measure.treble?.notes || []),
+                        ...(measure.bass?.notes || [])
+                    ]
+                };
+                context.melodyNotes = measure.treble?.notes || [];
+            }
+
+            const tensionResult = this.calculateMultiDimensionalTension(chord, key, context);
+
+            curveData.push({
+                index,
+                chord,
+                total: tensionResult.total,
+                normalizedPosition: progression.length > 1
+                    ? index / (progression.length - 1)
+                    : 0,
+                isMultiDimensional: tensionResult.isMultiDimensional,
+                dimensions: tensionResult.dimensions || null
+            });
+
+            // Track individual dimension curves
+            dimensionCurves.harmonic.push(tensionResult.harmonic?.total || tensionResult.total);
+
+            if (tensionResult.dimensions) {
+                dimensionCurves.rhythmic.push(tensionResult.dimensions.rhythmic?.value || 0.35);
+                dimensionCurves.melodic.push(tensionResult.dimensions.melodic?.value || 0.30);
+                dimensionCurves.dynamic.push(tensionResult.dimensions.dynamic?.value || 0.40);
+            } else {
+                // Defaults for non-multi-dimensional mode
+                dimensionCurves.rhythmic.push(0.35);
+                dimensionCurves.melodic.push(0.30);
+                dimensionCurves.dynamic.push(0.40);
+            }
+        });
+
+        // Calculate statistics for each dimension
+        const calcStats = (arr) => ({
+            avg: arr.reduce((a, b) => a + b, 0) / arr.length,
+            min: Math.min(...arr),
+            max: Math.max(...arr),
+            range: Math.max(...arr) - Math.min(...arr)
+        });
+
+        return {
+            curve: curveData,
+            dimensions: dimensionCurves,
+            statistics: {
+                combined: calcStats(curveData.map(p => p.total)),
+                harmonic: calcStats(dimensionCurves.harmonic),
+                rhythmic: calcStats(dimensionCurves.rhythmic),
+                melodic: calcStats(dimensionCurves.melodic),
+                dynamic: calcStats(dimensionCurves.dynamic)
+            },
+            isMultiDimensional: this.useMultiDimensional,
+            weightProfile: this.useMultiDimensional
+                ? this.getMultiDimensionalAnalyzer().getWeights().name
+                : 'Harmonic Only'
+        };
+    }
+
+    /**
+     * Compare multi-dimensional tension curve to target
+     * @param {Array} progression - Chord progression
+     * @param {string} key - Current key
+     * @param {Object} compositionState - Composition state for full analysis
+     * @returns {Object} Multi-dimensional comparison with per-dimension mismatches
+     */
+    compareMultiDimensionalToTarget(progression, key, compositionState = null) {
+        const mdCurve = this.calculateMultiDimensionalCurve(progression, key, compositionState);
+
+        if (mdCurve.curve.length === 0) {
+            return {
+                alignment: 1.0,
+                mismatches: [],
+                dimensionAlignments: {},
+                overall: 'No progression to analyze'
+            };
+        }
+
+        const mismatches = [];
+        let totalDeviation = 0;
+
+        // Calculate per-dimension alignments
+        const dimensionDeviations = {
+            harmonic: 0,
+            rhythmic: 0,
+            melodic: 0,
+            dynamic: 0
+        };
+
+        mdCurve.curve.forEach((point, idx) => {
+            const targetTension = this.getTargetTensionAt(point.normalizedPosition);
+            const deviation = Math.abs(point.total - targetTension);
+            totalDeviation += deviation;
+
+            // Track per-dimension deviations against target
+            if (point.dimensions) {
+                dimensionDeviations.harmonic += Math.abs(point.dimensions.harmonic?.value - targetTension);
+                dimensionDeviations.rhythmic += Math.abs(point.dimensions.rhythmic?.value - targetTension);
+                dimensionDeviations.melodic += Math.abs(point.dimensions.melodic?.value - targetTension);
+                dimensionDeviations.dynamic += Math.abs(point.dimensions.dynamic?.value - targetTension);
+            } else {
+                dimensionDeviations.harmonic += deviation;
+            }
+
+            const severity = this.getDeviationSeverity(deviation);
+            if (severity !== 'good') {
+                mismatches.push({
+                    index: point.index,
+                    chord: point.chord,
+                    currentTension: point.total,
+                    targetTension,
+                    deviation,
+                    severity,
+                    direction: point.total > targetTension ? 'too-high' : 'too-low',
+                    dimensions: point.dimensions,
+                    suggestions: this.useMultiDimensional
+                        ? this.getMultiDimensionalSuggestions(
+                            {
+                                harmonic: point.dimensions?.harmonic?.value || point.total,
+                                rhythmic: point.dimensions?.rhythmic?.value || 0.35,
+                                melodic: point.dimensions?.melodic?.value || 0.30,
+                                dynamic: point.dimensions?.dynamic?.value || 0.40
+                            },
+                            { harmonic: targetTension, rhythmic: targetTension, melodic: targetTension, dynamic: targetTension }
+                        )
+                        : null
+                });
+            }
+        });
+
+        const numPoints = mdCurve.curve.length;
+        const averageDeviation = totalDeviation / numPoints;
+        const alignment = Math.max(0, 1 - averageDeviation);
+
+        // Calculate per-dimension alignment scores
+        const dimensionAlignments = {};
+        for (const dim of Object.keys(dimensionDeviations)) {
+            dimensionAlignments[dim] = Math.max(0, 1 - (dimensionDeviations[dim] / numPoints));
+        }
+
+        return {
+            alignment,
+            averageDeviation,
+            mismatches,
+            dimensionAlignments,
+            curve: mdCurve,
+            template: this.getTemplate(),
+            isMultiDimensional: this.useMultiDimensional,
+            overall: this.getOverallAssessment(alignment, mismatches.length, numPoints)
+        };
     }
 }
 
