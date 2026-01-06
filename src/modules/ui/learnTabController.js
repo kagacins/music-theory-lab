@@ -96,7 +96,7 @@ function renderLessonBrowser(container) {
                 <button id="start-practice-mode-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
                     <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🧠</div>
                     <div class="text-left flex-1">
-                        <div class="text-xs text-emerald-100">Flashcard Review</div>
+                        <div class="text-xs text-emerald-100">Flashcard Review <span class="px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-semibold">WIP</span></div>
                         <div class="text-sm font-bold">Practice Mode</div>
                     </div>
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
