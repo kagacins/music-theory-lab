@@ -2321,11 +2321,9 @@ export class CompositionState {
         // Try to get total from bass block sequence (source of truth for chord durations)
         if (this.bassBlockSequence && this.bassBlockSequence.blocks.length > 0) {
             totalBeats = this.bassBlockSequence.blocks.reduce((sum, block) => sum + block.beats, 0);
-            console.log(`[initializeTrebleBlockSequence] Using bass block total: ${totalBeats} beats`);
         } else {
             // Fallback to measure-based calculation
             totalBeats = this.measures.length * beatsPerMeasure;
-            console.log(`[initializeTrebleBlockSequence] Using measure-based total: ${totalBeats} beats`);
         }
 
         if (totalBeats === 0) {

@@ -50,7 +50,14 @@
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(timeout 8 npm run dev:*)",
-      "Bash(timeout 10 npm run build-css:*)"
+      "Bash(timeout 10 npm run build-css:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(cd:*)",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)",
+      "Bash(timeout 60 npx vite:*)"
     ],
     "deny": [],
     "ask": []

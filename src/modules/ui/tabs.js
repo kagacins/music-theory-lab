@@ -353,8 +353,32 @@ export function switchTab(tabId, options = {}) {
         }
         updateKeyboardLabels();
     } else if (tabId === 'learn') {
-        // Initialize Learn tab content
-        if (window.initLearnTab) {
+        // Lazy load and initialize Learn tab content
+        const learnContainer = document.getElementById('learn-tab-content');
+        if (learnContainer && !learnContainer.dataset.initialized) {
+            // Show loading state
+            learnContainer.innerHTML = `
+                <div class="flex items-center justify-center h-64">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                        <div class="text-gray-600 dark:text-gray-400">Loading Theory Academy...</div>
+                    </div>
+                </div>
+            `;
+            // Lazy load the module
+            import('./learnTabController.js').then(module => {
+                learnContainer.dataset.initialized = 'true';
+                module.initLearnTab();
+            }).catch(err => {
+                console.error('[Tabs] Failed to load Learn tab:', err);
+                learnContainer.innerHTML = `
+                    <div class="text-center py-12 text-red-500">
+                        Failed to load Theory Academy. Please refresh the page.
+                    </div>
+                `;
+            });
+        } else if (window.initLearnTab) {
+            // Already loaded, just reinitialize
             window.initLearnTab();
         }
         // Use same width as other tabs

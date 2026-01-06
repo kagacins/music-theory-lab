@@ -25,12 +25,18 @@ import { openManualChordEntryModal, closeManualChordEntryModal } from '../module
 import { showAutoHarmonizeModal } from '../modules/ui/autoHarmonizeModal.js';
 import { showTensionOptimizerModal } from '../modules/ui/tensionOptimizerModal.js';
 import { toast, showToast } from '../modules/ui/toastNotifications.js';
+import {
+    quickAddChordFromForm,
+    updateQuickAddChordTypes,
+    populateScaleDropdown,
+    initQuickAddChordForms
+} from '../modules/ui/quickAddChord.js';
 // Phase 1.3 & Phase 2: Interactive Learning Tools
 import { showChordComparisonModal } from '../modules/ui/chordComparisonModal.js';
 import { showWhatIfSandbox } from '../modules/ui/whatIfSandbox.js';
 import { initChordFunctionLegend, showLegend as showChordFunctionLegend, hideLegend as hideChordFunctionLegend, toggleLegend as toggleChordFunctionLegend } from '../modules/ui/chordFunctionLegend.js';
 // Phase 3: Guided Learning Journeys
-import { initLearnTab } from '../modules/ui/learnTabController.js';
+// Learn tab is lazy loaded when user clicks the tab (see tabs.js)
 import { dispatchBuilderEvent } from '../modules/ui/lessonGuidedMode.js';
 import { startLetItBeTutorial } from '../modules/teaching/letItBeTutorial.js';
 // Tier 1: Teaching-Composition Integration
@@ -100,6 +106,9 @@ import {
     toggleChordSetupPanel,
     toggleChordLibraryPanel,
     toggleChordLibraryMode,
+    setScaleFilterMode,
+    getAvailableScales,
+    isChordInScale,
     toggleChordIntervalsPanel,
     toggleBuilderProgressionPanel,
     toggleBuilderCardView,
@@ -1362,6 +1371,9 @@ export function setupWindowExports() {
     window.toggleChordSetupPanel = toggleChordSetupPanel;
     window.toggleChordLibraryPanel = toggleChordLibraryPanel;
     window.toggleChordLibraryMode = toggleChordLibraryMode;
+    window.setScaleFilterMode = setScaleFilterMode;
+    window.getAvailableScales = getAvailableScales;
+    window.isChordInScale = isChordInScale;
     window.toggleChordIntervalsPanel = toggleChordIntervalsPanel;
     window.toggleChordIdentifierPanel = toggleChordIdentifierPanel;
     window.identifyChordFromInput = identifyChordFromInput;
@@ -1471,8 +1483,18 @@ export function setupWindowExports() {
             if (wasHidden && window.dispatchBuilderEvent) {
                 window.dispatchBuilderEvent('quickAddFormOpened', { formId });
             }
+            // Initialize scale dropdown when form is opened
+            if (wasHidden) {
+                populateScaleDropdown(formId);
+            }
         }
     };
+
+    // Quick Add Chord functions
+    window.quickAddChordFromForm = quickAddChordFromForm;
+    window.updateQuickAddChordTypes = updateQuickAddChordTypes;
+    window.populateScaleDropdown = populateScaleDropdown;
+    window.initQuickAddChordForms = initQuickAddChordForms;
 
     // Progression panel toggle functions
     window.toggleStyleMoodInsightsPanel = toggleStyleMoodInsightsPanel;
@@ -2264,8 +2286,11 @@ export function setupWindowExports() {
     // Why This Works panel
     window.initWhyThisWorksPanel = initWhyThisWorksPanel;
 
-    // Learn Tab
-    window.initLearnTab = initLearnTab;
+    // Learn Tab - lazy loaded in tabs.js, but provide a stub for compatibility
+    window.initLearnTab = async () => {
+        const module = await import('../modules/ui/learnTabController.js');
+        module.initLearnTab();
+    };
 
     // Let It Be Tutorial
     window.startLetItBeTutorial = startLetItBeTutorial;

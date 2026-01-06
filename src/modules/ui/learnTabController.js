@@ -6,16 +6,48 @@
  * - Lesson viewer (individual lesson view)
  * - Songwriting wizard
  * - Progress tracking integration
+ *
+ * This module is LAZY LOADED when user clicks the Theory Academy tab.
+ * Sub-modules are also lazy loaded for optimal performance.
  */
 
+// Core lesson data - needed for browser view (lightweight metadata)
 import { learningPaths, getAllLessons, getLessonById, LESSON_STATUS } from '../../data/theoryExplanations/lessons/index.js';
-import { renderLessonViewer } from './lessonViewer.js';
-import { renderSongwritingWizard } from './songwritingWizard.js';
+// Progress tracking - needed for browser view
 import { getLessonStatus, getUserStats, getRecommendedLesson, loadProgress } from './learningProgress.js';
-import { showEarTrainingModal } from './earTraining/earTrainingModal.js';
-import { getOverallStats as getEarTrainingStats } from './earTraining/earTrainingProgress.js';
 
-// Lazy load practice mode modal
+// ===========================================
+// LAZY LOADED MODULES
+// ===========================================
+
+// Lesson viewer - only loaded when viewing a specific lesson
+let lessonViewerModule = null;
+async function loadLessonViewer() {
+    if (!lessonViewerModule) {
+        lessonViewerModule = await import('./lessonViewer.js');
+    }
+    return lessonViewerModule;
+}
+
+// Songwriting wizard - only loaded when opening wizard
+let songwritingWizardModule = null;
+async function loadSongwritingWizard() {
+    if (!songwritingWizardModule) {
+        songwritingWizardModule = await import('./songwritingWizard.js');
+    }
+    return songwritingWizardModule;
+}
+
+// Ear training modal - only loaded when clicking ear training
+let earTrainingModule = null;
+async function loadEarTrainingModal() {
+    if (!earTrainingModule) {
+        earTrainingModule = await import('./earTraining/earTrainingModal.js');
+    }
+    return earTrainingModule;
+}
+
+// Practice mode modal - only loaded when clicking practice mode
 let practiceModeModule = null;
 async function loadPracticeModeModal() {
     if (!practiceModeModule) {
@@ -240,9 +272,14 @@ function attachBrowserListeners(container) {
         }
     });
 
-    // Start ear training button
-    container.querySelector('#start-ear-training-btn')?.addEventListener('click', () => {
-        showEarTrainingModal();
+    // Start ear training button (lazy loaded)
+    container.querySelector('#start-ear-training-btn')?.addEventListener('click', async () => {
+        try {
+            const module = await loadEarTrainingModal();
+            module.showEarTrainingModal();
+        } catch (err) {
+            console.error('[LearnTab] Failed to load ear training:', err);
+        }
     });
 
     // Lesson cards
@@ -282,26 +319,64 @@ function showBrowser(pushHistory = true) {
 }
 
 /**
- * Show a specific lesson
+ * Show a specific lesson (lazy loads lesson viewer)
  * @param {string} lessonId - The lesson ID to show
  * @param {boolean} pushHistory - Whether to push to browser history (default: true)
  */
-function showLesson(lessonId, pushHistory = true) {
+async function showLesson(lessonId, pushHistory = true) {
     currentView = 'lesson';
     const container = document.getElementById('learn-tab-content');
     if (container) {
-        renderLessonViewer(lessonId, container, pushHistory);
+        // Show loading state
+        container.innerHTML = `
+            <div class="flex items-center justify-center h-64">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                    <div class="text-gray-600 dark:text-gray-400">Loading lesson...</div>
+                </div>
+            </div>
+        `;
+        try {
+            const module = await loadLessonViewer();
+            module.renderLessonViewer(lessonId, container, pushHistory);
+        } catch (err) {
+            console.error('[LearnTab] Failed to load lesson viewer:', err);
+            container.innerHTML = `
+                <div class="text-center py-12 text-red-500">
+                    Failed to load lesson. <button onclick="window.showLessonBrowserUI()" class="underline">Go back</button>
+                </div>
+            `;
+        }
     }
 }
 
 /**
- * Show the songwriting wizard
+ * Show the songwriting wizard (lazy loads wizard module)
  */
-function showWizard() {
+async function showWizard() {
     currentView = 'wizard';
     const container = document.getElementById('learn-tab-content');
     if (container) {
-        renderSongwritingWizard(container);
+        // Show loading state
+        container.innerHTML = `
+            <div class="flex items-center justify-center h-64">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                    <div class="text-gray-600 dark:text-gray-400">Loading wizard...</div>
+                </div>
+            </div>
+        `;
+        try {
+            const module = await loadSongwritingWizard();
+            module.renderSongwritingWizard(container);
+        } catch (err) {
+            console.error('[LearnTab] Failed to load songwriting wizard:', err);
+            container.innerHTML = `
+                <div class="text-center py-12 text-red-500">
+                    Failed to load wizard. <button onclick="window.showLessonBrowserUI()" class="underline">Go back</button>
+                </div>
+            `;
+        }
     }
 }
 
@@ -379,8 +454,9 @@ window.showLessonBrowserUI = showBrowser;
 window.showSongwritingWizardUI = showWizard;
 window.initLearnTab = initLearnTab;
 window.checkUrlForLesson = checkUrlForLesson;
-window.renderLessonViewer = (lessonId, container, pushHistory) => {
-    renderLessonViewer(lessonId, container, pushHistory);
+window.renderLessonViewer = async (lessonId, container, pushHistory) => {
+    const module = await loadLessonViewer();
+    module.renderLessonViewer(lessonId, container, pushHistory);
 };
 
 export default {

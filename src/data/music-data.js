@@ -509,6 +509,258 @@ function generateDiatonicChords(rootNote, noteArray) {
 }
 
 /**
+ * Determines the chord type (Major, Minor, Diminished, Augmented) based on
+ * the intervals from a scale degree to its 3rd and 5th
+ * @param {number} third - Interval in semitones to the 3rd (3 = minor, 4 = major)
+ * @param {number} fifth - Interval in semitones to the 5th (6 = dim, 7 = perfect, 8 = aug)
+ * @returns {Object} { triad: string, seventh: string, romanPrefix: string, romanSuffix: string }
+ */
+function determineChordQuality(third, fifth) {
+    // Triads: Major (4,7), Minor (3,7), Diminished (3,6), Augmented (4,8)
+    if (third === 4 && fifth === 7) {
+        return { triad: 'Major', seventh: 'Major 7th', romanPrefix: '', romanCase: 'upper' };
+    } else if (third === 3 && fifth === 7) {
+        return { triad: 'Minor', seventh: 'Minor 7th', romanPrefix: '', romanCase: 'lower' };
+    } else if (third === 3 && fifth === 6) {
+        return { triad: 'Diminished', seventh: 'Half-Diminished 7th', romanPrefix: '', romanCase: 'lower', romanSuffix: '°' };
+    } else if (third === 4 && fifth === 8) {
+        return { triad: 'Augmented', seventh: 'Augmented 7th', romanPrefix: '', romanCase: 'upper', romanSuffix: '+' };
+    }
+    // Fallback for unusual intervals
+    return { triad: 'Major', seventh: 'Major 7th', romanPrefix: '', romanCase: 'upper' };
+}
+
+/**
+ * Roman numerals for scale degrees
+ */
+const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+
+/**
+ * Generates diatonic chords for any scale based on its intervals
+ * Builds triads, 7ths, 9ths, 6ths, 11ths, and extensions by stacking thirds from each scale degree
+ *
+ * @param {string} rootNote - The tonic note (e.g., 'C', 'D', 'F#')
+ * @param {string} scaleName - The scale name from SCALE_DEFINITIONS (e.g., 'Natural Minor (Aeolian)')
+ * @param {Array} noteArray - The note array to use (SHARP_NOTES or FLAT_NOTES)
+ * @returns {Array} Array of chord groups with notes and types
+ */
+function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
+    const rootIndex = noteArray.indexOf(rootNote);
+    if (rootIndex === -1) return [];
+
+    const scaleDef = SCALE_DEFINITIONS[scaleName];
+    if (!scaleDef || !scaleDef.intervals) return [];
+
+    const intervals = scaleDef.intervals;
+    const numDegrees = intervals.length;
+
+    // For scales with fewer than 7 notes (pentatonic, blues, etc.),
+    // we still generate chords but with limited degrees
+    const triads = [];
+    const sixths = [];
+    const sevenths = [];
+    const ninths = [];
+    const elevenths = [];
+    const extensions = [];
+
+    for (let degree = 0; degree < numDegrees; degree++) {
+        const chordRootInterval = intervals[degree];
+        const chordRoot = noteArray[(rootIndex + chordRootInterval) % 12];
+
+        // Find the 3rd (2 scale degrees up) and 5th (4 scale degrees up)
+        const thirdDegree = (degree + 2) % numDegrees;
+        const fifthDegree = (degree + 4) % numDegrees;
+
+        // Calculate semitone intervals from chord root to 3rd and 5th
+        let thirdInterval = intervals[thirdDegree] - intervals[degree];
+        if (thirdInterval < 0) thirdInterval += 12;
+
+        let fifthInterval = intervals[fifthDegree] - intervals[degree];
+        if (fifthInterval < 0) fifthInterval += 12;
+
+        // Determine chord quality based on intervals
+        const quality = determineChordQuality(thirdInterval, fifthInterval);
+
+        // Generate roman numeral
+        const romanBase = quality.romanCase === 'lower'
+            ? ROMAN_NUMERALS[degree].toLowerCase()
+            : ROMAN_NUMERALS[degree];
+        const romanSuffix = quality.romanSuffix || '';
+
+        // Add triad
+        triads.push({
+            root: chordRoot,
+            type: quality.triad,
+            roman: romanBase + romanSuffix,
+            degree: degree + 1
+        });
+
+        // Calculate 6th, 7th, 9th, and 11th intervals for extended chords
+        // 6th is 5 scale degrees up (same as 13th in jazz, but we use 6th for simpler chords)
+        const sixthDegree = (degree + 5) % numDegrees;
+        let sixthInterval = intervals[sixthDegree] - intervals[degree];
+        if (sixthInterval < 0) sixthInterval += 12;
+
+        // 7th is 6 scale degrees up
+        const seventhDegree = (degree + 6) % numDegrees;
+        let seventhInterval = intervals[seventhDegree] - intervals[degree];
+        if (seventhInterval < 0) seventhInterval += 12;
+
+        // 9th is 1 scale degree up (wraps around = 2nd + octave)
+        const ninthDegree = (degree + 1) % numDegrees;
+        let ninthInterval = intervals[ninthDegree] - intervals[degree];
+        if (ninthInterval < 0) ninthInterval += 12;
+
+        // 11th is 3 scale degrees up (wraps around = 4th + octave)
+        const eleventhDegree = (degree + 3) % numDegrees;
+        let eleventhInterval = intervals[eleventhDegree] - intervals[degree];
+        if (eleventhInterval < 0) eleventhInterval += 12;
+
+        // === 6th Chords ===
+        // Only add 6th chords for Major and Minor triads (not diminished/augmented)
+        if (quality.triad === 'Major' || quality.triad === 'Minor') {
+            const sixthType = quality.triad === 'Major' ? 'Major 6th' : 'Minor 6th';
+            const sixthRoman = romanBase + '6';
+            sixths.push({
+                root: chordRoot,
+                type: sixthType,
+                roman: sixthRoman,
+                degree: degree + 1
+            });
+        }
+
+        // === 7th Chords ===
+        if (numDegrees >= 5) {
+            // Determine 7th chord type based on all intervals
+            let seventhType = quality.seventh;
+
+            // Special cases for dominant 7th (major triad + minor 7th)
+            if (quality.triad === 'Major' && seventhInterval === 10) {
+                seventhType = 'Dominant 7th';
+            }
+            // Minor-major 7th (minor triad + major 7th)
+            else if (quality.triad === 'Minor' && seventhInterval === 11) {
+                seventhType = 'Minor-Major 7th';
+            }
+            // Diminished 7th (diminished triad + diminished 7th = 9 semitones)
+            else if (quality.triad === 'Diminished' && seventhInterval === 9) {
+                seventhType = 'Diminished 7th';
+            }
+
+            // Generate 7th chord roman numeral
+            let seventhRoman = romanBase;
+            if (seventhType === 'Major 7th') {
+                seventhRoman += 'maj7';
+            } else if (seventhType === 'Minor 7th') {
+                seventhRoman += '7';
+            } else if (seventhType === 'Dominant 7th') {
+                seventhRoman += '7';
+            } else if (seventhType === 'Half-Diminished 7th') {
+                seventhRoman += 'ø7';
+            } else if (seventhType === 'Diminished 7th') {
+                seventhRoman += 'o7';
+            } else if (seventhType === 'Minor-Major 7th') {
+                seventhRoman += 'mM7';
+            } else {
+                seventhRoman += '7';
+            }
+
+            sevenths.push({
+                root: chordRoot,
+                type: seventhType,
+                roman: seventhRoman,
+                degree: degree + 1
+            });
+
+            // === 9th Chords ===
+            // 9th chords are 7th chords + the 9th
+            // Skip for diminished chords (they don't typically have 9ths)
+            if (quality.triad !== 'Diminished') {
+                let ninthType;
+                let ninthRoman = romanBase;
+
+                if (seventhType === 'Major 7th') {
+                    ninthType = 'Major 9th';
+                    ninthRoman += 'maj9';
+                } else if (seventhType === 'Minor 7th') {
+                    ninthType = 'Minor 9th';
+                    ninthRoman += '9';
+                } else if (seventhType === 'Dominant 7th') {
+                    ninthType = 'Dominant 9th';
+                    ninthRoman += '9';
+                } else if (seventhType === 'Half-Diminished 7th') {
+                    // Half-dim 9 is less common but valid
+                    ninthType = 'Minor 9th';
+                    ninthRoman += 'ø9';
+                } else {
+                    ninthType = 'Minor 9th';
+                    ninthRoman += '9';
+                }
+
+                ninths.push({
+                    root: chordRoot,
+                    type: ninthType,
+                    roman: ninthRoman,
+                    degree: degree + 1
+                });
+            }
+
+            // === 11th Chords ===
+            // 11th chords extend 9th chords
+            // Typically used on minor chords and dominant chords
+            // Major chords with natural 11 clash (major 3rd vs perfect 4th), so we include #11 versions
+            if (quality.triad === 'Minor') {
+                elevenths.push({
+                    root: chordRoot,
+                    type: 'Minor 11th',
+                    roman: romanBase + '11',
+                    degree: degree + 1
+                });
+            } else if (seventhType === 'Dominant 7th') {
+                elevenths.push({
+                    root: chordRoot,
+                    type: 'Dominant 11th',
+                    roman: romanBase + '11',
+                    degree: degree + 1
+                });
+            }
+        }
+
+        // === Add9 Extensions ===
+        // Add9 = triad + 9th (no 7th) - works on Major and Minor triads
+        if (quality.triad === 'Major' || quality.triad === 'Minor') {
+            extensions.push({
+                root: chordRoot,
+                type: 'Add9',
+                roman: romanBase + 'add9',
+                degree: degree + 1
+            });
+        }
+    }
+
+    // Build result with all chord groups
+    const result = [{ title: 'Triads', chords: triads }];
+
+    if (sixths.length > 0) {
+        result.push({ title: 'Sixths', chords: sixths });
+    }
+    if (sevenths.length > 0) {
+        result.push({ title: 'Sevenths', chords: sevenths });
+    }
+    if (ninths.length > 0) {
+        result.push({ title: 'Ninths', chords: ninths });
+    }
+    if (elevenths.length > 0) {
+        result.push({ title: 'Elevenths', chords: elevenths });
+    }
+    if (extensions.length > 0) {
+        result.push({ title: 'Extensions', chords: extensions });
+    }
+
+    return result;
+}
+
+/**
  * Supported time signatures
  * Each entry has:
  * - value: string format for UI dropdowns ("4/4")
@@ -550,6 +802,7 @@ export {
     RELATIVE_MINOR_MAP,
     DIATONIC_CHORD_GROUPS,
     generateDiatonicChords,
+    generateScaleDiatonicChords,
     TIME_SIGNATURES,
     DEFAULT_TIME_SIGNATURE
 };

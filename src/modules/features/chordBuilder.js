@@ -35,12 +35,15 @@ import {
     getChordLibraryMode,
     setChordLibraryMode,
     getLastDiatonicChord,
-    setLastDiatonicChord
+    setLastDiatonicChord,
+    getScaleFilter,
+    setScaleFilter
 } from '../state/builderState.js';
 
 import {
     getCurrentTab,
     getEnharmonicPreference,
+    setEnharmonicPreference,
     getNotationPreference,
     getIsSuggestionEngineOn
 } from '../state/globalState.js';
@@ -1158,6 +1161,156 @@ export function toggleChordLibraryMode(isDiatonic) {
     updateBuilderDisplay();
 }
 
+/**
+ * Set the scale filter for the chord library
+ * @param {string|null} scaleName - Scale name from SCALE_DEFINITIONS (e.g., 'Major Pentatonic') or null to disable
+ */
+/**
+ * Determine the appropriate enharmonic preference for a given root note and scale
+ * - Flat keys (Bb, Eb, Ab, Db, Gb, Cb, F) → 'flat'
+ * - Sharp keys (G, D, A, E, B, F#, C#) → 'sharp'
+ * - C with minor/flat scales → 'flat' (C minor uses Eb, Ab, Bb)
+ * - C with major/sharp scales → 'sharp'
+ * @param {string} rootNote - The root note to analyze
+ * @param {string} scaleName - Optional scale name to consider
+ * @returns {'sharp'|'flat'} The recommended enharmonic preference
+ */
+function getEnharmonicPreferenceForScale(rootNote, scaleName = null) {
+    // Keys that use flats in their key signature
+    const flatKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
+    // Keys that use sharps
+    const sharpKeys = ['G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
+
+    // Normalize the root note (handle enharmonic equivalents)
+    const normalizedRoot = rootNote.replace('♭', 'b').replace('♯', '#');
+
+    // Check if root contains a flat - use flats
+    if (normalizedRoot.includes('b')) {
+        return 'flat';
+    }
+    // Check if root contains a sharp - use sharps
+    if (normalizedRoot.includes('#')) {
+        return 'sharp';
+    }
+    // For natural notes, check the key signature tradition
+    if (flatKeys.includes(normalizedRoot)) {
+        return 'flat';
+    }
+    if (sharpKeys.includes(normalizedRoot)) {
+        return 'sharp';
+    }
+
+    // For C (neutral key), determine based on scale type
+    // Minor scales and modes with flats should use flat notation
+    if (normalizedRoot === 'C' && scaleName) {
+        const scaleNameLower = scaleName.toLowerCase();
+        // Scales that imply flat accidentals
+        const flatScalePatterns = [
+            'minor', 'aeolian', 'dorian', 'phrygian', 'locrian',
+            'blues', 'harmonic minor', 'melodic minor'
+        ];
+        for (const pattern of flatScalePatterns) {
+            if (scaleNameLower.includes(pattern)) {
+                return 'flat';
+            }
+        }
+    }
+
+    // Default (C Major, Lydian, etc.) uses sharps
+    return 'sharp';
+}
+
+export function setScaleFilterMode(scaleName) {
+    setScaleFilter(scaleName);
+
+    // Auto-update enharmonic preference based on selected scale root AND scale type
+    // Get the current root note and determine appropriate enharmonic spelling
+    if (scaleName) {
+        const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+        const rootNoteName = currentNotes[getBuilderRootIndex()];
+
+        // Determine the appropriate enharmonic preference for this root + scale combination
+        const recommendedPreference = getEnharmonicPreferenceForScale(rootNoteName, scaleName);
+
+        // Only update if different to avoid unnecessary re-renders
+        if (getEnharmonicPreference() !== recommendedPreference) {
+            setEnharmonicPreference(recommendedPreference);
+
+            // Update the enharmonic toggle checkbox in the UI if it exists
+            const enharmonicToggle = document.getElementById('enharmonic-toggle');
+            if (enharmonicToggle) {
+                enharmonicToggle.checked = recommendedPreference === 'flat';
+            }
+
+            // Update the global window variable for other modules
+            if (typeof window !== 'undefined') {
+                window.enharmonicPreference = recommendedPreference;
+            }
+        }
+    }
+
+    renderBuilderSelectors();
+    updateBuilderDisplay();
+}
+
+/**
+ * Get available scales for the filter dropdown
+ * @returns {Array} Array of scale names sorted alphabetically
+ */
+export function getAvailableScales() {
+    return Object.keys(SCALE_DEFINITIONS).sort();
+}
+
+
+/**
+ * Get the pitch classes of a scale starting from a given root
+ * Uses the existing noteToPitchClass helper defined later in this file.
+ * @param {string} scaleName - Scale name from SCALE_DEFINITIONS
+ * @param {string} rootNote - Root note of the scale
+ * @returns {Set<number>} Set of pitch classes (0-11) in the scale
+ */
+function getScalePitchClasses(scaleName, rootNote) {
+    const scaleDef = SCALE_DEFINITIONS[scaleName];
+    if (!scaleDef) return new Set();
+
+    const rootPitchClass = noteToPitchClass(rootNote);
+    if (rootPitchClass === null || rootPitchClass === undefined) return new Set();
+
+    const pitchClasses = new Set();
+    scaleDef.intervals.forEach(interval => {
+        pitchClasses.add((rootPitchClass + interval) % 12);
+    });
+    return pitchClasses;
+}
+
+/**
+ * Check if all notes of a chord are contained within a scale
+ * @param {string} chordType - Chord type from CHORD_DEFINITIONS
+ * @param {string} chordRoot - Root note of the chord
+ * @param {string} scaleName - Scale name from SCALE_DEFINITIONS
+ * @param {string} scaleRoot - Root note of the scale
+ * @returns {boolean} True if all chord notes are in the scale
+ */
+export function isChordInScale(chordType, chordRoot, scaleName, scaleRoot) {
+    const chordDef = CHORD_DEFINITIONS[chordType];
+    if (!chordDef || !chordDef.intervals) return false;
+
+    const scalePitchClasses = getScalePitchClasses(scaleName, scaleRoot);
+    if (scalePitchClasses.size === 0) return false;
+
+    const chordRootPitchClass = noteToPitchClass(chordRoot);
+    if (chordRootPitchClass === null || chordRootPitchClass === undefined) return false;
+
+    // Check if all chord intervals (converted to pitch classes) are in the scale
+    for (const interval of chordDef.intervals) {
+        const pitchClass = (chordRootPitchClass + interval) % 12;
+        if (!scalePitchClasses.has(pitchClass)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export function toggleChordIntervalsPanel(event = null) {
     // Don't allow panel toggling during guided mode (scroll is locked)
     if (isGuidedModeActive()) return;
@@ -1909,7 +2062,10 @@ import {
     MAJOR_SCALE_STEPS,
     ENHARMONIC_MAP,
     ROMAN_MAP_BASE,
-    generateDiatonicChords
+    generateDiatonicChords,
+    generateScaleDiatonicChords,
+    SCALE_DEFINITIONS,
+    SCALE_CATEGORIES
 } from '../../data/music-data.js';
 
 // Import UI utilities (to be defined when needed)
@@ -2473,16 +2629,43 @@ export function selectBuilderRootNote(index, playAudio = true) {
     }
     if (playAudio) setBuilderOmittedNotes([]); // Reset omissions on root change
     if (playAudio) setBuilderLHOmittedNotes([]);
+
+    // Auto-update enharmonic preference based on new root + current scale
+    const currentScaleFilter = getScaleFilter();
+    if (currentScaleFilter) {
+        // Get root note using BOTH note arrays to determine correct spelling
+        const sharpRoot = SHARP_NOTES[index];
+        const flatRoot = FLAT_NOTES[index];
+        // Use the current preference to get the root, then determine new preference
+        const currentRoot = getEnharmonicPreference() === 'sharp' ? sharpRoot : flatRoot;
+        const recommendedPreference = getEnharmonicPreferenceForScale(currentRoot, currentScaleFilter);
+
+        if (getEnharmonicPreference() !== recommendedPreference) {
+            setEnharmonicPreference(recommendedPreference);
+
+            // Update the enharmonic toggle checkbox in the UI if it exists
+            const enharmonicToggle = document.getElementById('enharmonic-toggle');
+            if (enharmonicToggle) {
+                enharmonicToggle.checked = recommendedPreference === 'flat';
+            }
+
+            // Update the global window variable for other modules
+            if (typeof window !== 'undefined') {
+                window.enharmonicPreference = recommendedPreference;
+            }
+        }
+    }
+
     updateButtonSelection('#builder-note-selector', 'index', index.toString(), 'bg-amber-600', 'text-white');
-    
-    // Get the root note name for key signature display
+
+    // Get the root note name for key signature display (after preference may have changed)
     const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[index];
-    
+
     // Update key signature display immediately
     if (window.updateKeySignatureDisplay) {
         window.updateKeySignatureDisplay(rootNote);
     }
-    
+
     updateBuilderDisplay();
 
     // Update keyboard labels (function to be imported from UI module)
@@ -2866,6 +3049,55 @@ export function renderBuilderSelectors() {
 
     const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
+    // Populate scale filter dropdown if not already populated (organized by category)
+    const scaleDropdown = document.getElementById('scale-filter-dropdown');
+    if (scaleDropdown && scaleDropdown.options.length <= 1) {
+        // Group scales by category
+        const scalesByCategory = {};
+        Object.entries(SCALE_DEFINITIONS).forEach(([scaleName, scaleDef]) => {
+            const category = scaleDef.category || 'other';
+            if (!scalesByCategory[category]) {
+                scalesByCategory[category] = [];
+            }
+            scalesByCategory[category].push(scaleName);
+        });
+
+        // Define category order for display
+        const categoryOrder = ['basic', 'modes', 'minor-variants', 'symmetric', 'bebop', 'exotic', 'jazz'];
+
+        // Add optgroups for each category
+        categoryOrder.forEach(categoryKey => {
+            const scales = scalesByCategory[categoryKey];
+            if (scales && scales.length > 0) {
+                const categoryInfo = SCALE_CATEGORIES[categoryKey];
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = `${categoryInfo?.icon || ''} ${categoryInfo?.name || categoryKey}`.trim();
+                // Apply dark text styling for optgroup (browser support varies)
+                optgroup.style.color = '#1f2937';
+                optgroup.style.fontWeight = 'bold';
+                optgroup.style.background = '#f3f4f6';
+
+                // Sort scales within category alphabetically
+                scales.sort().forEach(scaleName => {
+                    const option = document.createElement('option');
+                    option.value = scaleName;
+                    option.textContent = scaleName;
+                    // Use inline styles for reliable dark text in dropdown
+                    option.style.color = '#374151';
+                    option.style.background = 'white';
+                    optgroup.appendChild(option);
+                });
+
+                scaleDropdown.appendChild(optgroup);
+            }
+        });
+    }
+    // Update dropdown selection to match current state
+    if (scaleDropdown) {
+        const currentScaleFilter = getScaleFilter();
+        scaleDropdown.value = currentScaleFilter || '';
+    }
+
     // Always re-render the root note selector to reflect enharmonic preference
     rootSelector.innerHTML = '';
     currentNotes.forEach((note, index) => {
@@ -2898,19 +3130,34 @@ export function renderBuilderSelectors() {
     const chordLibraryMode = getChordLibraryMode();
     const rootNoteName = currentNotes[getBuilderRootIndex()];
 
-    // Update header based on mode
+    // Update header based on mode and scale filter
     const headerElement = document.getElementById('chord-library-header');
+    const currentScaleFilter = getScaleFilter();
     if (headerElement) {
-        if (chordLibraryMode === 'diatonic') {
-            headerElement.textContent = `Browse Chord Families - Diatonic to ${rootNoteName}`;
+        if (chordLibraryMode === 'diatonic' && currentScaleFilter) {
+            // Scale-aware diatonic mode: show "Diatonic to C Natural Minor" etc.
+            headerElement.textContent = `Browse Chord Families - Diatonic to ${rootNoteName} ${currentScaleFilter}`;
+        } else if (chordLibraryMode === 'diatonic') {
+            // Standard diatonic mode (Major scale)
+            headerElement.textContent = `Browse Chord Families - Diatonic to ${rootNoteName} Major`;
+        } else if (currentScaleFilter) {
+            // Chromatic mode with scale filter
+            headerElement.textContent = `Browse Chord Families - ${rootNoteName} ${currentScaleFilter}`;
         } else {
             headerElement.textContent = 'Browse Chord Families';
         }
     }
 
     if (chordLibraryMode === 'diatonic') {
-        // Render diatonic chords based on the selected root note
-        const diatonicChords = window.generateDiatonicChords ? window.generateDiatonicChords(rootNoteName, currentNotes) : [];
+        // Render diatonic chords based on the selected root note and optional scale
+        let diatonicChords;
+        if (currentScaleFilter && SCALE_DEFINITIONS[currentScaleFilter]) {
+            // Scale-aware diatonic mode: generate chords from the selected scale
+            diatonicChords = generateScaleDiatonicChords(rootNoteName, currentScaleFilter, currentNotes);
+        } else {
+            // Standard diatonic mode: use Major scale (original behavior)
+            diatonicChords = window.generateDiatonicChords ? window.generateDiatonicChords(rootNoteName, currentNotes) : [];
+        }
 
         diatonicChords.forEach(group => {
             const groupContainer = document.createElement('div');
@@ -3112,18 +3359,31 @@ export function renderBuilderSelectors() {
             typeSelector.appendChild(groupContainer);
         });
     } else {
-        // Chromatic mode - show all chords
+        // Chromatic mode - show all chords (optionally filtered by scale)
+        const scaleFilter = getScaleFilter();
+        const scaleRoot = rootNoteName; // Use current selected root as scale root
+
         CHORD_GROUPS.forEach(group => {
+            // Filter chord types by scale if a scale filter is active
+            const filteredTypes = scaleFilter
+                ? group.types.filter(chordType =>
+                    CHORD_DEFINITIONS[chordType] && isChordInScale(chordType, rootNoteName, scaleFilter, scaleRoot)
+                )
+                : group.types;
+
+            // Skip empty groups when filtering
+            if (scaleFilter && filteredTypes.length === 0) return;
+
             const groupContainer = document.createElement('div');
             groupContainer.className = 'border border-gray-200 rounded-lg p-2 flex flex-col';
             const title = document.createElement('h4');
             title.className = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 text-center';
-            title.textContent = group.title;
+            title.textContent = scaleFilter ? `${group.title} (${filteredTypes.length})` : group.title;
             groupContainer.appendChild(title);
 
             const buttonGrid = document.createElement('div');
             buttonGrid.className = 'grid grid-cols-1 gap-1.5';
-            group.types.forEach(chordType => {
+            filteredTypes.forEach(chordType => {
                 if (CHORD_DEFINITIONS[chordType]) {
                     const buttonContainer = document.createElement('div');
                     buttonContainer.className = 'key-button-wrapper flex items-stretch rounded-lg shadow-sm overflow-hidden bg-gray-200 transition duration-150 transform hover:scale-105';

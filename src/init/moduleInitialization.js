@@ -109,9 +109,7 @@ import {
     applyProjectToState
 } from '../modules/storage/projectManager.js';
 
-import {
-    initLearnTab
-} from '../modules/ui/learnTabController.js';
+// Learn tab is lazy loaded when user clicks the tab (see tabs.js)
 
 import {
     initExportService
@@ -365,10 +363,7 @@ export async function initializeModules() {
         initEnhancedNotation();
     }, 250);
 
-    // Initialize Learn Tab (delayed to ensure DOM is ready)
-    setTimeout(() => {
-        initLearnTab();
-    }, 300);
+    // Learn Tab is lazy loaded when user clicks the tab (see tabs.js)
 
     // Initialize Melody Composer Bridge (delayed to ensure compositionState is ready)
     setTimeout(() => {

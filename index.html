@@ -611,14 +611,14 @@
                     <!-- Collapsible Display Panels -->
                     <div id="header-display-panels" class="header-displays-container flex items-center gap-1.5 overflow-hidden transition-all duration-300">
                         <!-- Key Signature Display -->
-                        <div id="shared-key-signature-display" class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 h-10 overflow-hidden">
+                        <div id="shared-key-signature-display" class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-1 min-h-10">
                             <div class="relative flex-shrink-0 w-8 h-8">
                                 <img id="treble-clef-img" src="/key_signatures/treble_0.svg" alt="Key Signature" class="h-8 w-8 object-contain" onerror="this.style.opacity='0.3'">
                                 <span id="enharmonic-key-label" class="absolute -bottom-0.5 -right-0.5 text-[7px] leading-none font-bold bg-gray-800 text-white px-0.5 rounded hidden"></span>
                             </div>
-                            <div class="flex flex-col border-l border-gray-200 pl-1.5 min-w-0 overflow-hidden">
-                                <span id="key-signature-text" class="text-[11px] font-semibold text-gray-800 leading-tight whitespace-nowrap truncate">C Major</span>
-                                <span class="text-[9px] text-gray-500 leading-tight whitespace-nowrap"><span class="text-gray-400">rel:</span> <span id="relative-minor-display" class="font-medium">Am</span></span>
+                            <div class="flex flex-col border-l border-gray-200 pl-1.5 min-w-0">
+                                <span id="key-signature-text" class="text-[11px] font-semibold text-gray-800 leading-tight">C Major</span>
+                                <span class="text-[9px] text-gray-500 leading-tight"><span class="text-gray-400">rel:</span> <span id="relative-minor-display" class="font-medium">Am</span></span>
                             </div>
                         </div>
                         <!-- Active Context Display (chord/scale/progression) -->
@@ -1372,6 +1372,13 @@
                                 </label>
                                 <span class="text-[9px] font-semibold text-white/80">Diatonic</span>
                             </div>
+                            <!-- Scale Filter Dropdown -->
+                            <div class="flex items-center gap-1 ml-2 px-2 py-0.5 bg-white/20 rounded-full" onclick="event.stopPropagation()" title="Filter chords by scale - only show chords whose notes are all in the selected scale">
+                                <span class="text-[9px] font-semibold text-white/80">Scale:</span>
+                                <select id="scale-filter-dropdown" class="text-[9px] bg-white/30 text-white rounded px-1 py-0.5 border-none outline-none cursor-pointer scale-filter-select" style="max-width: 110px;" onchange="window.setScaleFilterMode && window.setScaleFilterMode(this.value || null)">
+                                    <option value="" style="color: #374151; background: white;">All</option>
+                                </select>
+                            </div>
                             <!-- Chord Details Toggle -->
                             <div class="flex items-center gap-1 ml-2 px-2 py-0.5 bg-white/20 rounded-full" onclick="event.stopPropagation()" title="Show/hide chord details, inversions, and info icons">
                                 <span class="text-[9px] font-semibold text-white/80">Details</span>
@@ -1763,10 +1770,21 @@
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
+                            <!-- Scale Filter Row -->
+                            <div class="mb-3 p-2 bg-purple-50 rounded-lg border border-purple-200">
+                                <div class="flex items-center gap-3 flex-wrap">
+                                    <label class="text-xs font-medium text-purple-700">Scale Filter:</label>
+                                    <select id="quick-add-chord-form-scale" onchange="window.updateQuickAddChordTypes && window.updateQuickAddChordTypes('quick-add-chord-form')" class="flex-1 min-w-[200px] p-1.5 text-sm border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white">
+                                        <option value="">All Chords (no filter)</option>
+                                        <!-- Options populated by JS -->
+                                    </select>
+                                    <span class="text-xs text-purple-600 italic">Filter chord types by scale compatibility</span>
+                                </div>
+                            </div>
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Root Note</label>
-                                    <select id="quick-add-chord-form-root" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                    <select id="quick-add-chord-form-root" onchange="window.updateQuickAddChordTypes && window.updateQuickAddChordTypes('quick-add-chord-form')" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                                         <option value="0">C</option>
                                         <option value="1">C# / Db</option>
                                         <option value="2">D</option>
@@ -1784,57 +1802,57 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type</label>
                                     <select id="quick-add-chord-form-type-input" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                                        <optgroup label="─── TRIADS ───">
-                                            <option value="Major" selected>Major</option>
-                                            <option value="Minor">Minor</option>
-                                            <option value="Augmented">Augmented</option>
-                                            <option value="Diminished">Diminished</option>
-                                            <option value="Sus2">Sus2</option>
-                                            <option value="Sus4">Sus4</option>
-                                            <option value="Power Chord">Power Chord</option>
+                                        <optgroup label="─── TRIADS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Major" selected style="color: #374151; background: white;">Major</option>
+                                            <option value="Minor" style="color: #374151; background: white;">Minor</option>
+                                            <option value="Augmented" style="color: #374151; background: white;">Augmented</option>
+                                            <option value="Diminished" style="color: #374151; background: white;">Diminished</option>
+                                            <option value="Sus2" style="color: #374151; background: white;">Sus2</option>
+                                            <option value="Sus4" style="color: #374151; background: white;">Sus4</option>
+                                            <option value="Power Chord" style="color: #374151; background: white;">Power Chord</option>
                                         </optgroup>
-                                        <optgroup label="─── SEVENTHS ───">
-                                            <option value="Dominant 7th">Dominant 7th</option>
-                                            <option value="Major 7th">Major 7th</option>
-                                            <option value="Minor 7th">Minor 7th</option>
-                                            <option value="Half-Diminished 7th">Half-Diminished 7th</option>
-                                            <option value="Diminished 7th">Diminished 7th</option>
-                                            <option value="Minor-Major 7th">Minor-Major 7th</option>
+                                        <optgroup label="─── SEVENTHS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Dominant 7th" style="color: #374151; background: white;">Dominant 7th</option>
+                                            <option value="Major 7th" style="color: #374151; background: white;">Major 7th</option>
+                                            <option value="Minor 7th" style="color: #374151; background: white;">Minor 7th</option>
+                                            <option value="Half-Diminished 7th" style="color: #374151; background: white;">Half-Diminished 7th</option>
+                                            <option value="Diminished 7th" style="color: #374151; background: white;">Diminished 7th</option>
+                                            <option value="Minor-Major 7th" style="color: #374151; background: white;">Minor-Major 7th</option>
                                         </optgroup>
-                                        <optgroup label="─── NINTHS ───">
-                                            <option value="Major 9th">Major 9th</option>
-                                            <option value="Dominant 9th">Dominant 9th</option>
-                                            <option value="Minor 9th">Minor 9th</option>
-                                            <option value="6/9">6/9</option>
-                                            <option value="Add9">Add9</option>
+                                        <optgroup label="─── NINTHS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Major 9th" style="color: #374151; background: white;">Major 9th</option>
+                                            <option value="Dominant 9th" style="color: #374151; background: white;">Dominant 9th</option>
+                                            <option value="Minor 9th" style="color: #374151; background: white;">Minor 9th</option>
+                                            <option value="6/9" style="color: #374151; background: white;">6/9</option>
+                                            <option value="Add9" style="color: #374151; background: white;">Add9</option>
                                         </optgroup>
-                                        <optgroup label="─── EXTENDED ───">
-                                            <option value="Dominant 11th">Dominant 11th</option>
-                                            <option value="Minor 11th">Minor 11th</option>
-                                            <option value="Dominant 13th">Dominant 13th</option>
-                                            <option value="Major 6th">Major 6th</option>
-                                            <option value="Minor 6th">Minor 6th</option>
+                                        <optgroup label="─── EXTENDED ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Dominant 11th" style="color: #374151; background: white;">Dominant 11th</option>
+                                            <option value="Minor 11th" style="color: #374151; background: white;">Minor 11th</option>
+                                            <option value="Dominant 13th" style="color: #374151; background: white;">Dominant 13th</option>
+                                            <option value="Major 6th" style="color: #374151; background: white;">Major 6th</option>
+                                            <option value="Minor 6th" style="color: #374151; background: white;">Minor 6th</option>
                                         </optgroup>
-                                        <optgroup label="─── ALTERED ───">
-                                            <option value="Augmented 7th">Augmented 7th</option>
-                                            <option value="7b5">7b5</option>
-                                            <option value="7#5">7#5</option>
-                                            <option value="7b9">7b9</option>
-                                            <option value="7#9">7#9</option>
+                                        <optgroup label="─── ALTERED ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Augmented 7th" style="color: #374151; background: white;">Augmented 7th</option>
+                                            <option value="7b5" style="color: #374151; background: white;">7b5</option>
+                                            <option value="7#5" style="color: #374151; background: white;">7#5</option>
+                                            <option value="7b9" style="color: #374151; background: white;">7b9</option>
+                                            <option value="7#9" style="color: #374151; background: white;">7#9</option>
                                         </optgroup>
-                                        <optgroup label="─── INTERVALS ───">
-                                            <option value="Major 2nd">Major 2nd</option>
-                                            <option value="Minor 2nd">Minor 2nd</option>
-                                            <option value="Major 3rd">Major 3rd</option>
-                                            <option value="Minor 3rd">Minor 3rd</option>
-                                            <option value="Perfect 4th">Perfect 4th</option>
-                                            <option value="Tritone">Tritone</option>
-                                            <option value="Perfect 5th">Perfect 5th</option>
-                                            <option value="Major 6th">Major 6th (interval)</option>
-                                            <option value="Minor 6th">Minor 6th (interval)</option>
-                                            <option value="Major 7th">Major 7th (interval)</option>
-                                            <option value="Minor 7th">Minor 7th (interval)</option>
-                                            <option value="Octave">Octave</option>
+                                        <optgroup label="─── INTERVALS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Major 2nd" style="color: #374151; background: white;">Major 2nd</option>
+                                            <option value="Minor 2nd" style="color: #374151; background: white;">Minor 2nd</option>
+                                            <option value="Major 3rd" style="color: #374151; background: white;">Major 3rd</option>
+                                            <option value="Minor 3rd" style="color: #374151; background: white;">Minor 3rd</option>
+                                            <option value="Perfect 4th" style="color: #374151; background: white;">Perfect 4th</option>
+                                            <option value="Tritone" style="color: #374151; background: white;">Tritone</option>
+                                            <option value="Perfect 5th" style="color: #374151; background: white;">Perfect 5th</option>
+                                            <option value="Major 6th" style="color: #374151; background: white;">Major 6th (interval)</option>
+                                            <option value="Minor 6th" style="color: #374151; background: white;">Minor 6th (interval)</option>
+                                            <option value="Major 7th" style="color: #374151; background: white;">Major 7th (interval)</option>
+                                            <option value="Minor 7th" style="color: #374151; background: white;">Minor 7th (interval)</option>
+                                            <option value="Octave" style="color: #374151; background: white;">Octave</option>
                                         </optgroup>
                                     </select>
                                 </div>
@@ -2261,10 +2279,21 @@
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
+                            <!-- Scale Filter Row -->
+                            <div class="mb-3 p-2 bg-purple-50 rounded-lg border border-purple-200">
+                                <div class="flex items-center gap-3 flex-wrap">
+                                    <label class="text-xs font-medium text-purple-700">Scale Filter:</label>
+                                    <select id="quick-add-chord-form-melody-scale" onchange="window.updateQuickAddChordTypes && window.updateQuickAddChordTypes('quick-add-chord-form-melody')" class="flex-1 min-w-[200px] p-1.5 text-sm border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white">
+                                        <option value="">All Chords (no filter)</option>
+                                        <!-- Options populated by JS -->
+                                    </select>
+                                    <span class="text-xs text-purple-600 italic">Filter chord types by scale compatibility</span>
+                                </div>
+                            </div>
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Root Note</label>
-                                    <select id="quick-add-chord-form-melody-root" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                    <select id="quick-add-chord-form-melody-root" onchange="window.updateQuickAddChordTypes && window.updateQuickAddChordTypes('quick-add-chord-form-melody')" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                                         <option value="0">C</option>
                                         <option value="1">C# / Db</option>
                                         <option value="2">D</option>
@@ -2282,57 +2311,57 @@
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type</label>
                                     <select id="quick-add-chord-form-melody-type-input" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                                        <optgroup label="─── TRIADS ───">
-                                            <option value="Major" selected>Major</option>
-                                            <option value="Minor">Minor</option>
-                                            <option value="Augmented">Augmented</option>
-                                            <option value="Diminished">Diminished</option>
-                                            <option value="Sus2">Sus2</option>
-                                            <option value="Sus4">Sus4</option>
-                                            <option value="Power Chord">Power Chord</option>
+                                        <optgroup label="─── TRIADS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Major" selected style="color: #374151; background: white;">Major</option>
+                                            <option value="Minor" style="color: #374151; background: white;">Minor</option>
+                                            <option value="Augmented" style="color: #374151; background: white;">Augmented</option>
+                                            <option value="Diminished" style="color: #374151; background: white;">Diminished</option>
+                                            <option value="Sus2" style="color: #374151; background: white;">Sus2</option>
+                                            <option value="Sus4" style="color: #374151; background: white;">Sus4</option>
+                                            <option value="Power Chord" style="color: #374151; background: white;">Power Chord</option>
                                         </optgroup>
-                                        <optgroup label="─── SEVENTHS ───">
-                                            <option value="Dominant 7th">Dominant 7th</option>
-                                            <option value="Major 7th">Major 7th</option>
-                                            <option value="Minor 7th">Minor 7th</option>
-                                            <option value="Half-Diminished 7th">Half-Diminished 7th</option>
-                                            <option value="Diminished 7th">Diminished 7th</option>
-                                            <option value="Minor-Major 7th">Minor-Major 7th</option>
+                                        <optgroup label="─── SEVENTHS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Dominant 7th" style="color: #374151; background: white;">Dominant 7th</option>
+                                            <option value="Major 7th" style="color: #374151; background: white;">Major 7th</option>
+                                            <option value="Minor 7th" style="color: #374151; background: white;">Minor 7th</option>
+                                            <option value="Half-Diminished 7th" style="color: #374151; background: white;">Half-Diminished 7th</option>
+                                            <option value="Diminished 7th" style="color: #374151; background: white;">Diminished 7th</option>
+                                            <option value="Minor-Major 7th" style="color: #374151; background: white;">Minor-Major 7th</option>
                                         </optgroup>
-                                        <optgroup label="─── NINTHS ───">
-                                            <option value="Major 9th">Major 9th</option>
-                                            <option value="Dominant 9th">Dominant 9th</option>
-                                            <option value="Minor 9th">Minor 9th</option>
-                                            <option value="6/9">6/9</option>
-                                            <option value="Add9">Add9</option>
+                                        <optgroup label="─── NINTHS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Major 9th" style="color: #374151; background: white;">Major 9th</option>
+                                            <option value="Dominant 9th" style="color: #374151; background: white;">Dominant 9th</option>
+                                            <option value="Minor 9th" style="color: #374151; background: white;">Minor 9th</option>
+                                            <option value="6/9" style="color: #374151; background: white;">6/9</option>
+                                            <option value="Add9" style="color: #374151; background: white;">Add9</option>
                                         </optgroup>
-                                        <optgroup label="─── EXTENDED ───">
-                                            <option value="Dominant 11th">Dominant 11th</option>
-                                            <option value="Minor 11th">Minor 11th</option>
-                                            <option value="Dominant 13th">Dominant 13th</option>
-                                            <option value="Major 6th">Major 6th</option>
-                                            <option value="Minor 6th">Minor 6th</option>
+                                        <optgroup label="─── EXTENDED ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Dominant 11th" style="color: #374151; background: white;">Dominant 11th</option>
+                                            <option value="Minor 11th" style="color: #374151; background: white;">Minor 11th</option>
+                                            <option value="Dominant 13th" style="color: #374151; background: white;">Dominant 13th</option>
+                                            <option value="Major 6th" style="color: #374151; background: white;">Major 6th</option>
+                                            <option value="Minor 6th" style="color: #374151; background: white;">Minor 6th</option>
                                         </optgroup>
-                                        <optgroup label="─── ALTERED ───">
-                                            <option value="Augmented 7th">Augmented 7th</option>
-                                            <option value="7b5">7b5</option>
-                                            <option value="7#5">7#5</option>
-                                            <option value="7b9">7b9</option>
-                                            <option value="7#9">7#9</option>
+                                        <optgroup label="─── ALTERED ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Augmented 7th" style="color: #374151; background: white;">Augmented 7th</option>
+                                            <option value="7b5" style="color: #374151; background: white;">7b5</option>
+                                            <option value="7#5" style="color: #374151; background: white;">7#5</option>
+                                            <option value="7b9" style="color: #374151; background: white;">7b9</option>
+                                            <option value="7#9" style="color: #374151; background: white;">7#9</option>
                                         </optgroup>
-                                        <optgroup label="─── INTERVALS ───">
-                                            <option value="Major 2nd">Major 2nd</option>
-                                            <option value="Minor 2nd">Minor 2nd</option>
-                                            <option value="Major 3rd">Major 3rd</option>
-                                            <option value="Minor 3rd">Minor 3rd</option>
-                                            <option value="Perfect 4th">Perfect 4th</option>
-                                            <option value="Tritone">Tritone</option>
-                                            <option value="Perfect 5th">Perfect 5th</option>
-                                            <option value="Major 6th">Major 6th (interval)</option>
-                                            <option value="Minor 6th">Minor 6th (interval)</option>
-                                            <option value="Major 7th">Major 7th (interval)</option>
-                                            <option value="Minor 7th">Minor 7th (interval)</option>
-                                            <option value="Octave">Octave</option>
+                                        <optgroup label="─── INTERVALS ───" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">
+                                            <option value="Major 2nd" style="color: #374151; background: white;">Major 2nd</option>
+                                            <option value="Minor 2nd" style="color: #374151; background: white;">Minor 2nd</option>
+                                            <option value="Major 3rd" style="color: #374151; background: white;">Major 3rd</option>
+                                            <option value="Minor 3rd" style="color: #374151; background: white;">Minor 3rd</option>
+                                            <option value="Perfect 4th" style="color: #374151; background: white;">Perfect 4th</option>
+                                            <option value="Tritone" style="color: #374151; background: white;">Tritone</option>
+                                            <option value="Perfect 5th" style="color: #374151; background: white;">Perfect 5th</option>
+                                            <option value="Major 6th" style="color: #374151; background: white;">Major 6th (interval)</option>
+                                            <option value="Minor 6th" style="color: #374151; background: white;">Minor 6th (interval)</option>
+                                            <option value="Major 7th" style="color: #374151; background: white;">Major 7th (interval)</option>
+                                            <option value="Minor 7th" style="color: #374151; background: white;">Minor 7th (interval)</option>
+                                            <option value="Octave" style="color: #374151; background: white;">Octave</option>
                                         </optgroup>
                                     </select>
                                 </div>
