@@ -1456,24 +1456,23 @@ export function generateBeams(notes, options = {}) {
   if (!VF || !notes || notes.length === 0) return [];
 
   const {
-    groups = null, // Custom beam groups
-    stemDirection = null, // Force stem direction for all notes in the beam
-    maintainStemDirections = true, // Preserve stem directions set on notes (for multi-voice)
+    groups = null,
+    stemDirection = null,
+    timeSignature = '4/4', // Time signature for beat grouping
   } = options;
 
   try {
-    // When explicit stem direction is provided (multi-voice mode):
-    // 1. Set stem direction on ALL beamable notes FIRST
-    // 2. Then use VF.Beam.generateBeams with maintain_stem_directions: true
-    // This gives us intelligent beat-based grouping WHILE preserving our stem directions
+    // Filter to only beamable notes
+    const beamableNotes = notes.filter(note => {
+      if (note.isRest?.() || note.getNoteType?.() === 'r') return false;
+      const dur = note.getDuration ? note.getDuration() : '';
+      return ['8', '16', '32', '64'].some(d => dur.startsWith(d));
+    });
 
+    if (beamableNotes.length < 2) return [];
+
+    // Set stem direction BEFORE creating beams
     if (stemDirection !== null) {
-      // Force stem direction on all beamable notes BEFORE calling generateBeams
-      const beamableNotes = notes.filter(note => {
-        const durationType = note.getDuration ? note.getDuration() : '';
-        return ['8', '16', '32', '64'].includes(durationType);
-      });
-
       beamableNotes.forEach(note => {
         if (note.setStemDirection) {
           note.setStemDirection(stemDirection);
@@ -1481,43 +1480,127 @@ export function generateBeams(notes, options = {}) {
       });
     }
 
-    // Use generateBeams for intelligent grouping (beat-based beam groups)
-    const beamOptions = {
-      maintain_stem_directions: true,
+    // Parse time signature to determine beat grouping
+    const [tsNum, tsDenom] = timeSignature.split('/').map(Number);
+
+    // Determine if compound meter (6/8, 9/8, 12/8, etc.)
+    // Compound meters have numerator divisible by 3 (but not 3 itself in simple time)
+    // and denominator of 8
+    const isCompoundMeter = tsDenom === 8 && tsNum >= 6 && tsNum % 3 === 0;
+
+    // Calculate beat value in quarter notes
+    // Simple meter: beat = denominator note value (e.g., 4/4 -> quarter = 1)
+    // Compound meter: beat = dotted denominator (e.g., 6/8 -> dotted quarter = 1.5)
+    let beatValueInQuarters;
+    if (isCompoundMeter) {
+      // In compound meter, 3 eighth notes = 1 beat
+      // 3 * 0.5 = 1.5 quarter notes per beat
+      beatValueInQuarters = 1.5;
+    } else if (tsDenom === 2) {
+      // 2/2 (cut time): half note = 1 beat = 2 quarter notes
+      beatValueInQuarters = 2;
+    } else if (tsDenom === 8) {
+      // Simple 3/8, 5/8, etc.: eighth note = 1 beat = 0.5 quarter notes
+      beatValueInQuarters = 0.5;
+    } else {
+      // 4/4, 3/4, 2/4, etc.: quarter note = 1 beat
+      beatValueInQuarters = 1;
+    }
+
+    // Group beamable notes by beat boundaries
+    const beamGroups = [];
+    let currentGroup = [];
+    let currentGroupDuration = null;
+    let currentBeatValue = 0;
+    let lastNoteIndex = -1;
+
+    // Duration to beat value (in quarter notes)
+    const getDurationBeatValue = (dur) => {
+      // Handle dotted durations
+      const isDotted = dur.includes('d');
+      let baseValue;
+      if (dur.startsWith('8')) baseValue = 0.5;
+      else if (dur.startsWith('16')) baseValue = 0.25;
+      else if (dur.startsWith('32')) baseValue = 0.125;
+      else if (dur.startsWith('64')) baseValue = 0.0625;
+      else baseValue = 0.5;
+
+      return isDotted ? baseValue * 1.5 : baseValue;
     };
-    if (stemDirection !== null) {
-      beamOptions.stem_direction = stemDirection;
-    }
-    if (groups) {
-      beamOptions.groups = groups;
-    }
 
-    const beams = VF.Beam.generateBeams(notes, beamOptions);
-
-    // Process each beam to:
-    // 1. Force stem direction for multi-voice scenarios
-    // 2. Suppress flags (VexFlow doesn't auto-suppress in this version)
-    beams.forEach(beam => {
-      const beamNotes = beam.getNotes ? beam.getNotes() : (beam.notes || []);
-
-      beamNotes.forEach(note => {
-        // Force stem direction for multi-voice
-        if (stemDirection !== null && note.setStemDirection) {
-          note.setStemDirection(stemDirection);
+    for (let i = 0; i < notes.length; i++) {
+      const note = notes[i];
+      if (!beamableNotes.includes(note)) {
+        // Non-beamable note breaks the group
+        if (currentGroup.length >= 2) {
+          beamGroups.push([...currentGroup]);
         }
+        currentGroup = [];
+        currentGroupDuration = null;
+        currentBeatValue = 0;
+        continue;
+      }
 
-        // Suppress flag drawing by overriding draw methods on the original flag
-        // Keep the original object intact so all VexFlow methods work
-        if (note.flag) {
-          note.flag.draw = () => {};
-          note.flag.drawWithStyle = () => {};
-          note.flag.render = () => {};
+      const dur = note.getDuration ? note.getDuration() : '8';
+      const beatValue = getDurationBeatValue(dur);
+
+      // Check if consecutive in the original note array
+      if (lastNoteIndex !== -1 && i !== lastNoteIndex + 1) {
+        // Gap in notes, break group
+        if (currentGroup.length >= 2) {
+          beamGroups.push([...currentGroup]);
         }
-      });
-    });
+        currentGroup = [];
+        currentGroupDuration = null;
+        currentBeatValue = 0;
+      }
 
-    // Note: calculateSlope() and applyStemExtensions() are called automatically
-    // during beam.draw() -> postFormat() when notes have TickContext.
+      // Check if duration type changed (don't mix 8ths with 16ths in simple meter)
+      // In compound meter, we can beam 8ths together more freely
+      const durType = dur.startsWith('8') ? '8' : dur.startsWith('16') ? '16' : dur.startsWith('32') ? '32' : '64';
+      if (!isCompoundMeter && currentGroupDuration !== null && currentGroupDuration !== durType) {
+        // Duration type changed, break group
+        if (currentGroup.length >= 2) {
+          beamGroups.push([...currentGroup]);
+        }
+        currentGroup = [];
+        currentGroupDuration = null;
+        currentBeatValue = 0;
+      }
+
+      currentGroup.push(note);
+      currentGroupDuration = durType;
+      currentBeatValue += beatValue;
+      lastNoteIndex = i;
+
+      // Break at beat boundaries
+      if (currentBeatValue >= beatValueInQuarters) {
+        if (currentGroup.length >= 2) {
+          beamGroups.push([...currentGroup]);
+        }
+        currentGroup = [];
+        currentGroupDuration = null;
+        currentBeatValue = 0;
+      }
+    }
+
+    if (currentGroup.length >= 2) {
+      beamGroups.push(currentGroup);
+    }
+
+    // Create beams using VF.Beam constructor directly
+    // This respects the stem direction we set on notes
+    const beams = [];
+    for (const group of beamGroups) {
+      try {
+        // VF.Beam constructor: new Beam(notes, auto_stem)
+        // When auto_stem is false/undefined, it uses the stem direction already set on notes
+        const beam = new VF.Beam(group, false);
+        beams.push(beam);
+      } catch (e) {
+        console.warn('Error creating beam:', e);
+      }
+    }
 
     return beams;
   } catch (e) {
@@ -1533,7 +1616,10 @@ export function generateBeams(notes, options = {}) {
  */
 export function drawBeams(context, beams) {
   if (!beams) return;
-  beams.forEach(beam => beam.setContext(context).draw());
+  beams.forEach(beam => {
+    beam.setContext(context);
+    beam.draw();
+  });
 }
 
 // ============================================================================

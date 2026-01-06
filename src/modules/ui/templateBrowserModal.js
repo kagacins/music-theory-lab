@@ -651,6 +651,7 @@ function convertTemplateToChordData(template, key) {
     const adjustedKeyIndex = key.includes('#') ? (keyIndex + 1) % 12 : keyIndex;
 
     // Roman numeral to scale degree mapping
+    // Includes sharp (#) and flat (b) variants for chromatic alterations
     const ROMAN_MAP = {
         'I': { degree: 0, quality: 'Major' },
         'i': { degree: 0, quality: 'Minor' },
@@ -668,10 +669,22 @@ function convertTemplateToChordData(template, key) {
         'VII': { degree: 6, quality: 'Major' },
         'vii': { degree: 6, quality: 'Minor' },
         'vii°': { degree: 6, quality: 'Diminished' },
+        // Flat alterations
         'bII': { degree: 0, quality: 'Major', offset: 1 },
         'bIII': { degree: 2, quality: 'Major', offset: -1 },
+        'bV': { degree: 4, quality: 'Major', offset: -1 },
         'bVI': { degree: 5, quality: 'Major', offset: -1 },
-        'bVII': { degree: 6, quality: 'Major', offset: -1 }
+        'bVII': { degree: 6, quality: 'Major', offset: -1 },
+        'bvii': { degree: 6, quality: 'Minor', offset: -1 },
+        // Sharp alterations (chromatic passing chords)
+        '#I': { degree: 0, quality: 'Major', offset: 1 },
+        '#i': { degree: 0, quality: 'Minor', offset: 1 },
+        '#II': { degree: 1, quality: 'Major', offset: 1 },
+        '#ii': { degree: 1, quality: 'Minor', offset: 1 },
+        '#IV': { degree: 3, quality: 'Major', offset: 1 },
+        '#iv': { degree: 3, quality: 'Minor', offset: 1 },
+        '#V': { degree: 4, quality: 'Major', offset: 1 },
+        '#v': { degree: 4, quality: 'Minor', offset: 1 }
     };
 
     // Chord intervals for generating notes
@@ -679,10 +692,15 @@ function convertTemplateToChordData(template, key) {
         'Major': [0, 4, 7],
         'Minor': [0, 3, 7],
         'Diminished': [0, 3, 6],
+        'Augmented': [0, 4, 8],
         'Major 7th': [0, 4, 7, 11],
         'Minor 7th': [0, 3, 7, 10],
         'Dominant 7th': [0, 4, 7, 10],
-        'Diminished 7th': [0, 3, 6, 9]
+        'Diminished 7th': [0, 3, 6, 9],
+        'Half-Diminished 7th': [0, 3, 6, 10],
+        'Major 9th': [0, 4, 7, 11, 14],
+        'Minor 9th': [0, 3, 7, 10, 14],
+        'Dominant 9th': [0, 4, 7, 10, 14]
     };
 
     const chordData = [];
@@ -691,34 +709,102 @@ function convertTemplateToChordData(template, key) {
         // Parse roman numeral
         let baseRoman = roman;
         let chordQuality = null;
+        let hasSharpAccidental = false;
+        let hasFlatAccidental = false;
 
-        // Check for 7th chord suffixes
-        if (roman.includes('maj7')) {
+        // Detect accidentals at the start
+        if (roman.startsWith('#')) {
+            hasSharpAccidental = true;
+        } else if (roman.startsWith('b') && roman.length > 1 && roman[1] !== 'b') {
+            hasFlatAccidental = true;
+        }
+
+        // Check for chord quality suffixes (order matters - check longer suffixes first)
+        if (roman.includes('maj9')) {
+            baseRoman = roman.replace('maj9', '');
+            chordQuality = 'Major 9th';
+        } else if (roman.includes('maj7')) {
             baseRoman = roman.replace('maj7', '');
             chordQuality = 'Major 7th';
-        } else if (roman.includes('°7')) {
-            baseRoman = roman.replace('°7', '°');
+        } else if (roman.includes('dim7') || roman.includes('°7')) {
+            baseRoman = roman.replace('dim7', '').replace('°7', '');
+            // Keep the ° for diminished base lookup
+            if (!baseRoman.includes('°')) {
+                // Check if original had diminished quality indicator
+                const romanUpper = baseRoman.replace(/[#b]/g, '').toUpperCase();
+                if (romanUpper === 'VII' || romanUpper === 'II') {
+                    baseRoman = baseRoman.replace(romanUpper.toLowerCase(), romanUpper.toLowerCase() + '°');
+                }
+            }
             chordQuality = 'Diminished 7th';
+        } else if (roman.includes('m9') || roman.includes('min9')) {
+            baseRoman = roman.replace('m9', '').replace('min9', '');
+            chordQuality = 'Minor 9th';
+        } else if (roman.includes('9')) {
+            baseRoman = roman.replace('9', '');
+            // Determine if dominant or minor 9th based on case
+            const romanCore = baseRoman.replace(/[#b°]/g, '');
+            if (romanCore === romanCore.toUpperCase() || romanCore === 'V') {
+                chordQuality = 'Dominant 9th';
+            } else {
+                chordQuality = 'Minor 9th';
+            }
         } else if (roman.includes('7')) {
             baseRoman = roman.replace('7', '');
-            if (baseRoman.toUpperCase() === baseRoman || baseRoman === 'V') {
+            const romanCore = baseRoman.replace(/[#b°]/g, '');
+            if (romanCore === romanCore.toUpperCase() || romanCore === 'V') {
                 chordQuality = 'Dominant 7th';
             } else {
                 chordQuality = 'Minor 7th';
             }
         }
 
-        // Look up base roman numeral
-        const mapEntry = ROMAN_MAP[baseRoman];
-        if (!mapEntry) {
-            // Try without accidentals
-            const cleanRoman = baseRoman.replace('b', '').replace('#', '');
-            const cleanEntry = ROMAN_MAP[cleanRoman];
-            if (!cleanEntry) return;
+        // Handle diminished symbol (°) without 7
+        if (baseRoman.includes('°') && !chordQuality) {
+            chordQuality = 'Diminished';
+        }
+        if (baseRoman.includes('dim') && !chordQuality) {
+            baseRoman = baseRoman.replace('dim', '');
+            chordQuality = 'Diminished';
         }
 
-        const entry = ROMAN_MAP[baseRoman] || ROMAN_MAP[baseRoman.replace('b', '').replace('#', '')];
-        if (!entry) return;
+        // Look up base roman numeral
+        let entry = ROMAN_MAP[baseRoman];
+
+        if (!entry) {
+            // Try without the ° symbol for lookup
+            const withoutDim = baseRoman.replace('°', '');
+            entry = ROMAN_MAP[withoutDim];
+
+            if (!entry) {
+                // Try stripping accidentals and looking up, then apply offset manually
+                const cleanRoman = baseRoman.replace(/[#b°]/g, '');
+                entry = ROMAN_MAP[cleanRoman];
+
+                if (entry) {
+                    // Clone the entry and apply accidental offset
+                    entry = { ...entry };
+                    if (hasSharpAccidental) {
+                        entry.offset = (entry.offset || 0) + 1;
+                    } else if (hasFlatAccidental) {
+                        entry.offset = (entry.offset || 0) - 1;
+                    }
+                }
+            }
+        }
+
+        if (!entry) {
+            // Still couldn't parse - create a fallback to avoid breaking playback
+            console.warn(`[TemplateBrowser] Could not parse roman numeral: ${roman}, using C Major fallback`);
+            chordData.push({
+                root: 'C',
+                type: 'Major',
+                roman: roman,
+                notes: ['C3', 'E3', 'G3'],
+                key: key
+            });
+            return;
+        }
 
         // Calculate root note
         const scaleStep = MAJOR_SCALE_STEPS[entry.degree];
@@ -726,8 +812,14 @@ function convertTemplateToChordData(template, key) {
         const rootIndex = (adjustedKeyIndex + scaleStep + offset + 12) % 12;
         const rootNote = SHARP_NOTES[rootIndex];
 
-        // Determine final quality
-        const finalQuality = chordQuality || entry.quality;
+        // Determine final quality - use parsed quality or entry quality
+        // For diminished chords, prefer Diminished 7th if a 7 was in the original
+        let finalQuality = chordQuality || entry.quality;
+
+        // If entry was diminished and we have a 7th quality, use it
+        if (entry.quality === 'Diminished' && chordQuality && chordQuality.includes('7')) {
+            finalQuality = chordQuality;
+        }
 
         // Generate notes
         const intervals = CHORD_INTERVALS[finalQuality] || CHORD_INTERVALS['Major'];

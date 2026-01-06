@@ -1829,8 +1829,18 @@ export function updateChordAndRenderPreservingTrebleNotes(index, options = {}) {
  * @param {string} root - Root note
  * @param {number} inversion - Inversion (default 0)
  * @param {number} octaveShift - Octave shift (default 0)
+ * @param {boolean} playShutterSound - Whether to play the camera shutter sound (default: true)
  */
-export function addChordToProgressionByParams(chordType, root, inversion = 0, octaveShift = 0) {
+export function addChordToProgressionByParams(chordType, root, inversion = 0, octaveShift = 0, playShutterSound = true) {
+    // Play camera shutter sound effect (only if requested and buffer is loaded)
+    if (playShutterSound && window.getAudioIsReady && window.getCameraShutter) {
+        const audioIsReady = window.getAudioIsReady();
+        const shutter = window.getCameraShutter();
+        if (audioIsReady && shutter && shutter.loaded) {
+            shutter.start();
+        }
+    }
+
     // Save current state for undo (same mechanism as other progression edits)
     if (window.captureProgressionState && window.pushToUndoStack) {
         const currentState = window.captureProgressionState();
@@ -1911,8 +1921,9 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
     const originalLength = currentProgression.length;
 
     // Append using the canonical helper (handles compositionState + notation)
+    // skipSuccessToast: true because we show our own toast at the end of this function
     if (window.addToProgressionData) {
-        window.addToProgressionData(newChordData);
+        window.addToProgressionData(newChordData, { skipSuccessToast: true });
     } else {
         // Fallback: append and sync manually
         const appended = [...currentProgression, newChordData];
@@ -2031,6 +2042,11 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
             key: trainerState.currentKey
         });
     }
+
+    // Show success toast notification
+    const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol ?? '';
+    const displayName = `${root}${chordSymbol}`;
+    showToast(`Added ${displayName} to progression`, { type: 'success', duration: 2000 });
 
     // Phase 2.1: Select the newly inserted chord
     selectChordCard(insertedIndex);
@@ -2342,6 +2358,13 @@ export function addToProgressionData(chordData, options = {}) {
             setTimeout(restoreScroll, 300);
         });
     });
+
+    // Show success toast notification (unless caller wants to show their own)
+    if (!options.skipSuccessToast) {
+        const chordSymbol = CHORD_DEFINITIONS[chordData.type]?.symbol ?? '';
+        const displayName = `${chordData.root}${chordSymbol}`;
+        showToast(`Added ${displayName} to progression`, { type: 'success', duration: 2000 });
+    }
 }
 
 // ============================================================================

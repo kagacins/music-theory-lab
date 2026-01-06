@@ -1158,9 +1158,25 @@ export function toggleChordLibraryMode(isDiatonic) {
     updateBuilderDisplay();
 }
 
-export function toggleChordIntervalsPanel() {
+export function toggleChordIntervalsPanel(event = null) {
     // Don't allow panel toggling during guided mode (scroll is locked)
     if (isGuidedModeActive()) return;
+
+    // If event is provided, check if click was in the right 25% zone (collapse zone)
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX;
+        const rightZoneStart = rect.right - (rect.width * 0.25);
+
+        // If click was NOT in the right zone, don't toggle (unless clicking chevron)
+        const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                               event.target.closest('.chevron-icon') ||
+                               event.target.closest('svg[class*="rotate"]');
+
+        if (clickX < rightZoneStart && !clickedChevron) {
+            return;
+        }
+    }
 
     const panel = document.getElementById('chord-intervals-panel');
     const chevron = document.getElementById('chord-intervals-chevron');
@@ -1191,9 +1207,25 @@ let builderDetailedView = false;
 /**
  * Toggle the Current Chord Progression panel in Chord Builder
  */
-export function toggleBuilderProgressionPanel() {
+export function toggleBuilderProgressionPanel(event = null) {
     // Don't allow panel toggling during guided mode (scroll is locked)
     if (isGuidedModeActive()) return;
+
+    // If event is provided, check if click was in the right 25% zone (collapse zone)
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX;
+        const rightZoneStart = rect.right - (rect.width * 0.25);
+
+        // If click was NOT in the right zone, don't toggle (unless clicking chevron)
+        const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                               event.target.closest('.chevron-icon') ||
+                               event.target.closest('svg[class*="rotate"]');
+
+        if (clickX < rightZoneStart && !clickedChevron) {
+            return;
+        }
+    }
 
     const panel = document.getElementById('builder-progression-panel');
     const chevron = document.getElementById('builder-progression-chevron');
@@ -1222,6 +1254,481 @@ export function toggleBuilderProgressionPanel() {
 export function toggleBuilderCardView(detailed) {
     builderDetailedView = detailed;
     renderBuilderProgressionCards();
+}
+
+// =========================================================================
+// Chord Identifier Panel
+// =========================================================================
+
+/**
+ * Toggle the Chord Identifier panel
+ */
+export function toggleChordIdentifierPanel(event = null) {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
+    // If event is provided, check if click was in the right 25% zone (collapse zone)
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX;
+        const rightZoneStart = rect.right - (rect.width * 0.25);
+
+        // If click was NOT in the right zone, don't toggle (unless clicking chevron)
+        const clickedChevron = event.target.closest('[id$="-chevron"]') ||
+                               event.target.closest('.chevron-icon') ||
+                               event.target.closest('svg[class*="rotate"]');
+
+        if (clickX < rightZoneStart && !clickedChevron) {
+            return;
+        }
+    }
+
+    const panel = document.getElementById('chord-identifier-panel');
+    const chevron = document.getElementById('chord-identifier-chevron');
+    if (!panel || !chevron) return;
+
+    const isHidden = panel.classList.contains('hidden');
+    if (isHidden) {
+        panel.classList.remove('hidden');
+        chevron.classList.add('rotate-180');
+        // Initialize quick note buttons when panel opens
+        initChordIdentifierQuickButtons();
+    } else {
+        panel.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+    }
+
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState('chord-identifier-panel', !isHidden);
+    }
+}
+
+/**
+ * Initialize quick note buttons for the chord identifier
+ */
+function initChordIdentifierQuickButtons() {
+    const container = document.getElementById('chord-identifier-note-buttons');
+    if (!container || container.hasChildNodes()) return; // Only initialize once
+
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+    notes.forEach(note => {
+        const btn = document.createElement('button');
+        btn.className = 'px-2 py-1 text-xs bg-gray-200 hover:bg-violet-500 hover:text-white text-gray-700 rounded transition-colors';
+        btn.textContent = note;
+        btn.onclick = () => addNoteToIdentifierInput(note);
+        container.appendChild(btn);
+    });
+}
+
+/**
+ * Add a note to the chord identifier input
+ */
+export function addNoteToIdentifierInput(note) {
+    const input = document.getElementById('chord-identifier-input');
+    if (!input) return;
+
+    const currentValue = input.value.trim();
+    if (currentValue) {
+        input.value = currentValue + ' ' + note;
+    } else {
+        input.value = note;
+    }
+}
+
+/**
+ * Clear the chord identifier input and results
+ */
+export function clearChordIdentifier() {
+    const input = document.getElementById('chord-identifier-input');
+    const resultsContainer = document.getElementById('chord-identifier-matches');
+    const noResultsEl = document.getElementById('chord-identifier-no-results');
+
+    if (input) input.value = '';
+    if (resultsContainer) resultsContainer.innerHTML = '';
+    if (noResultsEl) noResultsEl.classList.add('hidden');
+}
+
+/**
+ * Parse note input string into an array of note names (without octaves)
+ * Supports delimiters: space, comma, hyphen, colon
+ */
+function parseNoteInput(inputStr) {
+    if (!inputStr || typeof inputStr !== 'string') return [];
+
+    // Replace all delimiters with space, then split
+    const normalized = inputStr
+        .replace(/[,\-:]/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+    // Normalize note names (strip octave numbers, uppercase first letter)
+    const notes = normalized.map(n => {
+        // Remove any octave number at the end
+        const noteOnly = n.replace(/\d+$/, '');
+        // Capitalize first letter, rest lowercase
+        return noteOnly.charAt(0).toUpperCase() + noteOnly.slice(1).toLowerCase();
+    });
+
+    // Remove duplicates
+    return [...new Set(notes)];
+}
+
+/**
+ * Convert a note to its pitch class (0-11)
+ */
+function noteToPitchClass(note) {
+    const noteMap = {
+        'C': 0, 'C#': 1, 'Db': 1,
+        'D': 2, 'D#': 3, 'Eb': 3,
+        'E': 4, 'Fb': 4, 'E#': 5,
+        'F': 5, 'F#': 6, 'Gb': 6,
+        'G': 7, 'G#': 8, 'Ab': 8,
+        'A': 9, 'A#': 10, 'Bb': 10,
+        'B': 11, 'Cb': 11, 'B#': 0
+    };
+    return noteMap[note] ?? null;
+}
+
+/**
+ * Convert pitch class to note name
+ */
+function pitchClassToNote(pc, preferSharps = true) {
+    const sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    return preferSharps ? sharpNotes[pc] : flatNotes[pc];
+}
+
+/**
+ * Get intervals from a set of pitch classes relative to a root
+ */
+function getIntervalsFromRoot(rootPc, pitchClasses) {
+    return pitchClasses.map(pc => (pc - rootPc + 12) % 12).sort((a, b) => a - b);
+}
+
+/**
+ * Identify chords that match the given notes
+ */
+export function identifyChordFromInput() {
+    const input = document.getElementById('chord-identifier-input');
+    const resultsWrapper = document.getElementById('chord-identifier-results');
+    const resultsContainer = document.getElementById('chord-identifier-matches');
+    const noResultsEl = document.getElementById('chord-identifier-no-results');
+
+    if (!input || !resultsContainer) return;
+
+    const notes = parseNoteInput(input.value);
+
+    if (notes.length < 2) {
+        if (resultsWrapper) resultsWrapper.classList.add('hidden');
+        if (noResultsEl) noResultsEl.classList.remove('hidden');
+        noResultsEl.innerHTML = `
+            <svg class="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-sm">Please enter at least 2 notes.</p>
+            <p class="text-xs mt-1">Try: C E G or C, E, G</p>
+        `;
+        return;
+    }
+
+    // Convert notes to pitch classes
+    const pitchClasses = notes.map(noteToPitchClass).filter(pc => pc !== null);
+
+    if (pitchClasses.length < 2) {
+        if (resultsWrapper) resultsWrapper.classList.add('hidden');
+        if (noResultsEl) {
+            noResultsEl.classList.remove('hidden');
+            noResultsEl.innerHTML = `
+                <svg class="w-10 h-10 mx-auto mb-2 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <p class="text-sm text-red-500">Could not parse the notes.</p>
+                <p class="text-xs mt-1">Use format like: C E G</p>
+            `;
+        }
+        return;
+    }
+
+    // Find matching chords
+    const matches = findMatchingChords(pitchClasses, notes);
+
+    if (matches.length === 0) {
+        if (resultsWrapper) resultsWrapper.classList.add('hidden');
+        resultsContainer.innerHTML = '';
+        if (noResultsEl) {
+            noResultsEl.classList.remove('hidden');
+            noResultsEl.innerHTML = `
+                <svg class="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-sm">No matching chords found for these notes.</p>
+                <p class="text-xs mt-1">Try adding or removing notes.</p>
+            `;
+        }
+        return;
+    }
+
+    // Show results, hide no-results
+    if (noResultsEl) noResultsEl.classList.add('hidden');
+    if (resultsWrapper) resultsWrapper.classList.remove('hidden');
+
+    // Render results
+    resultsContainer.innerHTML = matches.map(match => `
+        <div class="bg-violet-50 rounded-lg p-3 border border-violet-200 hover:border-violet-400 transition-colors">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-lg font-bold text-violet-900">${match.symbol}</span>
+                <span class="text-xs px-2 py-0.5 ${match.matchType === 'Exact' ? 'bg-green-500 text-white' : match.matchType === 'Extended' ? 'bg-blue-500 text-white' : 'bg-yellow-400 text-yellow-900'} rounded">${match.matchType}</span>
+            </div>
+            <div class="text-xs text-gray-600">${match.fullName}</div>
+            ${match.missingNotes.length > 0 ? `<div class="text-xs text-orange-600 mt-1">Missing: ${match.missingNotes.join(', ')}</div>` : ''}
+            ${match.extraNotes.length > 0 ? `<div class="text-xs text-blue-600 mt-1">Extra: ${match.extraNotes.join(', ')}</div>` : ''}
+            <div class="mt-2 flex gap-2">
+                <button onmousedown="window.playChordPreview && window.playChordPreview('${match.root}', '${match.type}', ${match.inversion})"
+                        onmouseup="window.stopChordPreview && window.stopChordPreview()"
+                        onmouseleave="window.stopChordPreview && window.stopChordPreview()"
+                        ontouchstart="window.playChordPreview && window.playChordPreview('${match.root}', '${match.type}', ${match.inversion})"
+                        ontouchend="window.stopChordPreview && window.stopChordPreview()"
+                        class="px-2 py-1 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded flex items-center gap-1 select-none">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                    Play
+                </button>
+                <button onclick="window.addChordToProgressionByParams && window.addChordToProgressionByParams('${match.type}', '${match.root}', ${match.inversion}, 0)"
+                        class="px-2 py-1 text-xs bg-indigo-500 hover:bg-indigo-600 text-white rounded flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                    Add to Progression
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Find chords that match the given pitch classes
+ * Also detects inversions based on the bass note (first note in input)
+ */
+function findMatchingChords(inputPitchClasses, inputNotes) {
+    const matches = [];
+
+    // Define chord intervals for matching
+    const chordIntervals = {
+        'Major': [0, 4, 7],
+        'Minor': [0, 3, 7],
+        'Diminished': [0, 3, 6],
+        'Augmented': [0, 4, 8],
+        'Sus2': [0, 2, 7],
+        'Sus4': [0, 5, 7],
+        'Dominant 7th': [0, 4, 7, 10],
+        'Major 7th': [0, 4, 7, 11],
+        'Minor 7th': [0, 3, 7, 10],
+        'Minor-Major 7th': [0, 3, 7, 11],
+        'Diminished 7th': [0, 3, 6, 9],
+        'Half-Diminished 7th': [0, 3, 6, 10],
+        'Augmented 7th': [0, 4, 8, 10],
+        'Major 6th': [0, 4, 7, 9],
+        'Minor 6th': [0, 3, 7, 9],
+        'Add9': [0, 4, 7, 14],
+        'Major 9th': [0, 4, 7, 11, 14],
+        'Dominant 9th': [0, 4, 7, 10, 14],
+        'Minor 9th': [0, 3, 7, 10, 14],
+        '6/9': [0, 4, 7, 9, 14],
+        '7b5': [0, 4, 6, 10],
+        '7#5': [0, 4, 8, 10],
+        '7b9': [0, 4, 7, 10, 13],
+        '7#9': [0, 4, 7, 10, 15],
+        'Power Chord': [0, 7]
+    };
+
+    // Chord symbols for display
+    const chordSymbols = {
+        'Major': '', 'Minor': 'm', 'Diminished': 'dim', 'Augmented': 'aug',
+        'Sus2': 'sus2', 'Sus4': 'sus4',
+        'Dominant 7th': '7', 'Major 7th': 'maj7', 'Minor 7th': 'm7',
+        'Minor-Major 7th': 'm(maj7)', 'Diminished 7th': 'dim7',
+        'Half-Diminished 7th': 'm7b5', 'Augmented 7th': 'aug7',
+        'Major 6th': '6', 'Minor 6th': 'm6', 'Add9': 'add9',
+        'Major 9th': 'maj9', 'Dominant 9th': '9', 'Minor 9th': 'm9',
+        '6/9': '6/9', '7b5': '7b5', '7#5': '7#5', '7b9': '7b9', '7#9': '7#9',
+        'Power Chord': '5'
+    };
+
+    const inputSet = new Set(inputPitchClasses);
+
+    // Get bass note (first note in input) for inversion detection
+    const bassNotePc = inputPitchClasses.length > 0 ? inputPitchClasses[0] : null;
+
+    // Try each pitch class as potential root
+    for (let rootPc = 0; rootPc < 12; rootPc++) {
+        const rootNote = pitchClassToNote(rootPc);
+
+        // Try each chord type
+        for (const [chordType, intervals] of Object.entries(chordIntervals)) {
+            const chordPitchClasses = intervals.map(i => (rootPc + (i % 12)) % 12);
+            const chordSet = new Set(chordPitchClasses);
+
+            // Check for exact match
+            const isExactMatch = inputSet.size === chordSet.size &&
+                [...inputSet].every(pc => chordSet.has(pc));
+
+            // Check for subset (input notes are part of the chord)
+            const isSubset = [...inputSet].every(pc => chordSet.has(pc)) && inputSet.size < chordSet.size;
+
+            // Check for superset (chord notes are part of input, with extras)
+            const isSuperset = [...chordSet].every(pc => inputSet.has(pc)) && inputSet.size > chordSet.size;
+
+            if (isExactMatch || isSubset || isSuperset) {
+                const missingNotes = [...chordSet]
+                    .filter(pc => !inputSet.has(pc))
+                    .map(pc => pitchClassToNote(pc));
+
+                const extraNotes = [...inputSet]
+                    .filter(pc => !chordSet.has(pc))
+                    .map(pc => pitchClassToNote(pc));
+
+                // Detect inversion based on bass note
+                let inversion = 0;
+                let bassNote = null;
+                if (bassNotePc !== null && chordSet.has(bassNotePc)) {
+                    // Find which chord tone the bass note is
+                    const bassInterval = (bassNotePc - rootPc + 12) % 12;
+                    const chordToneIndex = intervals.findIndex(i => (i % 12) === bassInterval);
+                    if (chordToneIndex > 0) {
+                        inversion = chordToneIndex;
+                        // Spell bass note correctly based on chord type
+                        // Minor chords and flat-based chords should use flats
+                        const useFlatSpelling = chordType.includes('Minor') ||
+                                                chordType.includes('Diminished') ||
+                                                chordType.includes('Half-Diminished') ||
+                                                rootNote.includes('b');
+                        bassNote = pitchClassToNote(bassNotePc, !useFlatSpelling);
+                    }
+                }
+
+                // Determine if root should use flats based on chord type
+                const useFlatsForRoot = chordType.includes('Minor') ||
+                                        chordType.includes('Diminished') ||
+                                        chordType.includes('Half-Diminished');
+                const displayRoot = pitchClassToNote(rootPc, !useFlatsForRoot);
+
+                // Build symbol with slash notation for inversions
+                const baseSymbol = displayRoot + (chordSymbols[chordType] || '');
+                const symbol = inversion > 0 && bassNote ? `${baseSymbol}/${bassNote}` : baseSymbol;
+
+                // Build full name with inversion info
+                const inversionNames = ['Root Position', '1st Inversion', '2nd Inversion', '3rd Inversion', '4th Inversion'];
+                const inversionName = inversion > 0 ? ` (${inversionNames[inversion] || `${inversion}th Inv.`})` : '';
+                const fullName = `${displayRoot} ${chordType}${inversionName}`;
+
+                matches.push({
+                    root: displayRoot,
+                    type: chordType,
+                    inversion: inversion,
+                    bassNote: bassNote,
+                    symbol: symbol,
+                    fullName: fullName,
+                    matchType: isExactMatch ? 'Exact' : isSubset ? 'Partial' : 'Extended',
+                    missingNotes,
+                    extraNotes,
+                    score: isExactMatch ? 100 : isSuperset ? 80 : 60 - missingNotes.length * 10
+                });
+            }
+        }
+    }
+
+    // Sort by score (exact matches first, then by fewer missing notes)
+    matches.sort((a, b) => b.score - a.score);
+
+    // Limit results
+    return matches.slice(0, 12);
+}
+
+/**
+ * Set the chord builder to show a specific chord
+ */
+export function setBuilderChord(root, type) {
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const rootIndex = notes.indexOf(root);
+
+    if (rootIndex >= 0) {
+        setBuilderRootIndex(rootIndex);
+        setBuilderChordType(type);
+        setBuilderSelectionMode('chord');
+
+        // Update display
+        updateBuilderDisplay();
+        renderBuilderSelectors();
+    }
+}
+
+// Track currently playing chord preview notes for release
+let chordPreviewNotes = [];
+
+/**
+ * Play a chord preview (for Chord Identifier results)
+ * Uses click-and-hold behavior like chord library buttons
+ * @param {string} root - Root note (e.g., 'C', 'F#')
+ * @param {string} type - Chord type (e.g., 'Major', 'Minor 7th')
+ * @param {number} inversion - Chord inversion (0, 1, 2, 3)
+ */
+export function playChordPreview(root, type, inversion = 0) {
+    // Check if audio system is available
+    if (typeof window.getPiano !== 'function' || typeof window.initAudio !== 'function') {
+        console.warn('Audio system not available');
+        return;
+    }
+
+    // Initialize audio if needed
+    window.initAudio();
+    if (typeof window.getAudioIsReady === 'function' && !window.getAudioIsReady()) {
+        console.warn('Audio not ready');
+        return;
+    }
+
+    const piano = window.getPiano();
+    if (!piano) {
+        console.warn('Piano not available');
+        return;
+    }
+
+    // Stop any currently playing preview first
+    stopChordPreview();
+
+    // Get current key for enharmonic resolution
+    const key = getCurrentKey() || 'C';
+
+    // Get chord notes with inversion
+    const chordData = getInvertedChordNotes(root, type, inversion, key, 0);
+
+    if (chordData && chordData.specificNotes && chordData.specificNotes.length > 0) {
+        chordPreviewNotes = [...chordData.specificNotes];
+
+        // Play chord (attack only - release on mouseup/mouseleave)
+        chordPreviewNotes.forEach(note => {
+            piano.triggerAttack(note, Tone.now());
+        });
+    }
+}
+
+/**
+ * Stop the chord preview (release all notes)
+ * Called on mouseup/mouseleave
+ */
+export function stopChordPreview() {
+    if (chordPreviewNotes.length === 0) return;
+
+    const piano = window.getPiano?.();
+    if (piano) {
+        chordPreviewNotes.forEach(note => {
+            try {
+                piano.triggerRelease(note, Tone.now());
+            } catch (e) {
+                // Ignore release errors
+            }
+        });
+    }
+    chordPreviewNotes = [];
 }
 
 /**

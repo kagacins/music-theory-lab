@@ -66,9 +66,10 @@ function isBeamable(vexNote) {
  * Manual beam controls (_beamControl) allow forcing beam start/end/break points
  * @param {Array} vexNotes - All VexFlow notes in the measure
  * @param {Object} tupletGroups - Tuplet groups from createNotesForStaff
+ * @param {string} timeSignature - Time signature for beat grouping (e.g., '4/4', '6/8')
  * @returns {Array} - Array of VexFlow Beam objects
  */
-function generateBeamsWithTuplets(vexNotes, tupletGroups) {
+function generateBeamsWithTuplets(vexNotes, tupletGroups, timeSignature = '4/4') {
   const VF = getVF();
   if (!VF || !vexNotes || vexNotes.length === 0) return [];
 
@@ -93,7 +94,7 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
         }
         // Use generateBeams helper which handles stem direction preservation
         // while also providing intelligent beat-based grouping
-        const tupletBeams = generateBeams(beamableNotes, { stemDirection: tupletStemDirection });
+        const tupletBeams = generateBeams(beamableNotes, { stemDirection: tupletStemDirection, timeSignature });
         beams.push(...tupletBeams);
       } catch (e) {
         console.warn('[generateBeamsWithTuplets] Error creating tuplet beam:', e);
@@ -181,7 +182,7 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
         groupStemDirection = group[0].getStemDirection();
       }
 
-      const groupBeams = generateBeams(group, { stemDirection: groupStemDirection });
+      const groupBeams = generateBeams(group, { stemDirection: groupStemDirection, timeSignature });
       beams.push(...groupBeams);
     } catch (e) {
       console.warn('[generateBeamsWithTuplets] Error creating standard beams:', e);
@@ -469,6 +470,10 @@ function getChordTypeSuffix(chordType) {
     'Sus2': 'sus2',
     'Sus4': 'sus4',
 
+    // Sixth chords
+    'Major 6th': '6',
+    'Minor 6th': 'm6',
+
     // Seventh chords
     'Dominant 7th': '7',
     'Major 7th': 'maj7',
@@ -476,6 +481,7 @@ function getChordTypeSuffix(chordType) {
     'Half-Diminished 7th': 'm7b5',
     'Diminished 7th': 'dim7',
     'Minor-Major 7th': 'mMaj7',
+    'Augmented 7th': 'aug7',
 
     // Ninth chords
     'Add9': 'add9',
@@ -2647,12 +2653,13 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const trebleTies = trebleResult.ties;
   const trebleTupletGroups = trebleResult.tupletGroups;
 
-  const trebleBeams = generateBeamsWithTuplets(vexTrebleNotes, trebleTupletGroups);
+  const trebleBeams = generateBeamsWithTuplets(vexTrebleNotes, trebleTupletGroups, timeSignature);
 
   // Create notes for voice 1 (secondary voice) if present in THIS measure
   let vexTrebleNotes2 = [];
   let trebleBeams2 = [];
   let trebleTupletGroups2 = {};
+  let trebleOttavaBrackets2 = [];
   if (hasMultipleVoicesInMeasure) {
     const trebleResult2 = createNotesForStaff(secondaryTrebleVoiceNotes, keySignature, 'treble', timeSignature, {
       stemDirection: VOICE_STEM_DIRECTIONS.secondary,
@@ -2660,8 +2667,9 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     });
     vexTrebleNotes2 = trebleResult2.notes;
     trebleTupletGroups2 = trebleResult2.tupletGroups;
+    trebleOttavaBrackets2 = trebleResult2.ottavaBrackets || [];
 
-    trebleBeams2 = generateBeamsWithTuplets(vexTrebleNotes2, trebleTupletGroups2);
+    trebleBeams2 = generateBeamsWithTuplets(vexTrebleNotes2, trebleTupletGroups2, timeSignature);
   }
 
   // Render bass notes - MULTI-VOICE SUPPORT (same pattern as treble)
@@ -2709,12 +2717,13 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const bassOttavaBrackets = bassResult.ottavaBrackets;
   const bassTies = bassResult.ties;
   const bassTupletGroups = bassResult.tupletGroups;
-  const bassBeams = generateBeamsWithTuplets(vexBassNotes, bassTupletGroups);
+  const bassBeams = generateBeamsWithTuplets(vexBassNotes, bassTupletGroups, timeSignature);
 
   // Create notes for bass voice 1 (secondary voice) if present in THIS measure
   let vexBassNotes2 = [];
   let bassBeams2 = [];
   let bassTupletGroups2 = {};
+  let bassOttavaBrackets2 = [];
   if (hasBassMultipleVoicesInMeasure) {
     const bassResult2 = createNotesForStaff(secondaryBassVoiceNotes, keySignature, 'bass', timeSignature, {
       stemDirection: VOICE_STEM_DIRECTIONS.secondary,
@@ -2722,7 +2731,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     });
     vexBassNotes2 = bassResult2.notes;
     bassTupletGroups2 = bassResult2.tupletGroups;
-    bassBeams2 = generateBeamsWithTuplets(vexBassNotes2, bassTupletGroups2);
+    bassOttavaBrackets2 = bassResult2.ottavaBrackets || [];
+    bassBeams2 = generateBeamsWithTuplets(vexBassNotes2, bassTupletGroups2, timeSignature);
   }
 
   // Apply note coloring
@@ -3426,8 +3436,11 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     trebleNotes: vexTrebleNotes,
     trebleNotes2: vexTrebleNotes2, // Second treble voice notes for multi-voice support
     bassNotes: vexBassNotes,
+    bassNotes2: vexBassNotes2, // Second bass voice notes for multi-voice support
     trebleOttavaBrackets,
+    trebleOttavaBrackets2, // Voice 2 treble ottava brackets
     bassOttavaBrackets,
+    bassOttavaBrackets2, // Voice 2 bass ottava brackets
     noteRegions,
     hasMultipleVoicesInMeasure, // Flag indicating if multi-voice is active
   };
@@ -4988,6 +5001,112 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       drawBassBracket(currentBassOttava, bassOttavaStart, bassOttavaEnd, bassHighestPitchLine, bassLowestPitchLine, bassNoteCount);
     }
 
+    // Process bass clef Voice 2 brackets with cross-measure support
+    // Same logic as Voice 1, but uses bassNotes2 and bassOttavaBrackets2
+    let currentBassOttava2 = null;
+    let bassOttavaStart2 = null;
+    let bassOttavaEnd2 = null;
+    let bassHighestPitchLine2 = -Infinity;
+    let bassLowestPitchLine2 = Infinity;
+    let bassNoteCount2 = 0;
+
+    for (let i = 0; i < renderedMeasures.length; i++) {
+      const measure = renderedMeasures[i];
+      const bassNotes2 = measure.bassNotes2;
+      const brackets2 = measure.bassOttavaBrackets2;
+
+      if (!bassNotes2 || bassNotes2.length === 0) {
+        // No Voice 2 notes - close any pending bracket
+        if (currentBassOttava2 && bassOttavaStart2 && bassOttavaEnd2) {
+          drawBassBracket(currentBassOttava2, bassOttavaStart2, bassOttavaEnd2, bassHighestPitchLine2, bassLowestPitchLine2, bassNoteCount2);
+        }
+        currentBassOttava2 = null;
+        bassOttavaStart2 = null;
+        bassOttavaEnd2 = null;
+        bassHighestPitchLine2 = -Infinity;
+        bassLowestPitchLine2 = Infinity;
+        bassNoteCount2 = 0;
+        continue;
+      }
+
+      if (!brackets2 || brackets2.length === 0) {
+        // No ottava in this measure for Voice 2 - close any pending bracket
+        if (currentBassOttava2 && bassOttavaStart2 && bassOttavaEnd2) {
+          drawBassBracket(currentBassOttava2, bassOttavaStart2, bassOttavaEnd2, bassHighestPitchLine2, bassLowestPitchLine2, bassNoteCount2);
+        }
+        currentBassOttava2 = null;
+        bassOttavaStart2 = null;
+        bassOttavaEnd2 = null;
+        bassNoteCount2 = 0;
+        bassHighestPitchLine2 = -Infinity;
+        bassLowestPitchLine2 = Infinity;
+        continue;
+      }
+
+      // Process each bracket in this measure for Voice 2
+      for (let bIdx = 0; bIdx < brackets2.length; bIdx++) {
+        const bracket = brackets2[bIdx];
+        const startIdx = bracket.startIndex ?? 0;
+        const endIdx = bracket.endIndex ?? 0;
+        const ottavaLabel = bracket.label;
+        const bracketNoteCount = endIdx - startIdx + 1;
+
+        // Check if this is a continuation of the current bracket
+        if (currentBassOttava2 === ottavaLabel && bIdx === 0 && startIdx === 0) {
+          // Continue the bracket
+          bassOttavaEnd2 = bassNotes2[endIdx];
+          bassNoteCount2 += bracketNoteCount;
+          for (let j = startIdx; j <= endIdx && j < bassNotes2.length; j++) {
+            const noteHighestLine = getHighestPitchLine(bassNotes2[j]);
+            const noteLowestLine = getLowestPitchLine(bassNotes2[j]);
+            if (noteHighestLine > bassHighestPitchLine2) bassHighestPitchLine2 = noteHighestLine;
+            if (noteLowestLine < bassLowestPitchLine2) bassLowestPitchLine2 = noteLowestLine;
+          }
+        } else {
+          // Different label or gap - draw previous bracket if exists
+          if (currentBassOttava2 && bassOttavaStart2 && bassOttavaEnd2) {
+            drawBassBracket(currentBassOttava2, bassOttavaStart2, bassOttavaEnd2, bassHighestPitchLine2, bassLowestPitchLine2, bassNoteCount2);
+          }
+
+          // Start new bracket
+          currentBassOttava2 = ottavaLabel;
+          bassOttavaStart2 = bassNotes2[startIdx];
+          bassOttavaEnd2 = bassNotes2[endIdx];
+          bassHighestPitchLine2 = -Infinity;
+          bassLowestPitchLine2 = Infinity;
+          bassNoteCount2 = bracketNoteCount;
+
+          for (let j = startIdx; j <= endIdx && j < bassNotes2.length; j++) {
+            const noteHighestLine = getHighestPitchLine(bassNotes2[j]);
+            const noteLowestLine = getLowestPitchLine(bassNotes2[j]);
+            if (noteHighestLine > bassHighestPitchLine2) bassHighestPitchLine2 = noteHighestLine;
+            if (noteLowestLine < bassLowestPitchLine2) bassLowestPitchLine2 = noteLowestLine;
+          }
+        }
+
+        // Check if we need to close this bracket before next
+        const isLastBracket = bIdx === brackets2.length - 1;
+        const endsAtLastNote = endIdx === bassNotes2.length - 1;
+
+        if (!isLastBracket || !endsAtLastNote) {
+          if (currentBassOttava2 && bassOttavaStart2 && bassOttavaEnd2) {
+            drawBassBracket(currentBassOttava2, bassOttavaStart2, bassOttavaEnd2, bassHighestPitchLine2, bassLowestPitchLine2, bassNoteCount2);
+          }
+          currentBassOttava2 = null;
+          bassOttavaStart2 = null;
+          bassOttavaEnd2 = null;
+          bassHighestPitchLine2 = -Infinity;
+          bassLowestPitchLine2 = Infinity;
+          bassNoteCount2 = 0;
+        }
+      }
+    }
+
+    // Draw final bass Voice 2 bracket if exists
+    if (currentBassOttava2 && bassOttavaStart2 && bassOttavaEnd2) {
+      drawBassBracket(currentBassOttava2, bassOttavaStart2, bassOttavaEnd2, bassHighestPitchLine2, bassLowestPitchLine2, bassNoteCount2);
+    }
+
     // Helper function to draw a bass bracket with correct positioning
     function drawBassBracket(label, startNote, endNote, highestLine, lowestLine, noteCount = 1) {
       if (!startNote || !endNote) return;
@@ -5147,6 +5266,112 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     // Draw final treble bracket if exists
     if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
       drawTrebleBracket(currentTrebleOttava, trebleOttavaStart, trebleOttavaEnd, trebleHighestPitchLine, trebleLowestPitchLine, trebleNoteCount);
+    }
+
+    // Process treble clef Voice 2 brackets with cross-measure support
+    // Same logic as Voice 1, but uses trebleNotes2 and trebleOttavaBrackets2
+    let currentTrebleOttava2 = null;
+    let trebleOttavaStart2 = null;
+    let trebleOttavaEnd2 = null;
+    let trebleHighestPitchLine2 = -Infinity;
+    let trebleLowestPitchLine2 = Infinity;
+    let trebleNoteCount2 = 0;
+
+    for (let i = 0; i < renderedMeasures.length; i++) {
+      const measure = renderedMeasures[i];
+      const trebleNotes2 = measure.trebleNotes2;
+      const brackets2 = measure.trebleOttavaBrackets2;
+
+      if (!trebleNotes2 || trebleNotes2.length === 0) {
+        // No Voice 2 notes - close any pending bracket
+        if (currentTrebleOttava2 && trebleOttavaStart2 && trebleOttavaEnd2) {
+          drawTrebleBracket(currentTrebleOttava2, trebleOttavaStart2, trebleOttavaEnd2, trebleHighestPitchLine2, trebleLowestPitchLine2, trebleNoteCount2);
+        }
+        currentTrebleOttava2 = null;
+        trebleOttavaStart2 = null;
+        trebleOttavaEnd2 = null;
+        trebleHighestPitchLine2 = -Infinity;
+        trebleLowestPitchLine2 = Infinity;
+        trebleNoteCount2 = 0;
+        continue;
+      }
+
+      if (!brackets2 || brackets2.length === 0) {
+        // No ottava in this measure for Voice 2 - close any pending bracket
+        if (currentTrebleOttava2 && trebleOttavaStart2 && trebleOttavaEnd2) {
+          drawTrebleBracket(currentTrebleOttava2, trebleOttavaStart2, trebleOttavaEnd2, trebleHighestPitchLine2, trebleLowestPitchLine2, trebleNoteCount2);
+        }
+        currentTrebleOttava2 = null;
+        trebleOttavaStart2 = null;
+        trebleOttavaEnd2 = null;
+        trebleNoteCount2 = 0;
+        trebleHighestPitchLine2 = -Infinity;
+        trebleLowestPitchLine2 = Infinity;
+        continue;
+      }
+
+      // Process each bracket in this measure for Voice 2
+      for (let bIdx = 0; bIdx < brackets2.length; bIdx++) {
+        const bracket = brackets2[bIdx];
+        const startIdx = bracket.startIndex ?? 0;
+        const endIdx = bracket.endIndex ?? 0;
+        const ottavaLabel = bracket.label;
+        const bracketNoteCount = endIdx - startIdx + 1;
+
+        // Check if this is a continuation of the current bracket
+        if (currentTrebleOttava2 === ottavaLabel && bIdx === 0 && startIdx === 0) {
+          // Continue the bracket
+          trebleOttavaEnd2 = trebleNotes2[endIdx];
+          trebleNoteCount2 += bracketNoteCount;
+          for (let j = startIdx; j <= endIdx && j < trebleNotes2.length; j++) {
+            const noteHighestLine = getHighestPitchLine(trebleNotes2[j]);
+            const noteLowestLine = getLowestPitchLine(trebleNotes2[j]);
+            if (noteHighestLine > trebleHighestPitchLine2) trebleHighestPitchLine2 = noteHighestLine;
+            if (noteLowestLine < trebleLowestPitchLine2) trebleLowestPitchLine2 = noteLowestLine;
+          }
+        } else {
+          // Different label or gap - draw previous bracket if exists
+          if (currentTrebleOttava2 && trebleOttavaStart2 && trebleOttavaEnd2) {
+            drawTrebleBracket(currentTrebleOttava2, trebleOttavaStart2, trebleOttavaEnd2, trebleHighestPitchLine2, trebleLowestPitchLine2, trebleNoteCount2);
+          }
+
+          // Start new bracket
+          currentTrebleOttava2 = ottavaLabel;
+          trebleOttavaStart2 = trebleNotes2[startIdx];
+          trebleOttavaEnd2 = trebleNotes2[endIdx];
+          trebleHighestPitchLine2 = -Infinity;
+          trebleLowestPitchLine2 = Infinity;
+          trebleNoteCount2 = bracketNoteCount;
+
+          for (let j = startIdx; j <= endIdx && j < trebleNotes2.length; j++) {
+            const noteHighestLine = getHighestPitchLine(trebleNotes2[j]);
+            const noteLowestLine = getLowestPitchLine(trebleNotes2[j]);
+            if (noteHighestLine > trebleHighestPitchLine2) trebleHighestPitchLine2 = noteHighestLine;
+            if (noteLowestLine < trebleLowestPitchLine2) trebleLowestPitchLine2 = noteLowestLine;
+          }
+        }
+
+        // Check if we need to close this bracket before next
+        const isLastBracket = bIdx === brackets2.length - 1;
+        const endsAtLastNote = endIdx === trebleNotes2.length - 1;
+
+        if (!isLastBracket || !endsAtLastNote) {
+          if (currentTrebleOttava2 && trebleOttavaStart2 && trebleOttavaEnd2) {
+            drawTrebleBracket(currentTrebleOttava2, trebleOttavaStart2, trebleOttavaEnd2, trebleHighestPitchLine2, trebleLowestPitchLine2, trebleNoteCount2);
+          }
+          currentTrebleOttava2 = null;
+          trebleOttavaStart2 = null;
+          trebleOttavaEnd2 = null;
+          trebleHighestPitchLine2 = -Infinity;
+          trebleLowestPitchLine2 = Infinity;
+          trebleNoteCount2 = 0;
+        }
+      }
+    }
+
+    // Draw final treble Voice 2 bracket if exists
+    if (currentTrebleOttava2 && trebleOttavaStart2 && trebleOttavaEnd2) {
+      drawTrebleBracket(currentTrebleOttava2, trebleOttavaStart2, trebleOttavaEnd2, trebleHighestPitchLine2, trebleLowestPitchLine2, trebleNoteCount2);
     }
 
     // Helper function to draw a treble bracket with correct positioning

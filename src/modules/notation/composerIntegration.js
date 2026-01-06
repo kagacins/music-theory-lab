@@ -25,7 +25,7 @@ import {
   noteToMidi,
   getVexFlowKeySignature,
 } from './vexFlowRenderer.js';
-import { getInteractiveMelody, playMeasure } from '../audio/melodyGenerator.js';
+import { getInteractiveMelody, playMeasure, setTimeSignature as setMelodyTimeSignature } from '../audio/melodyGenerator.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { showNoteTooltip, hideNoteTooltip } from '../ui/noteHighlighter.js';
 import { PageManager } from './pageManager.js';
@@ -636,6 +636,10 @@ export class NotationComposer {
       'Sus2': 'sus2',
       'Sus4': 'sus4',
 
+      // Sixth chords
+      'Major 6th': '6',
+      'Minor 6th': 'm6',
+
       // Seventh chords
       'Dominant 7th': '7',
       'Major 7th': 'maj7',
@@ -643,6 +647,7 @@ export class NotationComposer {
       'Half-Diminished 7th': 'm7b5',
       'Diminished 7th': 'dim7',
       'Minor-Major 7th': 'mMaj7',
+      'Augmented 7th': 'aug7',
 
       // Ninth chords
       'Add9': 'add9',
@@ -3263,6 +3268,10 @@ export class NotationComposer {
     }
 
     this.render();
+
+    // CRITICAL: Update the interactiveMelody time signature for metronome and playback
+    // Without this, the metronome clicks the old number of beats per measure
+    setMelodyTimeSignature(`${num}/${denom}`);
 
     // Update progression displays to reflect new durations
     if (window.renderProgressionDisplay) {

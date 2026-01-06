@@ -359,13 +359,9 @@ export class NoteEditor {
       ? !e.altKey   // Sticky mode ON: normal click is entry, Alt inverts to select
       : e.altKey;   // Sticky mode OFF: Alt enables entry, normal click is select
 
-    // DEBUG: Log mode state
-    console.log(`[NoteEditor] interactionMode=${interactionMode}, altKey=${e.altKey}, inNoteEntryMode=${inNoteEntryMode}`);
-
     // Check if clicking on an existing note (for selection)
     // Only try to select notes when NOT in entry mode
     const clickedNote = inNoteEntryMode ? null : this.findNoteAtPosition(position.x, position.y);
-    console.log(`[NoteEditor] clickedNote=${clickedNote ? 'found' : 'null'}`);
 
     if (clickedNote) {
       // Clicking on a note - handle selection (works with or without Alt in select mode)
@@ -6422,7 +6418,9 @@ export class NoteEditor {
    * @returns {number} - Beat position (0 to beatsPerMeasure)
    */
   getCurrentBeat(measureIndex, staff) {
-    return this.getBeatsPerMeasure() - this.getRemainingBeats(measureIndex, staff);
+    const bpm = this.getBeatsPerMeasure();
+    const remaining = this.getRemainingBeats(measureIndex, staff);
+    return bpm - remaining;
   }
 
   /**

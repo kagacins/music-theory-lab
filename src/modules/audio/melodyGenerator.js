@@ -1480,6 +1480,17 @@ export function setTimeSignature(timeSignature) {
     interactiveMelody.beatsPerMeasure = beats;
     interactiveMelody.beatDuration = noteValue === 4 ? '4n' : noteValue === 8 ? '8n' : '4n';
 
+    // CRITICAL: Update numMeasures from compositionState
+    // Without this, metronome uses stale measure count after time signature change
+    if (window.getCompositionState) {
+        const compState = window.getCompositionState();
+        const measureCount = compState.getMeasureCount();
+        if (measureCount > 0) {
+            interactiveMelody.numMeasures = measureCount;
+            console.log(`[setTimeSignature] Updated numMeasures to ${measureCount} for ${timeSignature}`);
+        }
+    }
+
     // Update the time signature selector UI
     const timeSigSelect = document.getElementById('time-signature-select');
     if (timeSigSelect) {
@@ -3667,9 +3678,10 @@ export function playFromSelectedMeasure() {
     // Calculate measures to play for metronome
     const measuresToPlay = measureCountFromState - startMeasure;
 
-    // Start metronome if enabled
+    // Start metronome if enabled (pass time signature for compound meter support)
     if (getMetronomeEnabled()) {
-        startMetronome(beatsPerMeasure, measuresToPlay);
+        const timeSignatureObj = { num: beatsPerMeasure, denom: beatValue };
+        startMetronome(beatsPerMeasure, measuresToPlay, timeSignatureObj);
     }
 
     Tone.Transport.start('+0.05');
@@ -5227,9 +5239,10 @@ export async function playAllMelody() {
         totalMeasuresForMetronome = compositionState.getMeasureCount();
     }
 
-    // Start metronome if enabled
+    // Start metronome if enabled (pass time signature for compound meter support)
     if (getMetronomeEnabled()) {
-        startMetronome(beatsPerMeasure, totalMeasuresForMetronome);
+        const timeSignatureObj = { num: beatsPerMeasure, denom: beatValue };
+        startMetronome(beatsPerMeasure, totalMeasuresForMetronome, timeSignatureObj);
     }
 
     // Start transport with offset to ensure all samples are ready
@@ -5602,9 +5615,10 @@ export function playProgressionOnly() {
         totalMeasuresForMetronome = playbackOrder.length;
     }
 
-    // Start metronome if enabled
+    // Start metronome if enabled (pass time signature for compound meter support)
     if (getMetronomeEnabled()) {
-        startMetronome(beatsPerMeasure, totalMeasuresForMetronome);
+        const timeSignatureObj = { num: beatsPerMeasure, denom: beatValue };
+        startMetronome(beatsPerMeasure, totalMeasuresForMetronome, timeSignatureObj);
     }
 
     Tone.Transport.start('+0.05');

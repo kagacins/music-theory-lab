@@ -611,12 +611,27 @@ export function toggleMetronome() {
 }
 
 /**
- * Start metronome playback with the transport
- * Call this when starting audio playback if metronome is enabled
- * @param {number} beatsPerMeasure - Number of beats per measure (e.g., 4 for 4/4)
- * @param {number} totalMeasures - Total number of measures to play
+ * Check if a time signature is compound meter
+ * Compound meters have numerators divisible by 3 (but not 3 itself) like 6/8, 9/8, 12/8
+ * @param {Object} timeSignature - { num, denom }
+ * @returns {boolean} True if compound meter
  */
-export function startMetronome(beatsPerMeasure = 4, totalMeasures = 1) {
+function isCompoundMeter(timeSignature) {
+    if (!timeSignature) return false;
+    const { num } = timeSignature;
+    // Compound meters: 6/8, 9/8, 12/8, 6/4, etc.
+    // The numerator is divisible by 3, and greater than 3
+    return num > 3 && num % 3 === 0;
+}
+
+/**
+ * Start metronome playback with the transport
+ * Uses absolute time in seconds to avoid Tone.js time signature issues
+ * @param {number} beatsPerMeasure - Number of beats per measure (numerator of time sig, e.g., 6 for 6/8)
+ * @param {number} totalMeasures - Total number of measures to play
+ * @param {Object} timeSignature - Time signature { num, denom } for compound meter detection
+ */
+export function startMetronome(beatsPerMeasure = 4, totalMeasures = 1, timeSignature = null) {
     if (!metronomeEnabled) return;
 
     // Stop any existing metronome
@@ -626,13 +641,44 @@ export function startMetronome(beatsPerMeasure = 4, totalMeasures = 1) {
     const synth = getMetronomeSynth();
     if (!synth) return;
 
-    // Create a Part that will play the metronome clicks
+    // Get tempo from Transport
+    const tempo = Tone.Transport.bpm.value;
+
+    // Calculate the duration of one beat unit (based on time signature denominator)
+    // For 6/8: denominator is 8, so beat unit is eighth note = 0.5 quarter notes
+    // For 4/4: denominator is 4, so beat unit is quarter note = 1 quarter note
+    const denom = timeSignature?.denom || 4;
+    const beatUnitInQuarters = 4 / denom; // e.g., 4/8 = 0.5 for eighth notes
+    const beatUnitDuration = (60 / tempo) * beatUnitInQuarters; // Duration of one beat unit in seconds
+
+    // Calculate measure duration
+    const num = timeSignature?.num || beatsPerMeasure;
+    const measureDuration = num * beatUnitDuration;
+
+    // Determine click pattern based on meter type
+    let clicksPerMeasure;
+    let clickSpacingInSeconds;
+
+    if (timeSignature && isCompoundMeter(timeSignature)) {
+        // Compound meter (6/8, 9/8, 12/8): click on dotted-quarter beats
+        // 6/8 = 2 clicks, 9/8 = 3 clicks, 12/8 = 4 clicks
+        clicksPerMeasure = num / 3;
+        // Each click is 3 beat units apart (3 eighth notes = dotted quarter)
+        clickSpacingInSeconds = 3 * beatUnitDuration;
+    } else {
+        // Simple meter: click on each beat
+        clicksPerMeasure = num;
+        clickSpacingInSeconds = beatUnitDuration;
+    }
+
+    // Create events with absolute time in seconds
     const events = [];
     for (let measure = 0; measure < totalMeasures; measure++) {
-        for (let beat = 0; beat < beatsPerMeasure; beat++) {
-            const time = `${measure}:${beat}:0`;
-            const isDownbeat = beat === 0;
-            events.push({ time, isDownbeat });
+        const measureStartTime = measure * measureDuration;
+        for (let click = 0; click < clicksPerMeasure; click++) {
+            const clickTime = measureStartTime + (click * clickSpacingInSeconds);
+            const isDownbeat = click === 0;
+            events.push({ time: clickTime, isDownbeat });
         }
     }
 

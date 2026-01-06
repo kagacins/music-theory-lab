@@ -133,6 +133,7 @@ function getTabPanelConfigs(tabId) {
             { panelId: 'chord-setup-panel', toggleId: 'chord-setup-toggle', chevronId: 'chord-setup-chevron' },
             { panelId: 'chord-library-panel', toggleId: 'chord-library-toggle', chevronId: 'chord-library-chevron' },
             { panelId: 'chord-intervals-panel', toggleId: 'chord-intervals-toggle', chevronId: 'chord-intervals-chevron' },
+            { panelId: 'chord-identifier-panel', toggleId: 'chord-identifier-toggle', chevronId: 'chord-identifier-chevron' },
             { panelId: 'builder-progression-panel', toggleId: 'builder-progression-toggle', chevronId: 'builder-progression-chevron' }
         ],
         trainer: [

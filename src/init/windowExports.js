@@ -104,7 +104,15 @@ import {
     toggleBuilderProgressionPanel,
     toggleBuilderCardView,
     renderBuilderProgressionCards,
-    updateBuilderProgressionPanel
+    updateBuilderProgressionPanel,
+    // Chord Identifier
+    toggleChordIdentifierPanel,
+    identifyChordFromInput,
+    clearChordIdentifier,
+    addNoteToIdentifierInput,
+    setBuilderChord,
+    playChordPreview,
+    stopChordPreview
 } from '../modules/features/chordBuilder.js';
 import {
     playArpeggio,
@@ -1355,6 +1363,13 @@ export function setupWindowExports() {
     window.toggleChordLibraryPanel = toggleChordLibraryPanel;
     window.toggleChordLibraryMode = toggleChordLibraryMode;
     window.toggleChordIntervalsPanel = toggleChordIntervalsPanel;
+    window.toggleChordIdentifierPanel = toggleChordIdentifierPanel;
+    window.identifyChordFromInput = identifyChordFromInput;
+    window.clearChordIdentifier = clearChordIdentifier;
+    window.addNoteToIdentifierInput = addNoteToIdentifierInput;
+    window.setBuilderChord = setBuilderChord;
+    window.playChordPreview = playChordPreview;
+    window.stopChordPreview = stopChordPreview;
     window.loadProgression = loadProgression;
 
     // Chord and Interval tooltip toggles
@@ -1555,10 +1570,14 @@ export function setupWindowExports() {
 
     // Complete load project function - combines loadProjectFromFile + applyProjectToState
     window.loadProject = async function loadProject() {
+        console.log('[IMTL Import] window.loadProject() called');
         try {
             // Get the project file
+            console.log('[IMTL Import] Calling loadProjectFromFile()...');
             const result = await loadProjectFromFile();
+            console.log('[IMTL Import] loadProjectFromFile() returned:', { success: result.success, error: result.error, hasProject: !!result.project });
             if (!result.success) {
+                console.log('[IMTL Import] Load failed or cancelled:', result.error);
                 if (result.error !== 'Load cancelled') {
                     if (window.showToast) {
                         window.showToast(result.error || 'Failed to load project', { type: 'error' });
@@ -1570,11 +1589,14 @@ export function setupWindowExports() {
             }
 
             // Get current state instances
+            console.log('[IMTL Import] Getting compositionState and trainerState...');
             const compositionState = getCompositionState();
             const trainerState = getTrainerState();
+            console.log('[IMTL Import] compositionState:', !!compositionState, 'trainerState:', !!trainerState);
 
             if (!compositionState || !trainerState) {
                 const error = 'Application state not ready. Please wait for the app to fully load.';
+                console.error('[IMTL Import] State not ready:', error);
                 if (window.showToast) {
                     window.showToast(error, { type: 'error' });
                 } else {
@@ -1584,23 +1606,34 @@ export function setupWindowExports() {
             }
 
             // Apply the project to state
+            console.log('[IMTL Import] Calling applyProjectToState()...');
             const applyResult = applyProjectToState(result.project, compositionState, trainerState, {
                 onProgressionLoaded: (progressionData) => {
+                    console.log('[IMTL Import] onProgressionLoaded callback, progressionData length:', progressionData?.length);
                     // Refresh progression display after loading
                     if (window.renderProgressionDisplay) {
+                        console.log('[IMTL Import] Calling renderProgressionDisplay for all three containers...');
                         window.renderProgressionDisplay('melody-progression-visualization', true);
                         window.renderProgressionDisplay('progression-visualization', true);
                         window.renderProgressionDisplay('builder-progression-visualization', true);
+                    } else {
+                        console.warn('[IMTL Import] window.renderProgressionDisplay not available!');
                     }
                 },
                 onNotationRefresh: () => {
+                    console.log('[IMTL Import] onNotationRefresh callback');
                     if (window.refreshNotationFromProgression) {
+                        console.log('[IMTL Import] Calling refreshNotationFromProgression...');
                         window.refreshNotationFromProgression();
+                    } else {
+                        console.warn('[IMTL Import] window.refreshNotationFromProgression not available!');
                     }
                 }
             });
+            console.log('[IMTL Import] applyProjectToState() returned:', applyResult);
 
             if (!applyResult.success) {
+                console.error('[IMTL Import] Apply failed:', applyResult.error);
                 if (window.showToast) {
                     window.showToast(applyResult.error || 'Failed to apply project', { type: 'error' });
                 } else {
@@ -1611,18 +1644,21 @@ export function setupWindowExports() {
 
             // Update title display
             const projectTitle = result.project.metadata?.title || result.filename || 'Untitled Project';
+            console.log('[IMTL Import] SUCCESS! Project loaded:', projectTitle);
             if (window.showToast) {
                 window.showToast(`Loaded: ${projectTitle}`, { type: 'success' });
             }
 
             // Trigger final refresh
+            console.log('[IMTL Import] Triggering final refreshNotationFromProgression...');
             if (window.refreshNotationFromProgression) {
                 window.refreshNotationFromProgression();
             }
 
+            console.log('[IMTL Import] Load complete, returning success');
             return { success: true, project: result.project, filename: result.filename };
         } catch (error) {
-            console.error('[loadProject] Error:', error);
+            console.error('[IMTL Import] Caught error in loadProject:', error);
             const errorMessage = error.message || 'Failed to load project';
             if (window.showToast) {
                 window.showToast(errorMessage, { type: 'error' });

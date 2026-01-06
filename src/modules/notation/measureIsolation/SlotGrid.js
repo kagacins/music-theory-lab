@@ -210,7 +210,7 @@ export class SlotGrid {
             const notes = voice.notes || [];
             let currentBeat = 0;
 
-            notes.forEach(note => {
+            notes.forEach((note, noteIndex) => {
                 // Get beat position - use note.beat if available, otherwise use running total
                 const noteBeat = note.beat !== undefined ? note.beat : currentBeat;
                 // Local slot index within the measure

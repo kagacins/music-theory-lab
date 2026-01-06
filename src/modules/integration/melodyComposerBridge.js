@@ -296,10 +296,14 @@ function getRemainingBeats(measureIndex, staff) {
  * Get current beat position in a measure (where next note would be added)
  * @param {number} measureIndex - Measure index
  * @param {string} staff - 'treble' or 'bass'
- * @returns {number} - Beat position (0-4 for 4/4 time)
+ * @returns {number} - Beat position (0 to beatsPerMeasure)
  */
 function getCurrentBeat(measureIndex, staff) {
-    return 4 - getRemainingBeats(measureIndex, staff);
+    // Use actual time signature instead of hardcoding 4/4
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(
+        compositionState?.metadata?.timeSignature || { num: 4, denom: 4 }
+    );
+    return beatsPerMeasure - getRemainingBeats(measureIndex, staff);
 }
 
 /**
