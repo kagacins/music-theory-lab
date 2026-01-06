@@ -6,6 +6,10 @@
   # Publish the built output directory
   publish = "dist"
 
+[build.environment]
+  # Increase Node heap size to prevent out-of-memory during Vite build
+  NODE_OPTIONS = "--max_old_space_size=4096"
+
 [functions]
   # Node.js version for serverless functions
   node_bundler = "esbuild"
