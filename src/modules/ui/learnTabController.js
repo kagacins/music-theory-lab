@@ -15,6 +15,15 @@ import { getLessonStatus, getUserStats, getRecommendedLesson, loadProgress } fro
 import { showEarTrainingModal } from './earTraining/earTrainingModal.js';
 import { getOverallStats as getEarTrainingStats } from './earTraining/earTrainingProgress.js';
 
+// Lazy load practice mode modal
+let practiceModeModule = null;
+async function loadPracticeModeModal() {
+    if (!practiceModeModule) {
+        practiceModeModule = await import('./practiceMode/practiceModeModal.js');
+    }
+    return practiceModeModule;
+}
+
 // ===========================================
 // STATE
 // ===========================================
@@ -62,35 +71,44 @@ function renderLessonBrowser(container) {
             </div>
 
             <!-- Quick Actions -->
-            <div class="grid md:grid-cols-2 gap-4 mb-8">
+            <div class="grid md:grid-cols-3 gap-4 mb-8">
                 ${recommended ? `
                     <button id="continue-lesson-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl" data-lesson-id="${recommended.id}">
-                        <div class="w-14 h-14 bg-white/30 rounded-full flex items-center justify-center text-2xl">
+                        <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">
                             ${recommended.icon}
                         </div>
-                        <div class="text-left">
-                            <div class="text-sm text-green-100">Continue Learning</div>
-                            <div class="text-lg font-bold">${recommended.title}</div>
+                        <div class="text-left flex-1">
+                            <div class="text-xs text-green-100">Continue Learning</div>
+                            <div class="text-sm font-bold">${recommended.title}</div>
                         </div>
-                        <svg class="w-6 h-6 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
                 ` : `
                     <div class="flex items-center gap-4 p-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl">
-                        <div class="w-14 h-14 bg-white/30 rounded-full flex items-center justify-center text-2xl">🎉</div>
-                        <div>
-                            <div class="text-lg font-bold">All Lessons Complete!</div>
-                            <div class="text-sm text-green-100">Amazing work! You've mastered the curriculum.</div>
+                        <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🎉</div>
+                        <div class="flex-1">
+                            <div class="text-sm font-bold">All Lessons Complete!</div>
+                            <div class="text-xs text-green-100">Amazing work!</div>
                         </div>
                     </div>
                 `}
 
-                <button id="start-ear-training-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
-                    <div class="w-14 h-14 bg-white/30 rounded-full flex items-center justify-center text-2xl">🎧</div>
-                    <div class="text-left">
-                        <div class="text-sm text-indigo-100">Train Your Ears</div>
-                        <div class="text-lg font-bold">Ear Training</div>
+                <button id="start-practice-mode-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
+                    <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🧠</div>
+                    <div class="text-left flex-1">
+                        <div class="text-xs text-emerald-100">Flashcard Review</div>
+                        <div class="text-sm font-bold">Practice Mode</div>
                     </div>
-                    <svg class="w-6 h-6 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+
+                <button id="start-ear-training-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
+                    <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🎧</div>
+                    <div class="text-left flex-1">
+                        <div class="text-xs text-indigo-100">Train Your Ears</div>
+                        <div class="text-sm font-bold">Ear Training</div>
+                    </div>
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                 </button>
 
             </div>
@@ -209,6 +227,16 @@ function attachBrowserListeners(container) {
         const lessonId = e.currentTarget.dataset.lessonId;
         if (lessonId) {
             showLesson(lessonId);
+        }
+    });
+
+    // Start practice mode button (lazy loaded)
+    container.querySelector('#start-practice-mode-btn')?.addEventListener('click', async () => {
+        try {
+            const module = await loadPracticeModeModal();
+            module.showPracticeModeModal();
+        } catch (err) {
+            console.error('[LearnTab] Failed to load practice mode:', err);
         }
     });
 
