@@ -1141,7 +1141,7 @@ export function updateChordInversion(index, newInversion, shouldUpdateUI = true,
  * @param {number} index - Chord index
  * @param {HTMLElement} sourceElement - Source element triggering the change
  */
-export function updateChordDuration(index, sourceElement) {
+export function updateChordDuration(index, sourceElement, directBeatsValue = null) {
     // Get compositionState directly - the single source of truth
     const compositionState = getCompositionState();
     if (!compositionState) {
@@ -1154,52 +1154,71 @@ export function updateChordDuration(index, sourceElement) {
         return;
     }
 
-    // Find the duration selectors - they could be in either the event source's wrapper
-    // or we need to search for them
-    let durationWholeSelect, durationFracSelect;
+    let totalBeats;
+    let singleDurationSelect = null;
+    let durationWholeSelect = null;
+    let durationFracSelect = null;
 
-    if (sourceElement) {
-        // Find the closest wrapper containing the duration controls
-        const wrapper = sourceElement.closest('.chord-card-wrapper') ||
-                       sourceElement.closest('[data-chord-index]');
-        if (wrapper) {
-            durationWholeSelect = wrapper.querySelector('.duration-whole-select');
-            durationFracSelect = wrapper.querySelector('.duration-frac-select');
-        }
-    }
-
-    // If not found via sourceElement, search in all containers
-    if (!durationWholeSelect || !durationFracSelect) {
-        const wrappers = document.querySelectorAll(`[data-chord-index="${index}"]`);
-        for (const wrapper of wrappers) {
-            const wholeSelect = wrapper.querySelector('.duration-whole-select');
-            const fracSelect = wrapper.querySelector('.duration-frac-select');
-            if (wholeSelect && fracSelect) {
-                durationWholeSelect = wholeSelect;
-                durationFracSelect = fracSelect;
-                break;
+    // If directBeatsValue is provided, use it directly (from new single dropdown)
+    if (directBeatsValue !== null && !isNaN(directBeatsValue)) {
+        totalBeats = directBeatsValue;
+        // Find the single dropdown for potential revert
+        if (sourceElement) {
+            const wrapper = sourceElement.closest('.chord-card-wrapper') ||
+                           sourceElement.closest('[data-chord-index]');
+            if (wrapper) {
+                singleDurationSelect = wrapper.querySelector('.duration-select');
             }
         }
-    }
+    } else {
+        // Legacy: Find the duration selectors (two-dropdown system)
+        if (sourceElement) {
+            // Find the closest wrapper containing the duration controls
+            const wrapper = sourceElement.closest('.chord-card-wrapper') ||
+                           sourceElement.closest('[data-chord-index]');
+            if (wrapper) {
+                durationWholeSelect = wrapper.querySelector('.duration-whole-select');
+                durationFracSelect = wrapper.querySelector('.duration-frac-select');
+            }
+        }
 
-    if (!durationWholeSelect || !durationFracSelect) {
-        return;
-    }
+        // If not found via sourceElement, search in all containers
+        if (!durationWholeSelect || !durationFracSelect) {
+            const wrappers = document.querySelectorAll(`[data-chord-index="${index}"]`);
+            for (const wrapper of wrappers) {
+                const wholeSelect = wrapper.querySelector('.duration-whole-select');
+                const fracSelect = wrapper.querySelector('.duration-frac-select');
+                if (wholeSelect && fracSelect) {
+                    durationWholeSelect = wholeSelect;
+                    durationFracSelect = fracSelect;
+                    break;
+                }
+            }
+        }
 
-    // Parse the selected values
-    const wholeBeats = parseInt(durationWholeSelect.value) || 0;
-    const fracBeats = parseFloat(durationFracSelect.value) || 0;
-    const totalBeats = wholeBeats + fracBeats;
+        if (!durationWholeSelect || !durationFracSelect) {
+            return;
+        }
+
+        // Parse the selected values
+        const wholeBeats = parseInt(durationWholeSelect.value) || 0;
+        const fracBeats = parseFloat(durationFracSelect.value) || 0;
+        totalBeats = wholeBeats + fracBeats;
+    }
 
     // Validation: minimum 0.25 beats (16th note)
     if (totalBeats < 0.25) {
         alert('Chord duration must be at least 0.25 beats (16th note)');
         // Reset to previous value
         const prevBeats = chord.beats || 4;
-        const prevWhole = Math.floor(prevBeats);
-        const prevFrac = prevBeats - prevWhole;
-        durationWholeSelect.value = prevWhole;
-        durationFracSelect.value = prevFrac;
+        if (singleDurationSelect) {
+            singleDurationSelect.value = prevBeats;
+        } else if (durationWholeSelect && durationFracSelect) {
+            const prevWhole = Math.floor(prevBeats);
+            const prevFrac = prevBeats - prevWhole;
+            durationWholeSelect.value = prevWhole;
+            durationFracSelect.value = prevFrac;
+        }
         return;
     }
 
@@ -1224,10 +1243,14 @@ export function updateChordDuration(index, sourceElement) {
         }, () => {
             // User cancelled - revert the selectors
             const prevBeats = chord.beats || 4;
-            const prevWhole = Math.floor(prevBeats);
-            const prevFrac = prevBeats - prevWhole;
-            durationWholeSelect.value = prevWhole;
-            durationFracSelect.value = prevFrac;
+            if (singleDurationSelect) {
+                singleDurationSelect.value = prevBeats;
+            } else if (durationWholeSelect && durationFracSelect) {
+                const prevWhole = Math.floor(prevBeats);
+                const prevFrac = prevBeats - prevWhole;
+                durationWholeSelect.value = prevWhole;
+                durationFracSelect.value = prevFrac;
+            }
         });
         return;
     }

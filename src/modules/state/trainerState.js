@@ -279,7 +279,9 @@ export function getCurrentKey() {
     return trainerState.currentKey;
 }
 
-export function setCurrentKey(value) {
+export function setCurrentKey(value, options = {}) {
+    const { updateUI = true } = options;
+
     trainerState.currentKey = value;
 
     // CRITICAL: Also sync to compositionState.metadata.key
@@ -288,6 +290,14 @@ export function setCurrentKey(value) {
         const compositionState = window.getCompositionState();
         if (compositionState && compositionState.metadata) {
             compositionState.metadata.key = value;
+        }
+    }
+
+    // Update the key selector dropdown UI if it exists
+    if (updateUI && typeof document !== 'undefined') {
+        const keySelect = document.getElementById('trainer-key-select');
+        if (keySelect && keySelect.value !== value) {
+            keySelect.value = value;
         }
     }
 }

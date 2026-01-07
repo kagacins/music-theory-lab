@@ -1592,6 +1592,8 @@ function updateSingleCardWrapper(wrapper, chord, index, key) {
         wrapper.innerHTML = createDetailedCardHTML(chord, index, key);
         // Ensure expanded class is present
         wrapper.classList.add('expanded-card-wrapper');
+        // Remove fixed width for expanded cards (they size dynamically)
+        wrapper.style.width = '';
 
         // Render chord notation on the canvas (after DOM is ready)
         requestAnimationFrame(() => {
@@ -1614,6 +1616,8 @@ function updateSingleCardWrapper(wrapper, chord, index, key) {
         wrapper.appendChild(simplifiedStructure);
         // Ensure expanded class is removed
         wrapper.classList.remove('expanded-card-wrapper');
+        // Set fixed width for simplified cards
+        wrapper.style.width = '120px';
     }
 
     // Re-attach event listeners
@@ -2166,7 +2170,7 @@ function renderProgressionDisplayImmediate(containerId = 'progression-visualizat
             initializeSimplifiedSortable(gridContainer);
         } else {
             // Default: Use flexbox with horizontal scroll (no wrapping)
-            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-1 overflow-x-auto pb-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                     showActionButtons: true
@@ -2258,7 +2262,7 @@ function renderProgressionDisplayImmediate(containerId = 'progression-visualizat
             initializeSimplifiedSortable(gridContainer);
         } else {
             // Default: Use flexbox with horizontal scroll (no wrapping)
-            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-1 overflow-x-auto pb-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                     showActionButtons: false
@@ -4282,7 +4286,7 @@ function createSectionChip(section, isSelected, onClick) {
  */
 function renderScrollViewMode(gridContainer, progressionData, key, options = {}) {
     // Apply scroll view container styles
-    gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+    gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-1 overflow-x-auto pb-2';
     gridContainer.style.cssText = `
         scroll-behavior: smooth;
         -webkit-overflow-scrolling: touch;
@@ -5417,6 +5421,11 @@ function createChordCardWrapper(chord, index, key) {
         : 'chord-card-wrapper no-animation'; // All cards take 1 grid cell
     wrapper.setAttribute('data-chord-index', index);
 
+    // Set fixed width for simplified cards (expanded cards size dynamically)
+    if (!isExpanded) {
+        wrapper.style.width = '120px';
+    }
+
     // Render simplified or detailed based on state
     if (isExpanded) {
         // Use local function for detailed card HTML
@@ -5466,37 +5475,11 @@ function createChordCardWrapper(chord, index, key) {
 export function createSimplifiedCardStructure(chord, index, key) {
     const fragment = document.createDocumentFragment();
 
-    // Create control bar
-    const controlBar = document.createElement('div');
-    controlBar.className = 'flex items-center justify-center gap-2 mb-1';
-    controlBar.innerHTML = `
-        <!-- Music Note/ABC Toggle -->
-        <button class="notation-toggle-btn bg-indigo-600 hover:bg-indigo-700 border-2 border-indigo-400 rounded px-2 py-1.5 transition flex items-center justify-center shadow-md" title="Toggle Notation View">
-            <svg class="music-note-icon w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path>
-            </svg>
-            <span class="abc-text hidden text-white text-xs font-bold">abc</span>
-        </button>
-        <!-- Lightbulb for Suggestions -->
-        <button class="suggestions-lightbulb-btn bg-amber-500 hover:bg-amber-600 border-2 border-amber-400 rounded px-2 py-1.5 transition flex items-center justify-center shadow-md" title="Chord Suggestions">
-            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
-            </svg>
-        </button>
-        <!-- Compare Options Button (Phase 2.1) -->
-        <button class="compare-btn bg-blue-500 hover:bg-blue-600 border-2 border-blue-400 rounded px-2 py-1.5 transition flex items-center justify-center shadow-md" title="Compare Options - Hear the Difference" data-card-index="${index}">
-            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
-                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
-            </svg>
-        </button>
-    `;
-
-    // Create card element - use local function for simplified card HTML (now migrated)
+    // Create card element - use local function for simplified card HTML
     const cardContainer = document.createElement('div');
     cardContainer.innerHTML = createSimplifiedCardHTML(chord, index, key);
 
-    // Get the entire card structure (wrapper with card + duration controls)
+    // Get the entire card structure (wrapper with card + controls below)
     const cardStructure = cardContainer.firstElementChild; // This is the <div class="relative inline-block">
 
     // Find the simplified-card inside the structure for tooltip insertion
@@ -5507,7 +5490,6 @@ export function createSimplifiedCardStructure(chord, index, key) {
         createTooltipElement(chord, index, key);
     }
 
-    fragment.appendChild(controlBar);
     if (cardStructure) {
         fragment.appendChild(cardStructure);
     }
@@ -5875,9 +5857,41 @@ function createSimplifiedCardHTML(chord, index, key) {
     const functionBorderStyle = colors.hexColor ? `border-color: ${colors.hexColor};` : '';
     const functionTopBorderStyle = colors.hexColor ? `background: linear-gradient(to right, ${colors.hexColor}, ${colors.hexColor});` : '';
 
+    // Generate duration dropdown options with emphasis
+    // Whole beats: background color + bold, Half beats: bold only
+    const durationOptions = [];
+    for (let whole = 0; whole <= 16; whole++) {
+        for (let frac = 0; frac < 1; frac += 0.25) {
+            const value = whole + frac;
+            if (value === 0) continue; // Skip 0 beats
+
+            let label;
+            if (frac === 0) {
+                label = `${whole}`;
+            } else if (frac === 0.25) {
+                label = whole === 0 ? '¼' : `${whole}¼`;
+            } else if (frac === 0.5) {
+                label = whole === 0 ? '½' : `${whole}½`;
+            } else if (frac === 0.75) {
+                label = whole === 0 ? '¾' : `${whole}¾`;
+            }
+
+            // Styling: whole beats get background, half beats get bold
+            let style = '';
+            if (frac === 0) {
+                style = 'background-color: #374151; font-weight: bold;'; // whole beats
+            } else if (frac === 0.5) {
+                style = 'font-weight: bold;'; // half beats
+            }
+
+            const selected = value === totalBeats ? 'selected' : '';
+            durationOptions.push(`<option value="${value}" ${selected} style="${style}">${label}</option>`);
+        }
+    }
+
     return `
-        <div class="relative inline-block">
-            <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-xl overflow-hidden hover:shadow-xl transition-all shadow-lg relative" style="min-height: 80px; ${functionBorderStyle}">
+        <div class="relative border border-gray-300 rounded-xl p-1" style="width: 118px;">
+            <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-xl overflow-hidden hover:shadow-xl transition-all shadow-lg relative w-full" style="min-height: 70px; ${functionBorderStyle}">
                 <!-- Inversion indicator (top-left corner) -->
                 ${inversionText ? `<div class="absolute top-2 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
 
@@ -5920,27 +5934,44 @@ function createSimplifiedCardHTML(chord, index, key) {
                 </div>
 
                 <!-- Notation view (hidden by default, light background) -->
-                <div class="notation-view hidden flex items-center justify-center h-full p-2 bg-gray-50" style="min-height: 80px;">
+                <div class="notation-view hidden flex items-center justify-center h-full p-2 bg-gray-50" style="min-height: 70px;">
                     <canvas class="simplified-notation-canvas"></canvas>
                 </div>
             </div>
 
-            <!-- Duration controls (dangling below card) -->
-            <div class="flex items-center justify-center gap-1 mt-1 px-2 py-1 rounded-md text-xs" style="background: #1a1a2e; border: 1px solid #2a2a4e;">
-                <span class="text-gray-300 text-[10px]">Dur:</span>
-                <select class="duration-whole-select bg-gray-800 text-white border border-gray-600 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" title="Whole beats" data-card-index="${index}">
-                    ${[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map(n =>
-                        `<option value="${n}" ${n === wholeBeats ? 'selected' : ''}>${n}</option>`
-                    ).join('')}
-                </select>
-                <span class="text-gray-400 text-[10px]">+</span>
-                <select class="duration-frac-select bg-gray-800 text-white border border-gray-600 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" title="Fractional beats" data-card-index="${index}">
-                    <option value="0" ${fractionalBeats === 0 ? 'selected' : ''}>0</option>
-                    <option value="0.25" ${fractionalBeats === 0.25 ? 'selected' : ''}>¼</option>
-                    <option value="0.5" ${fractionalBeats === 0.5 ? 'selected' : ''}>½</option>
-                    <option value="0.75" ${fractionalBeats === 0.75 ? 'selected' : ''}>¾</option>
-                </select>
-                <span class="text-gray-400 text-[10px]">♩</span>
+            <!-- Controls below card: duration dropdown + action buttons -->
+            <div class="flex flex-col items-center gap-1 mt-1">
+                <!-- Duration dropdown with label -->
+                <div class="flex items-center justify-center gap-1 w-full">
+                    <span class="text-[9px] text-gray-900 font-medium whitespace-nowrap">Beats:</span>
+                    <select class="duration-select bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-[11px] text-center focus:outline-none focus:ring-1 focus:ring-indigo-500 min-w-[50px]" title="Duration (beats)" data-card-index="${index}">
+                        ${durationOptions.join('')}
+                    </select>
+                </div>
+
+                <!-- Action buttons row -->
+                <div class="flex items-center gap-1">
+                    <!-- Notation toggle -->
+                    <button class="notation-toggle-btn bg-indigo-600 hover:bg-indigo-700 rounded px-1.5 py-1 transition flex items-center justify-center" title="Toggle Notation View">
+                        <svg class="music-note-icon w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path>
+                        </svg>
+                        <span class="abc-text hidden text-white text-[9px] font-bold">abc</span>
+                    </button>
+                    <!-- Suggestions -->
+                    <button class="suggestions-lightbulb-btn bg-amber-500 hover:bg-amber-600 rounded px-1.5 py-1 transition flex items-center justify-center" title="Chord Suggestions">
+                        <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
+                        </svg>
+                    </button>
+                    <!-- Compare -->
+                    <button class="compare-btn bg-blue-500 hover:bg-blue-600 rounded px-1.5 py-1 transition flex items-center justify-center" title="Compare Options" data-card-index="${index}">
+                        <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -6222,22 +6253,108 @@ function handleCardDragWithinSection(evt, originalSectionId) {
 
     // Update section membership if changed
     if (fromSectionId !== toSectionId) {
-        // Remove from old section
-        if (fromSectionId && !fromSectionId.startsWith('no-group')) {
-            compositionState.removeChordFromSection(oldChordIndex);
+        saveStateBeforeChange();
+
+        console.log('[handleCardDragWithinSection] === CROSS-SECTION DRAG ===');
+        console.log('  fromSectionId:', fromSectionId);
+        console.log('  toSectionId:', toSectionId);
+        console.log('  oldChordIndex:', oldChordIndex);
+        console.log('  sections BEFORE:', JSON.stringify(compositionState.sections.map(s => ({id: s.id, name: s.name, start: s.startIndex, count: s.chordCount}))));
+
+        const trainerState = getTrainerState();
+        const toSection = toSectionId && !toSectionId.startsWith('no-group')
+            ? compositionState.getSection(toSectionId)
+            : null;
+
+        console.log('  toSection:', toSection ? {id: toSection.id, name: toSection.name, start: toSection.startIndex, count: toSection.chordCount} : null);
+
+        // Calculate where the chord should be moved to
+        let targetIndex = oldChordIndex; // Default: no movement
+        let insertIndex = oldChordIndex;
+
+        if (toSection) {
+            // Find position within the new section based on where the card was dropped
+            const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+            const positionInSection = Array.from(sectionCards).indexOf(draggedItem);
+            console.log('  positionInSection:', positionInSection, 'of', sectionCards.length, 'cards');
+
+            // Calculate target position in the progression
+            const sectionStart = toSection.startIndex;
+            const sectionEnd = toSection.startIndex + toSection.chordCount - 1;
+
+            if (positionInSection <= 0) {
+                // Dropped at/before the start of the section
+                targetIndex = sectionStart;
+            } else if (positionInSection >= toSection.chordCount) {
+                // Dropped at/after the end of the section
+                targetIndex = sectionEnd + 1;
+            } else {
+                // Dropped in the middle
+                targetIndex = sectionStart + positionInSection;
+            }
+
+            // Calculate actual insert index after removal
+            insertIndex = targetIndex;
+            if (oldChordIndex < targetIndex) {
+                insertIndex--;
+            }
+            console.log('  targetIndex:', targetIndex, 'insertIndex:', insertIndex);
         }
-        // Add to new section (if dropping into a real section, not a pseudo-section)
-        if (toSectionId && !toSectionId.startsWith('no-group')) {
-            const section = compositionState.getSection(toSectionId);
-            if (section) {
-                // Find position within the new section
-                const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
-                const positionInSection = Array.from(sectionCards).indexOf(draggedItem);
-                compositionState.addChordToSection(oldChordIndex, toSectionId, positionInSection);
+
+        // Step 1: Move the chord data if needed
+        if (oldChordIndex !== targetIndex && oldChordIndex !== insertIndex) {
+            console.log('  Moving chord data from', oldChordIndex, 'to', insertIndex);
+            const chord = trainerState.progressionData[oldChordIndex];
+            const roman = trainerState.progressionRomans[oldChordIndex];
+
+            // Remove from old position
+            const newProgressionData = [...trainerState.progressionData];
+            const newProgressionRomans = [...trainerState.progressionRomans];
+            newProgressionData.splice(oldChordIndex, 1);
+            newProgressionRomans.splice(oldChordIndex, 1);
+
+            // Insert at new position
+            newProgressionData.splice(insertIndex, 0, chord);
+            newProgressionRomans.splice(insertIndex, 0, roman);
+
+            // Step 2: Update section indices for the move (preserveMembership=false to update memberships)
+            compositionState.updateSectionsAfterChordReorder(oldChordIndex, insertIndex, false);
+            console.log('  sections AFTER updateSectionsAfterChordReorder:', JSON.stringify(compositionState.sections.map(s => ({id: s.id, name: s.name, start: s.startIndex, count: s.chordCount}))));
+
+            // Update trainer state
+            setProgressionData(newProgressionData);
+            setProgressionRomans(newProgressionRomans);
+
+            // Step 3: The chord is now at insertIndex and updateSectionsAfterChordReorder has updated memberships
+            // But if the chord wasn't in a section before and we want it in one, or vice versa, handle that
+            const chordNowInSection = compositionState.getSectionForChord(insertIndex);
+            console.log('  chordNowInSection:', chordNowInSection ? {id: chordNowInSection.id, name: chordNowInSection.name} : null);
+
+            if (toSection && (!chordNowInSection || chordNowInSection.id !== toSectionId)) {
+                // Chord should be in toSection but isn't - add it
+                console.log('  Adding chord to section', toSectionId);
+                compositionState.addChordToSection(insertIndex, toSectionId);
+            } else if (!toSection && chordNowInSection) {
+                // Chord should be ungrouped but is in a section - remove it
+                console.log('  Removing chord from section');
+                compositionState.removeChordFromSection(insertIndex);
+            }
+        } else {
+            console.log('  No data movement needed (oldChordIndex === targetIndex or insertIndex)');
+            // No data movement needed, just update section membership
+            if (fromSectionId && !fromSectionId.startsWith('no-group')) {
+                console.log('  Removing from old section:', fromSectionId);
+                compositionState.removeChordFromSection(oldChordIndex);
+            }
+            if (toSection) {
+                console.log('  Adding to new section:', toSectionId);
+                compositionState.addChordToSection(oldChordIndex, toSectionId);
             }
         }
 
-        // Re-render to reflect section membership changes (including deleted empty sections)
+        console.log('  sections FINAL:', JSON.stringify(compositionState.sections.map(s => ({id: s.id, name: s.name, start: s.startIndex, count: s.chordCount}))));
+
+        // Re-render to reflect section membership changes
         renderProgressionDisplay('progression-visualization', false);
         renderProgressionDisplay('melody-progression-visualization', true);
 
@@ -6896,23 +7013,8 @@ export function attachCardEventListeners(wrapper, index) {
             inversionWasChanged = false;
         };
 
-        // Show tooltip on hover (desktop) - use cardWrapper since tooltip is sibling to card
-        cardWrapper.addEventListener('mouseenter', (e) => {
-            isOverCard = true;
-            if (hideTimeout) {
-                clearTimeout(hideTimeout);
-                hideTimeout = null;
-            }
-            // Don't show tooltip if hovering over duration controls
-            if (e.target.closest('.duration-whole-select') || e.target.closest('.duration-frac-select')) {
-                return;
-            }
-            if (!isTooltipPinned) {
-                tooltipTimeout = setTimeout(() => {
-                    showTooltip();
-                }, 300); // Small delay for hover
-            }
-        });
+        // Show tooltip on hover (desktop) - only when over the actual card, not controls below
+        // We don't use cardWrapper mouseenter for tooltip anymore - only use simplifiedCard mouseenter below
 
         // When mouse leaves card, only cancel the pending show timeout
         cardWrapper.addEventListener('mouseleave', (e) => {
@@ -6943,6 +7045,17 @@ export function attachCardEventListeners(wrapper, index) {
         simplifiedCard.addEventListener('mousemove', () => {
             isOverCard = true;
             ensureTooltipVisible();
+        });
+
+        // Hide tooltip when mouse leaves the simplified card itself (not just the wrapper)
+        simplifiedCard.addEventListener('mouseleave', () => {
+            isOverCard = false;
+            if (tooltipTimeout) {
+                clearTimeout(tooltipTimeout);
+                tooltipTimeout = null;
+            }
+            // Schedule hide - tooltip will stay open if user moves to it
+            scheduleHideTooltip();
         });
 
         // Keep tooltip open when mouse enters it
@@ -7169,7 +7282,21 @@ export function attachCardEventListeners(wrapper, index) {
         });
     }
 
-    // === DURATION SELECTORS ===
+    // === DURATION SELECTOR (single dropdown) ===
+    const durationSelect = wrapper.querySelector('.duration-select');
+
+    if (durationSelect) {
+        durationSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            // New single dropdown - value is the total beats (e.g., "4", "2.5", "0.25")
+            const newBeats = parseFloat(e.target.value);
+            if (!isNaN(newBeats) && newBeats > 0) {
+                updateChordDuration(index, e.target, newBeats);
+            }
+        });
+    }
+
+    // Legacy support for old two-dropdown system (detailed cards may still use it)
     const durationWholeSelect = wrapper.querySelector('.duration-whole-select');
     const durationFracSelect = wrapper.querySelector('.duration-frac-select');
 

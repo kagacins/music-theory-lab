@@ -576,7 +576,7 @@ While the system is fully functional, here are optional enhancements:
 - [ ] Customizable palette themes
 
 ### 2. Advanced Features
-- [ ] AI-powered suggestions (ML integration)
+- [ ] Advanced theory-based suggestions (pattern analysis)
 - [ ] Pattern recognition from user's style
 - [ ] Template-based progressions
 - [ ] Multi-voice suggestions

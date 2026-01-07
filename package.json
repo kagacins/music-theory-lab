@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@spotify/basic-pitch": "^1.0.1",
+    "@supabase/supabase-js": "^2.89.0",
     "@tensorflow/tfjs": "^4.10.0",
     "tonal": "^5.0.0"
   },

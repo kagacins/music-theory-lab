@@ -29,7 +29,8 @@ export default defineConfig(({ mode }) => ({
   // Development server configuration
   server: {
     port: 3000,
-    open: true, // Auto-open browser
+    strictPort: true, // Fail if port 3000 is busy instead of auto-incrementing
+    open: false, // Netlify Dev handles browser opening
     cors: true
   },
 

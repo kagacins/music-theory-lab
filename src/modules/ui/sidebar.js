@@ -213,14 +213,18 @@ export function toggleHeaderDisplays() {
 
 /**
  * Restore header displays collapsed state from localStorage
+ * Defaults to COLLAPSED to save header space for auth button
  */
 export function restoreHeaderDisplaysState() {
-    const isCollapsed = localStorage.getItem('headerDisplaysCollapsed') === 'true';
-    if (isCollapsed) {
-        const container = document.getElementById('header-display-panels');
-        const chevron = document.getElementById('header-displays-chevron');
-        const header = document.getElementById('main-header');
+    // Default to collapsed unless user has explicitly expanded (set to 'false')
+    const savedState = localStorage.getItem('headerDisplaysCollapsed');
+    const isCollapsed = savedState !== 'false'; // Collapsed by default
 
+    const container = document.getElementById('header-display-panels');
+    const chevron = document.getElementById('header-displays-chevron');
+    const header = document.getElementById('main-header');
+
+    if (isCollapsed) {
         if (container) {
             container.classList.add('collapsed');
         }

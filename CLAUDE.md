@@ -354,6 +354,58 @@ When text color isn't working:
 
 ---
 
+## CRITICAL: Chord Card Width - CSS Override Issue
+
+**Chord cards have their width set via inline styles in JavaScript, but CSS rules in `music.css` can override them with `!important`.**
+
+Both ungrouped (no sections defined) and grouped (inside sections) chord cards need explicit width rules to prevent them from becoming too narrow.
+
+### The Problem
+
+JavaScript sets `wrapper.style.width = '120px'` on chord card wrappers in `ProgressionRenderer.js`. However, CSS rules with `width: auto !important` override this, causing cards to shrink to their `min-width` value (often 90px), making them too narrow.
+
+### File Locations
+
+- **Ungrouped cards**: `music.css` around line 2076-2078
+- **Grouped cards (in sections)**: `music.css` lines 4166-4171
+
+### Current Fixed Values
+
+**Ungrouped chord cards** (before any sections are created):
+```css
+/* Around line 2076-2078 in music.css */
+/* The rule that was overriding inline width: 120px */
+/* Changed from width: auto !important to: */
+width: 118px !important;
+min-width: 118px;
+```
+
+**Grouped chord cards** (inside `.section-cards-area`):
+```css
+/* Lines 4166-4171 in music.css */
+.section-cards-area .chord-card-wrapper {
+    flex-shrink: 0;
+    width: 118px !important; /* Fixed width to match ungrouped cards */
+    min-width: 118px; /* Match ungrouped card width */
+    max-width: 300px; /* Maximum for expanded cards */
+}
+```
+
+### If Cards Appear Too Narrow
+
+1. Check if a CSS rule is setting `width: auto !important`
+2. Look in `music.css` for rules targeting `.chord-card-wrapper`
+3. The fix is to set an explicit width with `!important` (e.g., `width: 118px !important`)
+4. Both `width` and `min-width` should be set to the same value
+
+### Note on Width Values
+
+- **118px** is the current standard width for both grouped and ungrouped cards
+- This value accounts for padding and ensures consistent card sizing
+- Expanded cards (with notation view) use `width: fit-content` and are not affected
+
+---
+
 ## CRITICAL: Collapsible Card Header Patterns
 
 **When adding buttons or toggles to collapsible card headers, follow the established pattern exactly.**

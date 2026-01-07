@@ -275,6 +275,9 @@ export function initMobileFab() {
     // Expose closeFab globally so it can be called on tab change
     window.closeFab = closeFab;
 
+    // Expose closeAllSubmenus globally so actions can close dropdowns without closing the entire FAB
+    window.closeFabSubmenus = closeAllSubmenus;
+
     // Quick Play Chord button - press-and-hold pattern for Chord Lab
     if (fabPlayChordQuick) {
         // Mouse events

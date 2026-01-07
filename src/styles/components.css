@@ -276,7 +276,7 @@
 #progression-visualization,
 #melody-progression-visualization,
 #builder-progression-visualization {
-    gap: 0.25rem !important; /* Force 4px gap between cards for minimal white space */
+    gap: 2px !important; /* Minimal gap between cards */
     overflow: visible !important; /* Allow tooltips to escape container */
 }
 
@@ -325,8 +325,9 @@
     overflow: visible; /* prevent ring/outline clipping */
     /* Add padding to prevent selection ring from being clipped by parent containers */
     /* ring-4 = 4px ring, ring-offset-2 = 2px offset, so need 6px+ padding */
-    padding-top: 8px;
-    margin-top: -8px; /* Offset the padding to maintain original spacing */
+    /* Also need room for hover menu above card (32px = -top-8) */
+    padding-top: 36px;
+    margin-top: -36px; /* Offset the padding to maintain original spacing */
     flex-shrink: 0; /* Prevent cards from shrinking in flex containers */
 }
 

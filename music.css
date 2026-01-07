@@ -1076,6 +1076,10 @@ a:focus-visible {
     opacity: 0;
     margin: 0;
     padding: 0;
+    /* CRITICAL: Also collapse height to prevent vertical overflow */
+    height: 0;
+    min-height: 0;
+    visibility: hidden;
 }
 
 #header-displays-chevron {
@@ -2063,7 +2067,7 @@ button:disabled {
     margin: 0 !important; /* Remove any margins that might cause overlap */
     box-sizing: border-box !important; /* Ensure padding is included in width */
     flex-shrink: 0; /* Prevent cards from shrinking and overlapping */
-    padding: 4px !important; /* Padding to show multi-select outline (2px offset + 2px width) */
+    padding: 2px !important; /* Minimal padding for multi-select outline */
     overflow: visible; /* Allow ring highlight to show */
 }
 
@@ -2074,8 +2078,8 @@ button:disabled {
 
 /* Flex layout: Cards should size naturally */
 [id$="-cards-grid"].flex > .chord-card-wrapper:not(.expanded-card-wrapper):not(.has-notation) {
-    width: auto !important; /* Natural width in flexbox */
-    min-width: 90px; /* Minimum card width */
+    width: 118px !important; /* Fixed width for simplified cards */
+    min-width: 118px; /* Minimum card width */
 }
 
 /* Fix for simplified cards in progression visualization - prevent overflow */
@@ -4165,8 +4169,8 @@ canvas {
 /* Cards inside a section - proper sizing for flex layout */
 .section-cards-area .chord-card-wrapper {
     flex-shrink: 0; /* Don't shrink cards */
-    width: auto !important; /* Override the 100% width from grid layout */
-    min-width: 90px; /* Minimum card width */
+    width: 118px !important; /* Fixed width to match ungrouped cards */
+    min-width: 118px; /* Match ungrouped card width */
     max-width: 300px; /* Maximum for expanded cards */
 }
 

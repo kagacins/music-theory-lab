@@ -3,7 +3,7 @@
  * This function hides the API key from the client-side code
  */
 
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
     // Only allow GET requests
     if (event.httpMethod !== 'GET') {
         return {

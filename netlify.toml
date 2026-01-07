@@ -6,6 +6,14 @@
   # Publish the built output directory
   publish = "dist"
 
+[dev]
+  # Explicitly set the dev command to avoid framework detection issues
+  command = "npm run dev"
+  targetPort = 3000
+  port = 8888
+  autoLaunch = true
+  framework = "vite"
+
 [build.environment]
   # Increase Node heap size to prevent out-of-memory during Vite build
   NODE_OPTIONS = "--max_old_space_size=4096"

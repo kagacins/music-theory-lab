@@ -423,7 +423,7 @@ FeatureFlags.disable(FeatureFlags.FLAGS.AUTO_SHOW_SUGGESTIONS);
 ### Future Enhancements
 
 - **Template-Based Progressions** - Pre-built chord sequences
-- **AI-Powered Suggestions** - Machine learning integration
+- **Advanced Theory Analysis** - Pattern-based recommendations
 - **Multi-Voice Suggestions** - Simultaneous melody + harmony
 - **Pattern Recognition** - Learn from user's style
 - **Collaborative Suggestions** - Share suggestion sets

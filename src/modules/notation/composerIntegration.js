@@ -90,6 +90,9 @@ export class NotationComposer {
     this.activeNotes = new Set();     // Note IDs for red highlighting during playback
     this.hoveredMeasureIndex = -1;    // Track hovered measure for edit icon overlay
     this.measureEditOverlay = null;   // DOM element for measure edit icon
+    this.lastMouseClientX = 0;        // Track last mouse position for scroll detection
+    this.lastMouseClientY = 0;
+    this.overlayPositionCheckInterval = null; // Interval to check if mouse moved away during scroll
 
     // Playback cursor state
     this.playbackCursor = null;       // { measureIndex, beat } for vertical cursor line
@@ -1018,11 +1021,13 @@ export class NotationComposer {
     const key = this.compositionState
       ? this.compositionState.metadata.key
       : getCurrentKey() || 'C';
+    console.log('[performRender] Key signature:', key, '| from compositionState:', !!this.compositionState);
 
     // Get time signature
     const timeSig = this.compositionState
       ? `${this.compositionState.metadata.timeSignature.num}/${this.compositionState.metadata.timeSignature.denom}`
       : '4/4';
+    console.log('[performRender] Time signature:', timeSig);
 
     // Calculate layout
     this.layoutManager.calculateLayout(measures.length, {
@@ -1954,6 +1959,13 @@ export class NotationComposer {
 
     // Mouse leave - cancel any pending hold
     container.addEventListener('mouseleave', () => this.handleCanvasMouseLeave());
+
+    // Wheel event - hide measure edit overlay during trackpad/mouse wheel scrolling
+    // (wheel fires directly from input device, unlike scroll which only fires on scrollable elements)
+    container.addEventListener('wheel', () => this.hideMeasureEditOverlay(), { passive: true });
+
+    // Also listen on document for wheel events anywhere (captures trackpad scrolling over the page)
+    document.addEventListener('wheel', () => this.hideMeasureEditOverlay(), { passive: true });
   }
 
   /**
@@ -2559,6 +2571,10 @@ export class NotationComposer {
    * @param {MouseEvent} e - Mouse event
    */
   handleMouseMove(e) {
+    // Track mouse position for scroll detection (mouse stays still but page moves)
+    this.lastMouseClientX = e.clientX;
+    this.lastMouseClientY = e.clientY;
+
     // Use e.target (the actual canvas) for correct coordinates in multi-page mode
     const target = e.target || this.config.container;
     const rect = target.getBoundingClientRect();
@@ -2762,6 +2778,10 @@ export class NotationComposer {
     overlay.style.left = `${x - 14}px`;
     overlay.style.top = `${y - 14}px`;
     overlay.style.display = 'block';
+
+    // Start position check interval to detect scroll-induced mouse movement
+    // (trackpad scrolling moves the page but doesn't fire mouse events)
+    this.startOverlayPositionCheck();
   }
 
   /**
@@ -2769,11 +2789,54 @@ export class NotationComposer {
    * @param {boolean} preserveIndex - If true, don't reset hoveredMeasureIndex (used when clicking)
    */
   hideMeasureEditOverlay(preserveIndex = false) {
+    // Stop position check interval
+    this.stopOverlayPositionCheck();
+
     if (this.measureEditOverlay) {
       this.measureEditOverlay.style.display = 'none';
     }
     if (!preserveIndex) {
       this.hoveredMeasureIndex = -1;
+    }
+  }
+
+  /**
+   * Start interval to check if mouse is still over the measure
+   * This detects when scrolling moves the page away from the mouse
+   */
+  startOverlayPositionCheck() {
+    // Clear any existing interval
+    this.stopOverlayPositionCheck();
+
+    // Check every 100ms if mouse is still over a measure
+    this.overlayPositionCheckInterval = setInterval(() => {
+      if (this.isMouseOverEditOverlay) return; // Don't hide if mouse is on overlay
+
+      // Get element at last known mouse position
+      const elementAtPoint = document.elementFromPoint(this.lastMouseClientX, this.lastMouseClientY);
+      if (!elementAtPoint) {
+        this.hideMeasureEditOverlay();
+        return;
+      }
+
+      // Check if mouse is still over a canvas (notation area)
+      const isOverCanvas = elementAtPoint.tagName === 'CANVAS' ||
+                           elementAtPoint.closest('#notation-container') ||
+                           elementAtPoint.closest('.notation-page');
+
+      if (!isOverCanvas) {
+        this.hideMeasureEditOverlay();
+      }
+    }, 100);
+  }
+
+  /**
+   * Stop the overlay position check interval
+   */
+  stopOverlayPositionCheck() {
+    if (this.overlayPositionCheckInterval) {
+      clearInterval(this.overlayPositionCheckInterval);
+      this.overlayPositionCheckInterval = null;
     }
   }
 

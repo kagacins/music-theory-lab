@@ -24,7 +24,7 @@
 
 ## Executive Summary
 
-Music Theory Lab is already a remarkably comprehensive application with world-class AI-powered chord recommendations, professional notation rendering, and structured learning content. To become the undisputed best music theory teaching and composition tool, we need to:
+Music Theory Lab is already a remarkably comprehensive application with world-class theory-based chord recommendations, professional notation rendering, and structured learning content. To become the undisputed best music theory teaching and composition tool, we need to:
 
 1. **Fill critical gaps** in music theory coverage (scales, modulation, rhythm)
 2. **Add differentiating features** no competitor has (ear training + composition integration)

@@ -1005,10 +1005,69 @@ export function generateComprehensiveRecommendations(
                         forwardContextBonus;  // Phase 4: Forward context (leads well to next chord)
                 }
 
-                // Apply penalty for recommending the exact same chord and inversion
-                // (Generally not musically useful to repeat the exact same chord immediately)
-                if (nextRoot === currentRoot && nextType === currentChordType && nextInversion === currentInversion) {
-                    totalScore *= 0.3; // 70% penalty for exact repetition
+                // Apply penalty for recommending chords that have been repeated consecutively
+                // BEFORE the current chord position (small lookback window)
+                // This prevents suggesting the same chord when it's already been used multiple times in a row
+                let consecutiveRepetitions = 0;
+                const REPETITION_LOOKBACK = 3; // Only look back 3 chords max
+
+                // Get the current chord's position in the progression
+                const currentChordIdx = sectionInfo?.currentChordIndex ?? (progressionData.length - 1);
+
+                if (progressionData && progressionData.length > 0 && currentChordIdx >= 0) {
+                    // Look backwards from current position (inclusive) within the lookback window
+                    const startIdx = Math.max(0, currentChordIdx - REPETITION_LOOKBACK + 1);
+                    for (let i = currentChordIdx; i >= startIdx; i--) {
+                        const historyChord = progressionData[i];
+                        if (historyChord &&
+                            historyChord.root === nextRoot &&
+                            historyChord.type === nextType) {
+                            consecutiveRepetitions++;
+                        } else {
+                            break; // Stop at first non-matching chord
+                        }
+                    }
+                }
+
+                // Apply increasingly sharp penalty based on consecutive repetitions
+                // 1 repetition (same as current): 0.3 multiplier (70% penalty)
+                // 2 consecutive: 0.15 multiplier (85% penalty)
+                // 3 consecutive: 0.05 multiplier (95% penalty) - almost never suggest
+                if (consecutiveRepetitions > 0) {
+                    let repetitionPenalty;
+                    if (consecutiveRepetitions === 1) {
+                        repetitionPenalty = 0.3;  // Same as before for single repetition
+                    } else if (consecutiveRepetitions === 2) {
+                        repetitionPenalty = 0.15; // Much stronger for 2 in a row
+                    } else {
+                        repetitionPenalty = 0.05; // Nearly eliminate for 3+ in a row
+                    }
+                    totalScore *= repetitionPenalty;
+                }
+
+                // Apply lighter "recent usage" penalty for non-consecutive appearances
+                // This encourages variety without blocking valid musical choices
+                // Only applies if we didn't already apply the consecutive penalty
+                if (consecutiveRepetitions === 0 && progressionData && progressionData.length > 0) {
+                    const VARIETY_LOOKBACK = 4; // Look back 4 chords for variety
+                    let recentAppearances = 0;
+                    const startIdx = Math.max(0, currentChordIdx - VARIETY_LOOKBACK + 1);
+
+                    for (let i = currentChordIdx; i >= startIdx; i--) {
+                        const historyChord = progressionData[i];
+                        if (historyChord &&
+                            historyChord.root === nextRoot &&
+                            historyChord.type === nextType) {
+                            recentAppearances++;
+                        }
+                    }
+
+                    // Light penalty: 15% per appearance, max 40% total penalty
+                    // This nudges toward variety but doesn't crush valid musical choices
+                    if (recentAppearances > 0) {
+                        const varietyPenalty = Math.max(0.6, 1 - (recentAppearances * 0.15));
+                        totalScore *= varietyPenalty;
+                    }
                 }
 
                 // Apply tension-aware scoring for suspended chords

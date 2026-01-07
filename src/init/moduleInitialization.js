@@ -135,6 +135,21 @@ import {
     initMobileFab
 } from '../modules/ui/floatingActionButton.js';
 
+import {
+    initAuthButton
+} from '../modules/community/authButton.js';
+
+import {
+    initShareModal
+} from '../modules/community/shareModal.js';
+
+import {
+    initCommunityBrowser
+} from '../modules/community/communityBrowser.js';
+
+// Import mySubmissions module (registers window functions on import)
+import '../modules/community/mySubmissions.js';
+
 
 /**
  * Helper function to update the toolbar editing context indicator
@@ -377,4 +392,16 @@ export async function initializeModules() {
     setTimeout(() => {
         initMobileFab();
     }, 100);
+
+    // ===========================
+    // COMMUNITY FEATURES INITIALIZATION
+    // ===========================
+
+    // Initialize Auth Button (Sign In / User Avatar in header)
+    // Delayed to ensure DOM is ready
+    setTimeout(() => {
+        initAuthButton();
+        initShareModal();
+        initCommunityBrowser();
+    }, 150);
 }

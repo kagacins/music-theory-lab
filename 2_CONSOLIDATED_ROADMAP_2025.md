@@ -465,13 +465,13 @@ User completes challenge
 
 ## Conclusion
 
-Music Theory Lab has **completed its foundation** with exports, onboarding, and sophisticated AI-powered composition tools all in place. The strategic opportunity now lies in **making every interaction a teaching moment** while **making every lesson produce real music**.
+Music Theory Lab has **completed its foundation** with exports, onboarding, and sophisticated theory-based composition tools all in place. The strategic opportunity now lies in **making every interaction a teaching moment** while **making every lesson produce real music**.
 
 ### What's Done
 - Full export pipeline (MIDI, PDF, Audio, Shareable Links)
 - Interactive onboarding via "Let It Be" tutorials
 - 65+ song structure templates
-- AI-powered chord recommendations with voice leading analysis
+- Theory-based chord recommendations with voice leading analysis
 - 20+ structured lessons with multi-level explanations
 
 ### The Next Leap

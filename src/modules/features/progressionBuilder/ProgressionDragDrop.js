@@ -702,6 +702,9 @@ export function handleChordMoveToSection(evt) {
  */
 export function handleCardDragWithinSection(evt, originalSectionId) {
     console.log('[handleCardDragWithinSection] Using NEW section model');
+    console.log('[handleCardDragWithinSection] evt.from:', evt.from?.className, 'data-section-id:', evt.from?.getAttribute('data-section-id'));
+    console.log('[handleCardDragWithinSection] evt.to:', evt.to?.className, 'data-section-id:', evt.to?.getAttribute('data-section-id'));
+    console.log('[handleCardDragWithinSection] originalSectionId param:', originalSectionId);
 
     const draggedItem = evt.item;
     const oldChordIndex = parseInt(draggedItem.getAttribute('data-chord-index'), 10);
@@ -733,15 +736,20 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
     const totalChords = trainerState.progressionData.length;
     const isFilteredView = visibleChordOrder.length < totalChords;
 
-    // Get section IDs
+    // Get section IDs from the containers
     let toSectionId = toContainer.getAttribute('data-section-id');
     let fromSectionId = fromContainer.getAttribute('data-section-id');
 
+    console.log('[handleCardDragWithinSection] toSectionId from toContainer:', toSectionId);
+    console.log('[handleCardDragWithinSection] fromSectionId from fromContainer:', fromSectionId);
+
     if (!fromSectionId) {
         fromSectionId = draggedItem.getAttribute('data-in-section');
+        console.log('[handleCardDragWithinSection] fromSectionId from draggedItem:', fromSectionId);
     }
     if (!toSectionId && isFilteredView) {
         toSectionId = draggedItem.getAttribute('data-in-section');
+        console.log('[handleCardDragWithinSection] toSectionId from draggedItem (filtered view):', toSectionId);
     }
 
     // Check if dropped on main container (outside any section)
@@ -847,18 +855,17 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
                 compositionState.reorderChord(oldChordIndex, newChordIndex);
             }
 
-            // Also update trainerState arrays to stay in sync
-            const progressionData = [...trainerState.progressionData];
+            // CRITICAL FIX: Sync trainerState FROM compositionState after reorder
+            // compositionState.reorderChord() updates storedProgressionData internally
+            // We must sync trainerState to match, NOT do a separate manual splice
+            const reorderedData = compositionState.exportToProgressionData();
+            console.log(`[handleCardDragWithinSection] After reorder, compositionState has ${reorderedData.length} chords`);
+            trainerState.progressionData = reorderedData;
+
+            // Also reorder the romans array to match
             const progressionRomans = [...trainerState.progressionRomans];
-
-            const [movedChord] = progressionData.splice(oldChordIndex, 1);
-            progressionData.splice(newChordIndex, 0, movedChord);
-
             const [movedRoman] = progressionRomans.splice(oldChordIndex, 1);
             progressionRomans.splice(newChordIndex, 0, movedRoman);
-
-            // Use direct assignment to avoid triggering another sync
-            trainerState.progressionData = progressionData;
             trainerState.progressionRomans = progressionRomans;
         }
 
@@ -885,148 +892,145 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
     }
 
     // Handle section membership change (card moved between sections)
-    // NOTE: All sections are now "real" sections, including ungrouped ones
+    // SIMPLIFIED APPROACH: Read the DOM to determine new order and section assignments
+    console.log(`[handleCardDragWithinSection] Comparing sections: fromSectionId="${fromSectionId}" toSectionId="${toSectionId}" equal=${fromSectionId === toSectionId}`);
     if (fromSectionId !== toSectionId) {
         console.log(`[handleCardDragWithinSection] Cross-section move: from ${fromSectionId} to ${toSectionId}`);
 
-        // Get the visual position in the destination container
-        const containerCards = Array.from(toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
-        const visualPosition = containerCards.indexOf(draggedItem);
+        // Find the main grid container
+        const mainGrid = toContainer.closest('[id$="-cards-grid"]') ||
+                        toContainer.closest('#progression-visualization') ||
+                        toContainer.closest('#melody-progression-visualization');
 
-        // Calculate target position based on visual drop location
-        let targetChordIndex = oldChordIndex;
-        const toSection = toSectionId ? compositionState.getSection(toSectionId) : null;
+        if (!mainGrid) {
+            console.error('[handleCardDragWithinSection] Could not find main grid container');
+            return;
+        }
 
-        if (containerCards.length > 1) {
-            if (visualPosition === 0) {
-                // Dropped at the start - should be before the next card
-                const nextCard = containerCards[1];
-                if (nextCard) {
-                    const nextIdx = parseInt(nextCard.getAttribute('data-chord-index'), 10);
-                    targetChordIndex = nextIdx;
-                    if (oldChordIndex < nextIdx) targetChordIndex--;
-                }
-            } else {
-                // Dropped after another card - should be after that card
-                const prevCard = containerCards[visualPosition - 1];
-                if (prevCard) {
-                    const prevIdx = parseInt(prevCard.getAttribute('data-chord-index'), 10);
-                    targetChordIndex = prevIdx + 1;
-                    if (oldChordIndex < prevIdx) targetChordIndex--;
-                }
+        // Read the DOM to get the new chord order and section assignments
+        // The DOM now reflects the visual state after the drop
+        const sectionContainers = Array.from(mainGrid.querySelectorAll('.section-unified-container'));
+
+        const newOrder = [];  // Array of { oldIndex, sectionId }
+
+        sectionContainers.forEach(sectionEl => {
+            const sectionId = sectionEl.getAttribute('data-section-id');
+            const cardsArea = sectionEl.querySelector('.section-cards-area');
+            if (!cardsArea) return;
+
+            const cards = Array.from(cardsArea.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+            cards.forEach(card => {
+                const oldIdx = parseInt(card.getAttribute('data-chord-index'), 10);
+                newOrder.push({ oldIndex: oldIdx, sectionId });
+            });
+        });
+
+        console.log('[handleCardDragWithinSection] DOM order after drop:',
+            newOrder.map(x => `${x.oldIndex}→${x.sectionId}`).join(', '));
+
+        // Validate we have all chords
+        const totalChords = trainerState.progressionData.length;
+        if (newOrder.length !== totalChords) {
+            console.error(`[handleCardDragWithinSection] Chord count mismatch: DOM has ${newOrder.length}, data has ${totalChords}`);
+            // Force re-render to reset
+            if (window.renderProgressionDisplay) {
+                window.renderProgressionDisplay('progression-visualization', false);
+                window.renderProgressionDisplay('melody-progression-visualization', true);
             }
-        } else if (containerCards.length === 1) {
-            // Only card in container is the dragged card itself
-            // Determine position based on target section or surrounding sections
-            if (toSection) {
-                targetChordIndex = toSection.startIndex;
-            } else {
-                // Fallback: look at surrounding sections
-                const mainContainer = toContainer.closest('[id$="-cards-grid"]') ||
-                                     toContainer.closest('.flex.flex-wrap') ||
-                                     toContainer.closest('#progression-visualization');
+            return;
+        }
 
-                if (mainContainer) {
-                    const allSectionContainers = Array.from(mainContainer.querySelectorAll('.section-unified-container'));
-                    const toContainerParent = toContainer.closest('.section-unified-container');
-                    const toContainerIndex = allSectionContainers.indexOf(toContainerParent);
+        // Build the reordering: newOrder[newPosition].oldIndex tells us which chord goes where
+        const oldIndices = newOrder.map(x => x.oldIndex);
 
-                    let prevSectionLastChord = -1;
-                    let nextSectionFirstChord = Infinity;
+        // Reorder the progression data to match the new DOM order
+        const oldProgressionData = [...trainerState.progressionData];
+        const oldProgressionRomans = [...trainerState.progressionRomans];
+        const newProgressionData = oldIndices.map(oldIdx => oldProgressionData[oldIdx]);
+        const newProgressionRomans = oldIndices.map(oldIdx => oldProgressionRomans[oldIdx]);
 
-                    // Check previous sections for their last chord
-                    for (let i = toContainerIndex - 1; i >= 0; i--) {
-                        const prevCards = allSectionContainers[i].querySelectorAll('.chord-card-wrapper[data-chord-index]');
-                        if (prevCards.length > 0) {
-                            const lastCard = prevCards[prevCards.length - 1];
-                            const lastIdx = parseInt(lastCard.getAttribute('data-chord-index'), 10);
-                            if (lastIdx !== oldChordIndex) {
-                                prevSectionLastChord = lastIdx;
-                                break;
-                            }
-                        }
+        // Update trainerState
+        trainerState.progressionData = newProgressionData;
+        trainerState.progressionRomans = newProgressionRomans;
+
+        // Update compositionState - sync with the new progression data
+        if (typeof compositionState.syncWithProgressionData === 'function') {
+            console.log('[handleCardDragWithinSection] Syncing compositionState with new order');
+            compositionState.syncWithProgressionData(newProgressionData, {
+                key: compositionState.metadata?.key || 'C',
+                timeSignature: compositionState.metadata?.timeSignature || { num: 4, denom: 4 }
+            });
+        }
+
+        // Now rebuild section boundaries from the DOM structure
+        // Group consecutive chords by sectionId
+        console.log('[handleCardDragWithinSection] Rebuilding section boundaries from DOM');
+
+        // CRITICAL: Access sections array directly, NOT via getSection() which returns COPIES!
+        const sections = compositionState.sections;
+        if (!sections) {
+            console.error('[handleCardDragWithinSection] No sections array found on compositionState');
+            return;
+        }
+
+        // Clear all existing section boundaries (but keep section metadata)
+        sections.forEach(section => {
+            section.startIndex = -1;
+            section.chordCount = 0;
+        });
+
+        // Rebuild from the DOM order
+        let currentSectionId = null;
+        let sectionStartIdx = 0;
+
+        console.log('[handleCardDragWithinSection] Processing newOrder items:');
+        newOrder.forEach((item, newIdx) => {
+            console.log(`  newIdx=${newIdx}: oldIndex=${item.oldIndex}, sectionId=${item.sectionId}`);
+            if (item.sectionId !== currentSectionId) {
+                // Finish previous section - use direct array access, not getSection()
+                if (currentSectionId !== null) {
+                    const prevSection = sections.find(s => s.id === currentSectionId);
+                    if (prevSection) {
+                        const count = newIdx - sectionStartIdx;
+                        console.log(`    Finishing ${currentSectionId}: chordCount = ${newIdx} - ${sectionStartIdx} = ${count}`);
+                        prevSection.chordCount = count;
                     }
-
-                    // Check next sections for their first chord
-                    for (let i = toContainerIndex + 1; i < allSectionContainers.length; i++) {
-                        const nextCards = allSectionContainers[i].querySelectorAll('.chord-card-wrapper[data-chord-index]');
-                        if (nextCards.length > 0) {
-                            const firstCard = nextCards[0];
-                            const firstIdx = parseInt(firstCard.getAttribute('data-chord-index'), 10);
-                            if (firstIdx !== oldChordIndex) {
-                                nextSectionFirstChord = firstIdx;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (prevSectionLastChord >= 0) {
-                        targetChordIndex = prevSectionLastChord + 1;
-                        if (oldChordIndex <= prevSectionLastChord) targetChordIndex--;
-                    } else if (nextSectionFirstChord < Infinity) {
-                        targetChordIndex = nextSectionFirstChord;
-                        if (oldChordIndex < nextSectionFirstChord) targetChordIndex--;
-                    } else {
-                        targetChordIndex = 0;
-                    }
+                }
+                // Start new section - use direct array access
+                currentSectionId = item.sectionId;
+                sectionStartIdx = newIdx;
+                const section = sections.find(s => s.id === currentSectionId);
+                if (section) {
+                    console.log(`    Starting ${currentSectionId} at startIndex=${newIdx}`);
+                    section.startIndex = newIdx;
                 }
             }
-        }
+        });
 
-        console.log(`[handleCardDragWithinSection] Moving chord ${oldChordIndex} to position ${targetChordIndex}`);
-
-        // Remove from old section (all sections are now real)
-        if (fromSectionId) {
-            console.log(`[handleCardDragWithinSection] Removing chord ${oldChordIndex} from section ${fromSectionId}`);
-            compositionState.removeChordFromSection(oldChordIndex);
-        }
-
-        // Add to new section (all sections are now real)
-        if (toSectionId) {
-            const section = compositionState.getSection(toSectionId);
-            if (section) {
-                console.log(`[handleCardDragWithinSection] Adding chord ${oldChordIndex} to section ${toSectionId}`);
-                compositionState.addChordToSection(oldChordIndex, toSectionId);
+        // Finish the last section - use direct array access
+        if (currentSectionId !== null) {
+            const lastSection = sections.find(s => s.id === currentSectionId);
+            if (lastSection) {
+                const count = newOrder.length - sectionStartIdx;
+                console.log(`  Finishing last section ${currentSectionId}: chordCount = ${newOrder.length} - ${sectionStartIdx} = ${count}`);
+                lastSection.chordCount = count;
             }
         }
 
-        // Reorder the chord to its new position if needed
-        if (oldChordIndex !== targetChordIndex) {
-            // Update section boundaries FIRST (before chord data changes)
-            if (typeof compositionState.updateSectionsAfterChordReorder === 'function') {
-                compositionState.updateSectionsAfterChordReorder(oldChordIndex, targetChordIndex);
+        // Log the rebuilt sections (using direct array to confirm changes persisted)
+        console.log('[handleCardDragWithinSection] Section boundaries after rebuild:');
+        sections.forEach(s => {
+            if (s.chordCount > 0) {
+                console.log(`  ${s.id}: startIndex=${s.startIndex}, chordCount=${s.chordCount}, type=${s.type}`);
             }
-
-            // CRITICAL: Use compositionState.reorderChord() instead of manual splice
-            // This properly reorders bass blocks BEFORE sync, preserving user edits
-            if (typeof compositionState.reorderChord === 'function') {
-                console.log(`[handleCardDragWithinSection] Cross-section: Using compositionState.reorderChord(${oldChordIndex}, ${targetChordIndex})`);
-                compositionState.reorderChord(oldChordIndex, targetChordIndex);
-            }
-
-            const trainerState = getTrainerState();
-            const progressionData = [...trainerState.progressionData];
-            const progressionRomans = [...trainerState.progressionRomans];
-
-            // Move items
-            const [movedChord] = progressionData.splice(oldChordIndex, 1);
-            progressionData.splice(targetChordIndex, 0, movedChord);
-
-            const [movedRoman] = progressionRomans.splice(oldChordIndex, 1);
-            progressionRomans.splice(targetChordIndex, 0, movedRoman);
-
-            // Use direct assignment to avoid triggering another sync
-            trainerState.progressionData = progressionData;
-            trainerState.progressionRomans = progressionRomans;
-        }
+        });
 
         // CRITICAL: Remove the dragged item from DOM before re-rendering
-        // Sortable has moved it, but we're about to rebuild the entire display
         if (draggedItem.parentNode) {
             draggedItem.parentNode.removeChild(draggedItem);
         }
 
-        // Re-render to reflect section changes
+        // Re-render to reflect changes
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('progression-visualization', false);
             window.renderProgressionDisplay('melody-progression-visualization', true);
@@ -1034,6 +1038,10 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
         if (window.refreshNotationFromProgression) {
             window.refreshNotationFromProgression();
         }
+
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { message: 'Chord moved to section', type: 'success' }
+        }));
         return; // Exit - section membership change handled
     }
 

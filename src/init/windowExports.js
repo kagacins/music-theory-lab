@@ -243,7 +243,7 @@ import {
     getNumOctaves,
     setNumOctaves
 } from '../modules/state/globalState.js';
-import { getTrainerState, setProgressionData, setIsReady, getCurrentKey, invalidateProgressionDataCache } from '../modules/state/trainerState.js';
+import { getTrainerState, setProgressionData, setIsReady, getCurrentKey, setCurrentKey, invalidateProgressionDataCache } from '../modules/state/trainerState.js';
 import {
     getBuilderRootIndex,
     getBuilderChordType,
@@ -1664,8 +1664,10 @@ export function setupWindowExports() {
                 return { success: false, error: applyResult.error };
             }
 
-            // Update title display
-            const projectTitle = result.project.metadata?.title || result.filename || 'Untitled Project';
+            // Update title display - prefer filename over default "Untitled Project"
+            const metadataTitle = result.project.metadata?.title;
+            const hasCustomTitle = metadataTitle && metadataTitle !== 'Untitled Project';
+            const projectTitle = hasCustomTitle ? metadataTitle : (result.filename || 'Untitled Project');
             console.log('[IMTL Import] SUCCESS! Project loaded:', projectTitle);
             if (window.showToast) {
                 window.showToast(`Loaded: ${projectTitle}`, { type: 'success' });
@@ -1675,6 +1677,16 @@ export function setupWindowExports() {
             console.log('[IMTL Import] Triggering final refreshNotationFromProgression...');
             if (window.refreshNotationFromProgression) {
                 window.refreshNotationFromProgression();
+            }
+
+            // Update key display in all locations (including melody-workbench-key-display)
+            if (window.syncProgressionToMelodyTab) {
+                window.syncProgressionToMelodyTab();
+            }
+
+            // Close the FAB submenus (File dropdown) without closing the entire FAB
+            if (window.closeFabSubmenus) {
+                window.closeFabSubmenus();
             }
 
             console.log('[IMTL Import] Load complete, returning success');
@@ -2310,6 +2322,7 @@ export function setupWindowExports() {
     // Trainer state functions
     window.setProgressionData = setProgressionData;
     window.getCurrentKey = getCurrentKey;
+    window.setCurrentKey = setCurrentKey;
     window.invalidateProgressionDataCache = invalidateProgressionDataCache;
 
     // Songwriting Wizard functions

@@ -88,10 +88,8 @@ export class VoiceLeadingDiagram {
         if (savedExpanded !== null) {
             this.isPanelExpanded = savedExpanded === 'true';
         }
-        const savedWarningsOnly = localStorage.getItem('voice-leading-warnings-only');
-        if (savedWarningsOnly !== null) {
-            this.showWarningsOnly = savedWarningsOnly === 'true';
-        }
+        // Note: showWarningsOnly always defaults to false ("All" mode) on page load
+        // We don't load from localStorage - user gets fresh "All" view each session
         const savedNewDropped = localStorage.getItem('voice-leading-show-new-dropped');
         if (savedNewDropped !== null) {
             this.showNewDropped = savedNewDropped === 'true';
@@ -1085,6 +1083,10 @@ export class VoiceLeadingDiagram {
                 transitionWarnings.push({ type: 'leap', description: `Large leap${largeLeaps > 1 ? 's' : ''} (${largeLeaps})` });
             }
 
+            // Check if chords are identical (all notes are common tones)
+            const allCommonTones = motions.length > 0 &&
+                motions.every(m => m.type === 'commonTone' || m.interval === 0);
+
             const transition = {
                 fromIndex: i,
                 toIndex: i + 1,
@@ -1092,6 +1094,7 @@ export class VoiceLeadingDiagram {
                 score: analysis?.score || 0,
                 warnings: transitionWarnings,
                 hasWarnings: transitionWarnings.length > 0,
+                isIdentical: allCommonTones, // Flag for identical consecutive chords
             };
 
             transitions.push(transition);
@@ -1434,11 +1437,9 @@ export class VoiceLeadingDiagram {
             }
         }
 
-        // Filter transitions if warnings-only mode
+        // In warnings-only mode, we still show ALL transitions but will render
+        // non-warning lines very faintly so warnings stand out visually
         let displayTransitions = transitions;
-        if (this.showWarningsOnly) {
-            displayTransitions = transitions.filter(t => t.hasWarnings);
-        }
 
         // Calculate diagram dimensions
         const numChords = chords.length;
@@ -1480,8 +1481,11 @@ export class VoiceLeadingDiagram {
                 }
 
                 // Skip non-warning arcs in warnings-only mode
+                // EXCEPT for identical chord transitions - always show common tone lines for those
                 if (this.showWarningsOnly && (!motion.warnings || motion.warnings.length === 0)) {
-                    return;
+                    if (!transition.isIdentical) {
+                        return;
+                    }
                 }
 
                 // Use pitch-based Y positioning for accurate visual representation

@@ -7431,13 +7431,12 @@ export class CompositionState {
         // Calculate new section's chord indices
         const newChordIndices = duplicatedChords.map((_, i) => insertionPoint + i);
 
-        // Update all existing sections' chord indices that are >= insertionPoint
+        // Update all existing sections' startIndex if they are >= insertionPoint
+        // With the new contiguous model, we only need to shift startIndex, not chordIndices
         const shiftAmount = duplicatedChords.length;
         this.sections.forEach(section => {
-            if (section.id !== sectionId) {
-                section.chordIndices = section.chordIndices.map(idx =>
-                    idx >= insertionPoint ? idx + shiftAmount : idx
-                );
+            if (section.id !== sectionId && section.startIndex >= insertionPoint) {
+                section.startIndex += shiftAmount;
             }
         });
 

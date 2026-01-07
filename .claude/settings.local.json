@@ -57,7 +57,15 @@
       "Bash(git push:*)",
       "Bash(git merge:*)",
       "Bash(git stash:*)",
-      "Bash(timeout 60 npx vite:*)"
+      "Bash(timeout 60 npx vite:*)",
+      "Bash(cat:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(ls:*)",
+      "Bash(npm install:*)",
+      "Bash(netlify dev:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []
