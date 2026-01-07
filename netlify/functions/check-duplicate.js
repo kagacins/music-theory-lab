@@ -75,6 +75,8 @@ export const handler = async (event, context) => {
 
         // First, check for exact variant match (if variantHash provided)
         // This means same chords AND same durations/inversions
+        let variantHashColumnExists = true;
+
         if (variantHash) {
             const { data: exactMatches, error: exactError } = await supabase
                 .from('submissions')
@@ -97,7 +99,8 @@ export const handler = async (event, context) => {
                 .limit(1);
 
             if (exactError) {
-                console.error('Error checking variant hash:', exactError);
+                console.log('[check-duplicate] variant_hash column not available:', exactError.message);
+                variantHashColumnExists = false;
                 // Continue to base hash check - variant_hash column might not exist yet
             } else if (exactMatches && exactMatches.length > 0) {
                 // Exact duplicate found - same chords, durations, and inversions
@@ -146,7 +149,8 @@ export const handler = async (event, context) => {
             .limit(1);
 
         if (baseHashError) {
-            console.log('base_hash column not available, falling back to progression_hash');
+            console.log('[check-duplicate] base_hash column not available, falling back to progression_hash');
+            variantHashColumnExists = false;  // If base_hash doesn't exist, variant_hash probably doesn't either
             // Fall back to progression_hash (legacy column)
             const { data: legacyMatches, error: legacyError } = await supabase
                 .from('submissions')
@@ -215,7 +219,28 @@ export const handler = async (event, context) => {
             };
         }
 
-        // Legacy behavior: no variantHash provided, treat base match as duplicate
+        // If variantHash was provided but column doesn't exist, AND this has custom
+        // durations or inversions, treat as a variant (not duplicate)
+        // This handles the case where database hasn't been migrated yet
+        if (variantHash && !variantHashColumnExists && (hasCustomDurations || hasInversions)) {
+            console.log('[check-duplicate] Treating as variant due to custom durations/inversions (DB migration pending)');
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                    isDuplicate: false,
+                    isVariant: true,
+                    matchingSubmission: formatMatchResponse(match, tags),
+                    userKeySignature: userKeySignature || 'C',
+                    hasCustomDurations: hasCustomDurations || false,
+                    hasInversions: hasInversions || false,
+                    message: `A progression with the same chords exists, but yours has different rhythm/voicing`,
+                    migrationPending: true  // Flag to indicate DB needs migration
+                })
+            };
+        }
+
+        // Legacy behavior: no variantHash provided and no custom features, treat as duplicate
         return {
             statusCode: 200,
             headers,

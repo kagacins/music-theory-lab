@@ -1021,13 +1021,10 @@ export class NotationComposer {
     const key = this.compositionState
       ? this.compositionState.metadata.key
       : getCurrentKey() || 'C';
-    console.log('[performRender] Key signature:', key, '| from compositionState:', !!this.compositionState);
-
     // Get time signature
     const timeSig = this.compositionState
       ? `${this.compositionState.metadata.timeSignature.num}/${this.compositionState.metadata.timeSignature.denom}`
       : '4/4';
-    console.log('[performRender] Time signature:', timeSig);
 
     // Calculate layout
     this.layoutManager.calculateLayout(measures.length, {

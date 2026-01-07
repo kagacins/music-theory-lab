@@ -14,7 +14,7 @@
  */
 
 import { supabase } from './supabaseClient.js';
-import { isSignedIn, getCurrentUser, getAuthToken } from './authService.js';
+import { isSignedIn, getCurrentUser, getAuthToken, getSubmissionDisplayName } from './authService.js';
 import { generateDuplicateDetectionData, extractChordsFromComposition } from './duplicateDetection.js';
 import { getCompositionState } from '../state/compositionState.js';
 import { getCurrentKey } from '../state/trainerState.js';
@@ -97,6 +97,33 @@ function getModalHTML() {
                         <input type="text" id="share-title"
                                class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
                                placeholder="Give your composition a name..." maxlength="100">
+                    </div>
+
+                    <!-- Submitting As -->
+                    <div id="share-author-section" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Submitting as</p>
+                                <p id="share-author-name" class="text-base font-medium text-gray-900 dark:text-white">Loading...</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button type="button" id="share-author-settings" class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    </svg>
+                                    Change
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex items-center gap-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="share-anonymous" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Submit anonymously</span>
+                            </label>
+                            <span class="text-xs text-gray-400" title="Your submission will still be linked to your account, but displayed as 'Anonymous' to other users">(?)</span>
+                        </div>
+                        <p id="share-author-hint" class="mt-2 text-xs text-gray-500 dark:text-gray-400 hidden"></p>
                     </div>
 
                     <!-- Description -->
@@ -606,6 +633,9 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
     // Load tags
     await loadTags();
 
+    // Populate author section
+    await populateAuthorSection();
+
     // Set up form event listeners
     setupFormListeners();
 
@@ -616,6 +646,65 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
     // Set up footer buttons
     document.getElementById('share-cancel-btn').onclick = hideShareModal;
     document.getElementById('share-submit-btn').onclick = handleSubmit;
+}
+
+/**
+ * Populate the author section with display name and set up event listeners
+ */
+async function populateAuthorSection() {
+    const authorNameEl = document.getElementById('share-author-name');
+    const authorHintEl = document.getElementById('share-author-hint');
+    const anonymousCheckbox = document.getElementById('share-anonymous');
+    const settingsBtn = document.getElementById('share-author-settings');
+
+    // Get the display name info
+    const displayInfo = await getSubmissionDisplayName();
+
+    // Update the display
+    if (displayInfo.isUsername) {
+        authorNameEl.textContent = `@${displayInfo.displayName}`;
+        authorHintEl.classList.add('hidden');
+    } else {
+        authorNameEl.textContent = displayInfo.displayName;
+        if (!displayInfo.hasUsername) {
+            authorHintEl.textContent = 'This is your Google account name. Set a username in Profile Settings for more privacy.';
+            authorHintEl.classList.remove('hidden');
+        } else {
+            authorHintEl.classList.add('hidden');
+        }
+    }
+
+    // Reset anonymous checkbox
+    anonymousCheckbox.checked = false;
+
+    // Handle anonymous checkbox change
+    anonymousCheckbox.onchange = () => {
+        if (anonymousCheckbox.checked) {
+            authorNameEl.textContent = 'Anonymous';
+            authorNameEl.classList.add('italic', 'text-gray-500');
+            authorHintEl.textContent = 'Your submission will be linked to your account but displayed as "Anonymous" to others.';
+            authorHintEl.classList.remove('hidden');
+        } else {
+            authorNameEl.classList.remove('italic', 'text-gray-500');
+            if (displayInfo.isUsername) {
+                authorNameEl.textContent = `@${displayInfo.displayName}`;
+                authorHintEl.classList.add('hidden');
+            } else {
+                authorNameEl.textContent = displayInfo.displayName;
+                if (!displayInfo.hasUsername) {
+                    authorHintEl.textContent = 'This is your Google account name. Set a username in Profile Settings for more privacy.';
+                    authorHintEl.classList.remove('hidden');
+                }
+            }
+        }
+    };
+
+    // Handle settings button click - open profile settings modal
+    settingsBtn.onclick = () => {
+        if (window.showProfileSettingsModal) {
+            window.showProfileSettingsModal();
+        }
+    };
 }
 
 /**
@@ -742,6 +831,7 @@ async function handleSubmit() {
     const category = document.querySelector('input[name="share-category"]:checked')?.value;
     const originalTitle = document.getElementById('share-original-title')?.value.trim();
     const originalArtist = document.getElementById('share-original-artist')?.value.trim();
+    const isAnonymous = document.getElementById('share-anonymous')?.checked || false;
 
     // Validation
     if (!title || title.length < 3) {
@@ -828,7 +918,9 @@ async function handleSubmit() {
                 measureCount: (compState?.getMeasures?.() || []).length,
                 // Variant metadata
                 isVariant,
-                parentSubmissionId
+                parentSubmissionId,
+                // Anonymous submission
+                isAnonymous
             })
         });
 

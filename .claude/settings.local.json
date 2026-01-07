@@ -65,7 +65,8 @@
       "Bash(netlify dev:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(git diff:*)"
     ],
     "deny": [],
     "ask": []

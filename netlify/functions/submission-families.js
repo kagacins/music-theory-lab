@@ -81,6 +81,7 @@ export const handler = async (event, context) => {
                 is_variant,
                 composition_data,
                 profiles!submissions_user_id_fkey (
+                    username,
                     display_name,
                     avatar_url
                 )
@@ -245,7 +246,9 @@ function formatSubmission(submission) {
         createdAt: submission.created_at,
         isVariant: submission.is_variant,
         author: submission.profiles ? {
-            displayName: submission.profiles.display_name,
+            displayName: submission.profiles.username
+                ? `@${submission.profiles.username}`
+                : (submission.profiles.display_name || 'Unknown'),
             avatarUrl: submission.profiles.avatar_url
         } : null
     };
@@ -256,6 +259,7 @@ function formatSubmission(submission) {
  */
 function formatVariantSummary(variant, canonical) {
     const differences = [];
+    const details = {};  // Store detailed info for tooltips
 
     // Extract duration/inversion info from composition_data if available
     const variantData = variant.composition_data?.progressionData || [];
@@ -267,6 +271,12 @@ function formatVariantSummary(variant, canonical) {
     const hasDurationDiff = JSON.stringify(variantDurations) !== JSON.stringify(canonicalDurations);
     if (hasDurationDiff) {
         differences.push('durations');
+        details.durations = {
+            variant: variantDurations,
+            canonical: canonicalDurations,
+            // Human-readable summary
+            summary: formatDurationSummary(variantDurations, canonicalDurations)
+        };
     }
 
     // Check for inversion differences
@@ -275,12 +285,25 @@ function formatVariantSummary(variant, canonical) {
     const hasInversionDiff = JSON.stringify(variantInversions) !== JSON.stringify(canonicalInversions);
     if (hasInversionDiff) {
         differences.push('inversions');
+        details.inversions = {
+            variant: variantInversions,
+            canonical: canonicalInversions,
+            // Human-readable summary
+            summary: formatInversionSummary(variantInversions)
+        };
     }
 
     // Check for key difference
     if (variant.key_signature !== canonical.key_signature) {
         differences.push(`key: ${variant.key_signature}`);
+        details.key = {
+            variant: variant.key_signature,
+            canonical: canonical.key_signature
+        };
     }
+
+    // Extract chord roots for context
+    const chordRoots = variantData.map(c => c.root || '?');
 
     return {
         id: variant.id,
@@ -288,11 +311,36 @@ function formatVariantSummary(variant, canonical) {
         upvoteCount: variant.upvote_count,
         createdAt: variant.created_at,
         differences,
+        details,  // Include detailed breakdown
+        chordRoots,  // For context in tooltips
         author: variant.profiles ? {
-            displayName: variant.profiles.display_name,
+            displayName: variant.profiles.username
+                ? `@${variant.profiles.username}`
+                : (variant.profiles.display_name || 'Unknown'),
             avatarUrl: variant.profiles.avatar_url
         } : null
     };
+}
+
+/**
+ * Format duration differences into human-readable summary
+ */
+function formatDurationSummary(variantDurations, canonicalDurations) {
+    const variantTotal = variantDurations.reduce((a, b) => a + b, 0);
+    const canonicalTotal = canonicalDurations.reduce((a, b) => a + b, 0);
+
+    if (variantTotal !== canonicalTotal) {
+        return `${variantDurations.join('-')} beats (${variantTotal} total vs ${canonicalTotal})`;
+    }
+    return `${variantDurations.join('-')} beats`;
+}
+
+/**
+ * Format inversion differences into human-readable summary
+ */
+function formatInversionSummary(inversions) {
+    const inversionNames = ['root', '1st', '2nd', '3rd'];
+    return inversions.map(inv => inversionNames[inv] || `${inv}th`).join('-');
 }
 
 /**

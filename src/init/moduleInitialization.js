@@ -170,12 +170,16 @@ function updateToolbarEditingContext(compositionState) {
  * @returns {Promise<void>}
  */
 export async function initializeModules() {
+    const startTime = performance.now();
+    console.log('[Init] Starting module initialization...');
+
     // ===========================
     // AUDIO INITIALIZATION (MUST BE FIRST)
     // ===========================
-    // Initialize audio - CRITICAL: This MUST be first and MUST use await
-    // Other modules may depend on the audio system being ready
-    await initAudio();
+    // Initialize audio - starts loading samples but doesn't block
+    // (initAudio is synchronous, sample loading happens in background)
+    initAudio();
+    console.log('[Init] Audio init started:', (performance.now() - startTime).toFixed(0), 'ms');
 
     // Initialize audio context keep-alive (resumes audio when user returns to page)
     initAudioContextKeepAlive();
@@ -205,6 +209,8 @@ export async function initializeModules() {
     // Initialize Theory Tools
     initTheoryTools();
 
+    console.log('[Init] Feature modules:', (performance.now() - startTime).toFixed(0), 'ms');
+
     // ===========================
     // TEACHING SYSTEM INITIALIZATION (TIER 1)
     // ===========================
@@ -212,6 +218,8 @@ export async function initializeModules() {
     initTheoryMoments();
     initTheoryOverlay();
     initCompositionInsights();
+
+    console.log('[Init] Teaching system:', (performance.now() - startTime).toFixed(0), 'ms');
 
     // ===========================
     // SONG ANALYZER INITIALIZATION
@@ -398,10 +406,12 @@ export async function initializeModules() {
     // ===========================
 
     // Initialize Auth Button (Sign In / User Avatar in header)
-    // Delayed to ensure DOM is ready
+    // Now non-blocking - renders immediately, loads auth state in background
     setTimeout(() => {
         initAuthButton();
         initShareModal();
         initCommunityBrowser();
-    }, 150);
+    }, 50); // Reduced delay since these are now non-blocking
+
+    console.log('[Init] Module initialization complete:', (performance.now() - startTime).toFixed(0), 'ms');
 }

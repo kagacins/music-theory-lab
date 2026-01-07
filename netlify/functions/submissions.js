@@ -121,7 +121,9 @@ async function handleGet(event, headers) {
             comment_count,
             created_at,
             user_id,
+            is_anonymous,
             profiles!submissions_user_id_fkey (
+                username,
                 display_name,
                 avatar_url
             )
@@ -209,17 +211,44 @@ async function handleGet(event, headers) {
         }
 
         // Add tags to submission objects
-        submissionsWithTags = submissionsWithTags.map(s => ({
-            ...s,
-            tags: tagsBySubmission[s.id] || [],
-            author: s.profiles ? {
-                displayName: s.profiles.display_name,
-                avatarUrl: s.profiles.avatar_url
-            } : null
-        }));
+        submissionsWithTags = submissionsWithTags.map(s => {
+            // Handle anonymous submissions
+            let author = null;
 
-        // Remove profiles object
-        submissionsWithTags.forEach(s => delete s.profiles);
+            // Debug: log profile data for first few submissions
+            if (submissionsWithTags.indexOf(s) < 3) {
+                console.log('[submissions] Profile data for', s.id, ':', JSON.stringify(s.profiles));
+            }
+
+            if (s.is_anonymous) {
+                author = {
+                    displayName: 'Anonymous',
+                    avatarUrl: null,
+                    isAnonymous: true
+                };
+            } else if (s.profiles) {
+                // Prefer username over display_name
+                author = {
+                    displayName: s.profiles.username
+                        ? `@${s.profiles.username}`
+                        : (s.profiles.display_name || 'Unknown'),
+                    avatarUrl: s.profiles.avatar_url,
+                    isAnonymous: false
+                };
+            }
+
+            return {
+                ...s,
+                tags: tagsBySubmission[s.id] || [],
+                author
+            };
+        });
+
+        // Remove profiles object and is_anonymous from response
+        submissionsWithTags.forEach(s => {
+            delete s.profiles;
+            delete s.is_anonymous;
+        });
     }
 
     return {
@@ -280,7 +309,9 @@ async function handlePost(event, headers) {
         measureCount,
         // Variant metadata
         isVariant,
-        parentSubmissionId
+        parentSubmissionId,
+        // Anonymous submission
+        isAnonymous
     } = body;
 
     // Support both new (baseHash) and legacy (progressionHash) field names
@@ -362,6 +393,9 @@ async function handlePost(event, headers) {
     if (isVariant && parentSubmissionId) {
         insertData.parent_submission_id = parentSubmissionId;
         insertData.is_variant = true;
+    }
+    if (isAnonymous) {
+        insertData.is_anonymous = true;
     }
 
     console.log('[Submissions] Creating submission:', {

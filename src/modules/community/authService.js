@@ -208,6 +208,71 @@ export async function updateUserProfile(updates) {
 }
 
 /**
+ * Check if a username is available
+ * @param {string} username - Username to check
+ * @returns {Promise<boolean>} True if available
+ */
+export async function isUsernameAvailable(username) {
+    if (!username || username.length < 3) {
+        return false;
+    }
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username.toLowerCase())
+        .maybeSingle();
+
+    if (error) {
+        console.error('Error checking username:', error);
+        return false;
+    }
+
+    // If data is null, username is available
+    // If data exists but it's the current user's, it's also "available" (no change needed)
+    return !data || (currentUser && data.id === currentUser.id);
+}
+
+/**
+ * Get the display name to show for submissions
+ * Priority: username > display_name > email prefix > "Anonymous"
+ * @returns {Promise<{displayName: string, isUsername: boolean, hasUsername: boolean}>}
+ */
+export async function getSubmissionDisplayName() {
+    if (!currentUser) {
+        return { displayName: 'Anonymous', isUsername: false, hasUsername: false };
+    }
+
+    const profile = await getUserProfile();
+
+    if (profile?.username) {
+        return {
+            displayName: profile.username,
+            isUsername: true,
+            hasUsername: true
+        };
+    }
+
+    if (profile?.display_name) {
+        return {
+            displayName: profile.display_name,
+            isUsername: false,
+            hasUsername: false
+        };
+    }
+
+    // Fallback to Google metadata
+    const metadata = currentUser.user_metadata || {};
+    const fallback = metadata.full_name || metadata.name || currentUser.email?.split('@')[0] || 'User';
+
+    return {
+        displayName: fallback,
+        isUsername: false,
+        hasUsername: false
+    };
+}
+
+/**
  * Subscribe to auth state changes
  * @param {Function} callback - Called with (event, session) when auth state changes
  * @returns {Function} Unsubscribe function
@@ -234,10 +299,84 @@ function notifyListeners(event, session) {
     });
 }
 
+// Track if we're currently fetching a session to prevent concurrent calls
+let isGettingSession = false;
+let getSessionPromise = null;
+
 /**
  * Get the auth token for API requests
- * @returns {string|null} JWT token or null
+ * Uses cached session if available and not expired, otherwise fetches fresh
+ * @returns {Promise<string|null>} JWT token or null
  */
-export function getAuthToken() {
-    return currentSession?.access_token || null;
+export async function getAuthToken() {
+    console.log('[getAuthToken] Called');
+
+    // If we have a cached session with a valid token, use it
+    if (currentSession?.access_token) {
+        // Check if token is expired (with 60 second buffer)
+        const expiresAt = currentSession.expires_at;
+        const now = Math.floor(Date.now() / 1000);
+        if (expiresAt && expiresAt > now + 60) {
+            console.log('[getAuthToken] Using cached token (expires in', expiresAt - now, 'seconds)');
+            return currentSession.access_token;
+        }
+        console.log('[getAuthToken] Cached token expired or expiring soon, refreshing...');
+    }
+
+    // If another call is already fetching the session, wait for it
+    if (isGettingSession && getSessionPromise) {
+        console.log('[getAuthToken] Another call in progress, waiting...');
+        try {
+            const result = await getSessionPromise;
+            return result;
+        } catch (e) {
+            console.log('[getAuthToken] Waiting call failed:', e);
+            return currentSession?.access_token || null;
+        }
+    }
+
+    // Mark that we're fetching
+    isGettingSession = true;
+
+    // Create a promise with timeout
+    getSessionPromise = new Promise(async (resolve) => {
+        const timeoutId = setTimeout(() => {
+            console.warn('[getAuthToken] getSession timed out after 5 seconds, using cached token');
+            isGettingSession = false;
+            getSessionPromise = null;
+            resolve(currentSession?.access_token || null);
+        }, 5000);
+
+        try {
+            console.log('[getAuthToken] Calling supabase.auth.getSession()...');
+            const { data: { session }, error } = await supabase.auth.getSession();
+            clearTimeout(timeoutId);
+
+            console.log('[getAuthToken] getSession returned, error:', error, 'session exists:', !!session);
+
+            if (error) {
+                console.error('[getAuthToken] Error getting session:', error);
+                resolve(currentSession?.access_token || null);
+            } else if (session) {
+                currentSession = session;
+                currentUser = session.user;
+                console.log('[getAuthToken] Returning fresh access_token');
+                resolve(session.access_token);
+            } else {
+                console.log('[getAuthToken] No valid session');
+                currentSession = null;
+                currentUser = null;
+                resolve(null);
+            }
+        } catch (err) {
+            clearTimeout(timeoutId);
+            console.error('[getAuthToken] Exception:', err);
+            resolve(currentSession?.access_token || null);
+        } finally {
+            isGettingSession = false;
+            getSessionPromise = null;
+        }
+    });
+
+    return getSessionPromise;
 }
