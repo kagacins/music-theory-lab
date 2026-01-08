@@ -3,6 +3,8 @@
  * Allows users to quickly load chord progressions from text input
  */
 
+import { showAlertModal } from './modals.js';
+
 /**
  * Open the manual chord entry modal
  */
@@ -149,7 +151,11 @@ function createModal() {
 function manualChordEntryReplace() {
     const input = document.getElementById('modal-chord-list-input');
     if (!input || !input.value.trim()) {
-        alert('Please enter some chords first!');
+        showAlertModal({
+            title: 'No Chords Entered',
+            message: 'Please enter some chords first!',
+            type: 'warning'
+        });
         return;
     }
 
@@ -174,7 +180,11 @@ function manualChordEntryReplace() {
 function manualChordEntryAppend() {
     const input = document.getElementById('modal-chord-list-input');
     if (!input || !input.value.trim()) {
-        alert('Please enter some chords first!');
+        showAlertModal({
+            title: 'No Chords Entered',
+            message: 'Please enter some chords first!',
+            type: 'warning'
+        });
         return;
     }
 

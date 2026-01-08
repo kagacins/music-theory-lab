@@ -9,6 +9,7 @@ import { getTensionArcUI } from './TensionArcUI.js';
 import { getProgressionData, setProgressionData, getCurrentKey } from '../state/trainerState.js';
 import { saveState, pushToUndoStack } from '../utils/undoRedo.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
+import { showAlertModal } from './modals.js';
 
 // Modal state
 let modalElement = null;
@@ -23,7 +24,11 @@ export function showTensionOptimizerModal() {
     // Get current progression
     const progression = getProgressionData();
     if (!progression || progression.length === 0) {
-        alert('Please add some chords to your progression first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'Please add some chords to your progression first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -726,7 +731,11 @@ function applyOptimization() {
     const selectionCount = Object.keys(selectedChords).length;
 
     if (selectionCount === 0) {
-        alert('No changes selected. Click on a highlighted chord row to see alternatives and select one.');
+        showAlertModal({
+            title: 'No Changes Selected',
+            message: 'No changes selected. Click on a highlighted chord row to see alternatives and select one.',
+            type: 'info'
+        });
         return;
     }
 

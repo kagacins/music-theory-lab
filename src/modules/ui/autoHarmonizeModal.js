@@ -10,6 +10,7 @@ import {
     getSmartHarmonizer,
     MOTION_TYPES
 } from '../recommendations/harmony/index.js';
+import { showAlertModal } from './modals.js';
 
 // Harmony style options for the dropdown
 const HARMONY_STYLES = {
@@ -162,7 +163,11 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     let suggestions = regenerateSuggestions();
 
     if (suggestions.length === 0) {
-        alert('No melody notes found to harmonize. Please record or enter some melody notes first.');
+        showAlertModal({
+            title: 'No Melody Notes',
+            message: 'No melody notes found to harmonize. Please record or enter some melody notes first.',
+            type: 'warning'
+        });
         return;
     }
 

@@ -67,6 +67,7 @@ import { getUserPreferenceLearner } from '../../../recommendations/coordination/
 
 // Import from parent modal modules
 import { modalState, CHORD_VIEWS, CHORD_INTENTS } from './ModalState.js';
+import { showAlertModal } from '../../modals.js';
 import {
     getScoreColor,
     getScoreQualityLabel,
@@ -5162,8 +5163,12 @@ function createRecommendationCard(rec, index, rhythmicContext) {
                 notes: rec.notes
             });
         } else {
-            // Fallback if function not available - show basic alert
-            alert(`Why "${spelledRoot}" (${numeral}) works:\n\n${rec.reason || 'This chord fits well in the current harmonic context.'}`);
+            // Fallback if function not available - show modal
+            showAlertModal({
+                title: `Why "${spelledRoot}" (${numeral}) works`,
+                message: rec.reason || 'This chord fits well in the current harmonic context.',
+                type: 'info'
+            });
         }
     });
     card.appendChild(whyBtn);

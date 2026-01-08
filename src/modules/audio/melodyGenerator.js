@@ -11,6 +11,8 @@ import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS, DEFAULT_TIME_SIGNATURE
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
 import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
+import { toast } from '../ui/toastNotifications.js';
+import { showAlertModal } from '../ui/modals.js';
 
 /**
  * Get the enharmonic preference based on the current key.
@@ -944,7 +946,11 @@ export function getCurrentMelody() {
  */
 export function exportMelodyToMIDI() {
     if (!currentMelody || !currentMelody.notes || currentMelody.notes.length === 0) {
-        alert('No melody to export. Generate a melody first.');
+        showAlertModal({
+            title: 'No Melody',
+            message: 'No melody to export. Generate a melody first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -3306,7 +3312,11 @@ export function playSelectedMeasure() {
     const hasChords = progressionData && progressionData.length > 0;
 
     if (!hasMelody && !hasChords) {
-        alert('Please add melody notes or chords first.');
+        showAlertModal({
+            title: 'Nothing to Play',
+            message: 'Please add melody notes or chords first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -3364,7 +3374,11 @@ export function playFromSelectedMeasure() {
     const hasChords = progressionData && progressionData.length > 0;
 
     if (!hasMelody && !hasChords) {
-        alert('Please add melody notes or chords first.');
+        showAlertModal({
+            title: 'Nothing to Play',
+            message: 'Please add melody notes or chords first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -3411,7 +3425,7 @@ export function playFromSelectedMeasure() {
 
     initAudio();
     if (!getAudioIsReady()) {
-        alert('Audio not ready. Please wait...');
+        toast.warning('Audio not ready. Please wait...');
         return;
     }
 
@@ -3778,7 +3792,7 @@ export function playMeasure(measureIndex) {
 
     initAudio();
     if (!getAudioIsReady()) {
-        alert('Audio not ready. Please wait...');
+        toast.warning('Audio not ready. Please wait...');
         return;
     }
 
@@ -4128,7 +4142,11 @@ export function playInteractiveMelodyWithChords() {
     // Use compositionState to check for melody notes
     const hasMelody = window.getCompositionState?.().hasMelodyNotes() || false;
     if (!isInteractiveMode || !hasMelody) {
-        alert('Please add notes to the melody first.');
+        showAlertModal({
+            title: 'No Melody',
+            message: 'Please add notes to the melody first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -4137,7 +4155,7 @@ export function playInteractiveMelodyWithChords() {
 
     initAudio();
     if (!getAudioIsReady()) {
-        alert('Audio not ready. Please wait...');
+        toast.warning('Audio not ready. Please wait...');
         return;
     }
 
@@ -4492,7 +4510,11 @@ export async function playAllMelody() {
     const hasChords = progressionData && progressionData.length > 0;
 
     if (!hasMelody && !hasChords) {
-        alert('Please add melody notes or chords first.');
+        showAlertModal({
+            title: 'Nothing to Play',
+            message: 'Please add melody notes or chords first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -4500,7 +4522,7 @@ export async function playAllMelody() {
     Tone.Transport.stop();
     Tone.Transport.cancel();
     Tone.Transport.position = 0;
-    
+
     // Also stop any hold-to-play measures
     const canvas = document.getElementById('interactive-melody-notation-canvas');
     if (canvas) {
@@ -4512,13 +4534,13 @@ export async function playAllMelody() {
 
     // Allow playing even if there are no melody notes - just play the chords
     const hasMelodyNotes = hasMelody;
-    
+
     initAudio();
     if (!getAudioIsReady()) {
-        alert('Audio not ready. Please wait...');
+        toast.warning('Audio not ready. Please wait...');
         return;
     }
-    
+
     const piano = getPiano();
     const synth = getInstrument();
 
@@ -5341,7 +5363,11 @@ export function playProgressionOnly() {
     const hasChords = progressionData && progressionData.length > 0;
 
     if (!hasChords) {
-        alert('Please add chords first.');
+        showAlertModal({
+            title: 'No Chords',
+            message: 'Please add chords first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -5361,7 +5387,7 @@ export function playProgressionOnly() {
 
     initAudio();
     if (!getAudioIsReady()) {
-        alert('Audio not ready. Please wait...');
+        toast.warning('Audio not ready. Please wait...');
         return;
     }
 
@@ -5703,7 +5729,11 @@ export function toggleMelodyEditMode() {
     const melody = getCurrentMelody();
 
     if (!melody || !melody.notes || melody.notes.length === 0) {
-        alert('Please generate a melody first before editing.');
+        showAlertModal({
+            title: 'No Melody',
+            message: 'Please generate a melody first before editing.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -5721,13 +5751,13 @@ export function toggleMelodyEditMode() {
 
     if (!editor) {
         console.error('Melody editor element not found. IDs tried: melody-editor, melody-editor-main');
-        alert('Melody editor panel not found. Please refresh the page.');
+        toast.error('Melody editor panel not found. Please refresh the page.');
         return;
     }
 
     if (!btn) {
         console.error('Edit melody button not found. IDs tried: edit-melody-btn, edit-melody-btn-main');
-        alert('Edit melody button not found. Please refresh the page.');
+        toast.error('Edit melody button not found. Please refresh the page.');
         return;
     }
 
@@ -5815,7 +5845,11 @@ export function updateMelodyNote() {
     const newNote = newNoteSelect?.value;
 
     if (isNaN(noteIndex) || !newNote) {
-        alert('Please select a note to edit and provide a new note value.');
+        showAlertModal({
+            title: 'Invalid Selection',
+            message: 'Please select a note to edit and provide a new note value.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -5826,7 +5860,7 @@ export function updateMelodyNote() {
     // Refresh display
     refreshMelodyDisplay();
 
-    alert(`Note ${noteIndex + 1} updated to ${newNote}`);
+    toast.success(`Note ${noteIndex + 1} updated to ${newNote}`);
 }
 
 /**
@@ -5840,12 +5874,20 @@ export function deleteMelodyNote() {
     const noteIndex = parseInt(noteSelect?.value);
 
     if (isNaN(noteIndex)) {
-        alert('Please select a note to delete.');
+        showAlertModal({
+            title: 'No Note Selected',
+            message: 'Please select a note to delete.',
+            type: 'warning'
+        });
         return;
     }
 
     if (melody.notes.length <= 1) {
-        alert('Cannot delete the last note in the melody.');
+        showAlertModal({
+            title: 'Cannot Delete',
+            message: 'Cannot delete the last note in the melody.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -5860,7 +5902,7 @@ export function deleteMelodyNote() {
     refreshMelodyDisplay();
     populateEditSelectors();
 
-    alert(`Note ${noteIndex + 1} deleted.`);
+    toast.success(`Note ${noteIndex + 1} deleted.`);
 }
 
 /**
@@ -5877,7 +5919,11 @@ export function insertMelodyNote() {
     const newNote = newNoteSelect?.value;
 
     if (isNaN(noteIndex) || !newNote) {
-        alert('Please select a note position and provide a new note value.');
+        showAlertModal({
+            title: 'Invalid Selection',
+            message: 'Please select a note position and provide a new note value.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -5893,7 +5939,7 @@ export function insertMelodyNote() {
     refreshMelodyDisplay();
     populateEditSelectors();
 
-    alert(`Note ${newNote} inserted at position ${insertIndex + 1}.`);
+    toast.success(`Note ${newNote} inserted at position ${insertIndex + 1}.`);
 }
 
 /**

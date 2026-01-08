@@ -18,6 +18,8 @@ import basicPitchModelUrl from '@spotify/basic-pitch/model/model.json?url';
 
 // Server-side analysis configuration
 import { SERVER_API_URL, SERVER_ENABLED } from '../../../server/config.js';
+import { toast } from '../ui/toastNotifications.js';
+import { showAlertModal } from '../ui/modals.js';
 
 // ===========================================
 // STATE
@@ -2153,7 +2155,11 @@ export function clearAudioFile() {
  */
 function handleFileSelect(file) {
     if (!file || !file.type.startsWith('audio/')) {
-        alert('Please select a valid audio file.');
+        showAlertModal({
+            title: 'Invalid File',
+            message: 'Please select a valid audio file.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -2171,7 +2177,11 @@ function handleFileSelect(file) {
  */
 export async function startAudioAnalysis() {
     if (!currentAudioFile) {
-        alert('Please select an audio file first.');
+        showAlertModal({
+            title: 'No File Selected',
+            message: 'Please select an audio file first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -2227,7 +2237,11 @@ export async function startAudioAnalysis() {
 
     } catch (error) {
         console.error('[SongAnalyzer] Analysis failed:', error);
-        alert(`Analysis failed: ${error.message}`);
+        showAlertModal({
+            title: 'Analysis Failed',
+            message: error.message,
+            type: 'error'
+        });
         showSection('audio-upload-section');
     }
 }
@@ -2247,7 +2261,11 @@ export function reanalyzeAudio() {
  */
 export async function importDetectedChords() {
     if (detectedChords.length === 0) {
-        alert('No chords to import.');
+        showAlertModal({
+            title: 'No Chords',
+            message: 'No chords to import.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -2459,7 +2477,11 @@ export function getLastAnalysisInfo() {
  */
 export function showLastAnalysis() {
     if (!lastAnalysis || lastAnalysis.chords.length === 0) {
-        alert('No previous analysis available. Please analyze an audio file first.');
+        showAlertModal({
+            title: 'No Analysis Available',
+            message: 'No previous analysis available. Please analyze an audio file first.',
+            type: 'info'
+        });
         return;
     }
 

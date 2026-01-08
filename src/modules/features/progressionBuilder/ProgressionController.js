@@ -149,6 +149,7 @@ import {
 
 // Community submission context (for edit flow)
 import { clearLoadedSubmissionContext } from '../../community/loadedSubmissionContext.js';
+import { showAlertModal } from '../../ui/modals.js';
 
 // Section intent for position-based insertion
 import {
@@ -1211,7 +1212,11 @@ export function updateChordDuration(index, sourceElement, directBeatsValue = nul
 
     // Validation: minimum 0.25 beats (16th note)
     if (totalBeats < 0.25) {
-        alert('Chord duration must be at least 0.25 beats (16th note)');
+        showAlertModal({
+            title: 'Invalid Duration',
+            message: 'Chord duration must be at least 0.25 beats (16th note)',
+            type: 'warning'
+        });
         // Reset to previous value
         const prevBeats = chord.beats || 4;
         if (singleDurationSelect) {

@@ -35,7 +35,8 @@ import {
     showMusicXMLImportPicker,
     isMusicXMLFile
 } from '../import/musicXmlImporter.js';
-import { showCopyModal } from '../ui/modals.js';
+import { showCopyModal, showAlertModal } from '../ui/modals.js';
+import { toast } from '../ui/toastNotifications.js';
 
 // =============================================================================
 // CONSTANTS
@@ -177,13 +178,21 @@ export function exportToPDF(options = {}) {
     const key = getCurrentKey() || 'C';
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to export. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to export. Add some chords first.',
+            type: 'warning'
+        });
         return;
     }
 
     // Check if jsPDF is available
     if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
-        alert('PDF export library not loaded. Please refresh the page and try again.');
+        showAlertModal({
+            title: 'Library Not Loaded',
+            message: 'PDF export library not loaded. Please refresh the page and try again.',
+            type: 'error'
+        });
         return;
     }
 
@@ -304,13 +313,21 @@ export async function exportNotationToPDF(options = {}) {
     const key = getCurrentKey() || 'C';
 
     if (!compositionState || !compositionState.measures || compositionState.measures.length === 0) {
-        alert('No notation to export. Add some notes first.');
+        showAlertModal({
+            title: 'No Notation',
+            message: 'No notation to export. Add some notes first.',
+            type: 'warning'
+        });
         return;
     }
 
     // Check if jsPDF is available
     if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
-        alert('PDF export library not loaded. Please refresh the page and try again.');
+        showAlertModal({
+            title: 'Library Not Loaded',
+            message: 'PDF export library not loaded. Please refresh the page and try again.',
+            type: 'error'
+        });
         return;
     }
 
@@ -327,7 +344,11 @@ export async function exportNotationToPDF(options = {}) {
         // Get the notation composer instance
         const notationComposer = window.getNotationComposer?.();
         if (!notationComposer) {
-            alert('Notation system not initialized. Please switch to the Melody tab first.');
+            showAlertModal({
+                title: 'Not Initialized',
+                message: 'Notation system not initialized. Please switch to the Melody tab first.',
+                type: 'warning'
+            });
             return;
         }
 
@@ -441,7 +462,7 @@ export async function exportNotationToPDF(options = {}) {
 
     } catch (error) {
         console.error('[Export] Notation PDF export error:', error);
-        alert('Error exporting PDF. Please try again.');
+        toast.error('Error exporting PDF. Please try again.');
     }
 }
 
@@ -455,13 +476,21 @@ export async function exportCombinedPDF(options = {}) {
     const key = getCurrentKey() || 'C';
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to export. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to export. Add some chords first.',
+            type: 'warning'
+        });
         return;
     }
 
     // Check if jsPDF is available
     if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
-        alert('PDF export library not loaded. Please refresh the page and try again.');
+        showAlertModal({
+            title: 'Library Not Loaded',
+            message: 'PDF export library not loaded. Please refresh the page and try again.',
+            type: 'error'
+        });
         return;
     }
 
@@ -649,7 +678,7 @@ export async function exportCombinedPDF(options = {}) {
 
     } catch (error) {
         console.error('[Export] Combined PDF export error:', error);
-        alert('Error exporting PDF. Please try again.');
+        toast.error('Error exporting PDF. Please try again.');
     }
 }
 
@@ -863,13 +892,21 @@ export function exportToMIDI(options = {}) {
     const key = getCurrentKey() || 'C';
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to export. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to export. Add some chords first.',
+            type: 'warning'
+        });
         return;
     }
 
     // Check if MidiWriter is available
     if (typeof window.MidiWriter === 'undefined') {
-        alert('MIDI export library not loaded. Please refresh the page and try again.');
+        showAlertModal({
+            title: 'Library Not Loaded',
+            message: 'MIDI export library not loaded. Please refresh the page and try again.',
+            type: 'error'
+        });
         return;
     }
 
@@ -1028,7 +1065,11 @@ export function exportToMIDI(options = {}) {
 
         // Ensure we have at least one track
         if (tracks.length === 0) {
-            alert('No tracks to export. Please add some chords or notes first.');
+            showAlertModal({
+                title: 'No Tracks',
+                message: 'No tracks to export. Please add some chords or notes first.',
+                type: 'warning'
+            });
             return;
         }
 
@@ -1054,7 +1095,7 @@ export function exportToMIDI(options = {}) {
 
     } catch (error) {
         console.error('[Export] MIDI export error:', error);
-        alert('Error exporting MIDI file. Please try again.');
+        toast.error('Error exporting MIDI file. Please try again.');
     }
 }
 
@@ -1971,12 +2012,20 @@ export function showMIDIImportDialog() {
                 document.addEventListener('keydown', handleEscape);
 
             } else {
-                alert('No chords detected in the MIDI file. The file may contain only single notes or be in an unsupported format.');
+                showAlertModal({
+                    title: 'No Chords Detected',
+                    message: 'No chords detected in the MIDI file. The file may contain only single notes or be in an unsupported format.',
+                    type: 'warning'
+                });
             }
 
         } catch (error) {
             console.error('[Import] Error:', error);
-            alert('Failed to import MIDI file. The file may be corrupted or in an unsupported format.');
+            showAlertModal({
+                title: 'Import Failed',
+                message: 'Failed to import MIDI file. The file may be corrupted or in an unsupported format.',
+                type: 'error'
+            });
         }
     };
 
@@ -1996,7 +2045,11 @@ export function generateShareableLink() {
     const key = getCurrentKey() || 'C';
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to share. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to share. Add some chords first.',
+            type: 'warning'
+        });
         return null;
     }
 
@@ -2122,7 +2175,11 @@ export function showPDFExportDialog() {
     const compositionState = getCompositionState();
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to export. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to export. Add some chords first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -2325,7 +2382,11 @@ export function showMIDIExportDialog() {
     const compositionState = getCompositionState();
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to export. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to export. Add some chords first.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -2417,7 +2478,11 @@ export function showMIDIExportDialog() {
         const includeBass = document.getElementById('midi-include-bass').checked;
 
         if (!includeChords && !includeMelody && !includeBass) {
-            alert('Please select at least one track to export.');
+            showAlertModal({
+                title: 'No Tracks Selected',
+                message: 'Please select at least one track to export.',
+                type: 'warning'
+            });
             return;
         }
 
@@ -2461,13 +2526,21 @@ export function showAudioExportDialog() {
     const progressionData = getProgressionData();
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to export. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to export. Add some chords first.',
+            type: 'warning'
+        });
         return;
     }
 
     // Check if audio export is supported
     if (!isAudioExportSupported()) {
-        alert('Audio export is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Edge.');
+        showAlertModal({
+            title: 'Browser Not Supported',
+            message: 'Audio export is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Edge.',
+            type: 'error'
+        });
         return;
     }
 
@@ -2728,14 +2801,22 @@ export function showMusicXMLExportDialog() {
     const progressionData = getProgressionData();
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to export. Add some chords first.');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to export. Add some chords first.',
+            type: 'warning'
+        });
         return;
     }
 
     // Check if export is possible
     const { canExport, reason } = canExportMusicXML();
     if (!canExport) {
-        alert(reason || 'Cannot export to MusicXML.');
+        showAlertModal({
+            title: 'Cannot Export',
+            message: reason || 'Cannot export to MusicXML.',
+            type: 'error'
+        });
         return;
     }
 
@@ -2884,11 +2965,19 @@ export function showMusicXMLExportDialog() {
             if (result.success) {
                 modal.remove();
             } else {
-                alert('Export failed: ' + (result.error || 'Unknown error'));
+                showAlertModal({
+                    title: 'Export Failed',
+                    message: result.error || 'Unknown error',
+                    type: 'error'
+                });
             }
         } catch (error) {
             console.error('[MusicXML Export] Error:', error);
-            alert('Export failed: ' + error.message);
+            showAlertModal({
+                title: 'Export Failed',
+                message: error.message,
+                type: 'error'
+            });
         }
     });
 }

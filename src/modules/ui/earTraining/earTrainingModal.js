@@ -21,6 +21,7 @@ import {
     EXERCISE_TYPES,
     BADGES
 } from './earTrainingProgress.js';
+import { toast } from '../toastNotifications.js';
 
 // ===========================================
 // STATE
@@ -246,7 +247,7 @@ function renderMenu() {
     // Daily challenge button
     content.querySelector('#daily-challenge-btn')?.addEventListener('click', () => {
         // TODO: Implement daily challenge
-        alert('Daily Challenge coming soon!');
+        toast.info('Daily Challenge coming soon!');
     });
 }
 

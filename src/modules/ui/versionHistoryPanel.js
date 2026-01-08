@@ -19,6 +19,7 @@ import {
 
 import { getAutoSaveStatus } from '../storage/autoSave.js';
 import { showPromptModal, showAlertModal } from './modals.js';
+import { toast } from './toastNotifications.js';
 
 // Module state
 let onRestoreCallback = null;
@@ -551,7 +552,7 @@ function attachDetailEventListeners() {
                 renderVersionList(getActiveFilter());
                 renderVersionDetails(selectedVersionId);
             } else {
-                alert(result.error || 'Failed to rename version');
+                toast.error(result.error || 'Failed to rename version');
             }
         }
     });
@@ -570,10 +571,10 @@ function attachDetailEventListeners() {
                 if (callback) {
                     callback(result.project);
                 } else {
-                    alert('Restore callback not available. Please try again.');
+                    toast.error('Restore callback not available. Please try again.');
                 }
             } else {
-                alert(result.error || 'Failed to load version');
+                toast.error(result.error || 'Failed to load version');
             }
         }
     });
@@ -590,7 +591,7 @@ function attachDetailEventListeners() {
                 renderVersionDetails(null);
                 updateStorageStats();
             } else {
-                alert(result.error || 'Failed to delete version');
+                toast.error(result.error || 'Failed to delete version');
             }
         }
     });

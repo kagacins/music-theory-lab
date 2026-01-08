@@ -24,6 +24,8 @@ import {
     applyPreset,
     normalizeWeights
 } from '../config/weightPresets.js';
+import { toast } from './toastNotifications.js';
+import { showAlertModal } from './modals.js';
 // Tone.js is loaded via script tag in index.html, available as global 'Tone'
 
 /**
@@ -1637,14 +1639,14 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             // Check if Tone is available
             if (typeof Tone === 'undefined') {
                 console.error('Tone.js is not loaded');
-                alert('Audio library (Tone.js) is not loaded. Cannot play chord.');
+                toast.error('Audio library (Tone.js) is not loaded. Cannot play chord.');
                 return;
             }
 
             // Validate chord type exists in definitions
             if (!CHORD_DEFINITIONS[chordType]) {
                 console.error(`Invalid chord type: "${chordType}". Available types:`, Object.keys(CHORD_DEFINITIONS));
-                alert(`Cannot play chord: "${chordType}" is not a valid chord type.`);
+                toast.error(`Cannot play chord: "${chordType}" is not a valid chord type.`);
                 return;
             }
 
@@ -1716,15 +1718,15 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                 piano.triggerAttack(notesArray);
             } else {
                 console.error('No notes generated for chord. ChordType:', chordType, 'Root:', root, 'Inversion:', inversion);
-                alert(`Cannot generate notes for ${root} ${chordType} (inversion ${inversion}). Check console for details.`);
+                toast.error(`Cannot generate notes for ${root} ${chordType} (inversion ${inversion}).`);
             }
         } catch (error) {
             console.error('Error playing chord:', error);
             // Provide more helpful error message for buffer issues
             if (error.message && error.message.includes('buffer')) {
-                alert(`Audio samples are still loading. Please wait a moment and try again.`);
+                toast.warning('Audio samples are still loading. Please wait a moment and try again.');
             } else {
-                alert(`Error playing chord: ${error.message}`);
+                toast.error(`Error playing chord: ${error.message}`);
             }
         }
     }

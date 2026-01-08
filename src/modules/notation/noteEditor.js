@@ -24,7 +24,7 @@ import {
 } from './durationUtils.js';
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
 import { getPiano } from '../audio/audioEngine.js';
-import { showNoteOverflowDialog } from '../ui/modals.js';
+import { showNoteOverflowDialog, showAlertModal } from '../ui/modals.js';
 import {
   TUPLET_RATIOS,
   generateTupletGroupId,
@@ -3138,7 +3138,11 @@ export class NoteEditor {
     if (isLastNote && measureIsFull) {
       // The measure is completely full - inserting after the last note means the new note
       // would start in the next measure. This is confusing UX, so we block it.
-      alert('This measure is already full. To add more notes, click in the next measure or delete/shorten existing notes.');
+      showAlertModal({
+        title: 'Measure Full',
+        message: 'This measure is already full. To add more notes, click in the next measure or delete/shorten existing notes.',
+        type: 'info'
+      });
       return;
     }
 

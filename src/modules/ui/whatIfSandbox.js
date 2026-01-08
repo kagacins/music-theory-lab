@@ -17,6 +17,7 @@ import { getChordNotes, getLHNotes } from '../utils/noteUtils.js';
 import { getProgressionData, getCurrentKey, setProgressionData } from '../state/trainerState.js';
 import { CHORD_DEFINITIONS } from '../../data/music-data.js';
 import { getPiano } from '../audio/audioEngine.js';
+import { showAlertModal } from './modals.js';
 
 // ===========================================
 // STATE
@@ -311,7 +312,11 @@ export function showWhatIfSandbox() {
     const key = getCurrentKey() || 'C';
 
     if (!progression || progression.length === 0) {
-        alert('Please add some chords to your progression first!');
+        showAlertModal({
+            title: 'No Progression',
+            message: 'Please add some chords to your progression first!',
+            type: 'warning'
+        });
         return;
     }
 

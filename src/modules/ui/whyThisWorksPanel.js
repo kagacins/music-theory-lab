@@ -31,6 +31,7 @@ import {
 
 import { getChordNotes } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS } from '../../data/music-data.js';
+import { showAlertModal } from './modals.js';
 
 // ===========================================
 // STATE
@@ -1189,7 +1190,11 @@ function showFallbackExplanation(context, explanation) {
 
   } catch (err) {
     console.error('[WhyThisWorks] Error in showFallbackExplanation:', err);
-    alert(`${context.chord || ''} (${context.romanNumeral})\n\n${explanation?.explanation || context.reason || 'This chord works well here.'}`);
+    showAlertModal({
+      title: `${context.chord || ''} (${context.romanNumeral})`,
+      message: explanation?.explanation || context.reason || 'This chord works well here.',
+      type: 'info'
+    });
   }
 }
 
