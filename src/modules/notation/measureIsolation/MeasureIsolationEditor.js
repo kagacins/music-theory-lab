@@ -3081,7 +3081,7 @@ export class MeasureIsolationEditor {
             return;
         }
 
-        // Update the slot with new duration
+        // Update the slot with new duration (preserving all note properties)
         if (slot.type === SLOT_TYPES.NOTE_START) {
             this.slotGrid.setNote(clef, voice, slotIndex, {
                 pitches: slot.pitches,
@@ -3089,7 +3089,13 @@ export class MeasureIsolationEditor {
                 dotted: dotted,
                 stemDirection: slot.stemDirection,
                 articulation: slot.articulation,
-                dynamic: slot.dynamic
+                dynamic: slot.dynamic,
+                ornament: slot.ornament,
+                fermata: slot.fermata,
+                graceNotes: slot.graceNotes,
+                tied: slot.tied,
+                isTied: slot.isTied,
+                slur: slot.slur
             });
             const durationName = this._getDurationName(newDuration) + (dotted ? ' dotted' : '');
             this._updateStatus(`Changed to ${durationName}`);
@@ -3178,14 +3184,20 @@ export class MeasureIsolationEditor {
             return noteLetter + accidental + octave;
         });
 
-        // Update the slot with new pitches
+        // Update the slot with new pitches (preserving all note properties)
         this.slotGrid.setNote(clef, voice, slotIndex, {
             pitches: newPitches,
             duration: slot.duration,
             dotted: slot.dotted,
             stemDirection: slot.stemDirection,
             articulation: slot.articulation,
-            dynamic: slot.dynamic
+            dynamic: slot.dynamic,
+            ornament: slot.ornament,
+            fermata: slot.fermata,
+            graceNotes: slot.graceNotes,
+            tied: slot.tied,
+            isTied: slot.isTied,
+            slur: slot.slur
         });
 
         // Update selection to point to new pitch
@@ -3235,14 +3247,20 @@ export class MeasureIsolationEditor {
             return noteLetter + keyAcc + octave;
         });
 
-        // Update the slot
+        // Update the slot (preserving all note properties)
         this.slotGrid.setNote(clef, voice, slotIndex, {
             pitches: newPitches,
             duration: slot.duration,
             dotted: slot.dotted,
             stemDirection: slot.stemDirection,
             articulation: slot.articulation,
-            dynamic: slot.dynamic
+            dynamic: slot.dynamic,
+            ornament: slot.ornament,
+            fermata: slot.fermata,
+            graceNotes: slot.graceNotes,
+            tied: slot.tied,
+            isTied: slot.isTied,
+            slur: slot.slur
         });
 
         // Update selection
@@ -3333,14 +3351,20 @@ export class MeasureIsolationEditor {
             return newNoteName + octave;
         });
 
-        // Update the slot
+        // Update the slot (preserving all note properties)
         this.slotGrid.setNote(clef, voice, slotIndex, {
             pitches: newPitches,
             duration: slot.duration,
             dotted: slot.dotted,
             stemDirection: slot.stemDirection,
             articulation: slot.articulation,
-            dynamic: slot.dynamic
+            dynamic: slot.dynamic,
+            ornament: slot.ornament,
+            fermata: slot.fermata,
+            graceNotes: slot.graceNotes,
+            tied: slot.tied,
+            isTied: slot.isTied,
+            slur: slot.slur
         });
 
         // Update selection to point to new pitch

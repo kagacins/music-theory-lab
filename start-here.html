@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Disable browser's automatic scroll restoration to prevent scroll jump on page load -->
+    <script>
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+      // Immediately scroll to top before anything renders
+      window.scrollTo(0, 0);
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -142,13 +151,13 @@
                 </a>
 
                 <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6 px-3">Core Features</div>
-                <a href="#chord-lab" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
-                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span>Chord Lab</span>
-                </a>
                 <a href="#composition-studio" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
                     <span class="w-2 h-2 rounded-full bg-purple-500"></span>
                     <span>Composition Studio</span>
+                </a>
+                <a href="#chord-lab" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>Chord Lab</span>
                 </a>
                 <a href="#ai-recommendations" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
                     <span class="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -262,28 +271,11 @@
                     <div class="mb-8 rounded-xl overflow-hidden border border-gray-200 shadow-lg">
                         <img src="images/guide/app-overview.png" alt="Interactive Music Theory Lab - App Overview showing the main landing page with four feature cards" class="w-full">
                         <div class="bg-gray-50 px-4 py-2 text-sm text-gray-600">
-                            <strong>App landing page:</strong> Choose from Chord Lab, Composition Studio, Scale Explorer, or Theory Academy
+                            <strong>App landing page:</strong> Choose from Composition Studio, Chord Lab, Scale Explorer, or Theory Academy
                         </div>
                     </div>
 
                     <div class="space-y-4">
-                        <div class="bg-white rounded-xl p-6 border border-gray-200">
-                            <div class="flex items-start gap-4">
-                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Chord Lab</h3>
-                                    <p class="text-gray-600 text-sm mb-3">Your workspace for building and exploring individual chords. Select a root note and chord type, adjust inversions and voicings, and hear how it sounds.</p>
-                                    <div class="flex flex-wrap gap-2">
-                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">50+ chord types</span>
-                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Inversions</span>
-                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Voice controls</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="bg-white rounded-xl p-6 border border-gray-200">
                             <div class="flex items-start gap-4">
                                 <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -297,6 +289,23 @@
                                         <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Sections</span>
                                         <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Notation</span>
                                         <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Playback</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl p-6 border border-gray-200">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Chord Lab</h3>
+                                    <p class="text-gray-600 text-sm mb-3">Your workspace for building and exploring individual chords. Select a root note and chord type, adjust inversions and voicings, and hear how it sounds.</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">50+ chord types</span>
+                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Inversions</span>
+                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Voice controls</span>
                                     </div>
                                 </div>
                             </div>

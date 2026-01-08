@@ -2882,7 +2882,8 @@ function startMeasurePlayback(canvas, measureIndex) {
     if (measureMelodyNotes.length > 0) {
         const tempo = interactiveMelody.tempo || 120;
         const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
-        
+        const currentKey = getCurrentKey() || 'C';
+
         measureMelodyNotes.forEach((note, index) => {
             const delay = index * beatDuration;
 
@@ -2890,30 +2891,81 @@ function startMeasurePlayback(canvas, measureIndex) {
                 // Handle polyphony - play all pitches in the note
                 const pitches = getNotePitches(note);
                 const noteBeat = typeof note.beat === 'number' ? note.beat : index;
+                const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : beatDuration;
 
-                pitches.forEach(pitch => {
-                    synth.triggerAttack(pitch, Tone.now());
+                // Handle ornaments if present - expand into multiple notes
+                if (note.ornament && pitches.length > 0) {
+                    // For chords with ornaments, apply ornament to the top (melody) note only
+                    const topPitch = pitches[pitches.length - 1];
+                    const sustainPitches = pitches.slice(0, -1);
 
-                    // Add to activeNotes for highlighting (format: "measure-beat-pitch")
-                    const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
-                    activeNotes.add(noteId);
+                    // Expand ornament into note sequence
+                    const expandedNotes = expandOrnament(topPitch, note.ornament, noteDuration, currentKey, tempo);
 
-                    // DEBUG: Log note ID creation for red highlighting
-                    console.log(`[melodyGenerator] playMeasureNotes: Creating noteId="${noteId}" (beat=${noteBeat}, pitch=${pitch})`);
+                    // Play sustained lower notes (if any) with triggerAttack for hold-to-play
+                    sustainPitches.forEach(pitch => {
+                        synth.triggerAttack(pitch, Tone.now());
+                        state.activeMelodyNotes.push(pitch);
 
-                    // Notify new notation system for red note highlighting
-                    if (window.addNotationActiveNote) {
-                        window.addNotationActiveNote(noteId);
-                    }
+                        const keyEl = document.getElementById(getNoteKeyId(pitch));
+                        if (keyEl) {
+                            keyEl.classList.add('active-melody-playback');
+                        }
+                    });
 
-                    // Visual feedback on keyboard
-                    const keyEl = document.getElementById(getNoteKeyId(pitch));
-                    if (keyEl) {
-                        keyEl.classList.add('active-melody-playback');
-                    }
+                    // Play expanded ornament notes on top pitch
+                    expandedNotes.forEach((ornamentNote, ornamentIndex) => {
+                        const ornamentDelay = ornamentNote.offset * 1000;
+                        setTimeout(() => {
+                            // Release previous ornament note before playing next
+                            if (ornamentIndex > 0) {
+                                const prevNote = expandedNotes[ornamentIndex - 1];
+                                synth.triggerRelease(prevNote.pitch, Tone.now());
+                            }
+                            synth.triggerAttack(ornamentNote.pitch, Tone.now());
+                            state.activeMelodyNotes.push(ornamentNote.pitch);
 
-                    state.activeMelodyNotes.push(pitch);
-                });
+                            const keyEl = document.getElementById(getNoteKeyId(ornamentNote.pitch));
+                            if (keyEl) {
+                                keyEl.classList.add('active-melody-playback');
+                            }
+                        }, ornamentDelay);
+                    });
+
+                    // Add to activeNotes for highlighting
+                    pitches.forEach(pitch => {
+                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                        activeNotes.add(noteId);
+                        if (window.addNotationActiveNote) {
+                            window.addNotationActiveNote(noteId);
+                        }
+                    });
+                } else {
+                    // No ornament - play normally with triggerAttack for hold-to-play
+                    pitches.forEach(pitch => {
+                        synth.triggerAttack(pitch, Tone.now());
+
+                        // Add to activeNotes for highlighting (format: "measure-beat-pitch")
+                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                        activeNotes.add(noteId);
+
+                        // DEBUG: Log note ID creation for red highlighting
+                        console.log(`[melodyGenerator] playMeasureNotes: Creating noteId="${noteId}" (beat=${noteBeat}, pitch=${pitch})`);
+
+                        // Notify new notation system for red note highlighting
+                        if (window.addNotationActiveNote) {
+                            window.addNotationActiveNote(noteId);
+                        }
+
+                        // Visual feedback on keyboard
+                        const keyEl = document.getElementById(getNoteKeyId(pitch));
+                        if (keyEl) {
+                            keyEl.classList.add('active-melody-playback');
+                        }
+
+                        state.activeMelodyNotes.push(pitch);
+                    });
+                }
 
                 // Re-render to show red highlighting on the note
                 if (highlightEnabled && window.refreshNotationFromProgression) {
@@ -2921,7 +2973,6 @@ function startMeasurePlayback(canvas, measureIndex) {
                 }
 
                 // Remove from activeNotes after note duration
-                const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : beatDuration;
                 setTimeout(() => {
                     pitches.forEach(pitch => {
                         const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
@@ -3915,10 +3966,37 @@ export function playMeasure(measureIndex) {
             }
 
             // Schedule all pitches in the chord at exact time using Tone.js
+            // Handle ornaments if present - expand into multiple notes
             if (synth) {
-                notesToPlay.forEach(pitch => {
-                    synth.triggerAttackRelease(pitch, noteDuration, noteStartTime);
-                });
+                const currentKey = getCurrentKey() || 'C';
+
+                if (note.ornament && notesToPlay.length > 0) {
+                    // For chords with ornaments, apply ornament to the top (melody) note only
+                    // Other notes in the chord sustain normally
+                    const topPitch = notesToPlay[notesToPlay.length - 1]; // Top note gets ornament
+                    const sustainPitches = notesToPlay.slice(0, -1); // Lower notes sustain
+
+                    // Expand ornament into note sequence
+                    const expandedNotes = expandOrnament(topPitch, note.ornament, noteDuration, currentKey, tempo);
+
+                    // Play sustained lower notes (if any) for full duration
+                    sustainPitches.forEach(pitch => {
+                        synth.triggerAttackRelease(pitch, noteDuration, noteStartTime);
+                    });
+
+                    // Play expanded ornament notes on top pitch
+                    expandedNotes.forEach(ornamentNote => {
+                        const ornamentTime = noteStartTime + ornamentNote.offset;
+                        if (ornamentTime >= 0) {
+                            synth.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
+                        }
+                    });
+                } else {
+                    // No ornament - play all pitches normally
+                    notesToPlay.forEach(pitch => {
+                        synth.triggerAttackRelease(pitch, noteDuration, noteStartTime);
+                    });
+                }
             }
 
             // Use setTimeout for visual feedback since it needs DOM updates

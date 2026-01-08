@@ -17,6 +17,30 @@ import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
 import { getBaseDuration, isDotted as checkIsDotted } from './durationUtils.js';
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Check if any modal overlay is currently open
+ * Modals use fixed positioning with inset-0 and toggle the 'hidden' class
+ * @returns {boolean} True if a modal is open
+ */
+function isModalOpen() {
+  // Look for visible modal overlays (fixed position, full screen, not hidden)
+  const modalOverlays = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
+  for (const overlay of modalOverlays) {
+    // Check if it looks like a modal (has semi-transparent background)
+    const style = window.getComputedStyle(overlay);
+    const bg = style.backgroundColor;
+    // Modal overlays typically have rgba background with opacity
+    if (bg.includes('rgba') || overlay.classList.contains('bg-black') || overlay.classList.contains('bg-opacity-50')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -2093,6 +2117,10 @@ export class NotationToolbar {
     if (e.target.matches('input, textarea')) {
       return;
     }
+
+    // Don't process composition shortcuts when a modal is open
+    // This prevents accidental edits to notation while using modals
+    if (isModalOpen()) return;
 
     // Allow browser shortcuts when Ctrl/Meta is pressed (except for undo/redo)
     const hasModifier = e.ctrlKey || e.metaKey || e.altKey;

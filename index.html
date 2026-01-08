@@ -11,6 +11,15 @@
       gtag('config', 'G-C6M4CYVCKF');
     </script>
 
+    <!-- Disable browser's automatic scroll restoration to prevent scroll jump on page load -->
+    <script>
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+      // Immediately scroll to top before anything renders
+      window.scrollTo(0, 0);
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -137,17 +146,17 @@
             <div class="p-4 pt-0">
             <nav class="flex flex-col gap-1">
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Chord Lab</button>
-                    <div class="relative group">
-                        <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
-                                <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build custom chords, intervals, and voicings from scratch. This is your creative canvas.</div>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-melody" onclick="window.switchTab && window.switchTab('melody')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Composition Studio</button>
+                    <button id="sidebar-btn-melody" onclick="window.switchTab && window.switchTab('melody')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Composition Studio</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build melodies over chord progressions or create standalone melodic ideas. Craft and explore musical phrases with powerful generation tools.</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="sidebar-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Chord Lab</button>
+                    <div class="relative group">
+                        <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                                <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build custom chords, intervals, and voicings from scratch. This is your creative canvas.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -384,40 +393,6 @@
 
             <!-- Features Grid -->
             <div class="grid md:grid-cols-2 gap-6 mb-12">
-                <!-- Chord Lab -->
-                <div class="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-amber-500/50 hover:bg-white/15 shadow-xl shadow-black/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('builder')">
-                    <div class="flex items-start gap-4 mb-4">
-                        <div class="p-3 bg-amber-500/20 rounded-xl group-hover:bg-amber-500/30 transition-colors">
-                            <svg class="w-8 h-8 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-white mb-1">Chord Lab</h3>
-                            <p class="text-amber-300 text-sm font-medium">Build & Explore Chords</p>
-                        </div>
-                    </div>
-                    <ul class="space-y-2 text-purple-100 text-sm">
-                        <li class="flex items-start gap-2">
-                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                            <span>Interactive chord builder with real-time audio playback</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                            <span>Extensive chord library: triads, 7ths, extended, altered, and more</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                            <span>Visual piano keyboard and staff notation</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                            <span>Chord voicings and inversions explorer</span>
-                        </li>
-                    </ul>
-                    <div class="mt-4 text-amber-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                        Open Chord Lab <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                    </div>
-                </div>
-
                 <!-- Composition Studio -->
                 <div class="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-teal-500/50 hover:bg-white/15 shadow-xl shadow-black/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('melody')">
                     <div class="flex items-start gap-4 mb-4">
@@ -453,6 +428,40 @@
                     </ul>
                     <div class="mt-4 text-teal-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
                         Open Composition Studio <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </div>
+                </div>
+
+                <!-- Chord Lab -->
+                <div class="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-amber-500/50 hover:bg-white/15 shadow-xl shadow-black/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('builder')">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="p-3 bg-amber-500/20 rounded-xl group-hover:bg-amber-500/30 transition-colors">
+                            <svg class="w-8 h-8 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-1">Chord Lab</h3>
+                            <p class="text-amber-300 text-sm font-medium">Build & Explore Chords</p>
+                        </div>
+                    </div>
+                    <ul class="space-y-2 text-purple-100 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Interactive chord builder with real-time audio playback</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Extensive chord library: triads, 7ths, extended, altered, and more</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Visual piano keyboard and staff notation</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Chord voicings and inversions explorer</span>
+                        </li>
+                    </ul>
+                    <div class="mt-4 text-amber-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                        Open Chord Lab <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </div>
                 </div>
 
@@ -650,13 +659,13 @@
 
                 <!-- Header Tab buttons - Icon + Text Pills -->
                 <div class="hidden md:flex items-center gap-1">
-                    <button id="header-tab-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="header-tab-pill" data-tab="builder" title="Chord Lab">
-                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
-                        <span class="flex flex-col leading-none text-left"><span class="font-semibold">Chord</span><span class="text-[9px] opacity-80">Lab</span></span>
-                    </button>
                     <button id="header-tab-btn-melody" onclick="window.switchTab && window.switchTab('melody')" class="header-tab-pill" data-tab="melody" title="Composition Studio">
                         <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z"></path></svg>
                         <span class="flex flex-col leading-none text-left"><span class="font-semibold">Composition</span><span class="text-[9px] opacity-80">Studio</span></span>
+                    </button>
+                    <button id="header-tab-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="header-tab-pill" data-tab="builder" title="Chord Lab">
+                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+                        <span class="flex flex-col leading-none text-left"><span class="font-semibold">Chord</span><span class="text-[9px] opacity-80">Lab</span></span>
                     </button>
                     <button id="header-tab-btn-scales" onclick="window.switchTab && window.switchTab('scales')" class="header-tab-pill" data-tab="scales" title="Scale Explorer">
                         <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm-3 1a1 1 0 10-2 0v3a1 1 0 102 0V8zM8 9a1 1 0 00-2 0v2a1 1 0 102 0V9z" clip-rule="evenodd"></path></svg>

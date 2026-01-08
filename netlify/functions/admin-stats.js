@@ -42,6 +42,7 @@ export const handler = async (event, context) => {
             compositionsResult,
             usersResult,
             blockedResult,
+            pendingFlagsResult,
             recentAuditResult
         ] = await Promise.all([
             // Total submissions
@@ -64,6 +65,11 @@ export const handler = async (event, context) => {
             supabase.from('blocked_users')
                 .select('id', { count: 'exact', head: true })
                 .eq('is_active', true),
+
+            // Pending flags count
+            supabase.from('flags')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'pending'),
 
             // Recent audit log entries
             supabase.from('admin_audit_log')
@@ -119,6 +125,7 @@ export const handler = async (event, context) => {
                 totalCompositions: compositionsResult.count || 0,
                 totalUsers: usersResult.count || 0,
                 blockedUsers: blockedResult.count || 0,
+                pendingFlags: pendingFlagsResult.count || 0,
                 submissionsByStatus: statusCounts || {}
             },
             recentSubmissions: (recentSubmissions || []).map(s => ({

@@ -37,6 +37,30 @@ import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 import { getCurrentKey } from '../state/trainerState.js';
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Check if any modal overlay is currently open
+ * Modals use fixed positioning with inset-0 and toggle the 'hidden' class
+ * @returns {boolean} True if a modal is open
+ */
+function isModalOpen() {
+  // Look for visible modal overlays (fixed position, full screen, not hidden)
+  const modalOverlays = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
+  for (const overlay of modalOverlays) {
+    // Check if it looks like a modal (has semi-transparent background)
+    const style = window.getComputedStyle(overlay);
+    const bg = style.backgroundColor;
+    // Modal overlays typically have rgba background with opacity
+    if (bg.includes('rgba') || overlay.classList.contains('bg-black') || overlay.classList.contains('bg-opacity-50')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -630,6 +654,10 @@ export class NoteEditor {
   handleKeyDown(e) {
     if (!this.isEnabled) return;
 
+    // Don't process composition shortcuts when a modal is open
+    // This prevents accidental edits to notation while using modals
+    if (isModalOpen()) return;
+
     // Delete selected notes
     // Ctrl+Delete/Backspace = shift delete (removes note and shifts others left)
     // Delete/Backspace alone = replace with rest (preserves rhythm)
@@ -825,6 +853,9 @@ export class NoteEditor {
    */
   handleKeyUp(e) {
     if (!this.isEnabled) return;
+
+    // Don't process when a modal is open
+    if (isModalOpen()) return;
 
     // Clear ghost note when Alt key is released
     if (e.key === 'Alt' || e.keyCode === 18) {

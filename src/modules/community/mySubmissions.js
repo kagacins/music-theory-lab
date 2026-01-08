@@ -6,6 +6,8 @@
 
 import { getAuthToken, getUserDisplayInfo } from './authService.js';
 import { getCompositionState } from '../state/compositionState.js';
+import { getSubmissionVersions, getSubmissionVersion, restoreSubmissionVersion } from '../admin/adminService.js';
+import { setLoadedSubmissionContext } from './loadedSubmissionContext.js';
 
 let mySubmissionsModal = null;
 let currentSubmissions = [];
@@ -264,13 +266,29 @@ function renderSubmissions() {
             </div>
 
             <!-- Actions -->
-            <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-600">
+            <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-600">
                 <button onclick="window.loadMySubmission && window.loadMySubmission('${submission.id}')"
-                        class="flex-1 px-3 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors flex items-center justify-center gap-1">
+                        class="px-3 py-2 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors flex items-center justify-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                     </svg>
                     Load
+                </button>
+                <button onclick="window.editMySubmission && window.editMySubmission('${submission.id}')"
+                        class="px-3 py-2 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center gap-1"
+                        title="Edit and republish this submission">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Edit
+                </button>
+                <button onclick="window.showVersionHistory && window.showVersionHistory('${submission.id}', '${submission.title.replace(/'/g, "\\'")}')"
+                        class="px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-400 rounded-lg transition-colors flex items-center gap-1"
+                        title="View and restore previous versions (max 3)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    History
                 </button>
                 ${submission.status === 'draft' ? `
                 <button onclick="window.publishMySubmission && window.publishMySubmission('${submission.id}', '${submission.title.replace(/'/g, "\\'")}')"
@@ -411,9 +429,279 @@ export function refreshMySubmissions() {
 }
 
 /**
+ * Edit a submission - loads it and opens the share modal in edit mode
+ */
+export async function editMySubmission(submissionId) {
+    const submission = currentSubmissions.find(s => s.id === submissionId);
+    if (!submission) {
+        showToast('Submission not found', 'error');
+        return;
+    }
+
+    // Load the submission into the workspace first
+    hideMySubmissions();
+
+    if (window.loadCommunitySubmission) {
+        await window.loadCommunitySubmission(submissionId);
+    }
+
+    // Set the loaded submission context so Share Progression knows this was loaded for editing
+    setLoadedSubmissionContext({
+        submissionId: submissionId,
+        title: submission.title,
+        description: submission.description,
+        status: submission.status,
+        submissionType: submission.submission_type,
+        category: submission.category
+    });
+
+    // Show toast informing user they can now edit and then share
+    showToast(`"${submission.title}" loaded. Make your changes, then click Share/Upload Composition to update.`, 'success', 5000);
+}
+
+/**
+ * Show version history modal for a submission
+ */
+export async function showVersionHistory(submissionId, title) {
+    // Create version history modal if it doesn't exist
+    let versionModal = document.getElementById('version-history-modal');
+    if (!versionModal) {
+        versionModal = document.createElement('div');
+        versionModal.id = 'version-history-modal';
+        versionModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4';
+        document.body.appendChild(versionModal);
+
+        // Close on backdrop click
+        versionModal.addEventListener('click', (e) => {
+            if (e.target === versionModal) {
+                versionModal.classList.add('hidden');
+            }
+        });
+    }
+
+    // Show loading state
+    versionModal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-indigo-600">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Version History
+                    </h2>
+                    <button onclick="document.getElementById('version-history-modal').classList.add('hidden')" class="text-white hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-purple-100 text-sm mt-1 truncate">${title}</p>
+            </div>
+            <div class="p-6 flex items-center justify-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent"></div>
+            </div>
+        </div>
+    `;
+    versionModal.classList.remove('hidden');
+
+    try {
+        const result = await getSubmissionVersions(submissionId);
+        const versions = result.versions || [];
+
+        let versionsHTML = '';
+        if (versions.length === 0) {
+            versionsHTML = `
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-3">📝</div>
+                    <p class="text-gray-600 dark:text-gray-400">No version history yet.</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                        Version history is created when you edit and save changes.
+                    </p>
+                </div>
+            `;
+        } else {
+            versionsHTML = `
+                <div class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                    Up to 3 previous versions are kept. Older versions are automatically removed.
+                </div>
+                <div class="space-y-3">
+                    ${versions.map(v => `
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">
+                                            v${v.versionNumber}
+                                        </span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            ${new Date(v.createdAt).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <h4 class="font-medium text-gray-800 dark:text-white mt-2 truncate">${v.title}</h4>
+                                    ${v.description ? `<p class="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">${v.description}</p>` : ''}
+                                </div>
+                                <div class="flex flex-col gap-2 flex-shrink-0">
+                                    <button onclick="window.loadVersion && window.loadVersion('${submissionId}', '${v.id}', ${v.versionNumber})"
+                                            class="px-3 py-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors flex items-center gap-1"
+                                            title="Load this version into the workspace to view/edit">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                        </svg>
+                                        Load
+                                    </button>
+                                    <button onclick="window.restoreVersion && window.restoreVersion('${submissionId}', '${v.id}', ${v.versionNumber})"
+                                            class="px-3 py-1.5 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors flex items-center gap-1"
+                                            title="Make this version the current live version">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                        </svg>
+                                        Restore
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        versionModal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-indigo-600">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Version History
+                        </h2>
+                        <button onclick="document.getElementById('version-history-modal').classList.add('hidden')" class="text-white hover:text-gray-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-purple-100 text-sm mt-1 truncate">${title}</p>
+                </div>
+                <div class="p-6 max-h-[60vh] overflow-y-auto">
+                    ${versionsHTML}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading version history:', error);
+        versionModal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-indigo-600">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-bold text-white">Version History</h2>
+                        <button onclick="document.getElementById('version-history-modal').classList.add('hidden')" class="text-white hover:text-gray-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6 text-center">
+                    <div class="text-4xl mb-3">⚠️</div>
+                    <p class="text-gray-600 dark:text-gray-400">${error.message || 'Failed to load version history'}</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Restore a previous version
+ */
+export async function restoreVersion(submissionId, versionId, versionNumber) {
+    if (!confirm(`Restore to version ${versionNumber}?\n\nYour current version will be saved to history before restoring.`)) {
+        return;
+    }
+
+    try {
+        const result = await restoreSubmissionVersion(submissionId, versionId);
+
+        showToast(result.message || 'Version restored successfully!', 'success');
+
+        // Close version history modal
+        const versionModal = document.getElementById('version-history-modal');
+        if (versionModal) {
+            versionModal.classList.add('hidden');
+        }
+
+        // Refresh submissions list
+        await loadMySubmissions();
+
+    } catch (error) {
+        console.error('Error restoring version:', error);
+        showToast('Failed to restore: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Load a previous version into the workspace for editing
+ * This lets users view/modify a version before deciding to restore it
+ */
+export async function loadVersion(submissionId, versionId, versionNumber) {
+    const compState = getCompositionState();
+
+    // Check if workspace has content
+    const measures = compState?.getMeasures?.() || [];
+    const hasContent = measures.some(m =>
+        (m.treble && m.treble.length > 0) ||
+        (m.bass && m.bass.length > 0)
+    );
+
+    if (hasContent) {
+        if (!confirm(`Load version ${versionNumber} into workspace?\n\nThis will replace your current work.`)) {
+            return;
+        }
+    }
+
+    try {
+        // Fetch the full version data
+        const result = await getSubmissionVersion(submissionId, versionId);
+
+        if (!result.success || !result.version) {
+            throw new Error('Failed to fetch version data');
+        }
+
+        const version = result.version;
+
+        // Close version history modal
+        const versionModal = document.getElementById('version-history-modal');
+        if (versionModal) {
+            versionModal.classList.add('hidden');
+        }
+
+        // Close my submissions modal
+        hideMySubmissions();
+
+        // Load the composition data using the shared loader
+        if (window.loadCompositionData && version.compositionData) {
+            await window.loadCompositionData(version.compositionData, {
+                title: version.title,
+                keySignature: result.keySignature,
+                submissionType: result.submissionType
+            });
+
+            showToast(`Version ${versionNumber} loaded. Edit and use Share/Upload to save changes.`, 'success', 5000);
+        } else {
+            throw new Error('Composition loader not available');
+        }
+
+    } catch (error) {
+        console.error('Error loading version:', error);
+        showToast('Failed to load version: ' + error.message, 'error');
+    }
+}
+
+/**
  * Show a toast notification
  */
-function showToast(message, type = 'success') {
+function showToast(message, type = 'success', duration = 3000) {
     const toast = document.createElement('div');
     const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
     const icon = type === 'success'
@@ -429,7 +717,7 @@ function showToast(message, type = 'success') {
     setTimeout(() => {
         toast.classList.add('opacity-0', 'transition-opacity');
         setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    }, duration);
 }
 
 // Export for window access
@@ -439,6 +727,10 @@ window.loadMySubmission = loadMySubmission;
 window.publishMySubmission = publishMySubmission;
 window.deleteMySubmission = deleteMySubmission;
 window.refreshMySubmissions = refreshMySubmissions;
+window.editMySubmission = editMySubmission;
+window.showVersionHistory = showVersionHistory;
+window.restoreVersion = restoreVersion;
+window.loadVersion = loadVersion;
 
 export default {
     showMySubmissions,
@@ -446,5 +738,9 @@ export default {
     loadMySubmission,
     publishMySubmission,
     deleteMySubmission,
-    refreshMySubmissions
+    refreshMySubmissions,
+    editMySubmission,
+    showVersionHistory,
+    restoreVersion,
+    loadVersion
 };

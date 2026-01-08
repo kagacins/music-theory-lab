@@ -147,6 +147,9 @@ import {
     ROMAN_MAP_BASE
 } from '../../../data/music-data.js';
 
+// Community submission context (for edit flow)
+import { clearLoadedSubmissionContext } from '../../community/loadedSubmissionContext.js';
+
 // Section intent for position-based insertion
 import {
     getInsertAfterIndex,
@@ -2590,6 +2593,9 @@ export function clearProgression(skipConfirmation = false) {
     if (window.theoryInsightsPanel && window.theoryInsightsPanel.update) {
         window.theoryInsightsPanel.update();
     }
+
+    // Clear any loaded submission context (user is starting fresh)
+    clearLoadedSubmissionContext();
 }
 
 // ============================================================================

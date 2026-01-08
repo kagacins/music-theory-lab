@@ -19,6 +19,26 @@ import { getCompositionState, resetCompositionState, CompositionState } from '..
 import { getProgressionData } from '../modules/state/trainerState.js';
 
 /**
+ * Check if any modal overlay is currently open
+ * Modals use fixed positioning with inset-0 and toggle the 'hidden' class
+ * @returns {boolean} True if a modal is open
+ */
+function isModalOpen() {
+    // Look for visible modal overlays (fixed position, full screen, not hidden)
+    const modalOverlays = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
+    for (const overlay of modalOverlays) {
+        // Check if it looks like a modal (has semi-transparent background)
+        const style = window.getComputedStyle(overlay);
+        const bg = style.backgroundColor;
+        // Modal overlays typically have rgba background with opacity
+        if (bg.includes('rgba') || overlay.classList.contains('bg-black') || overlay.classList.contains('bg-opacity-50')) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Setup all global event handlers
  * Call this AFTER all modules are initialized
  */
@@ -56,6 +76,9 @@ function setupKeyboardShortcuts() {
 
     // Undo/Redo keyboard shortcuts (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y)
     document.addEventListener('keydown', (event) => {
+        // Don't process when a modal is open (prevents accidental undo while using modals)
+        if (isModalOpen()) return;
+
         // Check which tab we're in - undo/redo works on builder, trainer, and melody tabs
         const currentTab = document.querySelector('[id^="tab-"]:not(.hidden)');
         const tabId = currentTab ? currentTab.id : '';
@@ -97,6 +120,9 @@ function setupKeyboardShortcuts() {
 
     // Melody suggestions keyboard shortcuts (1-5, R, Escape)
     document.addEventListener('keydown', function(e) {
+        // Don't process when a modal is open (prevents accidental note insertion)
+        if (isModalOpen()) return;
+
         // Only handle shortcuts when in Melody Composer tab
         if (window.currentTab !== 'melody') return;
 

@@ -10,6 +10,7 @@ import { getCompositionState } from '../state/compositionState.js';
 import { getCurrentKey } from '../state/trainerState.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS } from '../../data/music-data.js';
+import { submitFlag } from '../admin/adminService.js';
 
 // Request timeout in milliseconds (prevents Chrome lockups)
 const FETCH_TIMEOUT = 10000;
@@ -35,6 +36,15 @@ async function fetchWithTimeout(url, options = {}) {
     } finally {
         clearTimeout(timeout);
     }
+}
+
+/**
+ * Escape HTML special characters for safe rendering
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 }
 
 // Common keys (beginner-friendly, ordered by popularity/ease)
@@ -583,6 +593,11 @@ function renderVariantRow(v) {
                 'class="px-1.5 py-0.5 text-[10px] bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors">' +
                 'Load/Append' +
             '</button>' +
+            // Report button
+            '<button onclick="event.stopPropagation(); window.showReportModal && window.showReportModal(\'' + v.id + '\', \'' + escapeHtml(v.title || 'Untitled') + '\')" ' +
+                'class="px-1.5 py-0.5 text-[10px] bg-gray-100 dark:bg-gray-600 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors" title="Report">' +
+                '<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>' +
+            '</button>' +
         '</div>' +
     '</div>';
 }
@@ -598,15 +613,52 @@ function renderFamilies() {
         const hasVariants = family.variantCount > 1;
         const isExpanded = expandedFamilies.has(family.baseHash);
 
+        // Format author display - displayName from backend may already include @ prefix
+        const authorDisplay = c.author?.displayName || 'anon';
+        // Only add @ if not already present
+        const formattedAuthor = authorDisplay.startsWith('@') ? authorDisplay : `@${authorDisplay}`;
+        // Get first letter for avatar, stripping @ if present
+        const avatarLetter = (authorDisplay.replace(/^@/, '') || 'A').charAt(0);
+
         return `
-            <div class="family-card bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 ${hasVariants ? 'ring-1 ring-indigo-200 dark:ring-indigo-800' : ''}">
-                <div class="p-3">
-                    <!-- Progression (prominent) -->
-                    <div class="mb-2 p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded text-sm font-mono text-indigo-700 dark:text-indigo-300 truncate" title="${c.normalizedProgression || ''}">
+            <div class="family-card bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 ${hasVariants ? 'ring-1 ring-indigo-200 dark:ring-indigo-800' : ''} flex flex-col">
+                <div class="p-3 flex flex-col flex-1">
+                    <!-- Canonical submission info -->
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                            ${c.author?.avatarUrl ?
+                                `<img src="${c.author.avatarUrl}" class="w-4 h-4 rounded-full shrink-0">` :
+                                `<span class="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[8px] shrink-0">${avatarLetter}</span>`}
+                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">${formattedAuthor}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-[10px] shrink-0">
+                            <!-- Type indicator -->
+                            <span class="px-1.5 py-0.5 rounded ${
+                                c.submissionType === 'full-composition'
+                                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300'
+                                    : 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300'
+                            }" title="${c.submissionType === 'full-composition' ? 'Full Composition with melody/bass' : 'Chord Progression only'}">
+                                ${c.submissionType === 'full-composition' ? '🎼 Full' : '🎹 Chords'}
+                            </span>
+                            <span class="text-gray-500 dark:text-gray-400" title="Key">${c.keySignature || 'C'}</span>
+                            <span title="Upvotes" class="flex items-center gap-0.5 text-gray-500 dark:text-gray-400">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/></svg>
+                                ${family.totalUpvotes}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Title (moved above progression) -->
+                    <h4 class="text-sm font-semibold text-gray-800 dark:text-white truncate mb-2" title="${c.title}">
+                        ${c.title}
+                    </h4>
+
+                    <!-- Progression (scrollable with tooltip) -->
+                    <div class="mb-2 p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded text-sm font-mono text-indigo-700 dark:text-indigo-300 overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-indigo-300 dark:scrollbar-thumb-indigo-600" title="${c.normalizedProgression || ''}">
                         ${c.normalizedProgression || 'No progression'}
                     </div>
 
-                    <!-- Variant badge (if has variants) - styled as obvious dropdown -->
+                    <!-- Variant badge (if has variants) - moved below progression -->
                     ${hasVariants ? `
                         <button onclick="window.toggleFamilyExpand && window.toggleFamilyExpand('${family.baseHash}')"
                                 class="w-full mb-2 px-2 py-1.5 text-xs rounded-lg flex items-center justify-between gap-1 border-2 cursor-pointer transition-all ${isExpanded ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-400 dark:border-indigo-500' : 'bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-600 hover:border-indigo-400 dark:hover:border-indigo-500 hover:from-indigo-50 hover:to-purple-50 dark:hover:from-indigo-900/40 dark:hover:to-purple-900/40'}">
@@ -627,38 +679,11 @@ function renderFamilies() {
                         </button>
                     ` : ''}
 
-                    <!-- Canonical submission info -->
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                            ${c.author?.avatarUrl ?
-                                `<img src="${c.author.avatarUrl}" class="w-4 h-4 rounded-full shrink-0">` :
-                                `<span class="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[8px] shrink-0">${(c.author?.displayName || 'A').charAt(0)}</span>`}
-                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">${c.author?.displayName || 'Anon'}</span>
-                        </div>
-                        <div class="flex items-center gap-2 text-[10px] shrink-0">
-                            <!-- Type indicator -->
-                            <span class="px-1.5 py-0.5 rounded ${
-                                c.submissionType === 'full-composition'
-                                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300'
-                                    : 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300'
-                            }" title="${c.submissionType === 'full-composition' ? 'Full Composition with melody/bass' : 'Chord Progression only'}">
-                                ${c.submissionType === 'full-composition' ? '🎼 Full' : '🎹 Chords'}
-                            </span>
-                            <span class="text-gray-500 dark:text-gray-400" title="Key">${c.keySignature || 'C'}</span>
-                            <span title="Upvotes" class="flex items-center gap-0.5 text-gray-500 dark:text-gray-400">
-                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/></svg>
-                                ${family.totalUpvotes}
-                            </span>
-                        </div>
-                    </div>
+                    <!-- Spacer to push actions to bottom -->
+                    <div class="flex-1"></div>
 
-                    <!-- Canonical title -->
-                    <h4 class="text-xs font-medium text-gray-800 dark:text-white truncate mb-2" title="${c.title}">
-                        ${c.title}
-                    </h4>
-
-                    <!-- Actions -->
-                    <div class="flex gap-1">
+                    <!-- Actions (always at bottom) -->
+                    <div class="flex gap-1 mt-auto">
                         <!-- Upvote button -->
                         <button onclick="window.upvoteSubmission && window.upvoteSubmission('${c.id}', this)"
                                 class="upvote-btn px-2 py-1 text-xs bg-gray-100 dark:bg-gray-600 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-gray-600 dark:text-gray-300 rounded transition-colors flex items-center gap-1" title="Upvote">
@@ -680,6 +705,11 @@ function renderFamilies() {
                         <button onclick="window.loadCommunitySubmission && window.loadCommunitySubmission('${c.id}')"
                                 class="flex-1 px-2 py-1 text-xs bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors">
                             Load/Append
+                        </button>
+                        <!-- Report button -->
+                        <button onclick="window.showReportModal && window.showReportModal('${c.id}', '${escapeHtml(c.title || 'Untitled')}')"
+                                class="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-600 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors" title="Report">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         </button>
                     </div>
                 </div>
@@ -966,21 +996,24 @@ function showKeyPickerModal(submissionTitle, originalKey, options = {}) {
 function renderSubmissions() {
     const container = document.getElementById('browser-results');
 
-    container.innerHTML = currentSubmissions.map(submission => `
+    container.innerHTML = currentSubmissions.map(submission => {
+        // Format author display - displayName from backend may already include @ prefix
+        const authorDisplay = submission.author?.displayName || 'anon';
+        // Only add @ if not already present
+        const formattedAuthor = authorDisplay.startsWith('@') ? authorDisplay : `@${authorDisplay}`;
+        // Get first letter for avatar, stripping @ if present
+        const avatarLetter = (authorDisplay.replace(/^@/, '') || 'A').charAt(0);
+
+        return `
         <div class="submission-card bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600">
             <div class="p-3">
-                <!-- Progression preview (prominent) -->
-                <div class="mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs font-mono text-gray-700 dark:text-gray-300 truncate" title="${submission.normalized_progression || ''}">
-                    ${submission.normalized_progression || 'No progression'}
-                </div>
-
                 <!-- Header row -->
-                <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center justify-between mb-1">
                     <div class="flex items-center gap-1.5 min-w-0 flex-1">
                         ${submission.author?.avatarUrl ?
                             `<img src="${submission.author.avatarUrl}" class="w-4 h-4 rounded-full shrink-0">` :
-                            `<span class="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[8px] shrink-0">${(submission.author?.displayName || 'A').charAt(0)}</span>`}
-                        <span class="text-xs text-gray-600 dark:text-gray-400 truncate">${submission.author?.displayName || 'Anon'}</span>
+                            `<span class="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[8px] shrink-0">${avatarLetter}</span>`}
+                        <span class="text-xs text-gray-600 dark:text-gray-400 truncate">${formattedAuthor}</span>
                     </div>
                     <span class="text-[10px] px-1.5 py-0.5 rounded ${
                         submission.submission_type === 'full-composition'
@@ -991,10 +1024,15 @@ function renderSubmissions() {
                     </span>
                 </div>
 
-                <!-- Title -->
-                <h4 class="text-xs font-medium text-gray-800 dark:text-white truncate mb-2" title="${submission.title}">
+                <!-- Title (moved above progression) -->
+                <h4 class="text-sm font-semibold text-gray-800 dark:text-white truncate mb-2" title="${submission.title}">
                     ${submission.title}
                 </h4>
+
+                <!-- Progression preview (scrollable with tooltip) -->
+                <div class="mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs font-mono text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600" title="${submission.normalized_progression || ''}">
+                    ${submission.normalized_progression || 'No progression'}
+                </div>
 
                 <!-- Compact meta + stats row -->
                 <div class="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400 mb-2">
@@ -1046,10 +1084,16 @@ function renderSubmissions() {
                             class="flex-1 px-2 py-1 text-[10px] bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors">
                         Load/Append
                     </button>
+                    <!-- Report button -->
+                    <button onclick="window.showReportModal && window.showReportModal('${submission.id}', '${escapeHtml(submission.title || 'Untitled')}')"
+                            class="px-2 py-1 text-[10px] bg-gray-100 dark:bg-gray-600 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors" title="Report">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </button>
                 </div>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 
     container.classList.remove('hidden');
 }
@@ -2620,12 +2664,273 @@ export function refreshCommunityBrowser() {
     loadSubmissions();
 }
 
+// ============================================================================
+// REPORT/FLAG FUNCTIONALITY
+// ============================================================================
+
+let reportModal = null;
+
+/**
+ * Show the report modal for a submission
+ */
+export function showReportModal(submissionId, submissionTitle) {
+    // Check if user is signed in
+    if (!isSignedIn()) {
+        alert('Please sign in to report content.');
+        return;
+    }
+
+    // Create modal if it doesn't exist
+    if (!reportModal) {
+        reportModal = document.createElement('div');
+        reportModal.id = 'report-modal';
+        reportModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4';
+        document.body.appendChild(reportModal);
+
+        // Close on backdrop click
+        reportModal.addEventListener('click', (e) => {
+            if (e.target === reportModal) {
+                hideReportModal();
+            }
+        });
+    }
+
+    // Populate modal content
+    reportModal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    Report Submission
+                </h3>
+                <button onclick="window.hideReportModal && window.hideReportModal()"
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Reporting: <span class="font-medium text-gray-800 dark:text-gray-200">${escapeHtml(submissionTitle)}</span>
+            </p>
+
+            <form id="report-form" class="space-y-4">
+                <input type="hidden" id="report-submission-id" value="${submissionId}">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Reason for reporting <span class="text-red-500">*</span>
+                    </label>
+                    <select id="report-reason" required
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                        <option value="">Select a reason...</option>
+                        <option value="spam">Spam or misleading content</option>
+                        <option value="inappropriate">Inappropriate or offensive</option>
+                        <option value="copyright">Copyright violation</option>
+                        <option value="low_quality">Low quality or duplicate</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Additional details (optional)
+                    </label>
+                    <textarea id="report-description" rows="3" maxlength="500"
+                              placeholder="Provide any additional context..."
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"></textarea>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <span id="report-char-count">0</span>/500 characters
+                    </p>
+                </div>
+
+                <div id="report-error" class="hidden text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 p-3 rounded-lg"></div>
+                <div id="report-success" class="hidden text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg"></div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="window.hideReportModal && window.hideReportModal()"
+                            class="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" id="report-submit-btn"
+                            class="flex-1 px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        Submit Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    // Add character count listener
+    const descriptionInput = reportModal.querySelector('#report-description');
+    const charCount = reportModal.querySelector('#report-char-count');
+    descriptionInput.addEventListener('input', () => {
+        charCount.textContent = descriptionInput.value.length;
+    });
+
+    // Add form submit handler
+    const form = reportModal.querySelector('#report-form');
+    form.addEventListener('submit', handleReportSubmit);
+
+    // Show modal
+    reportModal.classList.remove('hidden');
+}
+
+/**
+ * Hide the report modal
+ */
+export function hideReportModal() {
+    if (reportModal) {
+        reportModal.classList.add('hidden');
+    }
+}
+
+/**
+ * Handle report form submission
+ */
+async function handleReportSubmit(e) {
+    e.preventDefault();
+
+    const submissionId = document.getElementById('report-submission-id').value;
+    const reason = document.getElementById('report-reason').value;
+    const description = document.getElementById('report-description').value.trim();
+    const submitBtn = document.getElementById('report-submit-btn');
+    const errorDiv = document.getElementById('report-error');
+    const successDiv = document.getElementById('report-success');
+
+    // Validate
+    if (!reason) {
+        errorDiv.textContent = 'Please select a reason for reporting.';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+
+    // Disable button and show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        Submitting...
+    `;
+    errorDiv.classList.add('hidden');
+    successDiv.classList.add('hidden');
+
+    try {
+        await submitFlag(submissionId, reason, description || null);
+
+        // Show success
+        successDiv.textContent = 'Report submitted successfully. An admin will review it.';
+        successDiv.classList.remove('hidden');
+
+        // Hide modal after delay
+        setTimeout(() => {
+            hideReportModal();
+        }, 2000);
+
+    } catch (error) {
+        console.error('[Report] Error submitting report:', error);
+        errorDiv.textContent = error.message || 'Failed to submit report. Please try again.';
+        errorDiv.classList.remove('hidden');
+
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            Submit Report
+        `;
+    }
+}
+
+/**
+ * Load composition data directly into the workspace
+ * This is a shared utility for loading composition data from various sources
+ * (e.g., version history, clipboard, etc.)
+ *
+ * @param {Object} compositionData - The composition data to load
+ * @param {Object} options - Loading options
+ * @param {string} options.title - Display title for the composition
+ * @param {string} options.keySignature - Key signature (if not in compositionData)
+ * @param {string} options.submissionType - 'full-composition' or 'chord-progression'
+ */
+export async function loadCompositionData(compositionData, options = {}) {
+    if (!compositionData) {
+        throw new Error('No composition data provided');
+    }
+
+    const compositionState = getCompositionState();
+    if (!compositionState) {
+        throw new Error('Composition state not available');
+    }
+
+    // Detect format
+    const isNewFormat = compositionData && compositionData.formatVersion;
+    const isFullComposition = isNewFormat
+        ? compositionData.submissionType === 'full-composition'
+        : options.submissionType === 'full-composition';
+
+    // Get key from data or options
+    const key = compositionData.metadata?.key || options.keySignature || 'C';
+
+    // Set key before loading
+    if (window.setCurrentKey) {
+        window.setCurrentKey(key);
+    }
+
+    // Load based on type
+    if (isFullComposition && isNewFormat) {
+        await loadFullComposition(compositionState, compositionData, options.title || 'Untitled');
+    } else {
+        // For chord progressions, extract progression data and load
+        const progressionData = isNewFormat
+            ? compositionData.progressionData
+            : (Array.isArray(compositionData) ? compositionData : null);
+
+        if (!progressionData || !Array.isArray(progressionData)) {
+            throw new Error('No valid progression data found');
+        }
+
+        const metadata = isNewFormat ? compositionData.metadata : {};
+        const timeSignature = metadata.timeSignature || { num: 4, denom: 4 };
+        const tempo = metadata.tempo || 120;
+
+        await loadChordProgression(compositionState, progressionData, {
+            originalKey: key,
+            targetKey: key,
+            timeSignature,
+            tempo
+        });
+    }
+
+    // Update UI
+    if (window.syncProgressionToMelodyComposer) {
+        window.syncProgressionToMelodyComposer();
+    }
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    console.log('[Community] Composition data loaded successfully');
+}
+
 // Export for window access
 window.showCommunityBrowser = showCommunityBrowser;
 window.hideCommunityBrowser = hideCommunityBrowser;
 window.viewCommunitySubmission = viewCommunitySubmission;
 window.loadCommunitySubmission = loadCommunitySubmission;
+window.loadCompositionData = loadCompositionData;
 window.refreshCommunityBrowser = refreshCommunityBrowser;
+window.showReportModal = showReportModal;
+window.hideReportModal = hideReportModal;
 
 export default {
     initCommunityBrowser,
@@ -2633,5 +2938,6 @@ export default {
     hideCommunityBrowser,
     viewCommunitySubmission,
     loadCommunitySubmission,
+    loadCompositionData,
     refreshCommunityBrowser
 };

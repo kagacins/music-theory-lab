@@ -19,12 +19,20 @@ import { generateDuplicateDetectionData, extractChordsFromComposition } from './
 import { getCompositionState } from '../state/compositionState.js';
 import { getCurrentKey } from '../state/trainerState.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+import { getProgressionChordLimit, updateOwnSubmission } from '../admin/adminService.js';
+import {
+    getLoadedSubmissionContext,
+    hasLoadedSubmissionContext,
+    clearLoadedSubmissionContext
+} from './loadedSubmissionContext.js';
 
 // Modal state
 let modalElement = null;
 let tags = null;
 let selectedTags = new Set();
 let currentDuplicateInfo = null;
+let editModeState = null; // Stores { submissionId, existingData } when in edit mode
+let saveAsNewMode = false; // True when user chose "Save as New" from the update dialog
 
 /**
  * Initialize the share modal (creates the DOM element)
@@ -141,21 +149,21 @@ function getModalHTML() {
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                             Submission Type <span class="text-red-500">*</span>
                         </label>
-                        <div class="grid grid-cols-1 gap-3">
+                        <div class="grid grid-cols-2 gap-3">
                             <label class="flex items-start p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
                                 <input type="radio" name="share-type" value="chord-progression" class="sr-only" checked>
                                 <span class="flex flex-col">
-                                    <span class="text-sm font-semibold text-gray-800 dark:text-white">Chord Progression Only</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Saves: chords, inversions, key, beats per chord</span>
-                                    <span class="text-xs text-amber-600 dark:text-amber-400 mt-1">Does NOT save: melody, bass notes, ornaments, dynamics, articulations, grace notes, slurs, hairpins</span>
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-white">Chord Progression</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Chords, inversions, key, beats</span>
+                                    <span class="text-xs text-amber-600 dark:text-amber-400 mt-1">No melody/bass/notation</span>
                                 </span>
                             </label>
                             <label class="flex items-start p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
                                 <input type="radio" name="share-type" value="full-composition" class="sr-only">
                                 <span class="flex flex-col">
                                     <span class="text-sm font-semibold text-gray-800 dark:text-white">Full Composition</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Saves everything: melody, bass, ornaments, dynamics, articulations, grace notes, slurs, hairpins, and all notation details</span>
-                                    <span class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Use this to preserve your complete work</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Everything including notation</span>
+                                    <span class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Preserves complete work</span>
                                 </span>
                             </label>
                         </div>
@@ -340,10 +348,144 @@ function createCompositionDataForSharing(compositionState, submissionType) {
 }
 
 /**
+ * Show dialog asking whether to Update existing submission or Save as New
+ * Called when Share Progression is clicked and there's a loaded submission context
+ */
+async function showUpdateOrSaveNewDialog(loadedContext) {
+    // Create dialog element
+    let dialog = document.getElementById('update-or-new-dialog');
+    if (!dialog) {
+        dialog = document.createElement('div');
+        dialog.id = 'update-or-new-dialog';
+        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+        document.body.appendChild(dialog);
+    }
+
+    const truncatedTitle = loadedContext.title.length > 40
+        ? loadedContext.title.substring(0, 40) + '...'
+        : loadedContext.title;
+
+    dialog.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-amber-500 to-orange-500">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <h2 class="text-lg font-bold text-white">Update or Save as New?</h2>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="p-6">
+                <p class="text-gray-700 dark:text-gray-300 mb-6">
+                    You loaded <span class="font-semibold text-amber-600 dark:text-amber-400">"${truncatedTitle}"</span> for editing.
+                    What would you like to do?
+                </p>
+
+                <div class="space-y-3">
+                    <!-- Update Option -->
+                    <button id="update-existing-btn" class="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 border-2 border-amber-300 dark:border-amber-600 rounded-xl hover:border-amber-500 dark:hover:border-amber-400 transition-colors text-left">
+                        <div class="flex-shrink-0 w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-900 dark:text-white">Update "${truncatedTitle}"</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Save changes to your existing submission (creates version history)</div>
+                        </div>
+                    </button>
+
+                    <!-- Save as New Option -->
+                    <button id="save-as-new-btn" class="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-2 border-blue-300 dark:border-blue-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-left">
+                        <div class="flex-shrink-0 w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-900 dark:text-white">Save as New Submission</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Create a new separate submission (won't affect the original)</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex justify-end">
+                <button id="cancel-update-dialog-btn" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+
+    dialog.classList.remove('hidden');
+
+    // Handle button clicks
+    return new Promise((resolve) => {
+        const updateBtn = document.getElementById('update-existing-btn');
+        const saveNewBtn = document.getElementById('save-as-new-btn');
+        const cancelBtn = document.getElementById('cancel-update-dialog-btn');
+
+        const closeDialog = () => {
+            dialog.classList.add('hidden');
+        };
+
+        updateBtn.onclick = () => {
+            closeDialog();
+            // Open share modal in edit mode with the loaded context
+            showShareModal({
+                editMode: true,
+                submissionId: loadedContext.submissionId,
+                existingData: {
+                    title: loadedContext.title,
+                    description: loadedContext.description,
+                    status: loadedContext.status,
+                    submissionType: loadedContext.submissionType,
+                    category: loadedContext.category
+                },
+                skipEditCheck: true // Prevent infinite loop
+            });
+            resolve('update');
+        };
+
+        saveNewBtn.onclick = () => {
+            closeDialog();
+            // Open share modal as new - DON'T clear context yet
+            // Context will be cleared after successful submission
+            // This way if user cancels, they can still choose to Update
+            showShareModal({ skipEditCheck: true, saveAsNew: true });
+            resolve('new');
+        };
+
+        cancelBtn.onclick = () => {
+            closeDialog();
+            resolve('cancel');
+        };
+
+        // Close on backdrop click
+        dialog.onclick = (e) => {
+            if (e.target === dialog) {
+                closeDialog();
+                resolve('cancel');
+            }
+        };
+    });
+}
+
+/**
  * Show the share modal
  * Duplicate detection is deferred until user clicks "Publish" (not for drafts)
+ *
+ * @param {Object} options - Optional configuration
+ * @param {boolean} options.editMode - Whether to open in edit mode for an existing submission
+ * @param {string} options.submissionId - The submission ID if in edit mode
+ * @param {Object} options.existingData - The existing submission data (title, description, etc.)
  */
-export async function showShareModal() {
+export async function showShareModal(options = {}) {
     if (!modalElement) {
         initShareModal();
     }
@@ -358,12 +500,51 @@ export async function showShareModal() {
     selectedTags.clear();
     currentDuplicateInfo = null;
 
+    // Track if this is a "Save as New" flow (user chose to create new instead of update)
+    saveAsNewMode = options.saveAsNew || false;
+
+    // Handle edit mode - can be set explicitly via options OR detected from loaded submission context
+    if (options.editMode && options.submissionId) {
+        // Explicit edit mode (from old code path or direct call)
+        editModeState = {
+            submissionId: options.submissionId,
+            existingData: options.existingData || {}
+        };
+    } else if (!options.skipEditCheck && hasLoadedSubmissionContext()) {
+        // A submission was loaded for editing - show choice dialog
+        const loadedContext = getLoadedSubmissionContext();
+        await showUpdateOrSaveNewDialog(loadedContext);
+        return; // Dialog will call showShareModal again with appropriate options
+    } else {
+        editModeState = null;
+    }
+
     // Show modal with loading state briefly while we prepare form
     modalElement.classList.remove('hidden');
     document.getElementById('share-loading').classList.remove('hidden');
     document.getElementById('share-duplicate').classList.add('hidden');
     document.getElementById('share-form').classList.add('hidden');
     document.getElementById('share-modal-footer').classList.add('hidden');
+
+    // Update header for edit mode
+    const headerTitle = modalElement.querySelector('h2');
+    if (headerTitle) {
+        if (editModeState) {
+            headerTitle.innerHTML = `
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit Submission
+            `;
+        } else {
+            headerTitle.innerHTML = `
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+                Share with Community
+            `;
+        }
+    }
 
     // Set up close button
     document.getElementById('share-modal-close').onclick = hideShareModal;
@@ -616,6 +797,105 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
     const timeSigDenom = metadata.timeSignature?.denom || 4;
     const tempo = metadata.tempo || 120;
 
+    // Get chord count and segments for validation
+    const chordSegments = compState?.getChordSegments?.() || [];
+    const chordCount = chordSegments.length;
+
+    // Check for N.C. (No Chord) in the progression
+    const hasNoChord = chordSegments.some(segment =>
+        segment.chord?.type === 'No Chord' || segment.chord?.type === 'N.C.'
+    );
+
+    // Store validation flags in form data
+    form.dataset.chordCount = chordCount.toString();
+    form.dataset.hasNoChord = hasNoChord ? 'true' : 'false';
+
+    // Get chord limit setting (async but non-blocking for UI)
+    let chordLimitWarning = '';
+    try {
+        const limitSetting = await getProgressionChordLimit();
+        if (limitSetting?.enabled && limitSetting?.limit) {
+            const maxChords = limitSetting.limit;
+            if (chordCount > maxChords) {
+                chordLimitWarning = `
+                    <div class="mt-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                        <p class="text-sm text-red-700 dark:text-red-300 font-medium flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                            Chord limit exceeded
+                        </p>
+                        <p class="text-xs text-red-600 dark:text-red-400 mt-1">
+                            Chord progressions are limited to <strong>${maxChords} chords</strong>. Your progression has ${chordCount} chords.
+                            Please reduce the number of chords to submit as a chord progression, or submit as a full composition instead.
+                        </p>
+                    </div>
+                `;
+                // Store limit info for validation
+                form.dataset.chordLimitExceeded = 'true';
+                form.dataset.chordLimit = maxChords.toString();
+            } else {
+                form.dataset.chordLimitExceeded = 'false';
+                // Show info about the limit if it's getting close
+                if (chordCount >= maxChords - 2) {
+                    chordLimitWarning = `
+                        <div class="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded text-xs text-yellow-700 dark:text-yellow-400">
+                            <strong>Note:</strong> Chord progressions are limited to ${maxChords} chords. You have ${chordCount}.
+                        </div>
+                    `;
+                }
+            }
+        } else {
+            form.dataset.chordLimitExceeded = 'false';
+        }
+    } catch (err) {
+        console.warn('[Share] Could not fetch chord limit:', err);
+        form.dataset.chordLimitExceeded = 'false';
+    }
+
+    // Build validation warnings
+    let validationWarnings = chordLimitWarning;
+
+    // Minimum chord count warning (applies to publishing both types)
+    if (chordCount < 3) {
+        validationWarnings += `
+            <div class="mt-2 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p class="text-sm text-amber-700 dark:text-amber-300 font-medium flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    Minimum chord count not met
+                </p>
+                <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    At least <strong>3 chords</strong> are required to publish. You have ${chordCount} chord${chordCount !== 1 ? 's' : ''}.
+                    You can save as a draft with any number of chords.
+                </p>
+            </div>
+        `;
+        form.dataset.minChordsNotMet = 'true';
+    } else {
+        form.dataset.minChordsNotMet = 'false';
+    }
+
+    // N.C. chord warning (shown dynamically based on submission type selection)
+    // We'll add the warning HTML but control visibility via JavaScript when type changes
+    if (hasNoChord) {
+        validationWarnings += `
+            <div id="nc-chord-warning" class="mt-2 p-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg">
+                <p class="text-sm text-orange-700 dark:text-orange-300 font-medium flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    Contains N.C. (No Chord)
+                </p>
+                <p class="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    Chord progressions with "N.C." cannot be published. Remove N.C. chords or submit as a "Full Composition" instead.
+                    Drafts can be saved with N.C. chords.
+                </p>
+            </div>
+        `;
+    }
+
     // Populate preview
     const preview = document.getElementById('share-preview');
     preview.innerHTML = `
@@ -623,12 +903,13 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
             <div><span class="font-semibold">Key:</span> ${key}</div>
             <div><span class="font-semibold">Time:</span> ${timeSigNum}/${timeSigDenom}</div>
             <div><span class="font-semibold">BPM:</span> ${tempo}</div>
-            <div><span class="font-semibold">Chords:</span> ${(compState?.getChordSegments?.() || []).length}</div>
+            <div><span class="font-semibold">Chords:</span> ${chordCount}</div>
         </div>
         <div class="mt-2 p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
             <span class="font-semibold">Progression:</span>
             <span class="font-mono text-indigo-600 dark:text-indigo-400">${dupData.normalized}</span>
         </div>
+        ${validationWarnings}
     `;
 
     // Show form and footer FIRST, then load async content
@@ -640,6 +921,103 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
     document.getElementById('share-cancel-btn').onclick = hideShareModal;
     document.getElementById('share-draft-btn').onclick = () => handleSubmit('draft');
     document.getElementById('share-submit-btn').onclick = () => handleSubmit('published');
+
+    // Update button text for edit mode
+    const submitBtn = document.getElementById('share-submit-btn');
+    const draftBtn = document.getElementById('share-draft-btn');
+    if (editModeState) {
+        submitBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Update
+        `;
+        // Hide draft button in edit mode - existing submission already has a status
+        draftBtn.classList.add('hidden');
+    } else {
+        submitBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+            </svg>
+            Publish
+        `;
+        draftBtn.classList.remove('hidden');
+    }
+
+    // Pre-fill form with existing data in edit mode
+    if (editModeState && editModeState.existingData) {
+        const data = editModeState.existingData;
+        const titleInput = document.getElementById('share-title');
+        const descriptionInput = document.getElementById('share-description');
+
+        // Pre-fill title and make it read-only in edit mode
+        if (data.title) {
+            titleInput.value = data.title;
+            titleInput.readOnly = true;
+            titleInput.classList.add('bg-gray-100', 'dark:bg-gray-600', 'cursor-not-allowed');
+            titleInput.title = 'Title cannot be changed when updating. Use "Save as New" to create a new submission with a different title.';
+
+            // Add a visual indicator that title is locked
+            const titleLabel = titleInput.closest('div').querySelector('label');
+            if (titleLabel && !titleLabel.querySelector('.edit-mode-lock')) {
+                const lockIcon = document.createElement('span');
+                lockIcon.className = 'edit-mode-lock ml-2 text-gray-400 text-xs';
+                lockIcon.innerHTML = `
+                    <svg class="w-3.5 h-3.5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                    (locked)
+                `;
+                titleLabel.appendChild(lockIcon);
+            }
+        }
+
+        // Pre-fill description with hint about documenting changes
+        if (data.description) {
+            descriptionInput.value = data.description;
+        }
+
+        // Add hint about documenting changes in description
+        const descriptionLabel = descriptionInput.closest('div').querySelector('label');
+        if (descriptionLabel && !descriptionLabel.querySelector('.edit-mode-hint')) {
+            const hintSpan = document.createElement('span');
+            hintSpan.className = 'edit-mode-hint ml-2 text-amber-600 dark:text-amber-400 text-xs font-normal';
+            hintSpan.textContent = '(Consider noting what you changed)';
+            descriptionLabel.appendChild(hintSpan);
+        }
+
+        // Pre-select submission type
+        if (data.submissionType) {
+            const typeRadio = document.querySelector(`input[name="share-type"][value="${data.submissionType}"]`);
+            if (typeRadio) {
+                typeRadio.checked = true;
+                // Trigger change event to update styling
+                typeRadio.dispatchEvent(new Event('change'));
+            }
+        }
+
+        // Pre-select category
+        if (data.category) {
+            const categoryRadio = document.querySelector(`input[name="share-category"][value="${data.category}"]`);
+            if (categoryRadio) {
+                categoryRadio.checked = true;
+                // Trigger change event to update styling
+                categoryRadio.dispatchEvent(new Event('change'));
+            }
+        }
+    } else {
+        // Reset title input state for non-edit mode
+        const titleInput = document.getElementById('share-title');
+        titleInput.readOnly = false;
+        titleInput.classList.remove('bg-gray-100', 'dark:bg-gray-600', 'cursor-not-allowed');
+        titleInput.title = '';
+
+        // Remove any edit mode indicators
+        const lockIcon = document.querySelector('.edit-mode-lock');
+        if (lockIcon) lockIcon.remove();
+        const hintSpan = document.querySelector('.edit-mode-hint');
+        if (hintSpan) hintSpan.remove();
+    }
 
     // Set up form event listeners
     setupFormListeners();
@@ -819,6 +1197,28 @@ function setupFormListeners() {
         });
     });
 
+    // Show/hide N.C. warning based on submission type
+    const typeRadios = document.querySelectorAll('input[name="share-type"]');
+    const ncWarning = document.getElementById('nc-chord-warning');
+
+    function updateNcWarningVisibility() {
+        if (!ncWarning) return;
+        const selectedType = document.querySelector('input[name="share-type"]:checked')?.value;
+        // Only show N.C. warning for chord-progression type
+        if (selectedType === 'chord-progression') {
+            ncWarning.classList.remove('hidden');
+        } else {
+            ncWarning.classList.add('hidden');
+        }
+    }
+
+    typeRadios.forEach(radio => {
+        radio.addEventListener('change', updateNcWarningVisibility);
+    });
+
+    // Initial state - hide warning if full-composition is selected
+    updateNcWarningVisibility();
+
     // Style radio buttons when checked
     document.querySelectorAll('input[type="radio"]').forEach(radio => {
         radio.addEventListener('change', () => {
@@ -875,6 +1275,31 @@ async function handleSubmit(status = 'published') {
         return;
     }
 
+    // ==========================================
+    // PUBLISHING VALIDATION (not applied to drafts)
+    // ==========================================
+    if (!isDraft) {
+        // Check minimum chord count for publishing
+        if (form.dataset.minChordsNotMet === 'true') {
+            const chordCount = form.dataset.chordCount || '0';
+            alert(`At least 3 chords are required to publish. You have ${chordCount} chord(s). You can save as a draft with any number of chords.`);
+            return;
+        }
+
+        // Check for N.C. (No Chord) in chord-progression submissions
+        if (submissionType === 'chord-progression' && form.dataset.hasNoChord === 'true') {
+            alert('Chord progressions cannot contain "N.C." (No Chord) when publishing. Remove the N.C. chord, submit as a "Full Composition" instead, or save as a draft.');
+            return;
+        }
+
+        // Check chord limit for chord-progression submissions
+        if (submissionType === 'chord-progression' && form.dataset.chordLimitExceeded === 'true') {
+            const limit = form.dataset.chordLimit || 'unknown';
+            alert(`Chord progressions are limited to ${limit} chords. Please reduce the number of chords or submit as a "Full Composition" instead.`);
+            return;
+        }
+    }
+
     // Disable buttons
     submitBtn.disabled = true;
     draftBtn.disabled = true;
@@ -917,9 +1342,10 @@ async function handleSubmit(status = 'published') {
             throw new Error('Your session has expired. Please sign in again.');
         }
 
-        // Only check for duplicates when PUBLISHING (not for drafts)
+        // Only check for duplicates when PUBLISHING chord-progressions (not for drafts or full-compositions)
         // Drafts can be saved without duplicate checks - they're work in progress
-        if (!isDraft && !isVariant) {
+        // Full compositions are unique due to melody/arrangement and don't need duplicate detection
+        if (!isDraft && !isVariant && submissionType === 'chord-progression') {
             submitBtn.innerHTML = `
                 <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"></circle>
@@ -986,6 +1412,59 @@ async function handleSubmit(status = 'published') {
             `;
         }
 
+        // ==========================================
+        // EDIT MODE - Update existing submission
+        // ==========================================
+        if (editModeState) {
+            console.log('[Share] Updating submission:', {
+                submissionId: editModeState.submissionId,
+                title,
+                submissionType,
+                keySignature: form.dataset.key,
+                compositionDataSize: JSON.stringify(compositionData).length
+            });
+
+            submitBtn.innerHTML = `
+                <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"></circle>
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Updating...
+            `;
+
+            try {
+                const result = await updateOwnSubmission(editModeState.submissionId, {
+                    title,
+                    description: description || null,
+                    compositionData,
+                    baseHash: form.dataset.baseHash,
+                    variantHash: form.dataset.variantHash,
+                    progressionHash: form.dataset.baseHash,
+                    normalizedProgression: form.dataset.normalized,
+                    keySignature: form.dataset.key,
+                    timeSignatureNum: timeSigNum,
+                    timeSignatureDenom: timeSigDenom,
+                    bpm: tempo,
+                    chordCount: (compState?.getChordSegments?.() || []).length,
+                    measureCount: (compState?.getMeasures?.() || []).length,
+                    tags: Array.from(selectedTags)
+                });
+
+                // Success! Clear the loaded submission context since we've updated
+                clearLoadedSubmissionContext();
+                hideShareModal();
+                showSuccessMessage(result.submissionId, false, true); // isEdit = true
+                return;
+
+            } catch (updateError) {
+                console.error('[Share] Update error:', updateError);
+                throw new Error(updateError.message || 'Failed to update submission');
+            }
+        }
+
+        // ==========================================
+        // CREATE NEW SUBMISSION
+        // ==========================================
         console.log('[Share] Submitting with:', {
             submissionType,
             status,
@@ -1044,7 +1523,11 @@ async function handleSubmit(status = 'published') {
             throw new Error(result.error || (isDraft ? 'Failed to save draft' : 'Failed to publish'));
         }
 
-        // Success!
+        // Success! If this was a "Save as New" flow, clear the loaded context
+        if (saveAsNewMode) {
+            clearLoadedSubmissionContext();
+            saveAsNewMode = false;
+        }
         hideShareModal();
         showSuccessMessage(result.submissionId, isDraft);
 
@@ -1058,18 +1541,29 @@ async function handleSubmit(status = 'published') {
     function resetButtons() {
         submitBtn.disabled = false;
         draftBtn.disabled = false;
-        submitBtn.innerHTML = `
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
-            </svg>
-            Publish
-        `;
-        draftBtn.innerHTML = `
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-            </svg>
-            Save as Draft
-        `;
+
+        // Reset to appropriate state based on edit mode
+        if (editModeState) {
+            submitBtn.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Update
+            `;
+        } else {
+            submitBtn.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+                Publish
+            `;
+            draftBtn.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                </svg>
+                Save as Draft
+            `;
+        }
     }
 }
 
@@ -1077,25 +1571,47 @@ async function handleSubmit(status = 'published') {
  * Show success message after sharing
  * @param {string} submissionId - The submission ID
  * @param {boolean} isDraft - Whether this was saved as a draft
+ * @param {boolean} isEdit - Whether this was an edit of existing submission
  */
-function showSuccessMessage(submissionId, isDraft = false) {
+function showSuccessMessage(submissionId, isDraft = false, isEdit = false) {
     // Create a temporary toast notification
     const toast = document.createElement('div');
-    toast.className = `fixed bottom-4 right-4 ${isDraft ? 'bg-blue-500' : 'bg-green-500'} text-white px-6 py-4 rounded-lg shadow-xl z-50 flex items-center gap-3 animate-slide-up`;
-    toast.innerHTML = isDraft ? `
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-        </svg>
-        <div>
-            <span class="font-semibold block">Draft saved!</span>
-            <span class="text-sm opacity-90">Access it from My Submissions</span>
-        </div>
-    ` : `
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span class="font-semibold">Successfully published to the community!</span>
-    `;
+
+    let bgColor, content;
+    if (isEdit) {
+        bgColor = 'bg-amber-500';
+        content = `
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <div>
+                <span class="font-semibold block">Submission updated!</span>
+                <span class="text-sm opacity-90">Previous version saved to history</span>
+            </div>
+        `;
+    } else if (isDraft) {
+        bgColor = 'bg-blue-500';
+        content = `
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+            </svg>
+            <div>
+                <span class="font-semibold block">Draft saved!</span>
+                <span class="text-sm opacity-90">Access it from My Submissions</span>
+            </div>
+        `;
+    } else {
+        bgColor = 'bg-green-500';
+        content = `
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span class="font-semibold">Successfully published to the community!</span>
+        `;
+    }
+
+    toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-xl z-50 flex items-center gap-3 animate-slide-up`;
+    toast.innerHTML = content;
     document.body.appendChild(toast);
 
     setTimeout(() => {
