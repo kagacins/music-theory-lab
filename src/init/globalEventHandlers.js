@@ -297,7 +297,6 @@ function setupCustomEventListeners() {
         // Refresh the progression display to show the new section grouping
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('progression-visualization', true);
-            window.renderProgressionDisplay('melody-progression-visualization', false);
         }
     });
 }

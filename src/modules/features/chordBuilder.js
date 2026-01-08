@@ -3951,7 +3951,6 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
                 // Re-render to show the chord in the section
                 if (window.renderProgressionDisplay) {
                     window.renderProgressionDisplay('melody-progression-visualization', true);
-                    window.renderProgressionDisplay('melody-progression-visualization', false);
                 }
             } catch (e) {
                 // Silently fail - chord will remain ungrouped
@@ -4127,7 +4126,6 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
         if (!options.skipRender) {
             if (window.renderProgressionDisplay) {
                 window.renderProgressionDisplay('progression-visualization', true);
-                window.renderProgressionDisplay('melody-progression-visualization', false);
             }
 
             // Re-render melody notation if needed (same logic as addToProgressionData)
@@ -4176,7 +4174,6 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
                     // Re-render to show the chord in the section
                     if (window.renderProgressionDisplay) {
                         window.renderProgressionDisplay('melody-progression-visualization', true);
-                        window.renderProgressionDisplay('melody-progression-visualization', false);
                     }
                 } catch (e) {
                     // Silently fail - chord will remain ungrouped

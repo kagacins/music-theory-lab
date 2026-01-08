@@ -508,7 +508,6 @@ function createViewModeToggle() {
             setProgressionViewMode(mode);
             // Re-render both progression displays
             renderProgressionDisplay('melody-progression-visualization', true);
-            renderProgressionDisplay('melody-progression-visualization', false);
             // Update notation for section view (call via window - old module function)
             if (window.updateNotationForSelectedSections) {
                 window.updateNotationForSelectedSections();
@@ -557,7 +556,6 @@ export function createCompactViewModeToggle() {
             setProgressionViewMode(mode);
             // Re-render progression display
             renderProgressionDisplay('melody-progression-visualization', true);
-            renderProgressionDisplay('melody-progression-visualization', false);
             // Update notation for section view (call via window - old module function)
             if (window.updateNotationForSelectedSections) {
                 window.updateNotationForSelectedSections();
@@ -1931,31 +1929,13 @@ function renderMelodyNotationIfNeeded(preventScroll = false) {
     // Only render if on Melody tab or if Free mode is active
     if (isMelodyTab || isFreeModeActive) {
         // Phase 4.4: Use enhanced notation system if available
-        // Sync progression to compositionState first
+        // Sync progression to compositionState first, then refresh notation
+        // Note: refreshNotationFromProgression is debounced, so multiple calls are coalesced
         if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
             window.syncProgressionToMelodyComposer();
         }
-        // refreshNotationFromProgression returns true if it rendered, false otherwise
         if (window.refreshNotationFromProgression) {
-            const result = window.refreshNotationFromProgression(preventScroll);
-            if (result) {
-                return;
-            }
-        }
-
-        // Fallback to old renderers if enhanced notation not available or didn't render
-        // Phase 1B: Sync progression to composition state before rendering
-        // This ensures bass auto-fill is updated when chords are added
-        if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
-            window.syncProgressionToMelodyComposer();
-        }
-
-        // Refresh notation after updates
-        if (window.refreshNotationFromProgression) {
-            // Use setTimeout to ensure DOM updates are complete
-            setTimeout(() => {
-                window.refreshNotationFromProgression(preventScroll);
-            }, 50);
+            window.refreshNotationFromProgression(preventScroll);
         }
     }
 }
@@ -3486,7 +3466,6 @@ function renderProgressionDisplayImmediate(containerId = 'progression-visualizat
                 }
             } catch (_) {}
             renderProgressionDisplay('melody-progression-visualization', true);
-            renderProgressionDisplay('melody-progression-visualization', false);
             return window.ddInspect();
         };
     }
@@ -4073,10 +4052,9 @@ export function renderProgressionControls() {
     if (progressionData.length === 0) {
         loadProgression();
     } else {
-        // Render progression display
+        // Render progression display (syncBothTabs=true handles both containers)
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('melody-progression-visualization', true);
-            window.renderProgressionDisplay('melody-progression-visualization', false);
         }
     }
 }
@@ -6482,7 +6460,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
 
         // Re-render to update visuals (for real sections)
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
 
         if (window.refreshNotationFromProgression) {
             window.refreshNotationFromProgression();
@@ -6498,7 +6475,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     if (isFilteredView) {
         // Re-render to update section visuals
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
 
         // Update notation for filtered view
         if (window.refreshNotationFromProgression) {
@@ -6517,7 +6493,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     if (JSON.stringify(visibleChordOrder) === JSON.stringify(oldOrder)) {
         // Still re-render to update section visuals
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
         return;
     }
 
@@ -6548,7 +6523,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
 
     // Re-render
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update notation
     if (window.refreshNotationFromProgression) {

@@ -2821,9 +2821,9 @@ function showTransformPreview(container, original, transformed, transformation, 
             const typeChanged = !origChord || chord.type !== origChord.type;
 
             if (rootChanged || typeChanged) {
-                // Notes are stale - regenerate them for the new root/type
+                // Notes are stale - regenerate them for the new root/type (use null to derive enharmonic from key)
                 const inversion = chord.inversion || 0;
-                const res = getInvertedChordNotes(chord.root, chord.type, inversion, currentKey, 0, 'sharp', 'full');
+                const res = getInvertedChordNotes(chord.root, chord.type, inversion, currentKey, 0, null, 'full');
                 if (res && res.specificNotes) {
                     return { ...chord, notes: res.specificNotes };
                 }
@@ -3401,7 +3401,6 @@ function showTransformPreview(container, original, transformed, transformation, 
         // renderProgressionDisplay requires (containerId, simplified) parameters
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('melody-progression-visualization', true);
-            window.renderProgressionDisplay('melody-progression-visualization', false);
         }
 
         window.dispatchEvent(new CustomEvent('progressionUpdated'));
@@ -5352,7 +5351,6 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
         // Also refresh the main progression displays so newly created sections are visible immediately
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('progression-visualization', true);
-            window.renderProgressionDisplay('melody-progression-visualization', false);
         }
     }
 

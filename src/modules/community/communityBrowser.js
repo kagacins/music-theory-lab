@@ -1112,14 +1112,14 @@ function playPreviewChord(chord, key) {
         if (chord.notes && chord.notes.length > 0) {
             notes = [...chord.notes];
         } else {
-            // Generate notes from chord properties
+            // Generate notes from chord properties (use null to derive enharmonic from key)
             const res = getInvertedChordNotes(
                 chord.root,
                 chord.type,
                 chord.inversion || 0,
                 key,
                 0,
-                'sharp',
+                null,
                 'full'
             );
             notes = res?.specificNotes || [];
@@ -1854,11 +1854,11 @@ function getNoteDurationBeats(note) {
 function getVexNotesForChordGrandStaff(chord, key, keyAccidentals) {
     let notes = [];
 
-    // Get notes from chord
+    // Get notes from chord (use null to derive enharmonic from key)
     if (chord.notes && chord.notes.length > 0) {
         notes = chord.notes;
     } else {
-        const res = getInvertedChordNotes(chord.root, chord.type, chord.inversion || 0, key, 0, 'sharp', 'full');
+        const res = getInvertedChordNotes(chord.root, chord.type, chord.inversion || 0, key, 0, null, 'full');
         notes = res?.specificNotes || [];
     }
 
@@ -2415,7 +2415,7 @@ async function appendChordProgression(compositionState, progressionData, options
     const usesFlats = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'].includes(targetKey);
     const noteArray = usesFlats ? SEMITONE_TO_NOTE_FLAT : SEMITONE_TO_NOTE_SHARP;
 
-    // Transpose the new chords - clear notes so syncWithProgressionData regenerates them
+    // Transpose the new chords - regenerate notes with the new root
     const transposedChords = progressionData.map((chord) => {
         const rootSemitone = NOTE_TO_SEMITONE[chord.root];
         if (rootSemitone === undefined) return chord;
@@ -2423,12 +2423,26 @@ async function appendChordProgression(compositionState, progressionData, options
         const newSemitone = (rootSemitone + interval) % 12;
         const newRoot = noteArray[newSemitone];
 
-        // DON'T transpose the notes array - it causes octave corruption when crossing B/C boundary
-        // Clear the notes and let syncWithProgressionData regenerate them fresh using getChordNotes()
+        // Regenerate notes with the transposed root to avoid octave corruption
+        // Use getInvertedChordNotes to properly generate notes for the new root
+        const enharmonicPref = usesFlats ? 'flat' : 'sharp';
+        const chordNotesResult = getInvertedChordNotes(
+            newRoot,
+            chord.type,
+            chord.inversion || 0,
+            targetKey,
+            chord.octaveShift || 0,
+            enharmonicPref,
+            'full'
+        );
+
+        // Use regenerated notes, or fall back to empty array if generation failed
+        const newNotes = chordNotesResult?.specificNotes || [];
+
         return {
             ...chord,
             root: newRoot,
-            notes: null
+            notes: newNotes
         };
     });
 

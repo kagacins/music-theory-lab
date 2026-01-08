@@ -102,6 +102,59 @@ let primaryCanvas = null;
 let overlayCanvas = null;
 let toolbarContainer = null;
 
+// ============================================================================
+// RENDER DEBOUNCING SYSTEM
+// ============================================================================
+
+/**
+ * Debounce delay for notation refresh (ms)
+ * Short enough to feel responsive, long enough to coalesce rapid calls
+ */
+const NOTATION_REFRESH_DEBOUNCE_MS = 16; // ~1 frame at 60fps
+
+/**
+ * Timer for debounced refresh
+ */
+let notationRefreshTimer = null;
+
+/**
+ * Pending refresh request
+ */
+let pendingRefreshRequest = null;
+
+/**
+ * Counter for tracking render calls (for debugging)
+ */
+let renderCallCount = 0;
+let lastRenderCountReset = Date.now();
+
+/**
+ * Debug mode for render debouncing
+ * Set window.DEBUG_NOTATION_RENDER = true in console to enable
+ */
+const isNotationDebugMode = () => typeof window !== 'undefined' && window.DEBUG_NOTATION_RENDER;
+
+/**
+ * Get render statistics for debugging
+ * @returns {object} Stats about render calls
+ */
+export function getNotationRenderStats() {
+  const elapsed = (Date.now() - lastRenderCountReset) / 1000;
+  return {
+    totalRenders: renderCallCount,
+    elapsedSeconds: elapsed.toFixed(1),
+    rendersPerSecond: (renderCallCount / elapsed).toFixed(2)
+  };
+}
+
+/**
+ * Reset render statistics
+ */
+export function resetNotationRenderStats() {
+  renderCallCount = 0;
+  lastRenderCountReset = Date.now();
+}
+
 /**
  * Create or get overlay canvas for visual feedback
  * @param {HTMLCanvasElement} baseCanvas - Base canvas element
@@ -1837,12 +1890,21 @@ export function renderEnhancedNotation(canvas = null) {
 }
 
 /**
- * Re-render with updated data from progression
- * @returns {boolean} - True if rendering was performed, false if not initialized
+ * Internal function that actually performs the notation refresh
+ * Called by the debounced wrapper
+ * @param {boolean} preventScroll - Whether to prevent scroll during refresh
+ * @returns {boolean} - True if rendering was performed
  */
-export function refreshNotationFromProgression(preventScroll = false) {
+function refreshNotationFromProgressionImmediate(preventScroll = false) {
   if (!notationComposer) {
     return false;
+  }
+
+  // Increment render counter for debugging
+  renderCallCount++;
+
+  if (isNotationDebugMode()) {
+    console.log(`[NotationRender] Executing render #${renderCallCount} (preventScroll=${preventScroll})`);
   }
 
   // Save scroll position before syncing to prevent page jumping
@@ -1870,7 +1932,7 @@ export function refreshNotationFromProgression(preventScroll = false) {
   }
 
   notationComposer.syncFromProgression(preventScroll);
-  
+
   // Restore scroll position after sync completes
   const restoreScroll = () => {
     window.scrollTo(scrollX, scrollY);
@@ -1879,7 +1941,7 @@ export function refreshNotationFromProgression(preventScroll = false) {
       canvasContainer.scrollLeft = containerScrollLeft;
     }
   };
-  
+
   if (preventScroll) {
     // More aggressive scroll prevention when explicitly requested
     // Restore scroll immediately and multiple times
@@ -1907,6 +1969,86 @@ export function refreshNotationFromProgression(preventScroll = false) {
   }
   
   return true;
+}
+
+/**
+ * Debounced version of refreshNotationFromProgression
+ * Coalesces multiple rapid calls into a single render
+ *
+ * @param {boolean} preventScroll - Whether to prevent scroll during refresh
+ * @param {boolean} immediate - If true, bypass debouncing and render immediately
+ * @returns {boolean} - True if refresh was scheduled/performed
+ */
+export function refreshNotationFromProgression(preventScroll = false, immediate = false) {
+  if (!notationComposer) {
+    return false;
+  }
+
+  // If immediate mode requested, execute directly
+  if (immediate) {
+    if (isNotationDebugMode()) {
+      console.log('[NotationRender] Immediate render requested');
+    }
+    // Clear any pending debounced render
+    if (notationRefreshTimer) {
+      clearTimeout(notationRefreshTimer);
+      notationRefreshTimer = null;
+      pendingRefreshRequest = null;
+    }
+    return refreshNotationFromProgressionImmediate(preventScroll);
+  }
+
+  // Store the request (preferring preventScroll=true if any caller requests it)
+  if (pendingRefreshRequest) {
+    pendingRefreshRequest.preventScroll = pendingRefreshRequest.preventScroll || preventScroll;
+  } else {
+    pendingRefreshRequest = { preventScroll };
+  }
+
+  if (isNotationDebugMode()) {
+    console.log(`[NotationRender] Queuing refresh (preventScroll=${pendingRefreshRequest.preventScroll})`);
+  }
+
+  // Clear existing timer
+  if (notationRefreshTimer) {
+    clearTimeout(notationRefreshTimer);
+  }
+
+  // Set new timer
+  notationRefreshTimer = setTimeout(() => {
+    const request = pendingRefreshRequest;
+    pendingRefreshRequest = null;
+    notationRefreshTimer = null;
+
+    if (request) {
+      if (isNotationDebugMode()) {
+        console.log(`[NotationRender] Executing debounced render (preventScroll=${request.preventScroll})`);
+      }
+      refreshNotationFromProgressionImmediate(request.preventScroll);
+    }
+  }, NOTATION_REFRESH_DEBOUNCE_MS);
+
+  return true;
+}
+
+/**
+ * Force flush any pending notation refresh immediately
+ * Useful before operations that need the DOM to be up-to-date
+ */
+export function flushNotationRefresh() {
+  if (notationRefreshTimer && pendingRefreshRequest) {
+    clearTimeout(notationRefreshTimer);
+    notationRefreshTimer = null;
+
+    const request = pendingRefreshRequest;
+    pendingRefreshRequest = null;
+
+    if (isNotationDebugMode()) {
+      console.log('[NotationRender] Flushing pending refresh');
+    }
+
+    refreshNotationFromProgressionImmediate(request.preventScroll);
+  }
 }
 
 /**

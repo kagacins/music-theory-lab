@@ -568,7 +568,6 @@ function applyKeyChange(actualKey, type) {
     // Re-render the progression display with the new key context
     if (window.renderProgressionDisplay) {
         window.renderProgressionDisplay('melody-progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Also re-render chord cards to show updated Roman numerals

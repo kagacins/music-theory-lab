@@ -1082,23 +1082,8 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
     setProgressionData(newProgressionData);
     setProgressionRomans(newProgressionRomans);
 
-    // Sync to composition state
-    if (window.syncProgressionToMelodyComposer) {
-        window.syncProgressionToMelodyComposer();
-    }
-
     // NEW MODEL: Section startIndex and chordCount don't change when reordering within a section
     // The chords just swap positions within the same range
-
-    // Refresh notation
-    if (window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
-    }
-
-    // Update voice leading analysis
-    if (window.updateVoiceLeading) {
-        window.updateVoiceLeading();
-    }
 
     window.dispatchEvent(new CustomEvent('showNotification', {
         detail: { message: 'Cards reordered', type: 'success' }
@@ -1111,14 +1096,10 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
     }
 
     // Re-render to ensure DOM matches data
+    // Note: renderProgressionDisplay with syncBothTabs=true handles both tabs
+    // and internally calls sync + notation refresh
     if (window.renderProgressionDisplay) {
-        window.renderProgressionDisplay('progression-visualization', false);
         window.renderProgressionDisplay('melody-progression-visualization', true);
-    }
-
-    // Update notation
-    if (window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
     }
 
     // Update voice leading analysis after reorder

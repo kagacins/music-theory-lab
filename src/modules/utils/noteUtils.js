@@ -76,8 +76,9 @@ export function getEnharmonicPreferenceForKey(key) {
         return 'sharp';
     }
 
-    // Default to sharp for neutral keys like C major, A minor
-    return 'sharp';
+    // Default to flat for neutral keys like C major, A minor
+    // Flat spellings (Bb, Eb, Ab) are more common in popular music than sharp equivalents (A#, D#, G#)
+    return 'flat';
 }
 
 /**
@@ -144,7 +145,11 @@ export function noteToMidi(note) {
  * @returns {string} Resolved note name with octave
  * @requires enharmonicPreference - global state variable
  */
-export function resolveEnharmonic(noteWithOctave, key, enharmonicPreference = 'sharp') {
+export function resolveEnharmonic(noteWithOctave, key, enharmonicPreference = null) {
+    // If no preference provided, derive from key (or default to flat for common spellings)
+    if (enharmonicPreference === null) {
+        enharmonicPreference = key ? getEnharmonicPreferenceForKey(key) : 'flat';
+    }
     let noteNoOctave = noteWithOctave.slice(0, -1);
     const octave = noteWithOctave.slice(-1);
 
@@ -208,7 +213,11 @@ export function getNoteKeyId(note) {
  * @returns {Object} Object with baseNotes (without octave) and specificNotes (with octave)
  * @requires enharmonicPreference - global state variable
  */
-export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmonicPreference = 'sharp') {
+export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmonicPreference = null) {
+    // If no preference provided, derive from key (or default to flat for common spellings)
+    if (enharmonicPreference === null) {
+        enharmonicPreference = key ? getEnharmonicPreferenceForKey(key) : 'flat';
+    }
     const chordDef = CHORD_DEFINITIONS[chordType];
     if (!chordDef) { return { baseNotes: [], specificNotes: [] }; }
 
@@ -363,7 +372,11 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
  * @returns {Object} Object with name, simpleName, and specificNotes
  * @requires enharmonicPreference, notationPreference - global state variables
  */
-export function getInvertedChordNotes(rootNote, chordType, inversion, key, octaveShift = 0, enharmonicPreference = 'sharp', notationPreference = 'full') {
+export function getInvertedChordNotes(rootNote, chordType, inversion, key, octaveShift = 0, enharmonicPreference = null, notationPreference = 'full') {
+    // If no preference provided, derive from key (or default to flat for common spellings)
+    if (enharmonicPreference === null) {
+        enharmonicPreference = key ? getEnharmonicPreferenceForKey(key) : 'flat';
+    }
     // Determine if chordType is a string (e.g., "Major") or a temporary definition object.
     const isStringLookup = typeof chordType === 'string';
     const chordDef = isStringLookup ? CHORD_DEFINITIONS[chordType] : chordType;
@@ -434,7 +447,11 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
  * @returns {Object} Object with name and specificNotes
  * @requires enharmonicPreference - global state variable
  */
-export function getIntervalNotes(rootNote, intervalType, octaveShift = 0, enharmonicPreference = 'sharp') {
+export function getIntervalNotes(rootNote, intervalType, octaveShift = 0, enharmonicPreference = null) {
+    // If no preference provided, default to flat for common spellings
+    if (enharmonicPreference === null) {
+        enharmonicPreference = 'flat';
+    }
     const definition = INTERVAL_DEFINITIONS[intervalType];
     if (!definition) return { name: "N/A", specificNotes: [] };
 
@@ -462,7 +479,11 @@ export function getIntervalNotes(rootNote, intervalType, octaveShift = 0, enharm
  * @returns {Array<string>} Array of note names with octaves
  * @requires enharmonicPreference - global state variable
  */
-export function getLHNotes(rootNote, lhType, lhInversion = 0, key, lhOctaveShift, rhChordType = 'Major', enharmonicPreference = 'sharp') {
+export function getLHNotes(rootNote, lhType, lhInversion = 0, key, lhOctaveShift, rhChordType = 'Major', enharmonicPreference = null) {
+    // If no preference provided, derive from key (or default to flat for common spellings)
+    if (enharmonicPreference === null) {
+        enharmonicPreference = key ? getEnharmonicPreferenceForKey(key) : 'flat';
+    }
     if (lhType === 'off') {
         return [];
     }

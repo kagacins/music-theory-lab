@@ -393,6 +393,9 @@ import {
     initEnhancedNotation,
     renderEnhancedNotation,
     refreshNotationFromProgression,
+    flushNotationRefresh,
+    getNotationRenderStats,
+    resetNotationRenderStats,
     setNotationDuration,
     setNotationRestMode,
     setNotationDotted,
@@ -1713,11 +1716,8 @@ export function setupWindowExports() {
                 window.showToast(`Loaded: ${projectTitle}`, { type: 'success' });
             }
 
-            // Trigger final refresh
-            console.log('[IMTL Import] Triggering final refreshNotationFromProgression...');
-            if (window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            }
+            // Note: refreshNotationFromProgression is already called via onNotationRefresh callback
+            // and is debounced, so no need for an additional call here
 
             // Update key display in all locations (including melody-workbench-key-display)
             if (window.syncProgressionToMelodyTab) {
@@ -2286,6 +2286,9 @@ export function setupWindowExports() {
     window.initEnhancedNotation = initEnhancedNotation;
     window.renderEnhancedNotation = renderEnhancedNotation;
     window.refreshNotationFromProgression = refreshNotationFromProgression;
+    window.flushNotationRefresh = flushNotationRefresh;
+    window.getNotationRenderStats = getNotationRenderStats;
+    window.resetNotationRenderStats = resetNotationRenderStats;
     window.setNotationDuration = setNotationDuration;
     window.setNotationRestMode = setNotationRestMode;
     window.setNotationDotted = setNotationDotted;

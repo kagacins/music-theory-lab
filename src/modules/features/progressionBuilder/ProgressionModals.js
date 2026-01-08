@@ -685,7 +685,6 @@ function createNewSection(type, containerId) {
     // Re-render to show the new section
     console.log('[Section] Re-rendering progression display');
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Dispatch event for tutorial validation
     dispatchBuilderEvent('chordsGrouped', { groupName: type, chordIndices: selectedIndices });
@@ -710,7 +709,6 @@ export function toggleSectionCollapse(sectionId) {
     // TODO: renderProgressionDisplay needs to be imported
     if (renderProgressionDisplay) {
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
     }
 }
 
@@ -743,7 +741,6 @@ export function editSectionLabel(sectionId, labelElement) {
             // TODO: renderProgressionDisplay needs to be imported
             if (renderProgressionDisplay) {
                 renderProgressionDisplay('melody-progression-visualization', true);
-                renderProgressionDisplay('melody-progression-visualization', false);
             }
         }
         return;
@@ -770,7 +767,6 @@ export function editSectionLabel(sectionId, labelElement) {
         // TODO: renderProgressionDisplay needs to be imported
         if (renderProgressionDisplay) {
             renderProgressionDisplay('melody-progression-visualization', true);
-            renderProgressionDisplay('melody-progression-visualization', false);
         }
     };
 
@@ -798,7 +794,6 @@ export function editSectionLabel(sectionId, labelElement) {
             // TODO: renderProgressionDisplay needs to be imported
             if (renderProgressionDisplay) {
                 renderProgressionDisplay('melody-progression-visualization', true);
-                renderProgressionDisplay('melody-progression-visualization', false);
             }
         }
     }
@@ -865,7 +860,6 @@ export function showSectionMenu(event, sectionId) {
                 // TODO: renderProgressionDisplay needs to be imported
                 if (renderProgressionDisplay) {
                     renderProgressionDisplay('melody-progression-visualization', true);
-                    renderProgressionDisplay('melody-progression-visualization', false);
                 }
             }
         }, danger: false },
@@ -1007,7 +1001,6 @@ export function showChangeSectionTypeDialog(sectionId, currentType, compositionS
             // TODO: renderProgressionDisplay needs to be imported
             if (renderProgressionDisplay) {
                 renderProgressionDisplay('melody-progression-visualization', true);
-                renderProgressionDisplay('melody-progression-visualization', false);
             }
         });
     });
@@ -1070,7 +1063,6 @@ export function deleteSectionAndChords(sectionId, compositionState) {
     // TODO: renderProgressionDisplay needs to be imported
     if (renderProgressionDisplay) {
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Update notation
@@ -1174,7 +1166,6 @@ export function showDuplicateSectionDialog(sectionId, sectionLabel, compositionS
         // TODO: renderProgressionDisplay needs to be imported
         if (renderProgressionDisplay) {
             renderProgressionDisplay('melody-progression-visualization', true);
-            renderProgressionDisplay('melody-progression-visualization', false);
         }
 
         // Dispatch event for tutorial validation
@@ -1208,14 +1199,14 @@ export function showProgressionChordSuggestions(chordIndex) {
     const onAddChord = (nextChordType, nextRoot, nextInversion) => {
         const key = trainerState.currentKey;
 
-        // Get full chord information using getInvertedChordNotes
+        // Get full chord information using getInvertedChordNotes (use null to derive enharmonic from key)
         const result = getInvertedChordNotes(
             nextRoot,
             nextChordType,
             nextInversion,
             key,
             0, // octaveShift
-            getKeyBasedEnharmonic ? getKeyBasedEnharmonic() : 'sharp',
+            null, // derive enharmonic from key
             getNotationPreference()
         );
 
@@ -1255,7 +1246,6 @@ export function showProgressionChordSuggestions(chordIndex) {
         // TODO: renderProgressionDisplay and updateProgressionControlsUI need to be imported
         if (renderProgressionDisplay) {
             renderProgressionDisplay('melody-progression-visualization', true);
-            renderProgressionDisplay('melody-progression-visualization', false);
         }
         if (updateProgressionControlsUI) {
             updateProgressionControlsUI();
@@ -1268,14 +1258,15 @@ export function showProgressionChordSuggestions(chordIndex) {
     // Callback to preview a chord (starts playing)
     const onPlayChord = (chordType, root, inversion) => {
         try {
-            // Get chord notes using the same method as Chord Builder
+            // Get chord notes using the same method as Chord Builder (use null to derive enharmonic from key)
+            const key = trainerState.currentKey || root;
             const res = getInvertedChordNotes(
                 root,
                 chordType,
                 inversion,
-                root, // key (same as root for now)
+                key,
                 0, // octaveShift
-                'sharp', // enharmonicPreference
+                null, // derive enharmonic from key
                 'full' // notationPreference
             );
 

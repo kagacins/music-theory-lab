@@ -2865,7 +2865,6 @@ function loadToComposition(targetTab) {
                     setTimeout(() => {
                         if (typeof window.renderProgressionDisplay === 'function') {
                             window.renderProgressionDisplay('progression-visualization', true);
-                            window.renderProgressionDisplay('melody-progression-visualization', false);
                             console.log('[SongwritingWizard] Refreshed progression display to show sections');
                         }
                     }, 50);

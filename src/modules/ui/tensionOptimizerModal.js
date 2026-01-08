@@ -774,7 +774,6 @@ function applyOptimization() {
     // Refresh displays
     if (window.renderProgressionDisplay) {
         window.renderProgressionDisplay('progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Update tension curve if visible

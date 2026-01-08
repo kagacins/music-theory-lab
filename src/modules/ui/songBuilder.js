@@ -1881,7 +1881,6 @@ function applyChordReplacement(chordIndex, newRoot, newType, newInversion, secti
     renderProgressionDisplay();
     if (typeof window.renderProgressionDisplay === 'function') {
         window.renderProgressionDisplay('progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Dispatch events for other listeners
@@ -1979,7 +1978,6 @@ function applyAllPendingSwaps(container) {
     // Refresh chord display - use updateChordCard for each affected chord
     if (typeof window.renderProgressionDisplay === 'function') {
         window.renderProgressionDisplay('progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Re-render the notation

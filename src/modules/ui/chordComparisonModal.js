@@ -249,8 +249,9 @@ async function playChordSequence(chords, chordDuration = 0.8) {
         }
 
         const now = Tone.now();
+        const key = getCurrentKey ? getCurrentKey() : 'C';
         chords.forEach((chord, index) => {
-            const chordInfo = getChordNotes(chord.root, chord.type);
+            const chordInfo = getChordNotes(chord.root, chord.type, key);
             const notes = chordInfo?.specificNotes || [];
             if (notes.length > 0) {
                 piano.triggerAttackRelease(notes, chordDuration * 0.9, now + (index * chordDuration));
@@ -284,7 +285,8 @@ async function playChord(root, type, duration = 1.2) {
             await Tone.start();
         }
 
-        const chordInfo = getChordNotes(root, type);
+        const key = getCurrentKey ? getCurrentKey() : 'C';
+        const chordInfo = getChordNotes(root, type, key);
         const notes = chordInfo?.specificNotes || [];
         if (notes.length > 0) {
             piano.triggerAttackRelease(notes, duration);
@@ -553,6 +555,7 @@ function applyAlternativeChord(index, alternative) {
     const currentChord = progression[index];
 
     // Create new chord based on alternative
+    const key = getCurrentKey ? getCurrentKey() : 'C';
     const newChord = {
         ...currentChord,
         root: alternative.root,
@@ -560,7 +563,7 @@ function applyAlternativeChord(index, alternative) {
         roman: alternative.numeral,
         simpleName: getChordDisplayName(alternative.root, alternative.type),
         inversion: 0, // Reset inversion for new chord
-        notes: getChordNotes(alternative.root, alternative.type)?.specificNotes || []
+        notes: getChordNotes(alternative.root, alternative.type, key)?.specificNotes || []
     };
 
     // Update progression

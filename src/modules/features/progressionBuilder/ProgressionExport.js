@@ -516,11 +516,9 @@ export function importChordList(mode = 'replace') {
         // Get fresh state after updating
         trainerState = getTrainerState();
 
-        // Render progression display
-        // TODO: Import renderProgressionDisplay from parent module
+        // Render progression display (triggers sync and notation refresh internally)
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('melody-progression-visualization', true);
-            window.renderProgressionDisplay('melody-progression-visualization', false);
         }
 
         // Update UI
@@ -862,19 +860,10 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
         }
     }
 
-    // Render progression display
-    // TODO: Import renderProgressionDisplay from parent module
+    // Render progression display (triggers sync and notation refresh internally)
+    // Note: syncBothTabs=true queues both tabs, no need for double call
     if (window.renderProgressionDisplay) {
         window.renderProgressionDisplay('melody-progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
-    }
-
-    // Sync to melody composer and refresh notation
-    if (window.syncProgressionToMelodyComposer) {
-        window.syncProgressionToMelodyComposer();
-    }
-    if (window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
     }
 
     // Update UI controls
@@ -1331,16 +1320,10 @@ export function showRhythmPatternModal() {
         setProgressionData(updated);
 
         // Optional: trigger bass auto generation if user requested
-        if (bassFollowToggle && bassFollowToggle.checked && window.syncProgressionToMelodyComposer) {
-            window.syncProgressionToMelodyComposer();
-        }
-        // TODO: Import renderProgressionDisplay from parent module
+        // Render progression display (triggers sync and notation refresh internally)
+        // Note: syncBothTabs=true queues both tabs, no need for double call
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('melody-progression-visualization', true);
-            window.renderProgressionDisplay('melody-progression-visualization', false);
-        }
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
         }
 
         // Show confirmation
@@ -1481,19 +1464,10 @@ export function applyRhythmPatternToProgression(patternId, options = {}) {
     // Update state
     setProgressionData(updated);
 
-    // Re-render displays
-    // TODO: Import renderProgressionDisplay from parent module
+    // Render progression display (triggers sync and notation refresh internally)
+    // Note: syncBothTabs=true queues both tabs, no need for double call
     if (window.renderProgressionDisplay) {
         window.renderProgressionDisplay('melody-progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
-    }
-
-    // Sync to composition state for playback
-    if (window.syncProgressionToMelodyComposer) {
-        window.syncProgressionToMelodyComposer();
-    }
-    if (window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
     }
 
     // Show confirmation

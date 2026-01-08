@@ -3397,7 +3397,6 @@ export class NotationComposer {
     // Update progression displays to reflect new durations
     if (window.renderProgressionDisplay) {
       window.renderProgressionDisplay('melody-progression-visualization', true);
-      window.renderProgressionDisplay('melody-progression-visualization', false);
     }
   }
 

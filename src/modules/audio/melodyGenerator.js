@@ -2261,11 +2261,7 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidths, measureStart
 
                 // Re-render to show selection border immediately
                 requestAnimationFrame(() => {
-                    const isRecording = window.isInteractiveMode || false;
-                    const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
                     if (window.refreshNotationFromProgression) {
-                        window.refreshNotationFromProgression();
-                    } {
                         window.refreshNotationFromProgression();
                     }
                 });
@@ -2345,11 +2341,7 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidths, measureStart
 
                 // Re-render to show selection border immediately
                 requestAnimationFrame(() => {
-                    const isRecording = window.isInteractiveMode || false;
-                    const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
                     if (window.refreshNotationFromProgression) {
-                        window.refreshNotationFromProgression();
-                    } {
                         window.refreshNotationFromProgression();
                     }
                 });
@@ -2816,11 +2808,7 @@ function startMeasurePlayback(canvas, measureIndex) {
 
                 // Re-render to show red bass note highlighting
                 requestAnimationFrame(() => {
-                    const isRecording = window.isInteractiveMode || false;
-                    const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
                     if (window.refreshNotationFromProgression) {
-                        window.refreshNotationFromProgression();
-                    } {
                         window.refreshNotationFromProgression();
                     }
                 });
@@ -2835,11 +2823,7 @@ function startMeasurePlayback(canvas, measureIndex) {
 
                     // Re-render to clear red highlighting
                     requestAnimationFrame(() => {
-                        const isRecording = window.isInteractiveMode || false;
-                        const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
                         if (window.refreshNotationFromProgression) {
-                            window.refreshNotationFromProgression();
-                        } {
                             window.refreshNotationFromProgression();
                         }
                     });
@@ -2889,11 +2873,7 @@ function startMeasurePlayback(canvas, measureIndex) {
 
     // Re-render to show yellow measure highlighting
     requestAnimationFrame(() => {
-        const isRecording = window.isInteractiveMode || false;
-        const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
         if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
-        } {
             window.refreshNotationFromProgression();
         }
     });
@@ -3063,11 +3043,7 @@ function stopMeasurePlayback(canvas) {
 
     // Re-render to clear highlighting and restore selection border
     requestAnimationFrame(() => {
-        const isRecording = window.isInteractiveMode || false;
-        const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
         if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
-        } {
             window.refreshNotationFromProgression();
         }
     });
@@ -3135,11 +3111,7 @@ export function setSelectedMeasureIndex(index) {
         // Re-render canvas to show new selection
         const canvas = document.getElementById('interactive-melody-notation-canvas');
         if (canvas) {
-            const isRecording = window.isInteractiveMode || false;
-            const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
             if (window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            } {
                 window.refreshNotationFromProgression();
             }
         }
@@ -3265,11 +3237,7 @@ export function stopStepMeasureMelody() {
         // Re-render canvas to show new selection
         const canvas = document.getElementById('interactive-melody-notation-canvas');
         if (canvas) {
-            const isRecording = window.isInteractiveMode || false;
-            const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
             if (window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            } {
                 window.refreshNotationFromProgression();
             }
         }
@@ -4349,11 +4317,7 @@ export function stopPlayAllMelody() {
     // Re-render canvas
     if (highlightEnabled) {
         if (canvas) {
-            const isRecording = window.isInteractiveMode || false;
-            const hasMelodyNotes = window.getCompositionState?.().hasMelodyNotes() || false;
             if (window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            } {
                 window.refreshNotationFromProgression();
             }
         }
@@ -5963,9 +5927,6 @@ export function setMelodyClef(clef) {
                 // Re-render based on current mode
                 if (window.refreshNotationFromProgression) {
                     window.refreshNotationFromProgression();
-                } {
-                    // Re-render chord progression staff if not in interactive mode
-                    window.refreshNotationFromProgression();
                 }
             }
         }, 10);
@@ -5989,9 +5950,6 @@ export function setChordClef(clef) {
             if (interactiveCanvas) {
                 // Re-render based on current mode
                 if (window.refreshNotationFromProgression) {
-                    window.refreshNotationFromProgression();
-                } {
-                    // Re-render chord progression staff if not in interactive mode
                     window.refreshNotationFromProgression();
                 }
             }

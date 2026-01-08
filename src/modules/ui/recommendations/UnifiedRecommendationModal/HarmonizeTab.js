@@ -579,7 +579,6 @@ function renderHarmonizeTab(container) {
                 // Must render BOTH containers like addToProgressionData does
                 if (window.renderProgressionDisplay) {
                     window.renderProgressionDisplay('progression-visualization', true);
-                    window.renderProgressionDisplay('melody-progression-visualization', false);
                 }
             }, 100);
 

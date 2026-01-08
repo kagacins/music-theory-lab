@@ -5,7 +5,8 @@
 
 // Global UI state variables
 let currentTab = 'builder';
-let enharmonicPreference = 'sharp';
+// Default to 'flat' - flat spellings (Bb, Eb, Ab) are more common in popular music than sharp equivalents (A#, D#, G#)
+let enharmonicPreference = 'flat';
 let notationPreference = 'full';
 let isSuggestionEngineOn = false; // Default to off
 let isRomanNumeralEngineOn = false; // Default to off
@@ -146,7 +147,7 @@ export function getGlobalState() {
 // Initialize global state with default values
 export function initializeGlobalState() {
     currentTab = 'builder';
-    enharmonicPreference = 'sharp';
+    enharmonicPreference = 'flat';
     notationPreference = 'full';
     isSuggestionEngineOn = false;
     isRomanNumeralEngineOn = false;

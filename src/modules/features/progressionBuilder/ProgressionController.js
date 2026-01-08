@@ -1952,7 +1952,6 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         const appended = [...currentProgression, newChordData];
         setProgressionData(appended);
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // After append, compute actual indices
@@ -1974,7 +1973,6 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
                 const reordered = compositionState.exportToProgressionData();
                 setProgressionData(reordered);
                 renderProgressionDisplay('melody-progression-visualization', true);
-                renderProgressionDisplay('melody-progression-visualization', false);
             } else {
                 // Pure JS fallback reorder if compositionState is unavailable
                 const manual = [...afterAppend];
@@ -1982,7 +1980,6 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
                 manual.splice(targetIndex, 0, moved);
                 setProgressionData(manual);
                 renderProgressionDisplay('melody-progression-visualization', true);
-                renderProgressionDisplay('melody-progression-visualization', false);
             }
             // Update insertedIndex to reflect the actual position
             insertedIndex = targetIndex;
@@ -2038,7 +2035,6 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
     // Re-render display if a section was modified (to show section visuals)
     if (sectionWasModified) {
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Update unified suggestions
@@ -2337,7 +2333,6 @@ export function addToProgressionData(chordData, options = {}) {
     // Render both progression displays to keep them in sync
     // TODO: Import renderProgressionDisplay from ProgressionRenderer once all modules extracted
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Also update the Chord Lab/Builder panel if it exists
     if (window.updateBuilderProgressionPanel) {
@@ -2513,7 +2508,6 @@ export function deleteSelectedChords(indices) {
 
     // Re-render
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 }
 
 /**
@@ -2566,7 +2560,6 @@ export function clearProgression(skipConfirmation = false) {
 
     // Re-render the display
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update UI
     if (window.updateProgressionControlsUI) {
@@ -3171,7 +3164,6 @@ export function pasteChords() {
 
     // Re-render
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
     updateMultiSelectVisuals();
 }
@@ -3217,7 +3209,6 @@ export function duplicateSelectedChords(indices) {
 
     // Re-render
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
     updateMultiSelectVisuals();
 }
@@ -3349,7 +3340,6 @@ export function loadProgression() {
         window.updateProgressionControlsUI();
     }
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
     if (window.highlightTrainer) {
         window.highlightTrainer(scaleNotes, null);
     }
@@ -3507,7 +3497,6 @@ export function updateProgressionEnharmonics() {
 
     // Re-render the display
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update keyboard labels
     setTimeout(() => {
@@ -3938,16 +3927,35 @@ export function transposeProgression(oldKey, newKey) {
         chord.simpleName = newRoot;
 
         // Regenerate chord notes using existing helper
-        const chordNotesData = getProgressionChordNotes(
-            newKey,
-            newRoman,
-            newType,
-            chord.inversion || 0,
-            chord.octaveShift || 0
-        );
+        // Try getProgressionChordNotes first (requires roman numeral)
+        let chordNotesData = null;
+        if (newRoman) {
+            chordNotesData = getProgressionChordNotes(
+                newKey,
+                newRoman,
+                newType,
+                chord.inversion || 0,
+                chord.octaveShift || 0
+            );
+        }
 
         if (chordNotesData && chordNotesData.notes) {
             chord.notes = chordNotesData.notes;
+        } else {
+            // Fallback: use getInvertedChordNotes directly when roman numeral is missing
+            // This handles community progressions that may not have roman numerals
+            const fallbackResult = getInvertedChordNotes(
+                newRoot,
+                newType,
+                chord.inversion || 0,
+                newKey,
+                chord.octaveShift || 0,
+                enharmonicPref,
+                'full'
+            );
+            if (fallbackResult && fallbackResult.specificNotes) {
+                chord.notes = fallbackResult.specificNotes;
+            }
         }
 
         // Also update left-hand notes if present
@@ -3966,7 +3974,6 @@ export function transposeProgression(oldKey, newKey) {
             }
         }
 
-        console.log(`[transposeProgression] Chord ${index}: ${chord.roman} - ${originalRoot} ${originalType} → ${newRoot} ${newType}`);
     });
 
     // Update the progression data
@@ -4028,7 +4035,6 @@ export function toggleRecording() {
         setProgressionRomans([]);
 
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
 
         recordText.textContent = 'Stop';
         recordBtn.classList.add('animate-pulse');
@@ -4223,7 +4229,6 @@ export function handleUndo() {
 
         // Re-render progression display in both tabs
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
 
         // Re-render VexFlow notation from the restored compositionState.measures
         // IMPORTANT: Do NOT call syncProgressionToMelodyComposer() here!
@@ -4275,7 +4280,6 @@ export function handleRedo() {
 
         // Re-render progression display in both tabs
         renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
 
         // Re-render VexFlow notation from the restored compositionState.measures
         // IMPORTANT: Do NOT call syncProgressionToMelodyComposer() here!
