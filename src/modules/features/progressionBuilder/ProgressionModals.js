@@ -88,6 +88,8 @@ import { showUnifiedRecommendationModal } from '../../ui/recommendations/Unified
 
 import { dispatchBuilderEvent, isGuidedModeActive } from '../../ui/lessonGuidedMode.js';
 
+import { showPromptModal } from '../../ui/modals.js';
+
 // ============================================================================
 // IMPORTS - Cross-module dependencies
 // ============================================================================
@@ -735,14 +737,21 @@ export function editSectionLabel(sectionId, labelElement) {
 
     // If no label element provided or it's not in the DOM, use prompt dialog
     if (!labelElement || !labelElement.parentNode) {
-        const newLabel = prompt('Enter new section name:', currentLabel);
-        if (newLabel !== null && newLabel.trim() !== '') {
-            compositionState.updateSection(sectionId, { label: newLabel.trim() });
-            // TODO: renderProgressionDisplay needs to be imported
-            if (renderProgressionDisplay) {
-                renderProgressionDisplay('melody-progression-visualization', true);
+        showPromptModal({
+            title: 'Rename Section',
+            message: 'Enter new section name:',
+            defaultValue: currentLabel,
+            placeholder: 'e.g., Verse, Chorus, Bridge...',
+            confirmText: 'Rename',
+        }).then(newLabel => {
+            if (newLabel !== null && newLabel.trim() !== '') {
+                compositionState.updateSection(sectionId, { label: newLabel.trim() });
+                // TODO: renderProgressionDisplay needs to be imported
+                if (renderProgressionDisplay) {
+                    renderProgressionDisplay('melody-progression-visualization', true);
+                }
             }
-        }
+        });
         return;
     }
 
@@ -786,16 +795,23 @@ export function editSectionLabel(sectionId, labelElement) {
             }
         });
     } catch (err) {
-        console.warn('[editSectionLabel] Inline editing failed, using prompt:', err);
-        // Fallback to prompt
-        const newLabel = prompt('Enter new section name:', currentLabel);
-        if (newLabel !== null && newLabel.trim() !== '') {
-            compositionState.updateSection(sectionId, { label: newLabel.trim() });
-            // TODO: renderProgressionDisplay needs to be imported
-            if (renderProgressionDisplay) {
-                renderProgressionDisplay('melody-progression-visualization', true);
+        console.warn('[editSectionLabel] Inline editing failed, using modal:', err);
+        // Fallback to modal prompt
+        showPromptModal({
+            title: 'Rename Section',
+            message: 'Enter new section name:',
+            defaultValue: currentLabel,
+            placeholder: 'e.g., Verse, Chorus, Bridge...',
+            confirmText: 'Rename',
+        }).then(newLabel => {
+            if (newLabel !== null && newLabel.trim() !== '') {
+                compositionState.updateSection(sectionId, { label: newLabel.trim() });
+                // TODO: renderProgressionDisplay needs to be imported
+                if (renderProgressionDisplay) {
+                    renderProgressionDisplay('melody-progression-visualization', true);
+                }
             }
-        }
+        });
     }
 }
 

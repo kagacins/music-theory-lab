@@ -22,6 +22,7 @@ import {
 } from '../features/rhythmicPatterns.js';
 
 import { getProgressionData } from '../state/trainerState.js';
+import { showPromptModal, showAlertModal } from './modals.js';
 import { getVoiceLeadingOptimizedProgression, scoreProgressionVoiceLeading } from '../features/voiceLeadingOptimizer.js';
 import { previewPattern, stopPreview } from '../features/rhythmPatternPreview.js';
 import { getPiano, initAudio, getAudioIsReady } from '../audio/audioEngine.js';
@@ -908,18 +909,34 @@ function handleEscapeKey(e) {
 /**
  * Show dialog to save current progression as template
  */
-function showSaveTemplateDialog() {
+async function showSaveTemplateDialog() {
     const progressionData = getProgressionData();
 
     if (!progressionData || progressionData.length === 0) {
-        alert('No progression to save. Please create a progression first.');
+        await showAlertModal({
+            title: 'No Progression',
+            message: 'No progression to save. Please create a progression first.',
+            icon: 'warning'
+        });
         return;
     }
 
-    const name = prompt('Enter a name for this template:');
+    const name = await showPromptModal({
+        title: 'Save Template',
+        message: 'Enter a name for this template:',
+        placeholder: 'My Custom Template',
+        required: true,
+        headerGradient: 'from-purple-600 to-indigo-600'
+    });
     if (!name) return;
 
-    const description = prompt('Enter a description (optional):') || '';
+    const description = await showPromptModal({
+        title: 'Template Description',
+        message: 'Enter a description (optional):',
+        placeholder: 'A brief description of your progression...',
+        required: false,
+        headerGradient: 'from-purple-600 to-indigo-600'
+    }) || '';
 
     // Extract roman numerals from progression
     const romans = progressionData.map(chord => chord.roman);
@@ -942,7 +959,11 @@ function showSaveTemplateDialog() {
     const saved = saveCustomTemplate(customTemplate);
 
     if (saved) {
-        alert(`Template "${name}" saved successfully!`);
+        await showAlertModal({
+            title: 'Template Saved',
+            message: `Template "${name}" saved successfully!`,
+            icon: 'success'
+        });
         // Refresh template list
         renderTemplateList(TEMPLATE_CATEGORIES.CUSTOM);
         // Switch to Custom tab
@@ -951,6 +972,10 @@ function showSaveTemplateDialog() {
             customTab.click();
         }
     } else {
-        alert('Failed to save template. Please try again.');
+        await showAlertModal({
+            title: 'Save Failed',
+            message: 'Failed to save template. Please try again.',
+            icon: 'error'
+        });
     }
 }

@@ -1644,11 +1644,7 @@ export function setupWindowExports() {
             if (!result.success) {
                 console.log('[IMTL Import] Load failed or cancelled:', result.error);
                 if (result.error !== 'Load cancelled') {
-                    if (window.showToast) {
-                        window.showToast(result.error || 'Failed to load project', { type: 'error' });
-                    } else {
-                        alert(result.error || 'Failed to load project');
-                    }
+                    toast.error(result.error || 'Failed to load project');
                 }
                 return { success: false, error: result.error };
             }
@@ -1662,11 +1658,7 @@ export function setupWindowExports() {
             if (!compositionState || !trainerState) {
                 const error = 'Application state not ready. Please wait for the app to fully load.';
                 console.error('[IMTL Import] State not ready:', error);
-                if (window.showToast) {
-                    window.showToast(error, { type: 'error' });
-                } else {
-                    alert(error);
-                }
+                toast.error(error);
                 return { success: false, error };
             }
 
@@ -1699,11 +1691,7 @@ export function setupWindowExports() {
 
             if (!applyResult.success) {
                 console.error('[IMTL Import] Apply failed:', applyResult.error);
-                if (window.showToast) {
-                    window.showToast(applyResult.error || 'Failed to apply project', { type: 'error' });
-                } else {
-                    alert(applyResult.error || 'Failed to apply project');
-                }
+                toast.error(applyResult.error || 'Failed to apply project');
                 return { success: false, error: applyResult.error };
             }
 
@@ -1712,9 +1700,7 @@ export function setupWindowExports() {
             const hasCustomTitle = metadataTitle && metadataTitle !== 'Untitled Project';
             const projectTitle = hasCustomTitle ? metadataTitle : (result.filename || 'Untitled Project');
             console.log('[IMTL Import] SUCCESS! Project loaded:', projectTitle);
-            if (window.showToast) {
-                window.showToast(`Loaded: ${projectTitle}`, { type: 'success' });
-            }
+            toast.success(`Loaded: ${projectTitle}`);
 
             // Note: refreshNotationFromProgression is already called via onNotationRefresh callback
             // and is debounced, so no need for an additional call here
@@ -1734,11 +1720,7 @@ export function setupWindowExports() {
         } catch (error) {
             console.error('[IMTL Import] Caught error in loadProject:', error);
             const errorMessage = error.message || 'Failed to load project';
-            if (window.showToast) {
-                window.showToast(errorMessage, { type: 'error' });
-            } else {
-                alert(errorMessage);
-            }
+            toast.error(errorMessage);
             return { success: false, error: errorMessage };
         }
     };

@@ -19,6 +19,8 @@ import {
     getAppSettings,
     updateAppSetting
 } from './adminService.js';
+import { showPromptModal, showConfirmModal, showAlertModal } from '../ui/modals.js';
+import { toast } from '../ui/toastNotifications.js';
 
 let modalElement = null;
 let currentTab = 'overview';
@@ -740,7 +742,7 @@ window.resolveFlagWithAction = async (flagId, action) => {
         // Reload the list
         await loadFlagsList();
     } catch (error) {
-        alert('Error: ' + error.message);
+        toast.error('Error: ' + error.message);
     }
 };
 
@@ -749,7 +751,7 @@ window.resolveFlagWithAction = async (flagId, action) => {
  */
 window.viewFlagSubmission = async (submissionId) => {
     if (!submissionId) {
-        alert('Submission not found');
+        toast.error('Submission not found');
         return;
     }
     // Keep admin dashboard open - the submission modal has z-[60] and appears on top of admin dashboard z-50
@@ -1329,8 +1331,10 @@ function showBulkDeleteConfirmation() {
             confirmModal.remove();
 
             // Show result
-            if (failed > 0) {
-                alert(`Deleted ${deleted} submission(s). Failed to delete ${failed}.`);
+            if (deleted > 0 && failed === 0) {
+                toast.success(`Deleted ${deleted} submission(s).`);
+            } else if (failed > 0) {
+                toast.warning(`Deleted ${deleted} submission(s). Failed to delete ${failed}.`);
             }
 
             // Reload list
@@ -1338,7 +1342,7 @@ function showBulkDeleteConfirmation() {
 
         } catch (error) {
             console.error('[BulkDelete] Error:', error);
-            alert('Error during bulk delete: ' + error.message);
+            toast.error('Error during bulk delete: ' + error.message);
             confirmBtn.disabled = false;
             confirmBtn.textContent = 'Delete';
         }
@@ -1447,7 +1451,7 @@ window.editSubmission = async (id) => {
         const reason = editModal.querySelector('#edit-reason').value.trim();
 
         if (!newTitle) {
-            alert('Title is required');
+            toast.warning('Title is required');
             return;
         }
 
@@ -1464,7 +1468,7 @@ window.editSubmission = async (id) => {
             showAdminToast('Submission updated successfully!', 'success');
             loadSubmissionsList();
         } catch (error) {
-            alert('Error updating submission: ' + error.message);
+            toast.error('Error updating submission: ' + error.message);
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save Changes';
         }
@@ -1489,47 +1493,78 @@ function showAdminToast(message, type = 'success') {
 }
 
 window.deleteSubmissionConfirm = async (id) => {
-    const reason = prompt('Reason for deletion (required):');
+    const reason = await showPromptModal({
+        title: 'Delete Submission',
+        message: 'Reason for deletion (required):',
+        placeholder: 'Enter reason for deletion...',
+        required: true,
+        confirmText: 'Continue',
+    });
+
     if (!reason) {
-        alert('Deletion cancelled - reason is required');
         return;
     }
 
-    if (!confirm('Are you sure you want to delete this submission? This cannot be undone.')) {
+    const confirmed = await showConfirmModal({
+        title: 'Confirm Deletion',
+        message: 'Are you sure you want to delete this submission? This cannot be undone.',
+        confirmText: 'Delete',
+        danger: true,
+    });
+
+    if (!confirmed) {
         return;
     }
 
     try {
         await deleteSubmission(id, reason);
-        alert('Submission deleted successfully!');
+        await showAlertModal({ message: 'Submission deleted successfully!', type: 'success' });
         loadSubmissionsList();
     } catch (error) {
-        alert('Error deleting submission: ' + error.message);
+        await showAlertModal({ message: 'Error deleting submission: ' + error.message, type: 'error' });
     }
 };
 
 window.toggleUserBlock = async (userId, isCurrentlyBlocked) => {
     if (isCurrentlyBlocked) {
-        const reason = prompt('Reason for unblocking (optional):');
-        try {
-            await unblockUser(userId, reason);
-            alert('User unblocked successfully!');
-            loadUsersList();
-        } catch (error) {
-            alert('Error unblocking user: ' + error.message);
-        }
-    } else {
-        const reason = prompt('Reason for blocking (required):');
-        if (!reason) {
-            alert('Block cancelled - reason is required');
+        const reason = await showPromptModal({
+            title: 'Unblock User',
+            message: 'Reason for unblocking (optional):',
+            placeholder: 'Enter reason...',
+            confirmText: 'Unblock',
+        });
+
+        // null means cancelled, empty string is valid (optional field)
+        if (reason === null) {
             return;
         }
+
         try {
-            await blockUser(userId, reason);
-            alert('User blocked successfully!');
+            await unblockUser(userId, reason || null);
+            await showAlertModal({ message: 'User unblocked successfully!', type: 'success' });
             loadUsersList();
         } catch (error) {
-            alert('Error blocking user: ' + error.message);
+            await showAlertModal({ message: 'Error unblocking user: ' + error.message, type: 'error' });
+        }
+    } else {
+        const reason = await showPromptModal({
+            title: 'Block User',
+            message: 'Reason for blocking (required):',
+            placeholder: 'Enter reason for blocking...',
+            required: true,
+            confirmText: 'Block User',
+        });
+
+        if (!reason) {
+            return;
+        }
+
+        try {
+            await blockUser(userId, reason);
+            await showAlertModal({ message: 'User blocked successfully!', type: 'success' });
+            loadUsersList();
+        } catch (error) {
+            await showAlertModal({ message: 'Error blocking user: ' + error.message, type: 'error' });
         }
     }
 };

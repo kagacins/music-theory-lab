@@ -18,6 +18,7 @@ import {
 } from '../storage/versionHistory.js';
 
 import { getAutoSaveStatus } from '../storage/autoSave.js';
+import { showPromptModal, showAlertModal } from './modals.js';
 
 // Module state
 let onRestoreCallback = null;
@@ -598,8 +599,14 @@ function attachDetailEventListeners() {
 /**
  * Show dialog to create a named checkpoint
  */
-function showCheckpointDialog() {
-    const name = prompt('Enter a name for this checkpoint:');
+async function showCheckpointDialog() {
+    const name = await showPromptModal({
+        title: 'Create Checkpoint',
+        message: 'Enter a name for this checkpoint:',
+        placeholder: 'e.g., Before refactoring, Working version...',
+        confirmText: 'Create',
+    });
+
     if (name && name.trim()) {
         const result = createCheckpoint(name.trim());
         if (result.success) {
@@ -610,7 +617,7 @@ function showCheckpointDialog() {
             renderVersionList(getActiveFilter());
             renderVersionDetails(selectedVersionId);
         } else {
-            alert(result.error || 'Failed to create checkpoint');
+            await showAlertModal({ message: result.error || 'Failed to create checkpoint', type: 'error' });
         }
     }
 }

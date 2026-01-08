@@ -14,6 +14,8 @@
  */
 
 import { SHARP_NOTES, FLAT_NOTES, ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
+import { toast } from '../ui/toastNotifications.js';
+import { showAlertModal } from '../ui/modals.js';
 
 // Song database - loaded from JSON file
 let DEMO_SONG_DATABASE = [];
@@ -610,7 +612,11 @@ export function openUltimateGuitarSearch(query) {
  */
 export async function importInternetSongProgression(song) {
     if (!song.chords || song.chords.length === 0) {
-        alert('No chord progression available for this song. Please click "View" to see the full chord chart.');
+        showAlertModal({
+            title: 'No Chords Available',
+            message: 'No chord progression available for this song. Please click "View" to see the full chord chart.',
+            type: 'warning'
+        });
         return;
     }
     
@@ -684,7 +690,7 @@ export async function importInternetSongProgression(song) {
         // Expand and scroll to Current Chord Progression section
         expandAndScrollToProgressionSection();
         
-        alert(`Successfully imported "${song.title}"!\n\n${song.chords.length} chords added to your progression.`);
+        toast.success(`Successfully imported "${song.title}"! ${song.chords.length} chords added.`);
     }, updateDelay);
 }
 
@@ -1006,7 +1012,7 @@ export async function importSongProgression(songIndex) {
     await loadSongDatabase();
     
     if (songIndex < 0 || songIndex >= DEMO_SONG_DATABASE.length) {
-        alert('Invalid song selection.');
+        toast.error('Invalid song selection.');
         return;
     }
     
@@ -1095,7 +1101,7 @@ export async function importSongProgression(songIndex) {
         expandAndScrollToProgressionSection();
         
         // Show success message
-        alert(`Successfully imported "${song.title}" by ${song.artist}!\n\n${song.chords.length} chords added to your progression.`);
+        toast.success(`Successfully imported "${song.title}" by ${song.artist}! ${song.chords.length} chords added.`);
     }, updateDelay);
 }
 
@@ -1551,7 +1557,7 @@ export function applySuggestedChord(original, suggested) {
     const progressionData = trainerState?.progressionData || [];
 
     if (progressionData.length === 0) {
-        alert('No progression to modify');
+        toast.warning('No progression to modify');
         return;
     }
 
@@ -1631,7 +1637,7 @@ export function applySuggestedChord(original, suggested) {
         }
     } else {
         console.warn(`[SongSearch] Could not find chord ${original} in progression`);
-        alert(`Could not find ${original} in your progression to replace`);
+        toast.warning(`Could not find ${original} in your progression to replace`);
     }
 }
 

@@ -35,6 +35,7 @@ import {
     showMusicXMLImportPicker,
     isMusicXMLFile
 } from '../import/musicXmlImporter.js';
+import { showCopyModal } from '../ui/modals.js';
 
 // =============================================================================
 // CONSTANTS
@@ -2038,8 +2039,12 @@ export async function copyShareableLink() {
     } catch (error) {
         console.error('[Export] Failed to copy link:', error);
 
-        // Fallback: show the link in a prompt
-        prompt('Copy this link to share your progression:', link);
+        // Fallback: show the link in a copy modal
+        showCopyModal({
+            title: 'Share Progression',
+            message: 'Copy this link to share your progression:',
+            text: link,
+        });
     }
 }
 

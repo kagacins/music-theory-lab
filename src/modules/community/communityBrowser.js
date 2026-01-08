@@ -11,6 +11,7 @@ import { getCurrentKey } from '../state/trainerState.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS } from '../../data/music-data.js';
 import { submitFlag } from '../admin/adminService.js';
+import { toast } from '../ui/toastNotifications.js';
 
 // Request timeout in milliseconds (prevents Chrome lockups)
 const FETCH_TIMEOUT = 10000;
@@ -1348,7 +1349,7 @@ async function upvoteSubmission(submissionId, buttonElement) {
     // Check if user is signed in
     if (!isSignedIn()) {
         console.log('[upvoteSubmission] User not signed in');
-        alert('Please sign in to upvote submissions.');
+        toast.warning('Please sign in to upvote submissions.');
         return;
     }
     console.log('[upvoteSubmission] User is signed in');
@@ -1358,7 +1359,7 @@ async function upvoteSubmission(submissionId, buttonElement) {
         const token = await getAuthToken();
         if (!token) {
             console.log('[upvoteSubmission] No token returned');
-            alert('Authentication error. Please sign in again.');
+            toast.error('Authentication error. Please sign in again.');
             return;
         }
         console.log('[upvoteSubmission] Got token, making API call...');
@@ -1412,7 +1413,7 @@ async function upvoteSubmission(submissionId, buttonElement) {
 
     } catch (error) {
         console.error('[upvoteSubmission] Error:', error);
-        alert('Failed to upvote: ' + error.message);
+        toast.error('Failed to upvote: ' + error.message);
     }
 }
 
@@ -2197,7 +2198,7 @@ export async function viewCommunitySubmission(submissionId) {
 
     } catch (error) {
         console.error('Error viewing submission:', error);
-        alert('Failed to load submission details: ' + error.message);
+        toast.error('Failed to load submission details: ' + error.message);
     }
 }
 
@@ -2383,7 +2384,7 @@ export async function loadCommunitySubmission(submissionId) {
 
     } catch (error) {
         console.error('Error loading submission:', error);
-        alert('Failed to load submission: ' + error.message);
+        toast.error('Failed to load submission: ' + error.message);
     }
 }
 
@@ -2676,7 +2677,7 @@ let reportModal = null;
 export function showReportModal(submissionId, submissionTitle) {
     // Check if user is signed in
     if (!isSignedIn()) {
-        alert('Please sign in to report content.');
+        toast.warning('Please sign in to report content.');
         return;
     }
 

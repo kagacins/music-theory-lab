@@ -25,6 +25,8 @@ import {
 import { getBuilderState } from '../state/builderState.js';
 import { getTrainerState } from '../state/trainerState.js';
 import { getScaleState } from '../state/scaleState.js';
+import { showPromptModal, showCopyModal, showAlertModal, showConfirmModal } from './modals.js';
+import { toast } from './toastNotifications.js';
 
 // UI State
 let currentFilter = 'all'; // 'all', 'progression', 'chord', 'scale'
@@ -365,8 +367,13 @@ function createPresetCard(preset) {
  * Quick save current state
  * @param {string} category - Preset category
  */
-function quickSave(category) {
-    const name = prompt('Enter a name for this preset:');
+async function quickSave(category) {
+    const name = await showPromptModal({
+        title: 'Save Preset',
+        message: 'Enter a name for this preset:',
+        placeholder: 'My preset...',
+        confirmText: 'Save',
+    });
     if (!name) return;
 
     const data = captureCurrentState(category);
@@ -382,13 +389,13 @@ function quickSave(category) {
     });
 
     if (preset) {
-        alert(`Preset "${name}" saved successfully!`);
+        await showAlertModal({ message: `Preset "${name}" saved successfully!`, type: 'success' });
         if (isPresetPanelOpen) {
             refreshPresetList();
             updatePresetStats();
         }
     } else {
-        alert('Failed to save preset');
+        await showAlertModal({ message: 'Failed to save preset', type: 'error' });
     }
 }
 
@@ -468,17 +475,22 @@ function extractMetadata(category) {
  * Load a preset
  * @param {number} id - Preset ID
  */
-function loadPreset(id) {
+async function loadPreset(id) {
     const preset = getPresetById(id);
     if (!preset) {
         console.error('Preset not found:', id);
-        alert('Preset not found!');
+        toast.error('Preset not found!');
         return;
     }
 
     console.log('Loading preset:', preset);
 
-    if (!confirm(`Load preset "${preset.name}"? This will replace your current work.`)) {
+    const confirmed = await showConfirmModal({
+        title: 'Load Preset',
+        message: `Load preset "${preset.name}"? This will replace your current work.`,
+        confirmText: 'Load',
+    });
+    if (!confirmed) {
         return;
     }
 
@@ -488,14 +500,14 @@ function loadPreset(id) {
             console.log('Calling loadPresetData with:', preset.category, preset.data);
             window.loadPresetData(preset.category, preset.data);
             closePresetPanel();
-            alert(`Preset "${preset.name}" loaded!`);
+            toast.success(`Preset "${preset.name}" loaded!`);
         } catch (error) {
             console.error('Error loading preset:', error);
-            alert(`Failed to load preset: ${error.message}`);
+            toast.error(`Failed to load preset: ${error.message}`);
         }
     } else {
         console.error('window.loadPresetData not found');
-        alert('Load function not available - please refresh the page');
+        toast.error('Load function not available - please refresh the page');
     }
 }
 
@@ -503,14 +515,28 @@ function loadPreset(id) {
  * Edit a preset
  * @param {number} id - Preset ID
  */
-function editPreset(id) {
+async function editPreset(id) {
     const preset = getPresetById(id);
     if (!preset) return;
 
-    const name = prompt('Enter new name:', preset.name);
+    const name = await showPromptModal({
+        title: 'Edit Preset',
+        message: 'Enter new name:',
+        defaultValue: preset.name,
+        confirmText: 'Next',
+    });
     if (!name) return;
 
-    const description = prompt('Enter description:', preset.description);
+    const description = await showPromptModal({
+        title: 'Edit Preset',
+        message: 'Enter description:',
+        defaultValue: preset.description || '',
+        placeholder: 'Optional description...',
+        confirmText: 'Save',
+    });
+
+    // description can be empty string (user pressed OK without text)
+    if (description === null) return;
 
     if (updatePreset(id, { name, description })) {
         refreshPresetList();
@@ -536,15 +562,19 @@ function handleDuplicate(id) {
 async function handleShare(preset) {
     const url = exportPresetToURL(preset);
     if (!url) {
-        alert('Failed to create share link');
+        await showAlertModal({ message: 'Failed to create share link', type: 'error' });
         return;
     }
 
     const success = await copyToClipboard(url);
     if (success) {
-        alert('Share link copied to clipboard!');
+        await showAlertModal({ message: 'Share link copied to clipboard!', type: 'success' });
     } else {
-        prompt('Copy this URL to share:', url);
+        await showCopyModal({
+            title: 'Share Preset',
+            message: 'Copy this URL to share:',
+            text: url,
+        });
     }
 }
 
@@ -552,11 +582,18 @@ async function handleShare(preset) {
  * Handle delete preset
  * @param {number} id - Preset ID
  */
-function handleDelete(id) {
+async function handleDelete(id) {
     const preset = getPresetById(id);
     if (!preset) return;
 
-    if (!confirm(`Delete preset "${preset.name}"?`)) {
+    const confirmed = await showConfirmModal({
+        title: 'Delete Preset',
+        message: `Delete preset "${preset.name}"?`,
+        confirmText: 'Delete',
+        danger: true,
+    });
+
+    if (!confirmed) {
         return;
     }
 
@@ -597,11 +634,11 @@ function handleImport() {
 
         try {
             const results = await importPresetsFromFile(file);
-            alert(`Import complete!\nImported: ${results.imported}\nFailed: ${results.failed}`);
+            toast.success(`Import complete! Imported: ${results.imported}, Failed: ${results.failed}`);
             refreshPresetList();
             updatePresetStats();
         } catch (error) {
-            alert(`Import failed: ${error.message}`);
+            toast.error(`Import failed: ${error.message}`);
         }
     };
     input.click();

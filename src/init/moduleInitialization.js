@@ -154,6 +154,8 @@ import {
     initAdminFab
 } from '../modules/admin/adminFab.js';
 
+import { toast } from '../modules/ui/toastNotifications.js';
+
 
 /**
  * Helper function to update the toolbar editing context indicator
@@ -355,9 +357,9 @@ export async function initializeModules() {
                                 }
                             }
                         });
-                        alert('Your work has been recovered!');
+                        toast.success('Your work has been recovered!');
                     } else {
-                        alert('Failed to recover work: ' + result.error);
+                        toast.error('Failed to recover work: ' + result.error);
                     }
                     clearAutoSave();
                 } else {

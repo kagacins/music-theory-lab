@@ -354,6 +354,120 @@ When text color isn't working:
 
 ---
 
+## CRITICAL: User Notifications - Toasts vs Modals
+
+**NEVER use native browser `alert()`, `prompt()`, or `confirm()` dialogs. Use the themed alternatives instead.**
+
+This project has a themed notification system that provides a consistent, non-blocking user experience.
+
+### Toast Notifications (Non-blocking, Auto-dismiss)
+
+**File:** `src/modules/ui/toastNotifications.js`
+
+Use toasts for:
+- **Success messages** (e.g., "Project saved!", "Chord added!")
+- **Quick status updates** (e.g., "Loading...", "Import complete!")
+- **Non-critical errors** (e.g., "Invalid selection")
+- **Information that doesn't require acknowledgment**
+
+```javascript
+import { toast } from '../ui/toastNotifications.js';
+
+// Success messages
+toast.success('Preset loaded successfully!');
+
+// Error messages
+toast.error('Failed to save project');
+
+// Warning messages
+toast.warning('No progression to modify');
+
+// Info messages
+toast.info('Processing...');
+
+// With custom duration (ms)
+toast.success('Saved!', { duration: 2000 });
+```
+
+### Modal Dialogs (Blocking, Require Interaction)
+
+**File:** `src/modules/ui/modals.js`
+
+Use modals for:
+- **User input required** (replacing `prompt()`)
+- **Confirmation dialogs** (replacing `confirm()`)
+- **Important alerts that need acknowledgment** (replacing `alert()`)
+- **Displaying copyable content**
+
+```javascript
+import { showPromptModal, showConfirmModal, showAlertModal, showCopyModal } from '../ui/modals.js';
+
+// Prompt for user input (async - must await)
+const name = await showPromptModal({
+    title: 'Save Preset',
+    message: 'Enter a name for this preset:',
+    placeholder: 'My Preset',
+    defaultValue: ''
+});
+if (name === null) return; // User cancelled
+
+// Confirmation dialog
+const confirmed = await showConfirmModal({
+    title: 'Delete Preset',
+    message: 'Are you sure you want to delete this preset?',
+    confirmText: 'Delete',
+    danger: true  // Red confirm button
+});
+if (!confirmed) return;
+
+// Alert that needs acknowledgment
+await showAlertModal({
+    title: 'Error',
+    message: 'Please enter at least 3 chords before publishing.',
+    type: 'error'  // 'success', 'warning', 'error', 'info'
+});
+
+// Copyable text dialog
+await showCopyModal({
+    title: 'Share Link',
+    message: 'Copy this URL:',
+    text: 'https://example.com/share/abc123'
+});
+```
+
+### Decision Guide: Toast vs Modal
+
+| Situation | Use |
+|-----------|-----|
+| Operation succeeded | `toast.success()` |
+| Operation failed (recoverable) | `toast.error()` |
+| Need user to enter text | `showPromptModal()` |
+| Need user to confirm action | `showConfirmModal()` |
+| Validation error (must fix) | `showAlertModal()` |
+| User needs to copy text | `showCopyModal()` |
+| Loading/progress indicator | `toast.info()` |
+
+### Migration Pattern
+
+When you find `alert()`, `prompt()`, or `confirm()`:
+
+```javascript
+// BEFORE (native dialogs)
+alert('Saved successfully!');
+const name = prompt('Enter name:');
+if (confirm('Delete this?')) { ... }
+
+// AFTER (themed system)
+toast.success('Saved successfully!');
+const name = await showPromptModal({ title: 'Name', message: 'Enter name:' });
+const confirmed = await showConfirmModal({ title: 'Confirm', message: 'Delete this?' });
+if (confirmed) { ... }
+```
+
+**Note:** Modal functions return Promises, so the calling function must be `async` and use `await`.
+
+---
+
 ## CRITICAL: Chord Card Width - CSS Override Issue
 
 **Chord cards have their width set via inline styles in JavaScript, but CSS rules in `music.css` can override them with `!important`.**
@@ -1294,4 +1408,4 @@ lineOffset = -lowestLine + OFFSET;
 
 ---
 
-**Last Updated:** 2025-12-26
+**Last Updated:** 2026-01-08

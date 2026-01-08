@@ -25,6 +25,8 @@ import {
     hasLoadedSubmissionContext,
     clearLoadedSubmissionContext
 } from './loadedSubmissionContext.js';
+import { toast } from '../ui/toastNotifications.js';
+import { showAlertModal } from '../ui/modals.js';
 
 // Modal state
 let modalElement = null;
@@ -492,7 +494,7 @@ export async function showShareModal(options = {}) {
 
     // Check if user is signed in
     if (!isSignedIn()) {
-        alert('Please sign in to share with the community.');
+        toast.warning('Please sign in to share with the community.');
         return;
     }
 
@@ -1173,7 +1175,7 @@ function toggleTag(btn) {
         btn.classList.add('bg-white', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300', 'border-gray-300', 'dark:border-gray-600');
     } else {
         if (selectedTags.size >= 10) {
-            alert('You can select up to 10 tags.');
+            toast.warning('You can select up to 10 tags.');
             return;
         }
         selectedTags.add(tagId);
@@ -1260,18 +1262,30 @@ async function handleSubmit(status = 'published') {
 
     // Validation
     if (!title || title.length < 3) {
-        alert('Please enter a title (at least 3 characters).');
+        await showAlertModal({
+            title: 'Title Required',
+            message: 'Please enter a title (at least 3 characters).',
+            type: 'warning'
+        });
         document.getElementById('share-title').focus();
         return;
     }
 
     if (!submissionType) {
-        alert('Please select a submission type.');
+        await showAlertModal({
+            title: 'Type Required',
+            message: 'Please select a submission type.',
+            type: 'warning'
+        });
         return;
     }
 
     if (!category) {
-        alert('Please select a category.');
+        await showAlertModal({
+            title: 'Category Required',
+            message: 'Please select a category.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -1282,20 +1296,32 @@ async function handleSubmit(status = 'published') {
         // Check minimum chord count for publishing
         if (form.dataset.minChordsNotMet === 'true') {
             const chordCount = form.dataset.chordCount || '0';
-            alert(`At least 3 chords are required to publish. You have ${chordCount} chord(s). You can save as a draft with any number of chords.`);
+            await showAlertModal({
+                title: 'More Chords Required',
+                message: `At least 3 chords are required to publish. You have ${chordCount} chord(s). You can save as a draft with any number of chords.`,
+                type: 'warning'
+            });
             return;
         }
 
         // Check for N.C. (No Chord) in chord-progression submissions
         if (submissionType === 'chord-progression' && form.dataset.hasNoChord === 'true') {
-            alert('Chord progressions cannot contain "N.C." (No Chord) when publishing. Remove the N.C. chord, submit as a "Full Composition" instead, or save as a draft.');
+            await showAlertModal({
+                title: 'N.C. Not Allowed',
+                message: 'Chord progressions cannot contain "N.C." (No Chord) when publishing. Remove the N.C. chord, submit as a "Full Composition" instead, or save as a draft.',
+                type: 'warning'
+            });
             return;
         }
 
         // Check chord limit for chord-progression submissions
         if (submissionType === 'chord-progression' && form.dataset.chordLimitExceeded === 'true') {
             const limit = form.dataset.chordLimit || 'unknown';
-            alert(`Chord progressions are limited to ${limit} chords. Please reduce the number of chords or submit as a "Full Composition" instead.`);
+            await showAlertModal({
+                title: 'Chord Limit Exceeded',
+                message: `Chord progressions are limited to ${limit} chords. Please reduce the number of chords or submit as a "Full Composition" instead.`,
+                type: 'warning'
+            });
             return;
         }
     }
@@ -1533,7 +1559,7 @@ async function handleSubmit(status = 'published') {
 
     } catch (error) {
         console.error('Error saving submission:', error);
-        alert(`${isDraft ? 'Failed to save draft' : 'Failed to publish'}: ${error.message}`);
+        toast.error(`${isDraft ? 'Failed to save draft' : 'Failed to publish'}: ${error.message}`);
     } finally {
         resetButtons();
     }

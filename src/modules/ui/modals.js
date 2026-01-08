@@ -3,8 +3,11 @@
  * Handles modal dialog display and hiding
  */
 
-// Track active choice dialog for cleanup
+// Track active dialogs for cleanup
 let activeChoiceDialog = null;
+let activePromptDialog = null;
+let activeCopyDialog = null;
+let activeConfirmDialog = null;
 
 /**
  * Show a choice dialog with multiple options
@@ -449,4 +452,525 @@ export function hideAboutModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+}
+
+/**
+ * Show a themed prompt dialog (replaces browser prompt())
+ * @param {Object} options - Dialog options
+ * @param {string} options.title - Dialog title
+ * @param {string} options.message - Message/label for the input
+ * @param {string} options.defaultValue - Default value for input
+ * @param {string} options.placeholder - Placeholder text
+ * @param {string} options.confirmText - Text for confirm button (default: 'OK')
+ * @param {string} options.cancelText - Text for cancel button (default: 'Cancel')
+ * @param {boolean} options.required - Whether input is required (default: false)
+ * @param {string} options.inputType - Input type (default: 'text')
+ * @param {boolean} options.multiline - Use textarea instead of input (default: false)
+ * @returns {Promise<string|null>} The entered value or null if cancelled
+ */
+export function showPromptModal(options) {
+    return new Promise((resolve) => {
+        const {
+            title = 'Enter Value',
+            message = '',
+            defaultValue = '',
+            placeholder = '',
+            confirmText = 'OK',
+            cancelText = 'Cancel',
+            required = false,
+            inputType = 'text',
+            multiline = false,
+        } = options;
+
+        // Remove any existing prompt dialog
+        if (activePromptDialog) {
+            activePromptDialog.remove();
+            activePromptDialog = null;
+        }
+
+        // Create dialog overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+        overlay.style.zIndex = '100000';
+        overlay.id = 'prompt-dialog-overlay';
+
+        // Create dialog container
+        const dialog = document.createElement('div');
+        dialog.className = 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden';
+
+        // Build dialog HTML
+        dialog.innerHTML = `
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-500 to-purple-600">
+                <h3 class="text-lg font-semibold text-white">${escapeHtml(title)}</h3>
+            </div>
+            <div class="px-6 py-4">
+                ${message ? `<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">${escapeHtml(message)}</label>` : ''}
+                ${multiline
+                    ? `<textarea
+                        id="prompt-input"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                        rows="3"
+                        placeholder="${escapeHtml(placeholder)}"
+                    >${escapeHtml(defaultValue)}</textarea>`
+                    : `<input
+                        type="${inputType}"
+                        id="prompt-input"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        value="${escapeHtml(defaultValue)}"
+                        placeholder="${escapeHtml(placeholder)}"
+                    />`
+                }
+                ${required ? '<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">This field is required</p>' : ''}
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end gap-3">
+                <button id="prompt-cancel" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    ${escapeHtml(cancelText)}
+                </button>
+                <button id="prompt-confirm" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+                    ${escapeHtml(confirmText)}
+                </button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        activePromptDialog = overlay;
+
+        const input = dialog.querySelector('#prompt-input');
+        const confirmBtn = dialog.querySelector('#prompt-confirm');
+        const cancelBtn = dialog.querySelector('#prompt-cancel');
+
+        // Focus and select input
+        setTimeout(() => {
+            input.focus();
+            if (!multiline) {
+                input.select();
+            }
+        }, 50);
+
+        const cleanup = () => {
+            overlay.remove();
+            activePromptDialog = null;
+        };
+
+        const handleConfirm = () => {
+            const value = input.value.trim();
+            if (required && !value) {
+                input.classList.add('ring-2', 'ring-red-500', 'border-red-500');
+                input.focus();
+                return;
+            }
+            cleanup();
+            resolve(value || null);
+        };
+
+        const handleCancel = () => {
+            cleanup();
+            resolve(null);
+        };
+
+        confirmBtn.addEventListener('click', handleConfirm);
+        cancelBtn.addEventListener('click', handleCancel);
+
+        // Handle keyboard in input
+        input.addEventListener('keydown', (e) => {
+            // Allow standard keyboard shortcuts (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z)
+            if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                e.stopPropagation(); // Prevent global handlers from intercepting
+                return; // Let browser handle normally
+            }
+            // Handle Enter key (for single-line input)
+            if (!multiline && e.key === 'Enter') {
+                e.preventDefault();
+                handleConfirm();
+            }
+        });
+
+        // Handle Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEscape);
+                handleCancel();
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                handleCancel();
+            }
+        });
+    });
+}
+
+/**
+ * Show a themed confirm dialog (replaces browser confirm())
+ * @param {Object} options - Dialog options
+ * @param {string} options.title - Dialog title
+ * @param {string} options.message - Confirmation message (can include HTML)
+ * @param {string} options.confirmText - Text for confirm button (default: 'Confirm')
+ * @param {string} options.cancelText - Text for cancel button (default: 'Cancel')
+ * @param {boolean} options.danger - Whether this is a dangerous action (red button)
+ * @returns {Promise<boolean>} True if confirmed, false if cancelled
+ */
+export function showConfirmModal(options) {
+    return new Promise((resolve) => {
+        const {
+            title = 'Confirm',
+            message = 'Are you sure?',
+            confirmText = 'Confirm',
+            cancelText = 'Cancel',
+            danger = false,
+        } = options;
+
+        // Remove any existing confirm dialog
+        if (activeConfirmDialog) {
+            activeConfirmDialog.remove();
+            activeConfirmDialog = null;
+        }
+
+        // Create dialog overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+        overlay.style.zIndex = '100000';
+        overlay.id = 'confirm-dialog-overlay';
+
+        // Create dialog container
+        const dialog = document.createElement('div');
+        dialog.className = 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden';
+
+        const headerGradient = danger
+            ? 'from-red-500 to-red-600'
+            : 'from-indigo-500 to-purple-600';
+        const confirmBtnClass = danger
+            ? 'bg-red-600 hover:bg-red-700'
+            : 'bg-indigo-600 hover:bg-indigo-700';
+
+        dialog.innerHTML = `
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r ${headerGradient}">
+                <h3 class="text-lg font-semibold text-white">${escapeHtml(title)}</h3>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-gray-700 dark:text-gray-300">${message}</p>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end gap-3">
+                <button id="confirm-cancel" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    ${escapeHtml(cancelText)}
+                </button>
+                <button id="confirm-confirm" class="px-4 py-2 text-sm ${confirmBtnClass} text-white rounded-lg transition-colors font-medium">
+                    ${escapeHtml(confirmText)}
+                </button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        activeConfirmDialog = overlay;
+
+        const confirmBtn = dialog.querySelector('#confirm-confirm');
+        const cancelBtn = dialog.querySelector('#confirm-cancel');
+
+        // Focus confirm button
+        setTimeout(() => confirmBtn.focus(), 50);
+
+        const cleanup = () => {
+            overlay.remove();
+            activeConfirmDialog = null;
+        };
+
+        confirmBtn.addEventListener('click', () => {
+            cleanup();
+            resolve(true);
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            cleanup();
+            resolve(false);
+        });
+
+        // Handle Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEscape);
+                cleanup();
+                resolve(false);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                cleanup();
+                resolve(false);
+            }
+        });
+    });
+}
+
+/**
+ * Show a themed copy-to-clipboard dialog (replaces prompt for sharing links)
+ * @param {Object} options - Dialog options
+ * @param {string} options.title - Dialog title
+ * @param {string} options.message - Message above the text
+ * @param {string} options.text - Text to copy
+ * @param {string} options.successMessage - Message after successful copy
+ * @returns {Promise<void>}
+ */
+export function showCopyModal(options) {
+    return new Promise((resolve) => {
+        const {
+            title = 'Copy Link',
+            message = 'Copy the link below:',
+            text = '',
+            successMessage = 'Copied to clipboard!',
+        } = options;
+
+        // Remove any existing copy dialog
+        if (activeCopyDialog) {
+            activeCopyDialog.remove();
+            activeCopyDialog = null;
+        }
+
+        // Create dialog overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+        overlay.style.zIndex = '100000';
+        overlay.id = 'copy-dialog-overlay';
+
+        // Create dialog container
+        const dialog = document.createElement('div');
+        dialog.className = 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden';
+
+        dialog.innerHTML = `
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-500 to-teal-600">
+                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                    </svg>
+                    ${escapeHtml(title)}
+                </h3>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">${escapeHtml(message)}</p>
+                <div class="flex gap-2">
+                    <input
+                        type="text"
+                        id="copy-input"
+                        class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
+                        value="${escapeHtml(text)}"
+                        readonly
+                    />
+                    <button id="copy-btn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium text-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+                <p id="copy-success" class="mt-2 text-sm text-emerald-600 dark:text-emerald-400 hidden">
+                    ✓ ${escapeHtml(successMessage)}
+                </p>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end">
+                <button id="copy-close" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    Close
+                </button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        activeCopyDialog = overlay;
+
+        const input = dialog.querySelector('#copy-input');
+        const copyBtn = dialog.querySelector('#copy-btn');
+        const closeBtn = dialog.querySelector('#copy-close');
+        const successMsg = dialog.querySelector('#copy-success');
+
+        // Select input on focus
+        input.addEventListener('focus', () => input.select());
+
+        // Allow standard keyboard shortcuts (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z)
+        input.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                e.stopPropagation(); // Prevent global handlers from intercepting
+            }
+        });
+
+        setTimeout(() => {
+            input.focus();
+            input.select();
+        }, 50);
+
+        const cleanup = () => {
+            overlay.remove();
+            activeCopyDialog = null;
+        };
+
+        const handleCopy = async () => {
+            try {
+                await navigator.clipboard.writeText(text);
+                successMsg.classList.remove('hidden');
+                copyBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Copied!
+                `;
+                copyBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                copyBtn.classList.add('bg-gray-500');
+            } catch (err) {
+                // Fallback: select the text for manual copy
+                input.select();
+                input.setSelectionRange(0, text.length);
+            }
+        };
+
+        copyBtn.addEventListener('click', handleCopy);
+        closeBtn.addEventListener('click', () => {
+            cleanup();
+            resolve();
+        });
+
+        // Handle Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', handleEscape);
+                cleanup();
+                resolve();
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                cleanup();
+                resolve();
+            }
+        });
+    });
+}
+
+/**
+ * Show a themed alert dialog (replaces browser alert())
+ * @param {Object} options - Dialog options (or just a string for simple alert)
+ * @param {string} options.title - Dialog title
+ * @param {string} options.message - Alert message
+ * @param {string} options.type - Alert type: 'info', 'success', 'warning', 'error'
+ * @returns {Promise<void>}
+ */
+export function showAlertModal(options) {
+    // Allow simple string usage: showAlertModal('message')
+    if (typeof options === 'string') {
+        options = { message: options };
+    }
+
+    return new Promise((resolve) => {
+        const {
+            title,
+            message = '',
+            type = 'info',
+        } = options;
+
+        const typeConfig = {
+            info: {
+                gradient: 'from-blue-500 to-indigo-600',
+                icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+                defaultTitle: 'Information',
+            },
+            success: {
+                gradient: 'from-emerald-500 to-green-600',
+                icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+                defaultTitle: 'Success',
+            },
+            warning: {
+                gradient: 'from-amber-500 to-orange-600',
+                icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>',
+                defaultTitle: 'Warning',
+            },
+            error: {
+                gradient: 'from-red-500 to-red-600',
+                icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+                defaultTitle: 'Error',
+            },
+        };
+
+        const config = typeConfig[type] || typeConfig.info;
+        const displayTitle = title || config.defaultTitle;
+
+        // Create dialog overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+        overlay.style.zIndex = '100000';
+        overlay.id = 'alert-dialog-overlay';
+
+        // Create dialog container
+        const dialog = document.createElement('div');
+        dialog.className = 'bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden';
+
+        dialog.innerHTML = `
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r ${config.gradient}">
+                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        ${config.icon}
+                    </svg>
+                    ${escapeHtml(displayTitle)}
+                </h3>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-gray-700 dark:text-gray-300">${escapeHtml(message)}</p>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end">
+                <button id="alert-ok" class="px-4 py-2 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-medium">
+                    OK
+                </button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        const okBtn = dialog.querySelector('#alert-ok');
+        setTimeout(() => okBtn.focus(), 50);
+
+        const cleanup = () => {
+            overlay.remove();
+        };
+
+        okBtn.addEventListener('click', () => {
+            cleanup();
+            resolve();
+        });
+
+        // Handle Enter/Escape key
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape' || e.key === 'Enter') {
+                document.removeEventListener('keydown', handleKeydown);
+                cleanup();
+                resolve();
+            }
+        };
+        document.addEventListener('keydown', handleKeydown);
+
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                cleanup();
+                resolve();
+            }
+        });
+    });
+}
+
+/**
+ * Helper to escape HTML for safe rendering in dialogs
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }

@@ -16,6 +16,8 @@ import {
     isUsernameAvailable,
     onAuthStateChange
 } from './authService.js';
+import { toast } from '../ui/toastNotifications.js';
+import { showAlertModal } from '../ui/modals.js';
 
 // DOM element references
 let authButtonContainer = null;
@@ -228,7 +230,7 @@ async function handleSignIn() {
     } catch (error) {
         console.error('Sign in error:', error);
         // Show error to user
-        alert('Unable to sign in. Please try again.');
+        toast.error('Unable to sign in. Please try again.');
     }
 }
 
@@ -241,7 +243,7 @@ async function handleSignOut() {
         closeDropdown();
     } catch (error) {
         console.error('Sign out error:', error);
-        alert('Unable to sign out. Please try again.');
+        toast.error('Unable to sign out. Please try again.');
     }
 }
 
@@ -487,7 +489,7 @@ async function showProfileSettingsModal() {
 
     saveBtn.addEventListener('click', async () => {
         if (!usernameValid) {
-            alert('Please fix the username before saving.');
+            toast.warning('Please fix the username before saving.');
             return;
         }
 
@@ -525,7 +527,7 @@ async function showProfileSettingsModal() {
 
         } catch (error) {
             console.error('Error saving profile:', error);
-            alert('Failed to save profile: ' + error.message);
+            toast.error('Failed to save profile: ' + error.message);
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save Changes';
         }
@@ -533,7 +535,7 @@ async function showProfileSettingsModal() {
 
     } catch (error) {
         console.error('[ProfileSettings] Error showing modal:', error);
-        alert('Error opening profile settings: ' + error.message);
+        toast.error('Error opening profile settings: ' + error.message);
     }
 }
 
