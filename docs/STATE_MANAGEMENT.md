@@ -2,7 +2,7 @@
 
 **Purpose:** Visual data flow diagrams and state synchronization patterns.
 
-**Last Updated:** 2026-01-01 (Updated for Phase 1-3 refactoring + Sections + Measure Isolation)
+**Last Updated:** 2026-01-08 (Added Community State Management section)
 
 ---
 
@@ -857,6 +857,282 @@ window.syncProgressionToMelodyComposer();
 
 ---
 
+## 🌐 COMMUNITY STATE MANAGEMENT
+
+### Authentication State
+
+Authentication state is managed by `authService.js` using Supabase Auth:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Auth State (authService.js)              │
+│                                                             │
+│  currentUser: User | null    ← Supabase auth user           │
+│  currentSession: Session | null ← JWT token + metadata      │
+│  cachedProfile: Profile | null ← User profile from DB       │
+│                                                             │
+│  Auth Listeners: Set<callback>  ← Notified on auth changes  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**State Transitions:**
+
+```
+┌────────────────┐
+│  Not Signed In │ ←─────────────────────────────────┐
+│  user = null   │                                   │
+└───────┬────────┘                                   │
+        │                                            │
+        │ signInWithGoogle()                         │
+        ▼                                            │
+┌────────────────┐                                   │
+│  Google OAuth  │ (redirect to Google)              │
+│  Flow          │                                   │
+└───────┬────────┘                                   │
+        │                                            │
+        │ OAuth callback                             │
+        ▼                                            │
+┌────────────────┐                                   │
+│  Signed In     │ ───── signOut() ──────────────────┘
+│  user = {...}  │
+│  session = {   │
+│    access_token│
+│    expires_at  │
+│  }             │
+└────────────────┘
+```
+
+### Auth Event Listeners
+
+```javascript
+// Subscribe to auth changes
+const unsubscribe = onAuthStateChange((event, session) => {
+  // event: 'SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED'
+  if (event === 'SIGNED_IN') {
+    // Enable community features
+    updateAuthButton();
+    showAdminFabIfAdmin();
+  } else if (event === 'SIGNED_OUT') {
+    // Disable community features
+    clearAdminCache();
+    clearLoadedSubmissionContext();
+  }
+});
+```
+
+### Pattern 7: Share Submission Flow
+
+```
+┌─────────────────────────────────────┐
+│  User clicks "Share to Community"   │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  Check isSignedIn()                 │
+│  If not signed in → prompt sign in  │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  showShareModal()                   │
+│  - Generate duplicate detection data│
+│  - Check for existing similar       │
+│    progressions (API call)          │
+└─────────────────┬───────────────────┘
+                  │
+                  ├──── Exact duplicate found ───────────────┐
+                  │                                          │
+                  ▼                                          ▼
+┌─────────────────────────────────────┐   ┌─────────────────────────────────┐
+│  No duplicate found                 │   │  Show duplicate info            │
+│  - Show submission form             │   │  - Link to existing             │
+│  - User fills title, description,   │   │  - Option to add as variant     │
+│    category, tags                   │   │  - Option to cancel             │
+└─────────────────┬───────────────────┘   └─────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  hasLoadedSubmissionContext()?      │
+│  - If yes: show "Update" option     │
+│  - If no: normal publish            │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  POST /api/submissions              │
+│  - Include composition_data         │
+│  - Include chord_sequence           │
+│  - Include base_hash, variant_hash  │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  Success: Clear context, show toast │
+│  Error: Show error message          │
+└─────────────────────────────────────┘
+```
+
+### Pattern 8: Load Community Submission
+
+```
+┌──────────────────────────────────────┐
+│  User browses community submissions  │
+│  (communityBrowser.js)               │
+└─────────────────┬────────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────────┐
+│  User clicks "Load" on submission    │
+└─────────────────┬────────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────────┐
+│  Check if workspace has unsaved      │
+│  changes → Confirm overwrite?        │
+└─────────────────┬────────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────────┐
+│  GET /api/submission?id=xxx          │
+│  → Returns full composition_data     │
+└─────────────────┬────────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────────┐
+│  compositionState.importFrom...()    │
+│  or setProgressionData()             │
+└─────────────────┬────────────────────┘
+                  │
+                  ├──── Is own submission? ───────────────────┐
+                  │                                           │
+                  ▼                                           ▼
+┌──────────────────────────────────────┐   ┌──────────────────────────────────┐
+│  clearLoadedSubmissionContext()      │   │  setLoadedSubmissionContext({    │
+│  (Not own submission)                │   │    submissionId, title, etc.     │
+│                                      │   │  })                              │
+│                                      │   │  (Enables "Update" option)       │
+└─────────────────┬────────────────────┘   └─────────────────┬────────────────┘
+                  │                                          │
+                  └─────────────────┬────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────┐
+│  syncProgressionToMelodyComposer()   │
+│  refreshNotationFromProgression()    │
+└──────────────────────────────────────┘
+```
+
+### Pattern 9: Admin Dashboard Flow
+
+```
+┌─────────────────────────────────────┐
+│  User clicks Admin FAB              │
+│  (visible only if isAdmin)          │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  showAdminDashboard()               │
+│  - Loads stats from API             │
+│  - Shows dashboard modal            │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  Admin selects tab:                 │
+│  - Overview (stats)                 │
+│  - Submissions (manage)             │
+│  - Users (block/unblock)            │
+│  - Flags (content reports)          │
+│  - Settings (app config)            │
+└─────────────────┬───────────────────┘
+                  │
+          ┌───────┼───────┐
+          │       │       │
+          ▼       ▼       ▼
+┌──────────┐ ┌──────────┐ ┌──────────┐
+│ GET/PUT  │ │ GET/PUT  │ │ GET/PUT  │
+│ /admin-  │ │ /admin-  │ │ /flags   │
+│submissions│ │users     │ │          │
+└──────────┘ └──────────┘ └──────────┘
+```
+
+### Loaded Submission Context State
+
+Tracks when user loads their own submission for editing:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│            loadedSubmissionContext (global)                 │
+│                                                             │
+│  loadedContext: {                                           │
+│    submissionId: string,     // Original submission ID      │
+│    title: string,            // Original title              │
+│    description: string,      // Original description        │
+│    status: 'published'|'draft',                             │
+│    submissionType: 'chord-progression'|'full-composition',  │
+│    category: string,                                        │
+│    loadedAt: number          // Timestamp when loaded       │
+│  } | null                                                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**State Transitions:**
+
+```
+[No Context] ──load own submission──> [Context Set]
+    │                                      │
+    │                                      │
+    │<── clearLoadedSubmissionContext() ───┘
+    │         (on publish, new, or "Save as New")
+    │
+    └── loadedContext = null
+```
+
+### Admin Cache State
+
+```javascript
+// Cached admin status (adminService.js)
+let adminStatusCache = { isAdmin: boolean, email?: string } | null;
+let adminStatusCacheTime = number; // Timestamp
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Cache is cleared on:
+// - Sign out
+// - After CACHE_DURATION expires
+// - Manual clearAdminCache() call
+```
+
+### Community State Debugging
+
+```javascript
+// In browser console:
+
+// Check auth state
+window.isSignedIn && window.isSignedIn();
+window.getCurrentUser && window.getCurrentUser();
+
+// Check loaded submission context
+window.hasLoadedSubmissionContext && window.hasLoadedSubmissionContext();
+window.getLoadedSubmissionContext && window.getLoadedSubmissionContext();
+
+// Clear loaded context (for testing)
+window.clearLoadedSubmissionContext && window.clearLoadedSubmissionContext();
+```
+
+### Common Community Issues
+
+| Issue | Symptom | Solution |
+|-------|---------|----------|
+| Can't share | "Must be signed in" error | Call `signInWithGoogle()` |
+| Token expired | API calls fail with 401 | Call `refreshSession()` or sign in again |
+| Admin FAB missing | Admin can't access dashboard | Check `checkAdminStatus()`, clear cache |
+| "Update" missing | Share modal shows "Publish" only | Check `hasLoadedSubmissionContext()` |
+| Duplicate detected | Can't publish progression | Use "Add as Variant" or choose different chords |
+
+---
+
 ## 🔗 RELATED DOCUMENTS
 
 - [MODULE_INDEX.md](MODULE_INDEX.md) - Find state-related modules
@@ -887,4 +1163,4 @@ window.syncProgressionToMelodyComposer();
 
 ---
 
-**Last Updated:** 2026-01-01
+**Last Updated:** 2026-01-08

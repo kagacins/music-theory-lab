@@ -2,7 +2,7 @@
 
 **Purpose:** Quick lookup for key function signatures without reading full files.
 
-**Last Updated:** 2026-01-01 (Updated for Phase 1-3 refactoring + Measure Isolation + durationUtils)
+**Last Updated:** 2026-01-08 (Added Community, Admin, Backend API sections)
 
 ---
 
@@ -1001,6 +1001,374 @@ const chordData = {
   inversion: chord.inversion || 0,
   notes: chord.notes
 };
+```
+
+---
+
+## 🔐 AUTHENTICATION SERVICE
+**File:** [src/modules/community/authService.js](../src/modules/community/authService.js)
+
+### Initialization
+
+```javascript
+initAuthService() → Promise<{user, session}>
+// Initialize auth service, get initial session, set up listeners
+
+signInWithGoogle() → Promise<{provider, url}>
+// Trigger Google OAuth sign-in flow (redirects to Google)
+
+signOut() → Promise<boolean>
+// Sign out current user
+```
+
+### User State
+
+```javascript
+getCurrentUser() → User | null
+// Get current signed-in user object
+
+getCurrentSession() → Session | null
+// Get current session with tokens
+
+isSignedIn() → boolean
+// Quick check if user is signed in
+
+getUserDisplayInfo() → {id, email, displayName, avatarUrl} | null
+// Get user info for UI display
+```
+
+### Profile Management
+
+```javascript
+getUserProfile(forceRefresh?) → Promise<Profile | null>
+// Get user profile from database (cached)
+
+updateUserProfile(updates) → Promise<Profile>
+// Update user profile (username, display_name, bio)
+
+isUsernameAvailable(username) → Promise<boolean>
+// Check if username is available for registration
+
+getSubmissionDisplayName() → Promise<{displayName, isUsername, hasUsername}>
+// Get name to show on submissions (prefers username)
+```
+
+### Auth Events
+
+```javascript
+onAuthStateChange(callback) → () => void
+// Subscribe to auth changes, returns unsubscribe function
+// callback receives (event, session)
+// Events: 'SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED'
+
+getAuthToken() → Promise<string | null>
+// Get JWT token for API requests (auto-refreshes if needed)
+
+refreshSession() → Promise<boolean>
+// Manually refresh session token
+```
+
+---
+
+## 📤 SHARE MODAL
+**File:** [src/modules/community/shareModal.js](../src/modules/community/shareModal.js)
+
+### Modal Control
+
+```javascript
+initShareModal() → void
+// Initialize modal DOM element
+
+showShareModal() → void
+// Show share modal (checks for duplicates first)
+
+hideShareModal() → void
+// Hide share modal
+```
+
+### Submission Types
+
+Two submission types are supported:
+- `"chord-progression"`: Chord cards with durations, inversions, bass, sections (no melody)
+- `"full-composition"`: Complete composition including melody, dynamics, articulations
+
+---
+
+## 🔍 COMMUNITY BROWSER
+**File:** [src/modules/community/communityBrowser.js](../src/modules/community/communityBrowser.js)
+
+### Browser Control
+
+```javascript
+showCommunityBrowser() → void
+// Open community browser modal
+
+hideCommunityBrowser() → void
+// Close community browser modal
+
+loadSubmission(submissionId) → Promise<void>
+// Load a submission into the workspace
+```
+
+---
+
+## 📂 MY SUBMISSIONS
+**File:** [src/modules/community/mySubmissions.js](../src/modules/community/mySubmissions.js)
+
+```javascript
+showMySubmissions() → void
+// Show modal with user's own submissions
+
+hideMySubmissions() → void
+// Close my submissions modal
+```
+
+---
+
+## 📍 LOADED SUBMISSION CONTEXT
+**File:** [src/modules/community/loadedSubmissionContext.js](../src/modules/community/loadedSubmissionContext.js)
+
+Tracks when a submission is loaded for editing (enables "Update" vs "Save as New").
+
+```javascript
+setLoadedSubmissionContext(context) → void
+// Set context when loading own submission for editing
+// context: {submissionId, title, description, status, submissionType, category}
+
+getLoadedSubmissionContext() → LoadedContext | null
+// Get current loaded submission context
+
+hasLoadedSubmissionContext() → boolean
+// Check if a submission is loaded for editing
+
+clearLoadedSubmissionContext() → void
+// Clear context (on new composition, publish, or "Save as New")
+
+getLoadedSubmissionTitle() → string | null
+// Get title for UI display
+```
+
+---
+
+## 🔑 ADMIN SERVICE
+**File:** [src/modules/admin/adminService.js](../src/modules/admin/adminService.js)
+
+### Admin Status
+
+```javascript
+checkAdminStatus() → Promise<{isAdmin: boolean, email?: string}>
+// Check if current user is admin (cached 5 minutes)
+
+clearAdminCache() → void
+// Clear admin status cache (call on sign out)
+```
+
+### Dashboard Stats
+
+```javascript
+getAdminStats() → Promise<Stats>
+// Get dashboard statistics
+```
+
+### Submission Management
+
+```javascript
+getSubmissions(options?) → Promise<{submissions, total, page}>
+// Get submissions list with filtering
+// options: {search, status, type, sort, page, limit}
+
+getSubmission(id) → Promise<Submission>
+// Get single submission by ID
+
+updateSubmission(id, updates, reason?) → Promise<Submission>
+// Update submission (status, featured, etc.)
+
+deleteSubmission(id, reason?) → Promise<{success: boolean}>
+// Delete a submission
+```
+
+### User Management
+
+```javascript
+getUsers(options?) → Promise<{users, total, page}>
+// Get users list with filtering
+// options: {search, blocked, sort, page, limit}
+
+getUser(id) → Promise<User>
+// Get single user by ID
+
+blockUser(userId, reason, scope?) → Promise<User>
+// Block a user (scope: 'all' | 'submissions')
+
+unblockUser(userId, reason?) → Promise<User>
+// Unblock a user
+```
+
+### Content Moderation (Flags)
+
+```javascript
+getFlags(options?) → Promise<{flags, total, page}>
+// Get flags list (admin only)
+// options: {status, reason, search, sort, page, limit}
+
+getFlag(id) → Promise<Flag>
+// Get single flag by ID
+
+updateFlag(id, status, resolutionNotes?) → Promise<Flag>
+// Update flag status (resolved, dismissed, etc.)
+
+deleteFlag(id) → Promise<{success: boolean}>
+// Delete a flag
+
+submitFlag(submissionId, reason, description?) → Promise<Flag>
+// Submit a flag/report (any authenticated user)
+```
+
+### App Settings
+
+```javascript
+getAppSettings() → Promise<{settings: Setting[]}>
+// Get all app settings
+
+getAppSetting(key) → Promise<{setting: Setting}>
+// Get specific setting by key
+
+updateAppSetting(key, value) → Promise<Setting>
+// Update app setting (admin only)
+
+getProgressionChordLimit() → Promise<{limit: number | null, enabled: boolean}>
+// Get chord limit setting (public, for share modal)
+```
+
+### User Submission Management (non-admin)
+
+```javascript
+updateOwnSubmission(id, updates) → Promise<Submission>
+// Update own submission (authenticated user)
+
+getSubmissionVersions(submissionId) → Promise<{versions: Version[]}>
+// Get version history for own submission
+
+getSubmissionVersion(submissionId, versionId) → Promise<{version: Version}>
+// Get specific version with full composition data
+
+restoreSubmissionVersion(submissionId, versionId) → Promise<Submission>
+// Restore a previous version
+```
+
+---
+
+## 🌐 BACKEND API ENDPOINTS
+
+### Submissions API (`/api/submissions`)
+```
+GET  /api/submissions          - Browse/search submissions
+POST /api/submissions          - Create new submission (auth required)
+PUT  /api/submissions          - Update own submission (auth required)
+```
+
+Query parameters for GET:
+- `search`: Text search
+- `type`: 'chord-progression' | 'full-composition'
+- `category`: 'original', 'arrangement', etc.
+- `tags`: Comma-separated tag slugs
+- `key`: Key signature filter
+- `sort`: 'newest' | 'popular' | 'trending'
+- `page`, `limit`: Pagination
+
+### Admin API
+```
+GET    /api/admin-check        - Check if user is admin
+GET    /api/admin-stats        - Dashboard statistics
+GET    /api/admin-submissions  - List submissions (admin)
+PUT    /api/admin-submissions  - Update submission (admin)
+DELETE /api/admin-submissions  - Delete submission (admin)
+GET    /api/admin-users        - List users (admin)
+PUT    /api/admin-users        - Block/unblock user (admin)
+```
+
+### Social API
+```
+POST /api/upvote               - Upvote a submission (auth required)
+GET  /api/flags                - Get flags (admin only)
+POST /api/flags                - Submit flag (auth required)
+PUT  /api/flags                - Update flag (admin only)
+GET  /api/tags                 - Get available tags
+```
+
+### Version API
+```
+GET  /api/submission-versions  - Get version history
+POST /api/submission-versions  - Restore a version
+```
+
+---
+
+## 📦 COMMUNITY DATA STRUCTURES
+
+### User Profile
+```javascript
+{
+  id: string,                   // Supabase user ID
+  username: string | null,      // Unique username (optional)
+  display_name: string | null,  // Display name
+  avatar_url: string | null,    // Profile image URL
+  bio: string | null,           // User bio
+  created_at: string,           // ISO timestamp
+  updated_at: string            // ISO timestamp
+}
+```
+
+### Submission
+```javascript
+{
+  id: string,                   // Unique submission ID
+  user_id: string,              // Owner's user ID
+  title: string,                // Submission title
+  description: string | null,   // Description
+  submission_type: string,      // 'chord-progression' | 'full-composition'
+  category: string,             // 'original', 'arrangement', etc.
+  status: string,               // 'draft' | 'published' | 'hidden'
+  composition_data: object,     // Full composition JSON
+  chord_sequence: string,       // Normalized chord string (for search)
+  key_signature: string,        // Key of the piece
+  upvote_count: number,         // Number of upvotes
+  view_count: number,           // Number of views
+  base_hash: string,            // Hash for duplicate detection (chord family)
+  variant_hash: string,         // Hash including durations/inversions
+  created_at: string,
+  updated_at: string,
+  tags: string[]                // Tag slugs
+}
+```
+
+### Flag (Content Report)
+```javascript
+{
+  id: string,
+  submission_id: string,
+  reporter_id: string,
+  reason: string,               // 'inappropriate', 'spam', 'copyright', 'other'
+  description: string | null,   // Additional details
+  status: string,               // 'pending', 'resolved', 'dismissed'
+  resolution_notes: string | null,
+  resolved_by: string | null,
+  created_at: string,
+  resolved_at: string | null
+}
+```
+
+### Loaded Submission Context
+```javascript
+{
+  submissionId: string,
+  title: string,
+  description: string,
+  status: string,               // 'published' | 'draft'
+  submissionType: string,       // 'chord-progression' | 'full-composition'
+  category: string,
+  loadedAt: number              // Timestamp
+}
 ```
 
 ---

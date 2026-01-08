@@ -68,7 +68,8 @@
       "Bash(taskkill:*)",
       "Bash(git diff:*)",
       "Bash(while read hash msg)",
-      "Bash(do git show \"$hash\":index.html)"
+      "Bash(do git show \"$hash\":index.html)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

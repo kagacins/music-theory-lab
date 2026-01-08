@@ -2,7 +2,7 @@
 
 **Purpose:** Quick navigation guide for Claude Code to find the right code without reading entire files.
 
-**Last Updated:** 2026-01-01 (Updated for Phase 1, 2, 3 refactoring + Measure Isolation + UnifiedRecommendationModal refactor)
+**Last Updated:** 2026-01-08 (Added Community, Admin, Backend API, Config, Import modules)
 
 ---
 
@@ -413,6 +413,131 @@ recommendations/
 
 ---
 
+### COMMUNITY - Social Features & Sharing (8 files, ~6,773 lines)
+**Location:** `src/modules/community/`
+
+**Purpose:** User authentication, progression sharing, community browsing, and social features
+
+| File | Lines | Purpose | Key Exports |
+|------|-------|---------|-------------|
+| `communityBrowser.js` ⭐ | 2,943 | Browse/search community submissions | `showCommunityBrowser()`, `loadSubmission()` |
+| `shareModal.js` | 1,640 | Share progressions to community | `showShareModal()`, `initShareModal()` |
+| `mySubmissions.js` | 746 | View/manage user's own submissions | `showMySubmissions()` |
+| `authButton.js` | 542 | Authentication UI component | `initAuthButton()`, `updateAuthButton()` |
+| `authService.js` | 427 | Supabase authentication service | `signInWithGoogle()`, `signOut()`, `isSignedIn()`, `getAuthToken()` |
+| `duplicateDetection.js` | 353 | Check for duplicate submissions | `generateDuplicateDetectionData()`, `extractChordsFromComposition()` |
+| `loadedSubmissionContext.js` | 91 | Track loaded submission for editing | `setLoadedSubmissionContext()`, `getLoadedSubmissionContext()` |
+| `supabaseClient.js` | 31 | Supabase client initialization | `supabase` |
+
+**Data Flow:**
+```
+User Signs In (Google OAuth)
+    ↓
+authService.js → supabaseClient.js → Supabase Auth
+    ↓
+User Profile Created/Loaded
+    ↓
+Community Features Enabled (browse, share, upvote)
+```
+
+**When to Read:**
+- Authentication issues → `authService.js`
+- Share/publish flow → `shareModal.js`
+- Browse community → `communityBrowser.js`
+- User's submissions → `mySubmissions.js`
+- Duplicate detection → `duplicateDetection.js`
+
+---
+
+### ADMIN - Admin Dashboard & Moderation (3 files, ~2,079 lines)
+**Location:** `src/modules/admin/`
+
+**Purpose:** Admin dashboard for content moderation, user management, and app settings
+
+| File | Lines | Purpose | Key Exports |
+|------|-------|---------|-------------|
+| `adminDashboardModal.js` ⭐ | 1,537 | Admin dashboard UI with tabs | `showAdminDashboard()`, `initAdminDashboard()` |
+| `adminService.js` | 419 | Admin API client | `checkAdminStatus()`, `getSubmissions()`, `blockUser()`, `getFlags()` |
+| `adminFab.js` | 123 | Admin floating action button | `initAdminFab()`, `showAdminFabIfAdmin()` |
+
+**Admin Dashboard Tabs:**
+- **Overview**: Stats, recent activity
+- **Submissions**: Review, approve, reject, delete
+- **Users**: Block/unblock, view activity
+- **Flags**: Handle user reports
+- **Settings**: App-wide configuration
+
+**When to Read:**
+- Admin dashboard UI → `adminDashboardModal.js`
+- API calls to admin endpoints → `adminService.js`
+- Admin access control → `adminFab.js` + `adminService.js`
+
+---
+
+### BACKEND - Netlify Functions API (17 files, ~4,547 lines)
+**Location:** `netlify/functions/`
+
+**Purpose:** Serverless API endpoints for community features, authentication, and admin operations
+
+#### Core Submission Endpoints
+| File | Lines | Purpose | Endpoint |
+|------|-------|---------|----------|
+| `submissions.js` ⭐ | 841 | Browse/create submissions | `GET/POST /api/submissions` |
+| `submission.js` | 262 | Get single submission | `GET /api/submission` |
+| `my-submissions.js` | 206 | User's own submissions | `GET /api/my-submissions` |
+| `submission-status.js` | 177 | Check submission status | `GET /api/submission-status` |
+| `submission-families.js` | 383 | Group similar progressions | `GET /api/submission-families` |
+| `submission-versions.js` | 374 | Version history for edits | `GET/POST /api/submission-versions` |
+| `check-duplicate.js` | 295 | Duplicate detection | `POST /api/check-duplicate` |
+
+#### Admin Endpoints
+| File | Lines | Purpose | Endpoint |
+|------|-------|---------|----------|
+| `admin-check.js` | 51 | Verify admin status | `GET /api/admin-check` |
+| `admin-submissions.js` | 324 | Admin submission management | `GET/PUT/DELETE /api/admin-submissions` |
+| `admin-users.js` | 329 | User management | `GET/PUT /api/admin-users` |
+| `admin-stats.js` | 158 | Dashboard statistics | `GET /api/admin-stats` |
+
+#### Social & Moderation
+| File | Lines | Purpose | Endpoint |
+|------|-------|---------|----------|
+| `upvote.js` | 170 | Upvote submissions | `POST /api/upvote` |
+| `flags.js` | 455 | Content flagging/reporting | `GET/POST/PUT/DELETE /api/flags` |
+| `tags.js` | 94 | Submission tags | `GET /api/tags` |
+
+#### Utility
+| File | Lines | Purpose | Endpoint |
+|------|-------|---------|----------|
+| `searchChords.js` | 80 | Search by chord sequence | `GET /api/searchChords` |
+| `app-settings.js` | 156 | App configuration | `GET/PUT /api/app-settings` |
+| `utils/adminAuth.js` | 192 | Admin authentication helper | (internal) |
+
+**When to Read:**
+- API endpoint behavior → Specific function file
+- Authentication flow → `utils/adminAuth.js`
+- Submission CRUD → `submissions.js`, `submission.js`
+- Admin operations → `admin-*.js` files
+
+---
+
+### CONFIG - Application Configuration (1 file)
+**Location:** `src/modules/config/`
+
+| File | Lines | Purpose | Key Exports |
+|------|-------|---------|-------------|
+| `weightPresets.js` | 882 | Recommendation weight presets | Weight preset definitions |
+
+---
+
+### IMPORT - File Import (1 file)
+**Location:** `src/modules/import/`
+
+| File | Lines | Purpose | Key Exports |
+|------|-------|---------|-------------|
+| `musicXmlImporter.js` | 926 | Import MusicXML files | `importMusicXML()` |
+
+---
+
 ### CANVAS - Notation Canvas Suggestions (9 files)
 **Location:** `src/modules/canvas/suggestions/`
 
@@ -543,6 +668,13 @@ User selects chord → compositionState.updateChord()
 | **Undo/Redo** | `storage/versionHistory.js` | `progressionBuilder/ProgressionController.js` |
 | **Educational features** | `teaching/theoryMoments.js` | `teaching/whyThisWorksEnhanced.js` |
 | **Sections** | `state/compositionState.js` | `progressionBuilder/ProgressionRenderer.js` |
+| **Authentication** | `community/authService.js` | `community/authButton.js` |
+| **Share to Community** | `community/shareModal.js` | `community/duplicateDetection.js` |
+| **Browse Community** | `community/communityBrowser.js` | `community/loadedSubmissionContext.js` |
+| **User Submissions** | `community/mySubmissions.js` | `admin/adminService.js` |
+| **Admin Dashboard** | `admin/adminDashboardModal.js` | `admin/adminService.js` |
+| **Content Moderation** | `admin/adminService.js` | `netlify/functions/flags.js` |
+| **Backend API** | `netlify/functions/submissions.js` | All `netlify/functions/*.js` |
 
 ---
 
@@ -556,6 +688,9 @@ User selects chord → compositionState.updateChord()
 6. **When in doubt**, check `compositionState.js` - it's the data hub
 7. **For notation editing**, check if it's main canvas (`noteEditor.js`) or measure modal (`measureIsolation/`)
 8. **For recommendations**, the modal is now in `ui/recommendations/UnifiedRecommendationModal/`
+9. **For community features**, start with `community/authService.js` for auth, `community/shareModal.js` for sharing
+10. **For admin features**, check `admin/adminService.js` for API calls, `adminDashboardModal.js` for UI
+11. **For backend API**, check `netlify/functions/` - each file is one endpoint
 
 ---
 
@@ -588,3 +723,14 @@ User selects chord → compositionState.updateChord()
 | `lessonGuidedMode.js` | 2,098 | ui |
 | `chordExplorerModal.js` | 2,091 | ui |
 | `theoryInsightsPanel.js` | 2,068 | ui |
+| `communityBrowser.js` | 2,943 | community |
+| `shareModal.js` | 1,640 | community |
+| `adminDashboardModal.js` | 1,537 | admin |
+| `musicXmlImporter.js` | 926 | import |
+| `weightPresets.js` | 882 | config |
+| `submissions.js` | 841 | netlify/functions |
+| `mySubmissions.js` | 746 | community |
+| `authButton.js` | 542 | community |
+| `flags.js` | 455 | netlify/functions |
+| `authService.js` | 427 | community |
+| `adminService.js` | 419 | admin |
