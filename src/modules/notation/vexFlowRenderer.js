@@ -1017,11 +1017,6 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
-  // DEBUG: Log if special properties are being received
-  if (pedal || dynamic || ornament || articulation) {
-    console.log('[createChordNote DEBUG] Received special properties:', { pitches, clef, pedal, dynamic, ornament, articulation });
-  }
-
   // Convert duration and add 'd' suffix if dotted
   let vexDuration = DURATION_MAP[duration] || duration || 'q';
   if (dotted && !vexDuration.includes('d')) {
@@ -1111,7 +1106,6 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   // VexFlow 5 ornament codes - all use VF.Ornament class
   // See: https://github.com/vexflow/vexflow/blob/master/src/tables.ts
   if (ornament) {
-    console.log('[createChordNote DEBUG] Adding ornament:', ornament);
     const ornamentMap = {
       'trill': 'tr',
       'mordent': 'mordent',
@@ -1130,13 +1124,10 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
     };
 
     const vexOrnamentCode = ornamentMap[ornament];
-    console.log('[createChordNote DEBUG] vexOrnamentCode:', vexOrnamentCode, 'pitches.length:', pitches.length);
     if (vexOrnamentCode) {
       try {
         const ornamentObj = new VF.Ornament(vexOrnamentCode);
-        console.log('[createChordNote DEBUG] Created VF.Ornament:', ornamentObj);
         staveNote.addModifier(ornamentObj, pitches.length - 1);
-        console.log('[createChordNote DEBUG] Successfully added ornament to staveNote');
       } catch (error) {
         // Fall back to Unicode symbol if VexFlow ornament fails
         console.warn('[VexFlowRenderer] Error adding ornament to chord, using Unicode fallback:', error.message);

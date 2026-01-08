@@ -208,11 +208,18 @@ export async function saveProjectToFile(compositionState, suggestedName) {
                 if (err.name === 'AbortError') {
                     return { success: false, error: 'Save cancelled' };
                 }
-                throw err;
+                // InvalidStateError can occur if file handle became stale - fall through to download
+                if (err.name === 'InvalidStateError') {
+                    console.warn('[projectManager] File handle stale, falling back to download method');
+                    // Fall through to fallback download method below
+                } else {
+                    throw err;
+                }
             }
         }
 
         // Fallback for browsers without File System Access API (Firefox, Safari)
+        // Also used when File System Access API fails (e.g., stale file handle)
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -502,20 +509,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                         console.log(`[IMTL Import] Measure ${i} treble: ${savedMeasure.notation.treble.voices.length} voices, ${totalNotes} notes`);
                     }
 
-                    // DEBUG: Log special properties (pedal, dynamic, ornament, articulation)
-                    savedMeasure.notation.treble.voices.forEach((voice, vi) => {
-                        voice.notes?.forEach((note, ni) => {
-                            if (note.pedal || note.dynamic || note.ornament || note.articulation || note.fermata) {
-                                console.log(`[IMTL Import DEBUG] Measure ${i} treble voice ${vi} note ${ni} has special properties:`, {
-                                    pedal: note.pedal,
-                                    dynamic: note.dynamic,
-                                    ornament: note.ornament,
-                                    articulation: note.articulation,
-                                    fermata: note.fermata
-                                });
-                            }
-                        });
-                    });
                 }
 
                 // Restore ALL bass voices (not just Voice 2+)
@@ -535,20 +528,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                         console.log(`[IMTL Import] Measure ${i} bass: ${savedMeasure.notation.bass.voices.length} voices, ${totalNotes} notes`);
                     }
 
-                    // DEBUG: Log special properties (pedal, dynamic, ornament, articulation)
-                    savedMeasure.notation.bass.voices.forEach((voice, vi) => {
-                        voice.notes?.forEach((note, ni) => {
-                            if (note.pedal || note.dynamic || note.ornament || note.articulation || note.fermata) {
-                                console.log(`[IMTL Import DEBUG] Measure ${i} bass voice ${vi} note ${ni} has special properties:`, {
-                                    pedal: note.pedal,
-                                    dynamic: note.dynamic,
-                                    ornament: note.ornament,
-                                    articulation: note.articulation,
-                                    fermata: note.fermata
-                                });
-                            }
-                        });
-                    });
                 }
 
                 // Restore any other measure-level notation properties
@@ -562,7 +541,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             // This prevents the bass notes (with ornaments, articulations, etc.) from being regenerated
             // during post-load sync cascades (multiple calls happen from various event handlers)
             compositionState._skipBassRegenerationUntil = Date.now() + 2000; // Skip for 2 seconds
-            console.log('[IMTL Import] Set _skipBassRegenerationUntil to preserve bass properties for 2s');
         }
 
         // 8. Restore tempo markings
@@ -607,46 +585,10 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             compositionState._nextVoltaId = maxVoltaId + 1;
         }
 
-        // DEBUG: Log compositionState.measures BEFORE onNotationRefresh
-        console.log('[IMTL Import DEBUG] compositionState.measures BEFORE onNotationRefresh:');
-        compositionState.measures.forEach((m, i) => {
-            const trebleNotes = m.notation?.treble?.voices?.[0]?.notes || [];
-            const bassNotes = m.notation?.bass?.voices?.[0]?.notes || [];
-            trebleNotes.forEach((note, ni) => {
-                if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-                    console.log(`  Measure ${i} treble note ${ni}:`, { pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation });
-                }
-            });
-            bassNotes.forEach((note, ni) => {
-                if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-                    console.log(`  Measure ${i} bass note ${ni}:`, { pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation });
-                }
-            });
-        });
-
         // 13. Trigger notation refresh
         if (callbacks.onNotationRefresh) {
-            console.log('[IMTL Import DEBUG] Calling onNotationRefresh...');
             callbacks.onNotationRefresh();
-            console.log('[IMTL Import DEBUG] onNotationRefresh completed');
         }
-
-        // DEBUG: Log compositionState.measures AFTER onNotationRefresh
-        console.log('[IMTL Import DEBUG] compositionState.measures AFTER onNotationRefresh:');
-        compositionState.measures.forEach((m, i) => {
-            const trebleNotes = m.notation?.treble?.voices?.[0]?.notes || [];
-            const bassNotes = m.notation?.bass?.voices?.[0]?.notes || [];
-            trebleNotes.forEach((note, ni) => {
-                if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-                    console.log(`  Measure ${i} treble note ${ni}:`, { pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation });
-                }
-            });
-            bassNotes.forEach((note, ni) => {
-                if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-                    console.log(`  Measure ${i} bass note ${ni}:`, { pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation });
-                }
-            });
-        });
 
         // 14. Update UI elements (tempo, key display, etc.)
         if (callbacks.onMetadataUpdated) {

@@ -821,19 +821,7 @@ export class NotationComposer {
           bassVoices.forEach((voice, voiceIndex) => {
             const voiceNotes = voice?.notes || [];
             voiceNotes.forEach((note, noteIndex) => {
-              // DEBUG: Log if source note has special properties
-              if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} bass voice ${voiceIndex} note ${noteIndex} SOURCE has:`, {
-                  pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
-                });
-              }
               const copiedNote = copyNoteWithAllProperties(note, voiceIndex);
-              // DEBUG: Log if copied note has special properties
-              if (copiedNote.pedal || copiedNote.dynamic || copiedNote.ornament || copiedNote.articulation) {
-                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} bass voice ${voiceIndex} note ${noteIndex} COPIED has:`, {
-                  pedal: copiedNote.pedal, dynamic: copiedNote.dynamic, ornament: copiedNote.ornament, articulation: copiedNote.articulation
-                });
-              }
               allBassNotes.push(copiedNote);
             });
           });
@@ -850,19 +838,7 @@ export class NotationComposer {
           trebleVoices.forEach((voice, voiceIndex) => {
             const voiceNotes = voice?.notes || [];
             voiceNotes.forEach((note, noteIndex) => {
-              // DEBUG: Log if source note has special properties
-              if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} treble voice ${voiceIndex} note ${noteIndex} SOURCE has:`, {
-                  pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
-                });
-              }
               const copiedNote = copyNoteWithAllProperties(note, voiceIndex);
-              // DEBUG: Log if copied note has special properties
-              if (copiedNote.pedal || copiedNote.dynamic || copiedNote.ornament || copiedNote.articulation) {
-                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} treble voice ${voiceIndex} note ${noteIndex} COPIED has:`, {
-                  pedal: copiedNote.pedal, dynamic: copiedNote.dynamic, ornament: copiedNote.ornament, articulation: copiedNote.articulation
-                });
-              }
               allTrebleNotes.push(copiedNote);
             });
           });
@@ -902,10 +878,6 @@ export class NotationComposer {
     if (!this.config.container) {
       return;
     }
-
-    // DEBUG: Track what's calling render() to find extra renders
-    console.log('[render DEBUG] render() called, bypassSyncCheck:', bypassSyncCheck);
-    console.trace('[render DEBUG] Stack trace');
 
     // CRITICAL: Block ALL renders while sync is in progress
     // This prevents event-driven renders from catching partial state (e.g., 1 measure instead of 4)
@@ -1802,19 +1774,6 @@ export class NotationComposer {
     const startMeasure = currentPage.startMeasure;
     const endMeasure = currentPage.endMeasure;
     const pageMeasures = measures.slice(startMeasure, endMeasure + 1);
-
-    // DEBUG: Log pageMeasures to see if special properties are present
-    console.log(`[renderWithPagination DEBUG] Page ${currentPageIndex}, measures ${startMeasure}-${endMeasure}`);
-    pageMeasures.forEach((m, i) => {
-      const globalIdx = startMeasure + i;
-      (m.bassNotes || []).forEach((note, ni) => {
-        if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-          console.log(`[renderWithPagination DEBUG] Measure ${globalIdx} bassNotes[${ni}]:`, {
-            pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
-          });
-        }
-      });
-    });
 
     // Get page canvas
     const page = this.pageManager.getPage(currentPageIndex);

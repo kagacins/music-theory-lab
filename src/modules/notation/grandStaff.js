@@ -2498,15 +2498,6 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     bassNotes = [],    // Array of note data for bass clef
   } = measureData;
 
-  // DEBUG: Log ALL bassNotes to see why some renders don't have special properties
-  console.log(`[renderGrandStaffMeasure DEBUG] Measure ${measureIndex} has ${bassNotes.length} bassNotes`);
-  bassNotes.forEach((note, ni) => {
-    console.log(`[renderGrandStaffMeasure DEBUG] Measure ${measureIndex} bassNotes[${ni}]:`, {
-      pitches: note.pitches,
-      pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
-    });
-  });
-
   // Calculate bass staff Y position
   const trebleY = y;
   const bassY = y + 80 + staffSpacing; // 80 = staff height
@@ -3799,18 +3790,6 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
  * @returns {Object} - Rendered system information
  */
 export function renderGrandStaffSystem(container, measures, options = {}) {
-  console.log('[renderGrandStaffSystem DEBUG] Called with', measures.length, 'measures');
-  // DEBUG: Log special properties in measures
-  measures.forEach((m, i) => {
-    (m.bassNotes || []).forEach((note, ni) => {
-      if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-        console.log(`[renderGrandStaffSystem DEBUG] Measure ${i} bassNotes[${ni}]:`, {
-          pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
-        });
-      }
-    });
-  });
-
   const VF = getVF();
   if (!VF || !measures) {
     console.error('[renderGrandStaffSystem] VexFlow not loaded or no measures provided');

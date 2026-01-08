@@ -5001,7 +5001,6 @@ export class CompositionState {
         // This preserves special properties like ornament, articulation, pedal, dynamic.
         // Uses a timestamp to handle multiple sync calls during post-load event cascade.
         if (this._skipBassRegenerationUntil && Date.now() < this._skipBassRegenerationUntil) {
-            console.log('[syncWithProgressionData] Skipping sync - within _skipBassRegenerationUntil window');
             return;
         }
 

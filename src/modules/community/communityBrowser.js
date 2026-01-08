@@ -2484,6 +2484,10 @@ async function loadFullComposition(compositionState, compositionData, title) {
     };
 
     // 3. Sync with progression data
+    // NOTE: We call syncWithProgressionData to create the measure structure,
+    // but then we'll restore the full notation data (including bass with ornaments)
+    // from compositionData.measures afterward. The _skipBassRegenerationUntil flag
+    // will prevent SUBSEQUENT syncs from overwriting our restored data.
     compositionState.syncWithProgressionData(progressionData, {
         preserveMelody: false,
         key: metadata.key,
@@ -2543,6 +2547,11 @@ async function loadFullComposition(compositionState, compositionData, title) {
             }
         }
         console.log('[Community Load] All measure notation data restored');
+
+        // CRITICAL: Set flag to skip syncWithProgressionData calls for a short period
+        // This prevents the bass notes (with ornaments, articulations, etc.) from being regenerated
+        // during post-load sync cascades (multiple calls happen from various event handlers)
+        compositionState._skipBassRegenerationUntil = Date.now() + 2000; // Skip for 2 seconds
     }
 
     // 8. Restore tempo markings

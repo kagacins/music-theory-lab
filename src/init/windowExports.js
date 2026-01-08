@@ -1583,12 +1583,52 @@ export function setupWindowExports() {
     window.parseShareableLink = parseShareableLink;
     window.importFromMIDI = importFromMIDI;
 
-    // Project management functions
+    // Project management functions (raw functions)
     window.saveProjectToFile = saveProjectToFile;
     window.loadProjectFromFile = loadProjectFromFile;
     window.applyProjectToState = applyProjectToState;
     window.validateProjectData = validateProjectData;
     window.PROJECT_FORMAT_VERSION = PROJECT_FORMAT_VERSION;
+
+    // Complete save project function - wraps saveProjectToFile with toast and UI cleanup
+    window.saveProject = async function saveProject() {
+        try {
+            const compositionState = window.getCompositionState();
+            if (!compositionState) {
+                if (window.showToast) {
+                    window.showToast('No composition to save', { type: 'error' });
+                }
+                return { success: false, error: 'No composition to save' };
+            }
+
+            const result = await saveProjectToFile(compositionState);
+
+            if (result.success) {
+                // Show success toast
+                if (window.showToast) {
+                    window.showToast(`Saved: ${result.filename}`, { type: 'success' });
+                }
+
+                // Close the FAB submenus (File dropdown) without closing the entire FAB
+                if (window.closeFabSubmenus) {
+                    window.closeFabSubmenus();
+                }
+            } else if (result.error !== 'Save cancelled') {
+                // Show error toast (but not for user cancellation)
+                if (window.showToast) {
+                    window.showToast(result.error || 'Failed to save project', { type: 'error' });
+                }
+            }
+
+            return result;
+        } catch (error) {
+            console.error('[IMTL Export] Error in saveProject:', error);
+            if (window.showToast) {
+                window.showToast(error.message || 'Failed to save project', { type: 'error' });
+            }
+            return { success: false, error: error.message };
+        }
+    };
 
     // Complete load project function - combines loadProjectFromFile + applyProjectToState
     window.loadProject = async function loadProject() {

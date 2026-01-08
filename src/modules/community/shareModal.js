@@ -141,19 +141,21 @@ function getModalHTML() {
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                             Submission Type <span class="text-red-500">*</span>
                         </label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <label class="flex items-center p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
+                        <div class="grid grid-cols-1 gap-3">
+                            <label class="flex items-start p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
                                 <input type="radio" name="share-type" value="chord-progression" class="sr-only" checked>
                                 <span class="flex flex-col">
-                                    <span class="text-sm font-semibold text-gray-800 dark:text-white">Chord Progression</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Just the chord sequence</span>
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-white">Chord Progression Only</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Saves: chords, inversions, key, beats per chord</span>
+                                    <span class="text-xs text-amber-600 dark:text-amber-400 mt-1">Does NOT save: melody, bass notes, ornaments, dynamics, articulations, grace notes, slurs, hairpins</span>
                                 </span>
                             </label>
-                            <label class="flex items-center p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
+                            <label class="flex items-start p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
                                 <input type="radio" name="share-type" value="full-composition" class="sr-only">
                                 <span class="flex flex-col">
                                     <span class="text-sm font-semibold text-gray-800 dark:text-white">Full Composition</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Includes bass & melody</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Saves everything: melody, bass, ornaments, dynamics, articulations, grace notes, slurs, hairpins, and all notation details</span>
+                                    <span class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Use this to preserve your complete work</span>
                                 </span>
                             </label>
                         </div>
