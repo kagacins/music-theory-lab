@@ -223,13 +223,24 @@ function getModalHTML() {
             </div>
 
             <!-- Footer -->
-            <div id="share-modal-footer" class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-3 hidden">
+            <div id="share-modal-footer" class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between hidden">
                 <button id="share-cancel-btn" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
                     Cancel
                 </button>
-                <button id="share-submit-btn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-lg shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    Share
-                </button>
+                <div class="flex items-center gap-3">
+                    <button id="share-draft-btn" class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                        </svg>
+                        Save as Draft
+                    </button>
+                    <button id="share-submit-btn" class="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-lg shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                        </svg>
+                        Publish
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -327,7 +338,8 @@ function createCompositionDataForSharing(compositionState, submissionType) {
 }
 
 /**
- * Show the share modal and check for duplicates
+ * Show the share modal
+ * Duplicate detection is deferred until user clicks "Publish" (not for drafts)
  */
 export async function showShareModal() {
     if (!modalElement) {
@@ -344,7 +356,7 @@ export async function showShareModal() {
     selectedTags.clear();
     currentDuplicateInfo = null;
 
-    // Show modal with loading state
+    // Show modal with loading state briefly while we prepare form
     modalElement.classList.remove('hidden');
     document.getElementById('share-loading').classList.remove('hidden');
     document.getElementById('share-duplicate').classList.add('hidden');
@@ -376,53 +388,29 @@ export async function showShareModal() {
         }
 
         // Generate duplicate detection data (includes both base and variant hashes)
-        const dupData = await generateDuplicateDetectionData(chords, key);
-
-        console.log('[Share] Duplicate detection data:', {
-            baseHash: dupData.baseHash?.substring(0, 16) + '...',
-            variantHash: dupData.variantHash?.substring(0, 16) + '...',
-            normalized: dupData.normalized,
-            hasCustomDurations: dupData.hasCustomDurations,
-            hasInversions: dupData.hasInversions
-        });
-
-        // Check for duplicates via API (send both base and variant hashes)
-        const response = await fetch('/.netlify/functions/check-duplicate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                baseHash: dupData.baseHash,
-                variantHash: dupData.variantHash,
-                // Legacy field for backward compatibility
-                progressionHash: dupData.baseHash,
-                submissionType: 'chord-progression',
-                userKeySignature: key,
-                hasCustomDurations: dupData.hasCustomDurations,
-                hasInversions: dupData.hasInversions
-            })
-        });
-
-        const result = await response.json();
-
-        document.getElementById('share-loading').classList.add('hidden');
-
-        if (result.isDuplicate) {
-            // Show duplicate found UI (exact match on both base and variant)
-            currentDuplicateInfo = result;
-            showDuplicateFound(result, dupData.normalized);
-        } else if (result.isVariant) {
-            // Show variant warning UI (same chords but different durations/inversions)
-            currentDuplicateInfo = result;
-            showVariantWarning(result, dupData, key, compState);
-        } else {
-            // Show share form (completely new progression)
-            showShareForm(dupData, key, compState);
+        // We'll use this for the form and check for duplicates only when publishing
+        let dupData;
+        try {
+            dupData = await generateDuplicateDetectionData(chords, key);
+        } catch (hashError) {
+            console.error('[Share] Error generating hash, using fallback:', hashError);
+            // Fallback - create basic dupData without hashes
+            dupData = {
+                baseHash: 'fallback-' + Date.now(),
+                variantHash: 'fallback-variant-' + Date.now(),
+                normalized: chords.map(c => c.root + (c.type === 'Minor' ? 'm' : '')).join(' - '),
+                hasCustomDurations: false,
+                hasInversions: false
+            };
         }
 
+        // Hide loading and show form directly
+        // Duplicate detection is deferred to when user clicks "Publish"
+        document.getElementById('share-loading').classList.add('hidden');
+        await showShareForm(dupData, key, compState);
+
     } catch (error) {
-        console.error('Error preparing share modal:', error);
+        console.error('[Share] Error preparing share modal:', error);
         document.getElementById('share-loading').classList.add('hidden');
         document.getElementById('share-duplicate').classList.remove('hidden');
         document.getElementById('share-duplicate').innerHTML = `
@@ -598,6 +586,15 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
     const form = document.getElementById('share-form');
     const footer = document.getElementById('share-modal-footer');
 
+    if (!form) {
+        console.error('[Share] share-form element not found!');
+        return;
+    }
+    if (!footer) {
+        console.error('[Share] share-modal-footer element not found!');
+        return;
+    }
+
     // Store duplicate data for submission (including both hashes)
     form.dataset.baseHash = dupData.baseHash;
     form.dataset.variantHash = dupData.variantHash;
@@ -606,6 +603,8 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
     form.dataset.key = key;
     form.dataset.isVariant = isVariant ? 'true' : 'false';
     form.dataset.parentSubmissionId = parentSubmissionId || '';
+    form.dataset.hasCustomDurations = dupData.hasCustomDurations ? 'true' : 'false';
+    form.dataset.hasInversions = dupData.hasInversions ? 'true' : 'false';
 
     // Get settings and metadata from composition state
     const settings = compState?.getSettings?.() || compState?.settings || {};
@@ -630,22 +629,32 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
         </div>
     `;
 
-    // Load tags
-    await loadTags();
-
-    // Populate author section
-    await populateAuthorSection();
-
-    // Set up form event listeners
-    setupFormListeners();
-
-    // Show form and footer
+    // Show form and footer FIRST, then load async content
+    // This ensures the form is visible even if tags/author loading fails
     form.classList.remove('hidden');
     footer.classList.remove('hidden');
 
     // Set up footer buttons
     document.getElementById('share-cancel-btn').onclick = hideShareModal;
-    document.getElementById('share-submit-btn').onclick = handleSubmit;
+    document.getElementById('share-draft-btn').onclick = () => handleSubmit('draft');
+    document.getElementById('share-submit-btn').onclick = () => handleSubmit('published');
+
+    // Set up form event listeners
+    setupFormListeners();
+
+    // Load tags (non-blocking - form is already visible)
+    try {
+        await loadTags();
+    } catch (error) {
+        console.error('[Share] Error loading tags:', error);
+    }
+
+    // Populate author section (non-blocking - form is already visible)
+    try {
+        await populateAuthorSection();
+    } catch (error) {
+        console.error('[Share] Error populating author section:', error);
+    }
 }
 
 /**
@@ -657,8 +666,19 @@ async function populateAuthorSection() {
     const anonymousCheckbox = document.getElementById('share-anonymous');
     const settingsBtn = document.getElementById('share-author-settings');
 
-    // Get the display name info
-    const displayInfo = await getSubmissionDisplayName();
+    // Get the display name info with timeout fallback
+    let displayInfo;
+    try {
+        displayInfo = await getSubmissionDisplayName();
+    } catch (err) {
+        // Fallback if fetch fails
+        displayInfo = { displayName: 'User', isUsername: false, hasUsername: false };
+    }
+
+    // Ensure we have valid displayInfo
+    if (!displayInfo || !displayInfo.displayName) {
+        displayInfo = { displayName: 'User', isUsername: false, hasUsername: false };
+    }
 
     // Update the display
     if (displayInfo.isUsername) {
@@ -819,10 +839,13 @@ function setupFormListeners() {
 
 /**
  * Handle form submission
+ * @param {string} status - 'published' or 'draft'
  */
-async function handleSubmit() {
+async function handleSubmit(status = 'published') {
     const submitBtn = document.getElementById('share-submit-btn');
+    const draftBtn = document.getElementById('share-draft-btn');
     const form = document.getElementById('share-form');
+    const isDraft = status === 'draft';
 
     // Get form values
     const title = document.getElementById('share-title').value.trim();
@@ -850,9 +873,26 @@ async function handleSubmit() {
         return;
     }
 
-    // Disable submit button
+    // Disable buttons
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Sharing...';
+    draftBtn.disabled = true;
+    if (isDraft) {
+        draftBtn.innerHTML = `
+            <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"></circle>
+                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Saving...
+        `;
+    } else {
+        submitBtn.innerHTML = `
+            <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"></circle>
+                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Checking...
+        `;
+    }
 
     try {
         // Get composition data based on submission type
@@ -865,18 +905,88 @@ async function handleSubmit() {
         const timeSigDenom = metadata.timeSignature?.denom || 4;
         const tempo = metadata.tempo || 120;
 
-        // Check if this is a variant submission
-        const isVariant = form.dataset.isVariant === 'true';
-        const parentSubmissionId = form.dataset.parentSubmissionId || null;
+        // Check if this is a variant submission (user already confirmed via variant warning)
+        let isVariant = form.dataset.isVariant === 'true';
+        let parentSubmissionId = form.dataset.parentSubmissionId || null;
 
-        // Get auth token
+        // Get auth token (automatically handles refresh if token is expiring)
         const token = await getAuthToken();
         if (!token) {
-            throw new Error('Authentication required');
+            throw new Error('Your session has expired. Please sign in again.');
+        }
+
+        // Only check for duplicates when PUBLISHING (not for drafts)
+        // Drafts can be saved without duplicate checks - they're work in progress
+        if (!isDraft && !isVariant) {
+            submitBtn.innerHTML = `
+                <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"></circle>
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Checking for duplicates...
+            `;
+
+            // Check for duplicates via API
+            const dupResponse = await fetch('/.netlify/functions/check-duplicate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    baseHash: form.dataset.baseHash,
+                    variantHash: form.dataset.variantHash,
+                    progressionHash: form.dataset.baseHash,
+                    submissionType: 'chord-progression',
+                    userKeySignature: form.dataset.key,
+                    hasCustomDurations: form.dataset.hasCustomDurations === 'true',
+                    hasInversions: form.dataset.hasInversions === 'true'
+                })
+            });
+
+            const dupResult = await dupResponse.json();
+
+            if (dupResult.isDuplicate) {
+                // Exact duplicate found - show the duplicate UI
+                resetButtons();
+                document.getElementById('share-form').classList.add('hidden');
+                document.getElementById('share-modal-footer').classList.add('hidden');
+                showDuplicateFound(dupResult, form.dataset.normalized);
+                return;
+            } else if (dupResult.isVariant) {
+                // Variant found - show variant warning and let user decide
+                resetButtons();
+                document.getElementById('share-form').classList.add('hidden');
+                document.getElementById('share-modal-footer').classList.add('hidden');
+
+                // Store duplicate info for variant submission
+                currentDuplicateInfo = dupResult;
+
+                // Create dupData object for variant warning
+                const dupData = {
+                    baseHash: form.dataset.baseHash,
+                    variantHash: form.dataset.variantHash,
+                    normalized: form.dataset.normalized,
+                    hasCustomDurations: form.dataset.hasCustomDurations === 'true',
+                    hasInversions: form.dataset.hasInversions === 'true'
+                };
+
+                showVariantWarning(dupResult, dupData, form.dataset.key, compState);
+                return;
+            }
+
+            // No duplicate - continue with publishing
+            submitBtn.innerHTML = `
+                <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"></circle>
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Publishing...
+            `;
         }
 
         console.log('[Share] Submitting with:', {
             submissionType,
+            status,
             keySignature: form.dataset.key,
             timeSignatureNum: timeSigNum,
             timeSignatureDenom: timeSigDenom,
@@ -920,41 +1030,69 @@ async function handleSubmit() {
                 isVariant,
                 parentSubmissionId,
                 // Anonymous submission
-                isAnonymous
+                isAnonymous,
+                // Draft or published status
+                status
             })
         });
 
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to share');
+            throw new Error(result.error || (isDraft ? 'Failed to save draft' : 'Failed to publish'));
         }
 
         // Success!
         hideShareModal();
-        showSuccessMessage(result.submissionId);
+        showSuccessMessage(result.submissionId, isDraft);
 
     } catch (error) {
-        console.error('Error sharing:', error);
-        alert(`Failed to share: ${error.message}`);
+        console.error('Error saving submission:', error);
+        alert(`${isDraft ? 'Failed to save draft' : 'Failed to publish'}: ${error.message}`);
     } finally {
+        resetButtons();
+    }
+
+    function resetButtons() {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Share';
+        draftBtn.disabled = false;
+        submitBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+            </svg>
+            Publish
+        `;
+        draftBtn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+            </svg>
+            Save as Draft
+        `;
     }
 }
 
 /**
  * Show success message after sharing
+ * @param {string} submissionId - The submission ID
+ * @param {boolean} isDraft - Whether this was saved as a draft
  */
-function showSuccessMessage(submissionId) {
+function showSuccessMessage(submissionId, isDraft = false) {
     // Create a temporary toast notification
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-xl z-50 flex items-center gap-3 animate-slide-up';
-    toast.innerHTML = `
+    toast.className = `fixed bottom-4 right-4 ${isDraft ? 'bg-blue-500' : 'bg-green-500'} text-white px-6 py-4 rounded-lg shadow-xl z-50 flex items-center gap-3 animate-slide-up`;
+    toast.innerHTML = isDraft ? `
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+        </svg>
+        <div>
+            <span class="font-semibold block">Draft saved!</span>
+            <span class="text-sm opacity-90">Access it from My Submissions</span>
+        </div>
+    ` : `
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
-        <span class="font-semibold">Successfully shared with the community!</span>
+        <span class="font-semibold">Successfully published to the community!</span>
     `;
     document.body.appendChild(toast);
 

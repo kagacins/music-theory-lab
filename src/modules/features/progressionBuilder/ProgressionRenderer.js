@@ -1658,6 +1658,10 @@ function suggestInversion(chordIndex) {
     }
 
     // Get previous chord's bass note (lowest note)
+    // Guard against null/undefined notes array
+    if (!previousChord.notes || !Array.isArray(previousChord.notes)) {
+        return null;
+    }
     const prevNotes = previousChord.notes.filter(n => !(previousChord.omittedNotes || []).includes(n));
     if (prevNotes.length === 0) return null;
 

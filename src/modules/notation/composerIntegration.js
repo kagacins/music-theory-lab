@@ -36,6 +36,92 @@ import { initVoiceLeadingOverlay, getVoiceLeadingOverlay } from './voiceLeadingO
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 // ============================================================================
+// CENTRALIZED NOTE PROPERTY COPYING
+// ============================================================================
+// CRITICAL: This is the SINGLE SOURCE OF TRUTH for note properties.
+// All note-copying operations MUST use this function to avoid bugs where
+// properties like articulation, dynamics, pedal, ornaments, etc. get lost
+// during syncFromProgression, import, or other operations.
+//
+// If you add a new note property to the toolbar or notation system:
+// 1. Add it to this function
+// 2. It will automatically be preserved everywhere
+// ============================================================================
+
+/**
+ * Copy ALL properties from a source note to a new note object.
+ * This is the ONLY function that should be used when copying notes
+ * between data structures (e.g., compositionState → measureManager).
+ *
+ * @param {Object} note - Source note object
+ * @param {number} voiceIndex - Voice index for multi-voice rendering
+ * @returns {Object} New note object with all properties preserved
+ */
+export function copyNoteWithAllProperties(note, voiceIndex = 0) {
+  return {
+    // Core pitch/duration properties
+    pitch: note.pitch,
+    pitches: note.pitches,
+    duration: note.duration || '4n',
+    beat: note.beat || 0,
+    isRest: note.isRest || note.type === 'rest' || false,
+    dotted: note.dotted || false,
+
+    // Tie/slur properties
+    tie: note.tie,
+    tied: note.tied,
+    isTied: note.isTied,
+    slur: note.slur || null,
+
+    // Tuplet and voice
+    tuplet: note.tuplet || null,
+    voiceIndex: voiceIndex,
+
+    // Accidentals
+    accidental: note.accidental || null,
+
+    // ============================================
+    // NOTATION TOOLBAR PROPERTIES - ALL OF THEM!
+    // ============================================
+    // Articulations (staccato, accent, tenuto, marcato, etc.)
+    articulation: note.articulation || null,
+
+    // Dynamics (pp, p, mp, mf, f, ff, sfz, fp, etc.)
+    dynamic: note.dynamic || null,
+
+    // Ornaments (trill, mordent, turn, etc.)
+    ornament: note.ornament || null,
+
+    // Fermata markings ('normal', 'short', 'long')
+    fermata: note.fermata || null,
+
+    // Grace notes (acciaccatura, appoggiatura)
+    graceNotes: note.graceNotes || null,
+
+    // Lyrics
+    lyric: note.lyric || null,
+
+    // Piano pedal markings ('down', 'up', 'half', 'change')
+    pedal: note.pedal || null,
+
+    // Velocity for playback
+    velocity: note.velocity,
+
+    // Chord tone analysis flag
+    isChordTone: note.isChordTone,
+
+    // Multi-voice rest display (_restDisplay: 'cue', 'hidden', etc.)
+    _restDisplay: note._restDisplay,
+
+    // Stem direction override
+    stemDirection: note.stemDirection || null,
+
+    // Manual beam control
+    beam: note.beam || null,
+  };
+}
+
+// ============================================================================
 // NOTATION COMPOSER CLASS
 // ============================================================================
 
@@ -512,6 +598,7 @@ export class NotationComposer {
       const trebleVoices = measure.notation.treble.voices;
       measureData.trebleNotes = [];
 
+      // CRITICAL: Uses copyNoteWithAllProperties to ensure ALL properties are preserved
       if (trebleVoices) {
         trebleVoices.forEach((voice, voiceIndex) => {
           if (voice && voice.notes && voice.notes.length > 0) {
@@ -526,17 +613,7 @@ export class NotationComposer {
                 // Filter out notes with null/undefined pitch
                 return false;
               })
-              .map(note => ({
-                pitch: note.pitch,
-                pitches: note.pitches,
-                duration: note.duration || '4n',
-                isRest: note.isRest || false,
-                dotted: note.dotted || false,
-                accidental: note.accidental || null,
-                tuplet: note.tuplet || null,
-                voiceIndex: voiceIndex, // Track which voice this note belongs to
-                beat: note.beat || 0,   // Include beat position for proper voice alignment
-              }));
+              .map(note => copyNoteWithAllProperties(note, voiceIndex));
             measureData.trebleNotes.push(...voiceNotes);
           }
         });
@@ -550,35 +627,13 @@ export class NotationComposer {
       // legacy features, but NOT for rendering.
 
       // Convert bass clef notes from notation voices - MULTI-VOICE SUPPORT
+      // CRITICAL: Uses copyNoteWithAllProperties to ensure ALL properties are preserved
       const bassVoices = measure.notation.bass.voices;
       if (bassVoices && bassVoices.length > 0) {
         // Gather notes from ALL voices, not just voice 0
         bassVoices.forEach((voice, voiceIndex) => {
           if (voice && voice.notes && voice.notes.length > 0) {
-            const voiceNotes = voice.notes.map(note => {
-              // Handle both single notes and chords
-              if (note.pitches && Array.isArray(note.pitches)) {
-                return {
-                  pitches: note.pitches,
-                  duration: note.duration || '1n',
-                  beat: note.beat || 0,
-                  dotted: note.dotted || false,
-                  isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
-                  tuplet: note.tuplet || null,
-                  voiceIndex: voiceIndex,  // CRITICAL: Track voice for multi-voice rendering
-                };
-              }
-              return {
-                pitch: note.pitch,
-                duration: note.duration || '1n',
-                beat: note.beat || 0,
-                isRest: note.isRest || false,
-                dotted: note.dotted || false,
-                isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
-                tuplet: note.tuplet || null,
-                voiceIndex: voiceIndex,  // CRITICAL: Track voice for multi-voice rendering
-              };
-            });
+            const voiceNotes = voice.notes.map(note => copyNoteWithAllProperties(note, voiceIndex));
             measureData.bassNotes.push(...voiceNotes);
           }
         });
@@ -759,24 +814,27 @@ export class NotationComposer {
         };
 
         // Get bass notes from compositionState - ALL VOICES
+        // CRITICAL: Uses copyNoteWithAllProperties to ensure ALL properties are preserved
         const bassVoices = stateMeasure.notation?.bass?.voices;
         if (bassVoices) {
           const allBassNotes = [];
           bassVoices.forEach((voice, voiceIndex) => {
             const voiceNotes = voice?.notes || [];
-            voiceNotes.forEach(note => {
-              allBassNotes.push({
-                pitch: note.pitch,
-                pitches: note.pitches,
-                duration: note.duration || '4n',
-                beat: note.beat || 0,
-                isRest: note.isRest || note.type === 'rest',
-                dotted: note.dotted || false,
-                tie: note.tie,
-                isTied: note.isTied,
-                tuplet: note.tuplet || null,
-                voiceIndex: voiceIndex  // Preserve voice index for multi-voice rendering
-              });
+            voiceNotes.forEach((note, noteIndex) => {
+              // DEBUG: Log if source note has special properties
+              if (note.pedal || note.dynamic || note.ornament || note.articulation) {
+                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} bass voice ${voiceIndex} note ${noteIndex} SOURCE has:`, {
+                  pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
+                });
+              }
+              const copiedNote = copyNoteWithAllProperties(note, voiceIndex);
+              // DEBUG: Log if copied note has special properties
+              if (copiedNote.pedal || copiedNote.dynamic || copiedNote.ornament || copiedNote.articulation) {
+                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} bass voice ${voiceIndex} note ${noteIndex} COPIED has:`, {
+                  pedal: copiedNote.pedal, dynamic: copiedNote.dynamic, ornament: copiedNote.ornament, articulation: copiedNote.articulation
+                });
+              }
+              allBassNotes.push(copiedNote);
             });
           });
           if (allBassNotes.length > 0) {
@@ -785,25 +843,27 @@ export class NotationComposer {
         }
 
         // Get treble notes from compositionState - ALL VOICES
+        // CRITICAL: Uses copyNoteWithAllProperties to ensure ALL properties are preserved
         const trebleVoices = stateMeasure.notation?.treble?.voices;
         if (trebleVoices) {
           const allTrebleNotes = [];
           trebleVoices.forEach((voice, voiceIndex) => {
             const voiceNotes = voice?.notes || [];
-            voiceNotes.forEach(note => {
-              allTrebleNotes.push({
-                pitch: note.pitch,
-                pitches: note.pitches,
-                duration: note.duration || '4n',
-                beat: note.beat || 0,
-                isRest: note.isRest || note.type === 'rest',
-                dotted: note.dotted || false,
-                tie: note.tie,
-                tied: note.tied,
-                isTied: note.isTied,
-                tuplet: note.tuplet || null,
-                voiceIndex: voiceIndex  // Preserve voice index for multi-voice rendering
-              });
+            voiceNotes.forEach((note, noteIndex) => {
+              // DEBUG: Log if source note has special properties
+              if (note.pedal || note.dynamic || note.ornament || note.articulation) {
+                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} treble voice ${voiceIndex} note ${noteIndex} SOURCE has:`, {
+                  pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
+                });
+              }
+              const copiedNote = copyNoteWithAllProperties(note, voiceIndex);
+              // DEBUG: Log if copied note has special properties
+              if (copiedNote.pedal || copiedNote.dynamic || copiedNote.ornament || copiedNote.articulation) {
+                console.log(`[syncFromProgression DEBUG] Measure ${measureIndex} treble voice ${voiceIndex} note ${noteIndex} COPIED has:`, {
+                  pedal: copiedNote.pedal, dynamic: copiedNote.dynamic, ornament: copiedNote.ornament, articulation: copiedNote.articulation
+                });
+              }
+              allTrebleNotes.push(copiedNote);
             });
           });
           if (allTrebleNotes.length > 0) {
@@ -842,6 +902,10 @@ export class NotationComposer {
     if (!this.config.container) {
       return;
     }
+
+    // DEBUG: Track what's calling render() to find extra renders
+    console.log('[render DEBUG] render() called, bypassSyncCheck:', bypassSyncCheck);
+    console.trace('[render DEBUG] Stack trace');
 
     // CRITICAL: Block ALL renders while sync is in progress
     // This prevents event-driven renders from catching partial state (e.g., 1 measure instead of 4)
@@ -920,6 +984,20 @@ export class NotationComposer {
     // Get measures to render from compositionState (single source of truth)
     // Convert from compositionState format to renderGrandStaffSystem format
     const hasCompositionState = this.compositionState && this.compositionState.measures.length > 0;
+
+    // DEBUG: Log special properties in compositionState.measures before rendering
+    if (hasCompositionState) {
+      this.compositionState.measures.forEach((m, i) => {
+        const bassNotes = m.notation?.bass?.voices?.[0]?.notes || [];
+        bassNotes.forEach((note, ni) => {
+          if (note.pedal || note.dynamic || note.ornament || note.articulation) {
+            console.log(`[RENDER DEBUG] compositionState measure ${i} bass note ${ni}:`, {
+              pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
+            });
+          }
+        });
+      });
+    }
 
     const measures = hasCompositionState
       ? this.compositionState.measures.map(m => ({
@@ -1002,6 +1080,17 @@ export class NotationComposer {
               : m.metadata),
         }))
       : []; // compositionState is now required - no fallback
+
+    // DEBUG: Log special properties in the mapped measures array
+    measures.forEach((m, i) => {
+      (m.bassNotes || []).forEach((note, ni) => {
+        if (note.pedal || note.dynamic || note.ornament || note.articulation) {
+          console.log(`[RENDER DEBUG] Mapped measures[${i}].bassNotes[${ni}]:`, {
+            pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
+          });
+        }
+      });
+    });
 
     if (measures.length === 0) {
       // Render empty state
@@ -1713,6 +1802,19 @@ export class NotationComposer {
     const startMeasure = currentPage.startMeasure;
     const endMeasure = currentPage.endMeasure;
     const pageMeasures = measures.slice(startMeasure, endMeasure + 1);
+
+    // DEBUG: Log pageMeasures to see if special properties are present
+    console.log(`[renderWithPagination DEBUG] Page ${currentPageIndex}, measures ${startMeasure}-${endMeasure}`);
+    pageMeasures.forEach((m, i) => {
+      const globalIdx = startMeasure + i;
+      (m.bassNotes || []).forEach((note, ni) => {
+        if (note.pedal || note.dynamic || note.ornament || note.articulation) {
+          console.log(`[renderWithPagination DEBUG] Measure ${globalIdx} bassNotes[${ni}]:`, {
+            pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
+          });
+        }
+      });
+    });
 
     // Get page canvas
     const page = this.pageManager.getPage(currentPageIndex);

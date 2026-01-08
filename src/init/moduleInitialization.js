@@ -150,6 +150,10 @@ import {
 // Import mySubmissions module (registers window functions on import)
 import '../modules/community/mySubmissions.js';
 
+import {
+    initAdminFab
+} from '../modules/admin/adminFab.js';
+
 
 /**
  * Helper function to update the toolbar editing context indicator
@@ -171,7 +175,6 @@ function updateToolbarEditingContext(compositionState) {
  */
 export async function initializeModules() {
     const startTime = performance.now();
-    console.log('[Init] Starting module initialization...');
 
     // ===========================
     // AUDIO INITIALIZATION (MUST BE FIRST)
@@ -179,7 +182,6 @@ export async function initializeModules() {
     // Initialize audio - starts loading samples but doesn't block
     // (initAudio is synchronous, sample loading happens in background)
     initAudio();
-    console.log('[Init] Audio init started:', (performance.now() - startTime).toFixed(0), 'ms');
 
     // Initialize audio context keep-alive (resumes audio when user returns to page)
     initAudioContextKeepAlive();
@@ -209,7 +211,6 @@ export async function initializeModules() {
     // Initialize Theory Tools
     initTheoryTools();
 
-    console.log('[Init] Feature modules:', (performance.now() - startTime).toFixed(0), 'ms');
 
     // ===========================
     // TEACHING SYSTEM INITIALIZATION (TIER 1)
@@ -219,7 +220,6 @@ export async function initializeModules() {
     initTheoryOverlay();
     initCompositionInsights();
 
-    console.log('[Init] Teaching system:', (performance.now() - startTime).toFixed(0), 'ms');
 
     // ===========================
     // SONG ANALYZER INITIALIZATION
@@ -413,5 +413,13 @@ export async function initializeModules() {
         initCommunityBrowser();
     }, 50); // Reduced delay since these are now non-blocking
 
-    console.log('[Init] Module initialization complete:', (performance.now() - startTime).toFixed(0), 'ms');
+    // ===========================
+    // ADMIN FEATURES INITIALIZATION
+    // ===========================
+
+    // Initialize Admin FAB (only shows for admin users)
+    // Delayed to ensure auth is initialized first
+    setTimeout(() => {
+        initAdminFab();
+    }, 200);
 }

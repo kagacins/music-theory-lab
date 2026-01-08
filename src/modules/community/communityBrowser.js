@@ -2170,7 +2170,14 @@ export async function viewCommunitySubmission(submissionId) {
  */
 export async function loadCommunitySubmission(submissionId) {
     try {
-        const response = await fetchWithTimeout(`/.netlify/functions/submission/${submissionId}`);
+        // Include auth token if available (required for loading drafts)
+        const headers = {};
+        const token = await getAuthToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetchWithTimeout(`/.netlify/functions/submission/${submissionId}`, { headers });
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -2191,15 +2198,9 @@ export async function loadCommunitySubmission(submissionId) {
             isFullComposition = compositionData.submissionType === 'full-composition';
             progressionData = compositionData.progressionData;
 
-            console.log('[Community Load] New format detected:', {
-                formatVersion: compositionData.formatVersion,
-                submissionType: compositionData.submissionType,
-                isFullComposition
-            });
         } else if (Array.isArray(compositionData)) {
             // Legacy format - direct array of chords
             progressionData = compositionData;
-            console.log('[Community Load] Legacy format detected (chord array)');
         } else {
             throw new Error('No valid composition data found');
         }
@@ -2229,30 +2230,17 @@ export async function loadCommunitySubmission(submissionId) {
                 return;
             }
             targetKey = originalKey;
-            console.log('[Community Load] Full composition - using saved key:', targetKey);
         } else {
             // Chord progressions: show key picker with mode selection
             const pickerResult = await showKeyPickerModal(submission.title, originalKey);
 
             if (!pickerResult) {
-                // User cancelled
-                console.log('[Community Load] Key picker cancelled');
                 return;
             }
 
             targetKey = pickerResult.key;
             loadMode = pickerResult.mode || 'replace';
-            console.log('[Community Load] Chord progression - user selected:', { key: targetKey, mode: loadMode });
         }
-
-        console.log('[Community Load] Extracted metadata:', {
-            originalKey,
-            targetKey,
-            timeSignature,
-            tempo,
-            isFullComposition,
-            loadMode
-        });
 
         // Get composition state
         const compositionState = getCompositionState();
@@ -2266,12 +2254,8 @@ export async function loadCommunitySubmission(submissionId) {
         if (loadMode === 'replace') {
             // CRITICAL: Update the key in trainerState FIRST before any sync operations
             if (window.setCurrentKey) {
-                console.log('[Community Load] Calling setCurrentKey with:', targetKey);
                 window.setCurrentKey(targetKey);
             }
-        } else {
-            // In append mode, use the user's existing key as the target
-            console.log('[Community Load] Append mode - keeping current key:', targetKey);
         }
 
         // For full compositions, use applyProjectToState-like logic
@@ -2304,18 +2288,14 @@ export async function loadCommunitySubmission(submissionId) {
         if (loadMode === 'replace') {
             const timeSigString = `${timeSignature.num}/${timeSignature.denom}`;
             if (window.setTimeSignature) {
-                console.log('[Community Load] Calling setTimeSignature with:', timeSigString);
                 window.setTimeSignature(timeSigString);
             }
         }
 
         // Trigger UI refresh - order matters!
-        console.log('[Community Load] Before UI refresh - compositionState.metadata:', compositionState.metadata);
         if (window.refreshNotationFromProgression) {
-            console.log('[Community Load] Calling refreshNotationFromProgression');
             window.refreshNotationFromProgression();
         }
-        console.log('[Community Load] After refreshNotationFromProgression - compositionState.metadata:', compositionState.metadata);
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay();
         }
@@ -2378,7 +2358,6 @@ async function loadChordProgression(compositionState, progressionData, options) 
         compositionState.metadata.key = effectiveKey;
         compositionState.metadata.timeSignature = timeSignature;
         compositionState.metadata.tempo = tempo;
-        console.log('[Community Load] compositionState.metadata updated:', compositionState.metadata);
     }
 
     // Clear sections before loading new data
@@ -2407,7 +2386,6 @@ async function loadChordProgression(compositionState, progressionData, options) 
 
     // If user selected a different key, transpose the progression
     if (targetKey && originalKey && targetKey !== originalKey && window.transposeProgression) {
-        console.log(`[Community Load] Transposing progression from ${originalKey} to ${targetKey}`);
         window.transposeProgression(originalKey, targetKey);
     }
 }
@@ -2418,12 +2396,6 @@ async function loadChordProgression(compositionState, progressionData, options) 
  */
 async function appendChordProgression(compositionState, progressionData, options) {
     const { originalKey, targetKey } = options;
-
-    console.log('[Community Append] Appending progression:', {
-        originalKey,
-        targetKey,
-        chordCount: progressionData.length
-    });
 
     // Calculate transposition interval (semitones)
     const NOTE_TO_SEMITONE = {
@@ -2443,39 +2415,25 @@ async function appendChordProgression(compositionState, progressionData, options
     const usesFlats = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'].includes(targetKey);
     const noteArray = usesFlats ? SEMITONE_TO_NOTE_FLAT : SEMITONE_TO_NOTE_SHARP;
 
-    // Transpose the new chords
-    const transposedChords = progressionData.map(chord => {
+    // Transpose the new chords - clear notes so syncWithProgressionData regenerates them
+    const transposedChords = progressionData.map((chord) => {
         const rootSemitone = NOTE_TO_SEMITONE[chord.root];
         if (rootSemitone === undefined) return chord;
 
         const newSemitone = (rootSemitone + interval) % 12;
         const newRoot = noteArray[newSemitone];
 
-        // Transpose notes array if present
-        let transposedNotes = chord.notes;
-        if (chord.notes && Array.isArray(chord.notes)) {
-            transposedNotes = chord.notes.map(note => {
-                const match = note.match(/^([A-G][#b]?)(\d+)$/);
-                if (!match) return note;
-                const [, noteName, octave] = match;
-                const noteSemitone = NOTE_TO_SEMITONE[noteName];
-                if (noteSemitone === undefined) return note;
-                const newNoteSemitone = (noteSemitone + interval) % 12;
-                const octaveAdjust = Math.floor((noteSemitone + interval) / 12);
-                return noteArray[newNoteSemitone] + (parseInt(octave) + octaveAdjust);
-            });
-        }
-
+        // DON'T transpose the notes array - it causes octave corruption when crossing B/C boundary
+        // Clear the notes and let syncWithProgressionData regenerate them fresh using getChordNotes()
         return {
             ...chord,
             root: newRoot,
-            notes: transposedNotes
+            notes: null
         };
     });
 
     // Get existing progression data
     const existingChords = compositionState.storedProgressionData || [];
-    console.log('[Community Append] Existing chords:', existingChords.length, 'New chords:', transposedChords.length);
 
     // Combine progressions
     const combinedChords = [...existingChords, ...transposedChords];
@@ -2497,8 +2455,6 @@ async function appendChordProgression(compositionState, progressionData, options
     if (compositionState.initializeBassBlockSequence) {
         compositionState.initializeBassBlockSequence(combinedChords);
     }
-
-    console.log('[Community Append] Append complete, total chords:', combinedChords.length);
 }
 
 /**
@@ -2506,7 +2462,6 @@ async function appendChordProgression(compositionState, progressionData, options
  * Similar to applyProjectToState from projectManager.js
  */
 async function loadFullComposition(compositionState, compositionData, title) {
-    console.log('[Community Load] Loading full composition:', title);
 
     const metadata = compositionData.metadata || {};
     const settings = compositionData.settings || {};

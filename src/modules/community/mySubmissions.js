@@ -10,6 +10,7 @@ import { getCompositionState } from '../state/compositionState.js';
 let mySubmissionsModal = null;
 let currentSubmissions = [];
 let isLoading = false;
+let currentFilter = 'all'; // 'all', 'published', 'draft'
 
 /**
  * Initialize the my submissions modal
@@ -59,6 +60,19 @@ function getModalHTML() {
                         </svg>
                     </button>
                 </div>
+            </div>
+
+            <!-- Filter tabs -->
+            <div class="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 px-4">
+                <button data-filter="all" class="my-sub-filter px-4 py-3 text-sm font-medium border-b-2 transition-colors" style="color: #4f46e5; -webkit-text-fill-color: #4f46e5; border-color: #4f46e5;">
+                    All
+                </button>
+                <button data-filter="published" class="my-sub-filter px-4 py-3 text-sm font-medium border-b-2 border-transparent transition-colors" style="color: #6b7280; -webkit-text-fill-color: #6b7280;">
+                    Published
+                </button>
+                <button data-filter="draft" class="my-sub-filter px-4 py-3 text-sm font-medium border-b-2 border-transparent transition-colors" style="color: #6b7280; -webkit-text-fill-color: #6b7280;">
+                    Drafts
+                </button>
             </div>
 
             <!-- Content -->
@@ -113,8 +127,36 @@ export async function showMySubmissions() {
     // Set up close button
     document.getElementById('my-submissions-close-btn').onclick = hideMySubmissions;
 
+    // Set up filter tabs
+    mySubmissionsModal.querySelectorAll('.my-sub-filter').forEach(tab => {
+        tab.addEventListener('click', () => {
+            currentFilter = tab.dataset.filter;
+            updateFilterUI();
+            loadMySubmissions();
+        });
+    });
+
     // Load submissions
     await loadMySubmissions();
+}
+
+/**
+ * Update filter tab UI to show active state
+ */
+function updateFilterUI() {
+    mySubmissionsModal.querySelectorAll('.my-sub-filter').forEach(tab => {
+        if (tab.dataset.filter === currentFilter) {
+            tab.style.color = '#4f46e5';
+            tab.style.webkitTextFillColor = '#4f46e5';
+            tab.style.borderColor = '#4f46e5';
+            tab.classList.remove('border-transparent');
+        } else {
+            tab.style.color = '#6b7280';
+            tab.style.webkitTextFillColor = '#6b7280';
+            tab.style.borderColor = 'transparent';
+            tab.classList.add('border-transparent');
+        }
+    });
 }
 
 /**
@@ -145,7 +187,8 @@ async function loadMySubmissions() {
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch('/.netlify/functions/my-submissions', {
+        const statusParam = currentFilter !== 'all' ? `?status=${currentFilter}` : '';
+        const response = await fetch(`/.netlify/functions/my-submissions${statusParam}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -229,6 +272,15 @@ function renderSubmissions() {
                     </svg>
                     Load
                 </button>
+                ${submission.status === 'draft' ? `
+                <button onclick="window.publishMySubmission && window.publishMySubmission('${submission.id}', '${submission.title.replace(/'/g, "\\'")}')"
+                        class="px-3 py-2 text-sm bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Publish
+                </button>
+                ` : ''}
                 <button onclick="window.deleteMySubmission && window.deleteMySubmission('${submission.id}', '${submission.title.replace(/'/g, "\\'")}')"
                         class="px-3 py-2 text-sm bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg transition-colors flex items-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,6 +303,56 @@ export async function loadMySubmission(submissionId) {
     if (window.loadCommunitySubmission) {
         hideMySubmissions();
         await window.loadCommunitySubmission(submissionId);
+    }
+}
+
+/**
+ * Publish a draft submission
+ */
+export async function publishMySubmission(submissionId, title) {
+    if (!confirm(`Publish "${title}"?\n\nThis will make it visible to the community.`)) {
+        return;
+    }
+
+    try {
+        const token = await getAuthToken();
+        if (!token) {
+            throw new Error('Not authenticated');
+        }
+
+        const response = await fetch('/.netlify/functions/submission-status', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                submissionId,
+                status: 'published'
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to publish');
+        }
+
+        // Update local state
+        const submission = currentSubmissions.find(s => s.id === submissionId);
+        if (submission) {
+            submission.status = 'published';
+        }
+
+        // Re-render
+        renderSubmissions();
+
+        // Show success toast
+        showToast('Published successfully!', 'success');
+
+    } catch (error) {
+        console.error('Error publishing submission:', error);
+        showToast('Failed to publish: ' + error.message, 'error');
     }
 }
 
@@ -334,6 +436,7 @@ function showToast(message, type = 'success') {
 window.showMySubmissions = showMySubmissions;
 window.hideMySubmissions = hideMySubmissions;
 window.loadMySubmission = loadMySubmission;
+window.publishMySubmission = publishMySubmission;
 window.deleteMySubmission = deleteMySubmission;
 window.refreshMySubmissions = refreshMySubmissions;
 
@@ -341,6 +444,7 @@ export default {
     showMySubmissions,
     hideMySubmissions,
     loadMySubmission,
+    publishMySubmission,
     deleteMySubmission,
     refreshMySubmissions
 };

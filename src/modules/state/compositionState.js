@@ -865,6 +865,11 @@ export class CompositionState {
         // Guard flag to prevent recursive syncing
         this._isSyncing = false;
 
+        // Timestamp until which syncWithProgressionData should be skipped
+        // Set this after loading from .imtl file to preserve bass properties (ornaments, dynamics, etc.)
+        // Uses a timestamp to handle multiple sync calls during post-load event cascade.
+        this._skipBassRegenerationUntil = 0;
+
         // ====================================================================
         // CHORD SEGMENT MODEL (Phase 1 of Bass Clef Refactoring)
         // ====================================================================
@@ -4988,6 +4993,15 @@ export class CompositionState {
     syncWithProgressionData(progressionData, options = {}) {
         // Prevent recursive calls
         if (this._isSyncing) {
+            return;
+        }
+
+        // CRITICAL: If _skipBassRegenerationUntil is set (after loading from .imtl file),
+        // skip the entire sync because the data is already correct in compositionState.measures.
+        // This preserves special properties like ornament, articulation, pedal, dynamic.
+        // Uses a timestamp to handle multiple sync calls during post-load event cascade.
+        if (this._skipBassRegenerationUntil && Date.now() < this._skipBassRegenerationUntil) {
+            console.log('[syncWithProgressionData] Skipping sync - within _skipBassRegenerationUntil window');
             return;
         }
 

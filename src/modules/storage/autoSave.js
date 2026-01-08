@@ -203,8 +203,6 @@ function performAutoSave(trigger = 'manual') {
                 time: lastSaveTime,
                 trigger
             });
-
-            console.log(`[autoSave] Saved (${trigger}) at ${lastSaveTime.toLocaleTimeString()}`);
         }
 
         return success;
@@ -261,7 +259,6 @@ export function checkForRecovery() {
         const daysSinceSave = (Date.now() - savedAt.getTime()) / (1000 * 60 * 60 * 24);
 
         if (daysSinceSave > 7) {
-            console.log('[autoSave] Found old auto-save, ignoring (>7 days old)');
             return { hasRecovery: false };
         }
 
@@ -312,7 +309,6 @@ export function clearAutoSave() {
     removeFromStorage(AUTO_SAVE_KEY);
     removeFromStorage(AUTO_SAVE_META_KEY);
     isDirty = false;
-    console.log('[autoSave] Cleared auto-save');
 }
 
 /**
@@ -327,8 +323,6 @@ export function setAutoSaveEnabled(enabled) {
     } else {
         stopPeriodicSave();
     }
-
-    console.log('[autoSave] Auto-save', enabled ? 'enabled' : 'disabled');
 }
 
 /**
@@ -450,7 +444,6 @@ export function cleanupAutoSave() {
 
     compositionStateRef = null;
     onSaveCallbacks = [];
-    console.log('[autoSave] Cleaned up');
 }
 
 // Handle page unload - try to save

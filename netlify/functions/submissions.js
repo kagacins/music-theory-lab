@@ -311,11 +311,17 @@ async function handlePost(event, headers) {
         isVariant,
         parentSubmissionId,
         // Anonymous submission
-        isAnonymous
+        isAnonymous,
+        // Draft/published status (default to published for backward compatibility)
+        status: requestedStatus
     } = body;
 
     // Support both new (baseHash) and legacy (progressionHash) field names
     const effectiveBaseHash = baseHash || progressionHash;
+
+    // Validate status if provided
+    const validStatuses = ['published', 'draft'];
+    const finalStatus = validStatuses.includes(requestedStatus) ? requestedStatus : 'published';
 
     // Validation
     if (!title || title.trim().length < 3) {
@@ -380,7 +386,7 @@ async function handlePost(event, headers) {
         progression_hash: effectiveBaseHash,
         normalized_progression: normalizedProgression,
         composition_data: compositionData,
-        status: 'published'
+        status: finalStatus
     };
 
     // Add new hash fields (these will be ignored if columns don't exist yet)

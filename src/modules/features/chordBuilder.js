@@ -1462,7 +1462,21 @@ export function toggleChordIdentifierPanel(event = null) {
  */
 function initChordIdentifierQuickButtons() {
     const container = document.getElementById('chord-identifier-note-buttons');
-    if (!container || container.hasChildNodes()) return; // Only initialize once
+
+    // Ensure standard keyboard shortcuts work in chord identifier input (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z)
+    // This must run every time the panel is opened, so it's outside the early return
+    const input = document.getElementById('chord-identifier-input');
+    if (input && !input._keyboardShortcutsEnabled) {
+        input._keyboardShortcutsEnabled = true;
+        input.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                e.stopPropagation();
+            }
+        });
+    }
+
+    // Only initialize buttons once
+    if (!container || container.hasChildNodes()) return;
 
     const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 

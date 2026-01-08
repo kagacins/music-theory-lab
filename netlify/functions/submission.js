@@ -73,7 +73,7 @@ export const handler = async (event, context) => {
 
     try {
         if (event.httpMethod === 'GET') {
-            return await handleGet(submissionId, headers);
+            return await handleGet(submissionId, headers, event);
         } else if (event.httpMethod === 'DELETE') {
             return await handleDelete(event, submissionId, headers);
         } else {
@@ -95,17 +95,20 @@ export const handler = async (event, context) => {
 
 /**
  * GET /api/submission/:id - Get single submission
+ * Published submissions are visible to all.
+ * Drafts are only visible to their author.
  */
-async function handleGet(submissionId, headers) {
+async function handleGet(submissionId, headers, event) {
     const supabase = getSupabaseClient();
 
-    // Get submission with all details
+    // First, get the submission without status filter to check ownership
     const { data: submission, error } = await supabase
         .from('submissions')
         .select(`
             *,
             profiles!submissions_user_id_fkey (
                 id,
+                username,
                 display_name,
                 avatar_url,
                 submission_count,
@@ -113,7 +116,6 @@ async function handleGet(submissionId, headers) {
             )
         `)
         .eq('id', submissionId)
-        .eq('status', 'published')
         .single();
 
     if (error || !submission) {
@@ -122,6 +124,18 @@ async function handleGet(submissionId, headers) {
             headers,
             body: JSON.stringify({ error: 'Submission not found' })
         };
+    }
+
+    // If it's a draft, verify the requester is the author
+    if (submission.status === 'draft') {
+        const auth = await verifyAuth(event);
+        if (!auth || auth.user.id !== submission.user_id) {
+            return {
+                statusCode: 404,
+                headers,
+                body: JSON.stringify({ error: 'Submission not found' })
+            };
+        }
     }
 
     // Get tags
@@ -164,8 +178,10 @@ async function handleGet(submissionId, headers) {
             views: submission.view_count + 1, // Include this view
             comments: submission.comment_count
         },
+        status: submission.status,
         author: submission.profiles ? {
             id: submission.profiles.id,
+            username: submission.profiles.username,
             displayName: submission.profiles.display_name,
             avatarUrl: submission.profiles.avatar_url,
             submissionCount: submission.profiles.submission_count,

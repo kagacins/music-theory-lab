@@ -13,6 +13,7 @@ const authListeners = new Set();
 // Current user cache
 let currentUser = null;
 let currentSession = null;
+let cachedProfile = null;
 
 /**
  * Initialize auth service and set up listener for auth state changes
@@ -82,6 +83,7 @@ export async function signOut() {
 
     currentUser = null;
     currentSession = null;
+    cachedProfile = null;
 
     return true;
 }
@@ -137,10 +139,10 @@ async function ensureUserProfile(user) {
     if (!user) return;
 
     try {
-        // Check if profile exists
+        // Check if profile exists and cache it
         const { data: profile, error } = await supabase
             .from('profiles')
-            .select('id, display_name, avatar_url')
+            .select('*')
             .eq('id', user.id)
             .single();
 
@@ -149,10 +151,9 @@ async function ensureUserProfile(user) {
             console.error('Error checking profile:', error);
         }
 
-        // Profile should be created by the database trigger
-        // But we can update it if needed
+        // Cache the profile for later use
         if (profile) {
-            console.log('User profile found:', profile.display_name);
+            cachedProfile = profile;
         }
     } catch (err) {
         console.error('Error ensuring user profile:', err);
@@ -160,24 +161,42 @@ async function ensureUserProfile(user) {
 }
 
 /**
- * Get user's profile from the database
+ * Get user's profile from the database (uses cache if available)
+ * @param {boolean} forceRefresh - If true, bypass cache and fetch fresh
  * @returns {Object|null} Profile object
  */
-export async function getUserProfile() {
+export async function getUserProfile(forceRefresh = false) {
     if (!currentUser) return null;
 
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
-
-    if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
+    // Return cached profile if available and not forcing refresh
+    if (cachedProfile && !forceRefresh) {
+        return cachedProfile;
     }
 
-    return data;
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000);
+    });
+
+    try {
+        const fetchPromise = supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+
+        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (error) {
+            return cachedProfile; // Return cached if fetch fails
+        }
+
+        // Update cache
+        cachedProfile = data;
+        return data;
+    } catch (err) {
+        return cachedProfile; // Return cached if fetch fails
+    }
 }
 
 /**
@@ -203,6 +222,9 @@ export async function updateUserProfile(updates) {
         console.error('Error updating profile:', error);
         throw error;
     }
+
+    // Update the cache with new profile data
+    cachedProfile = data;
 
     return data;
 }
@@ -299,84 +321,107 @@ function notifyListeners(event, session) {
     });
 }
 
-// Track if we're currently fetching a session to prevent concurrent calls
-let isGettingSession = false;
-let getSessionPromise = null;
-
 /**
  * Get the auth token for API requests
- * Uses cached session if available and not expired, otherwise fetches fresh
+ *
+ * Supabase automatically handles token refresh via onAuthStateChange listener.
+ * This function simply returns the current token, refreshing if needed.
+ *
  * @returns {Promise<string|null>} JWT token or null
  */
 export async function getAuthToken() {
-    console.log('[getAuthToken] Called');
-
-    // If we have a cached session with a valid token, use it
+    // First, check our cached session
     if (currentSession?.access_token) {
-        // Check if token is expired (with 60 second buffer)
         const expiresAt = currentSession.expires_at;
         const now = Math.floor(Date.now() / 1000);
+
+        // If token is valid (with 60 second buffer), use it immediately
         if (expiresAt && expiresAt > now + 60) {
-            console.log('[getAuthToken] Using cached token (expires in', expiresAt - now, 'seconds)');
             return currentSession.access_token;
         }
-        console.log('[getAuthToken] Cached token expired or expiring soon, refreshing...');
-    }
 
-    // If another call is already fetching the session, wait for it
-    if (isGettingSession && getSessionPromise) {
-        console.log('[getAuthToken] Another call in progress, waiting...');
+        // Token is expired or expiring soon - try to refresh it
+        console.log('[AuthService] Token expiring soon, refreshing...');
         try {
-            const result = await getSessionPromise;
-            return result;
-        } catch (e) {
-            console.log('[getAuthToken] Waiting call failed:', e);
-            return currentSession?.access_token || null;
-        }
-    }
-
-    // Mark that we're fetching
-    isGettingSession = true;
-
-    // Create a promise with timeout
-    getSessionPromise = new Promise(async (resolve) => {
-        const timeoutId = setTimeout(() => {
-            console.warn('[getAuthToken] getSession timed out after 5 seconds, using cached token');
-            isGettingSession = false;
-            getSessionPromise = null;
-            resolve(currentSession?.access_token || null);
-        }, 5000);
-
-        try {
-            console.log('[getAuthToken] Calling supabase.auth.getSession()...');
-            const { data: { session }, error } = await supabase.auth.getSession();
-            clearTimeout(timeoutId);
-
-            console.log('[getAuthToken] getSession returned, error:', error, 'session exists:', !!session);
-
-            if (error) {
-                console.error('[getAuthToken] Error getting session:', error);
-                resolve(currentSession?.access_token || null);
-            } else if (session) {
+            const { data: { session }, error } = await supabase.auth.refreshSession();
+            if (!error && session) {
                 currentSession = session;
                 currentUser = session.user;
-                console.log('[getAuthToken] Returning fresh access_token');
-                resolve(session.access_token);
-            } else {
-                console.log('[getAuthToken] No valid session');
-                currentSession = null;
-                currentUser = null;
-                resolve(null);
+                return session.access_token;
             }
         } catch (err) {
-            clearTimeout(timeoutId);
-            console.error('[getAuthToken] Exception:', err);
-            resolve(currentSession?.access_token || null);
-        } finally {
-            isGettingSession = false;
-            getSessionPromise = null;
+            console.warn('[AuthService] Token refresh failed:', err.message);
         }
-    });
+    }
 
-    return getSessionPromise;
+    // No cached session or refresh failed - try getSession (reads from localStorage)
+    // This should be nearly instant since Supabase stores session in localStorage
+    try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+            console.warn('[AuthService] getSession error:', error.message);
+            return null;
+        }
+
+        if (session) {
+            currentSession = session;
+            currentUser = session.user;
+
+            // Check if this session token is expired
+            const expiresAt = session.expires_at;
+            const now = Math.floor(Date.now() / 1000);
+
+            if (expiresAt && expiresAt <= now) {
+                // Session from storage is expired, try refresh
+                console.log('[AuthService] Stored session expired, refreshing...');
+                const { data: { session: refreshed }, error: refreshError } = await supabase.auth.refreshSession();
+                if (!refreshError && refreshed) {
+                    currentSession = refreshed;
+                    currentUser = refreshed.user;
+                    return refreshed.access_token;
+                }
+                // Refresh failed, user needs to sign in again
+                console.warn('[AuthService] Session expired and refresh failed');
+                return null;
+            }
+
+            return session.access_token;
+        }
+
+        return null;
+    } catch (err) {
+        console.error('[AuthService] getAuthToken error:', err);
+        return null;
+    }
+}
+
+/**
+ * Refresh the current session
+ * Useful when a token has expired but user is still "signed in"
+ * @returns {Promise<boolean>} True if session was refreshed successfully
+ */
+export async function refreshSession() {
+    try {
+        console.log('[AuthService] Attempting session refresh...');
+        const { data: { session }, error } = await supabase.auth.refreshSession();
+
+        if (error) {
+            console.warn('[AuthService] Session refresh failed:', error.message);
+            return false;
+        }
+
+        if (session) {
+            currentSession = session;
+            currentUser = session.user;
+            console.log('[AuthService] Session refreshed successfully');
+            return true;
+        }
+
+        console.log('[AuthService] No session returned from refresh');
+        return false;
+    } catch (err) {
+        console.error('[AuthService] Session refresh error:', err);
+        return false;
+    }
 }

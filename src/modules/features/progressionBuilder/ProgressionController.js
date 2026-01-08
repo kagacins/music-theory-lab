@@ -2522,10 +2522,8 @@ export function deleteSelectedChords(indices) {
  * @param {boolean} skipConfirmation - If true, skip the confirmation dialog
  */
 export function clearProgression(skipConfirmation = false) {
-    console.log('[clearProgression] Called with skipConfirmation:', skipConfirmation);
     const trainerState = getTrainerState();
     const progressionData = getProgressionData();
-    console.log('[clearProgression] Current chord count:', progressionData?.length || 0);
 
     // If there are chords, ask for confirmation (unless skipped)
     if (!skipConfirmation && progressionData && progressionData.length > 0) {
@@ -2557,7 +2555,6 @@ export function clearProgression(skipConfirmation = false) {
     setProgressionRomans([]);
     setCurrentIndex(0);
     setIsReady(false);
-    console.log('[clearProgression] After clear, chord count:', getProgressionData()?.length || 0);
 
     // Clear highlights
     clearHighlights();

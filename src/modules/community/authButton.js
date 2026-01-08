@@ -163,15 +163,11 @@ function renderSignedInState() {
     if (signOutBtn) {
         signOutBtn.addEventListener('click', handleSignOut);
     }
-    console.log('[AuthButton] Setting up button handlers, profileSettingsBtn:', profileSettingsBtn);
     if (profileSettingsBtn) {
         profileSettingsBtn.addEventListener('click', () => {
-            console.log('[AuthButton] Profile Settings clicked');
             closeDropdown();
             showProfileSettingsModal();
         });
-    } else {
-        console.warn('[AuthButton] profileSettingsBtn not found');
     }
     if (shareProgressionBtn) {
         shareProgressionBtn.addEventListener('click', () => {
@@ -472,6 +468,15 @@ async function showProfileSettingsModal() {
             updatePreview();
         }, 500);
     }
+
+    // Ensure standard keyboard shortcuts work in input fields (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z)
+    modal.querySelectorAll('input, textarea').forEach(el => {
+        el.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                e.stopPropagation();
+            }
+        });
+    });
 
     // Event listeners
     usernameInput.addEventListener('input', checkUsername);

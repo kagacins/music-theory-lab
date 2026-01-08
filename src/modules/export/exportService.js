@@ -417,9 +417,9 @@ export async function exportNotationToPDF(options = {}) {
                 const scaledHeight = canvasHeight * scale;
                 const xOffset = (pageWidth - scaledWidth) / 2;
 
-                // Convert canvas to image and add to PDF
-                const imgData = canvas.toDataURL('image/png', 1.0);
-                doc.addImage(imgData, 'PNG', xOffset, yPos, scaledWidth, scaledHeight);
+                // Convert canvas to image and add to PDF (JPEG for smaller file size)
+                const imgData = canvas.toDataURL('image/jpeg', 0.92);
+                doc.addImage(imgData, 'JPEG', xOffset, yPos, scaledWidth, scaledHeight);
             }
         }
 
@@ -625,9 +625,9 @@ export async function exportCombinedPDF(options = {}) {
                 const scaledHeight = canvasHeight * scale;
                 const xOffset = (pageWidth - scaledWidth) / 2;
 
-                // Convert canvas to image and add to PDF
-                const imgData = canvas.toDataURL('image/png', 1.0);
-                doc.addImage(imgData, 'PNG', xOffset, yPos, scaledWidth, scaledHeight);
+                // Convert canvas to image and add to PDF (JPEG for smaller file size)
+                const imgData = canvas.toDataURL('image/jpeg', 0.92);
+                doc.addImage(imgData, 'JPEG', xOffset, yPos, scaledWidth, scaledHeight);
 
                 // Footer
                 doc.setFontSize(10);
@@ -653,7 +653,15 @@ export async function exportCombinedPDF(options = {}) {
 }
 
 /**
- * Helper to add canvas to PDF with optional modifications
+ * Helper to add canvas to PDF with compression
+ * Uses JPEG format with quality setting for much smaller file sizes
+ * @param {jsPDF} doc - The jsPDF document
+ * @param {HTMLCanvasElement} canvas - The canvas to add
+ * @param {number} x - X position in PDF
+ * @param {number} y - Y position in PDF
+ * @param {number} maxWidth - Maximum width available
+ * @param {number} maxHeight - Maximum height available
+ * @param {Object} options - Options including quality (0.0-1.0, default 0.92)
  */
 async function addCanvasToPDF(doc, canvas, x, y, maxWidth, maxHeight, options = {}) {
     const canvasWidth = canvas.width;
@@ -666,8 +674,12 @@ async function addCanvasToPDF(doc, canvas, x, y, maxWidth, maxHeight, options = 
     const scaledWidth = canvasWidth * scale;
     const scaledHeight = canvasHeight * scale;
 
-    const imgData = canvas.toDataURL('image/png', 1.0);
-    doc.addImage(imgData, 'PNG', x, y, scaledWidth, scaledHeight);
+    // Use JPEG with compression for much smaller file sizes
+    // Quality 0.92 provides good balance of quality vs size (reduces ~10-20x vs PNG)
+    // For music notation with clean lines, JPEG compression artifacts are minimal
+    const quality = options.quality ?? 0.92;
+    const imgData = canvas.toDataURL('image/jpeg', quality);
+    doc.addImage(imgData, 'JPEG', x, y, scaledWidth, scaledHeight);
 }
 
 /**

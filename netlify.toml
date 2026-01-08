@@ -19,6 +19,8 @@
   NODE_OPTIONS = "--max_old_space_size=4096"
 
 [functions]
+  # Directory containing Netlify Functions
+  directory = "netlify/functions"
   # Node.js version for serverless functions
   node_bundler = "esbuild"
 
@@ -35,6 +37,12 @@
   [headers.values]
     Content-Type = "image/svg+xml"
     X-Content-Type-Options = "nosniff"
+
+# API routes - redirect to Netlify Functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 [[redirects]]
   # SPA routing fallback - only if file doesn't exist (force = false)

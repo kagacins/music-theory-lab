@@ -19,6 +19,13 @@ export function openManualChordEntryModal() {
     if (input) {
         input.value = '';
         input.focus();
+
+        // Ensure standard keyboard shortcuts work in input fields (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z)
+        input.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                e.stopPropagation();
+            }
+        });
     }
 
     // Show modal

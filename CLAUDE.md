@@ -475,6 +475,59 @@ Use `peer-checked:bg-emerald-500` for green headers, `peer-checked:bg-cyan-500` 
 
 ---
 
+## CRITICAL: Note Property Copying - Use copyNoteWithAllProperties()
+
+**When copying notes between data structures (compositionState → measureManager, import/export, etc.), ALWAYS use the centralized `copyNoteWithAllProperties()` helper function.**
+
+### The Problem This Solves
+
+Notes have MANY properties beyond just pitch and duration:
+- `articulation` (staccato, accent, tenuto, marcato)
+- `dynamic` (pp, p, mp, mf, f, ff, sfz, fp)
+- `ornament` (trill, mordent, turn)
+- `fermata` (normal, short, long)
+- `graceNotes` (acciaccatura, appoggiatura)
+- `lyric` (syllable text)
+- `pedal` (down, up, half, change)
+- `slur`, `beam`, `stemDirection`, `velocity`, etc.
+
+Previously, code that copied notes manually would forget properties, causing them to be lost during:
+- `.imtl` file import
+- `syncFromProgression()` calls
+- `refreshNotationFromProgression()` calls
+
+### The Solution
+
+**Location:** `src/modules/notation/composerIntegration.js` (exported function at top of file)
+
+```javascript
+import { copyNoteWithAllProperties } from './composerIntegration.js';
+
+// CORRECT - Uses centralized function that includes ALL properties
+const newNote = copyNoteWithAllProperties(originalNote, voiceIndex);
+
+// WRONG - Manual copying that will miss properties!
+const newNote = {
+  pitch: note.pitch,
+  duration: note.duration,
+  // Missing articulation, dynamic, pedal, ornament, fermata, etc.!
+};
+```
+
+### When Adding New Note Properties
+
+If you add a new property to notes (e.g., from the toolbar):
+1. Add it to `copyNoteWithAllProperties()` in `composerIntegration.js`
+2. It will automatically be preserved everywhere
+
+### Key Files That Use This
+
+- `composerIntegration.js` - `syncFromProgression()`, `convertMeasuresToGrandStaff()`
+- `projectManager.js` - Import/export (uses JSON.parse/stringify for deep copy)
+- `compositionState.js` - Note creation and manipulation
+
+---
+
 ## CRITICAL: Dotted Note Canonical Format
 
 **Dotted notes MUST use the canonical format with a SEPARATE `dotted` boolean property.**
