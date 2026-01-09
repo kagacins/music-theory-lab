@@ -173,6 +173,8 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups, timeSignature = '4/4')
   }
 
   // Generate beams for each group
+  // Check if the GROUP has any notes with manual beam controls
+  // If so, preserve the exact grouping; otherwise, let generateBeams apply beat-based splitting
   for (const group of beamGroups) {
     try {
       // Get stem direction from the first note in the group
@@ -182,7 +184,19 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups, timeSignature = '4/4')
         groupStemDirection = group[0].getStemDirection();
       }
 
-      const groupBeams = generateBeams(group, { stemDirection: groupStemDirection, timeSignature });
+      // Check if this specific group has manual beam controls
+      const groupHasManualControls = group.some(n => {
+        const bc = n._beamControl;
+        return bc && (bc.start || bc.end || bc.unbeam || bc.break);
+      });
+
+      // If manual beam controls exist in this group, preserve its exact grouping
+      // Otherwise, let generateBeams apply beat-based splitting
+      const groupBeams = generateBeams(group, {
+        stemDirection: groupStemDirection,
+        timeSignature,
+        preserveGrouping: groupHasManualControls
+      });
       beams.push(...groupBeams);
     } catch (e) {
       console.warn('[generateBeamsWithTuplets] Error creating standard beams:', e);

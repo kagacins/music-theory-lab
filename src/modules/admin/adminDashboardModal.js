@@ -21,6 +21,7 @@ import {
 } from './adminService.js';
 import { showPromptModal, showConfirmModal, showAlertModal } from '../ui/modals.js';
 import { toast } from '../ui/toastNotifications.js';
+import { getAuthToken } from '../community/authService.js';
 
 let modalElement = null;
 let currentTab = 'overview';
@@ -73,6 +74,9 @@ export async function showAdminDashboard() {
                 </button>
                 <button data-tab="flags" class="admin-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:border-gray-400 transition-colors" style="color: #374151; -webkit-text-fill-color: #374151;">
                     Flags
+                </button>
+                <button data-tab="comments" class="admin-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:border-gray-400 transition-colors" style="color: #374151; -webkit-text-fill-color: #374151;">
+                    Comments
                 </button>
                 <button data-tab="users" class="admin-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:border-gray-400 transition-colors" style="color: #374151; -webkit-text-fill-color: #374151;">
                     Users
@@ -198,6 +202,9 @@ async function loadTabContent() {
                 break;
             case 'flags':
                 await renderFlags(content);
+                break;
+            case 'comments':
+                await renderComments(content);
                 break;
             case 'users':
                 await renderUsers(content);
@@ -760,6 +767,216 @@ window.viewFlagSubmission = async (submissionId) => {
     }
 };
 
+// Comments moderation state
+let commentsData = null;
+let commentsPage = 1;
+
+/**
+ * Render Comments moderation tab
+ */
+async function renderComments(container) {
+    const searchHtml = `
+        <div class="flex gap-4 mb-6">
+            <input type="text" id="admin-comment-search" placeholder="Search comments..."
+                   class="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white" style="color: #1f2937; -webkit-text-fill-color: #1f2937;">
+            <label class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg">
+                <input type="checkbox" id="admin-comment-include-deleted" class="rounded">
+                <span class="text-sm" style="color: #1f2937; -webkit-text-fill-color: #1f2937;">Show deleted</span>
+            </label>
+            <button id="admin-comment-search-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                Search
+            </button>
+        </div>
+        <div id="admin-comments-list"></div>
+    `;
+
+    container.innerHTML = searchHtml;
+
+    // Load comments
+    await loadCommentsList();
+
+    // Event listeners
+    container.querySelector('#admin-comment-search-btn').addEventListener('click', () => {
+        commentsPage = 1;
+        loadCommentsList();
+    });
+    container.querySelector('#admin-comment-search').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            commentsPage = 1;
+            loadCommentsList();
+        }
+    });
+}
+
+/**
+ * Load comments list for admin
+ */
+async function loadCommentsList() {
+    const listContainer = document.getElementById('admin-comments-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = `
+        <div class="flex items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+        </div>
+    `;
+
+    try {
+        const search = document.getElementById('admin-comment-search')?.value || '';
+        const includeDeleted = document.getElementById('admin-comment-include-deleted')?.checked || false;
+
+        const token = await getAuthToken();
+        const params = new URLSearchParams({
+            page: commentsPage.toString(),
+            limit: '20',
+            includeDeleted: includeDeleted.toString()
+        });
+        if (search) params.set('search', search);
+
+        const response = await fetch(`/.netlify/functions/admin-comments?${params}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to load comments');
+        }
+
+        commentsData = result;
+
+        if (!commentsData.comments || commentsData.comments.length === 0) {
+            listContainer.innerHTML = `
+                <div class="text-center py-12">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    <p class="text-gray-500" style="color: #6b7280; -webkit-text-fill-color: #6b7280;">No comments found</p>
+                </div>
+            `;
+            return;
+        }
+
+        listContainer.innerHTML = `
+            <div class="space-y-3">
+                ${commentsData.comments.map(c => `
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 ${c.isDeleted ? 'opacity-50 border-l-4 border-l-red-400' : ''}" data-comment-id="${c.id}">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1 min-w-0">
+                                <!-- Comment header -->
+                                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                    ${c.author?.avatarUrl
+                                        ? `<img src="${c.author.avatarUrl}" class="w-6 h-6 rounded-full" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="w-6 h-6 rounded-full bg-gray-300 items-center justify-center text-xs font-bold" style="display:none; color: #4b5563; -webkit-text-fill-color: #4b5563;">${(c.author?.displayName || '?').charAt(0).toUpperCase()}</div>`
+                                        : `<div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold" style="color: #4b5563; -webkit-text-fill-color: #4b5563;">${(c.author?.displayName || '?').charAt(0).toUpperCase()}</div>`
+                                    }
+                                    <span class="font-medium text-sm" style="color: #1f2937; -webkit-text-fill-color: #1f2937;">
+                                        ${escapeHtml(c.author?.displayName || 'Unknown')}
+                                    </span>
+                                    <span class="text-xs text-gray-500" style="color: #6b7280; -webkit-text-fill-color: #6b7280;">
+                                        ${formatDate(c.createdAt)}
+                                    </span>
+                                    ${c.isEdited ? '<span class="text-xs text-gray-400">(edited)</span>' : ''}
+                                    ${c.isDeleted ? '<span class="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded-full">Deleted</span>' : ''}
+                                    ${c.parentId ? '<span class="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">Reply</span>' : ''}
+                                </div>
+
+                                <!-- Comment content -->
+                                <p class="text-sm mb-2" style="color: #374151; -webkit-text-fill-color: #374151;">
+                                    ${escapeHtml(c.content)}
+                                </p>
+
+                                <!-- Submission link -->
+                                ${c.submission ? `
+                                    <p class="text-xs text-gray-500" style="color: #6b7280; -webkit-text-fill-color: #6b7280;">
+                                        On: <a href="#" onclick="window.viewAdminSubmission && window.viewAdminSubmission('${c.submission.id}'); return false;" class="text-indigo-500 hover:underline">${escapeHtml(c.submission.title)}</a>
+                                    </p>
+                                ` : ''}
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex items-center gap-2 shrink-0">
+                                ${!c.isDeleted ? `
+                                    <button onclick="window.deleteAdminComment('${c.id}')"
+                                            class="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700">
+                                        Delete
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Pagination -->
+            ${renderCommentsPagination(commentsData.pagination)}
+        `;
+    } catch (error) {
+        console.error('[AdminComments] Error:', error);
+        listContainer.innerHTML = `<p class="text-center text-red-500 py-8">Error: ${error.message}</p>`;
+    }
+}
+
+/**
+ * Render pagination for comments
+ */
+function renderCommentsPagination(pagination) {
+    if (!pagination || pagination.totalPages <= 1) return '';
+
+    return `
+        <div class="flex items-center justify-center gap-4 mt-6">
+            <button onclick="window.prevCommentsPage()"
+                    class="px-4 py-2 text-sm bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                    ${pagination.page <= 1 ? 'disabled' : ''}>
+                Previous
+            </button>
+            <span class="text-sm" style="color: #6b7280; -webkit-text-fill-color: #6b7280;">
+                Page ${pagination.page} of ${pagination.totalPages}
+            </span>
+            <button onclick="window.nextCommentsPage()"
+                    class="px-4 py-2 text-sm bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                    ${pagination.page >= pagination.totalPages ? 'disabled' : ''}>
+                Next
+            </button>
+        </div>
+    `;
+}
+
+// Window functions for comments moderation
+window.deleteAdminComment = async (commentId) => {
+    if (!confirm('Permanently delete this comment?')) return;
+
+    try {
+        const token = await getAuthToken();
+        const response = await fetch(`/.netlify/functions/admin-comments?commentId=${commentId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to delete comment');
+        }
+
+        toast.success('Comment deleted');
+        loadCommentsList();
+    } catch (error) {
+        toast.error(error.message || 'Failed to delete comment');
+    }
+};
+
+window.prevCommentsPage = () => {
+    if (commentsPage > 1) {
+        commentsPage--;
+        loadCommentsList();
+    }
+};
+
+window.nextCommentsPage = () => {
+    if (commentsData?.pagination?.totalPages && commentsPage < commentsData.pagination.totalPages) {
+        commentsPage++;
+        loadCommentsList();
+    }
+};
+
 /**
  * Render Users tab
  */
@@ -836,7 +1053,7 @@ async function loadUsersList() {
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 ${u.avatarUrl
-                                    ? `<img src="${u.avatarUrl}" class="w-10 h-10 rounded-full" alt="">`
+                                    ? `<img src="${u.avatarUrl}" class="w-10 h-10 rounded-full" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="w-10 h-10 rounded-full bg-gray-300 items-center justify-center font-bold" style="display:none; color: #4b5563; -webkit-text-fill-color: #4b5563;">${(u.displayName || u.username || '?').charAt(0).toUpperCase()}</div>`
                                     : `<div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center font-bold" style="color: #4b5563; -webkit-text-fill-color: #4b5563;">${(u.displayName || u.username || '?').charAt(0).toUpperCase()}</div>`
                                 }
                                 <div>

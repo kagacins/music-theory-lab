@@ -112,13 +112,13 @@ Speed up moderation workflow.
 
 ---
 
-### Phase 2: Comments System (Medium Priority)
+### Phase 2: Comments System (Medium Priority) - IMPLEMENTED
 
 #### 2.1 Core Comments
 Enable discussion on submissions.
 
 **Backend Changes:**
-- [ ] Create `comments` table:
+- [x] Create `comments` table:
   ```sql
   comments {
     id: UUID (PK)
@@ -132,24 +132,24 @@ Enable discussion on submissions.
     updated_at: timestamp
   }
   ```
-- [ ] Create `/api/comments` endpoint (GET, POST, PUT, DELETE)
-- [ ] Add database trigger to update `submissions.comment_count`
-- [ ] RLS: Users can CRUD own comments, read all non-deleted
+- [x] Create `/api/comments` endpoint (GET, POST, PUT, DELETE)
+- [x] Add database trigger to update `submissions.comment_count`
+- [x] RLS: Users can CRUD own comments, read all non-deleted
 
 **Frontend Changes:**
-- [ ] Add comments section to submission detail view
-- [ ] Comment input with character count
-- [ ] Threaded replies (1 level deep)
-- [ ] Edit/delete own comments
-- [ ] Load more pagination
+- [x] Add comments section to submission detail view
+- [x] Comment input with character count
+- [x] Threaded replies (1 level deep)
+- [x] Edit/delete own comments
+- [x] Load more pagination
 
 #### 2.2 Comment Moderation
 Admin tools for managing comments.
 
-- [ ] Add "Comments" sub-tab in admin dashboard
-- [ ] Search/filter comments
-- [ ] Delete inappropriate comments (with reason)
-- [ ] View comment in context (link to submission)
+- [x] Add "Comments" sub-tab in admin dashboard
+- [x] Search/filter comments
+- [x] Delete inappropriate comments (with reason)
+- [x] View comment in context (link to submission)
 
 #### 2.3 Comment Notifications (Optional)
 Notify users of activity.
@@ -160,25 +160,26 @@ Notify users of activity.
 
 ---
 
-### Phase 3: User Features (Medium Priority)
+### Phase 3: User Features (Medium Priority) - PARTIALLY IMPLEMENTED
 
-#### 3.1 Public User Profiles
+#### 3.1 Public User Profiles - IMPLEMENTED
 Let users showcase their work.
 
-- [ ] Create profile page route (`/profile/@username`)
-- [ ] Display:
+- [x] Create profile modal (click author name to view)
+- [x] Display:
   - Avatar, display name, username
   - Join date
   - Submission count, total upvotes received
-  - List of published submissions
-- [ ] Edit profile (display name, avatar, bio)
-- [ ] Link to profile from submission author names
+  - List of published submissions (clickable)
+- [ ] Edit profile (display name, avatar, bio) - *Not yet implemented*
+- [x] Link to profile from submission author names
+- [x] Require authentication to view profiles (privacy)
 
-#### 3.2 Bookmarks/Favorites
+#### 3.2 Bookmarks/Favorites - IMPLEMENTED
 Save submissions for later.
 
 **Backend Changes:**
-- [ ] Create `bookmarks` table:
+- [x] Create `bookmarks` table:
   ```sql
   bookmarks {
     user_id: UUID (PK)
@@ -186,12 +187,13 @@ Save submissions for later.
     created_at: timestamp
   }
   ```
-- [ ] Create `/api/bookmarks` endpoint (GET list, POST add, DELETE remove)
+- [x] Create `/api/bookmarks` endpoint (GET list, POST add, DELETE remove)
+- [x] Add `bookmark_count` column to submissions with trigger
 
 **Frontend Changes:**
-- [ ] Add bookmark button to submission cards
-- [ ] "My Bookmarks" section in user menu or modal
-- [ ] Show bookmarked submissions with load/remove actions
+- [x] Add bookmark button to submission detail view
+- [x] "My Bookmarks" modal with load/remove actions
+- [x] Show bookmarked submissions with load/remove actions
 
 #### 3.3 Follow System (Optional)
 Follow favorite creators.
@@ -348,3 +350,26 @@ These are small improvements that don't require new database tables:
 ---
 
 *Last Updated: January 2026*
+
+---
+
+## Implementation Notes (January 2026)
+
+### Phase 2 & 3 Implementation Summary
+
+**Files Created:**
+- `docs/migrations/005_add_comments_table.sql` - Comments table with RLS policies
+- `docs/migrations/006_add_bookmarks_table.sql` - Bookmarks table with RLS policies
+- `netlify/functions/comments.js` - Comments API (GET, POST, PUT, DELETE)
+- `netlify/functions/bookmarks.js` - Bookmarks API (GET, POST, DELETE)
+- `netlify/functions/admin-comments.js` - Admin comments moderation API
+- `netlify/functions/user-profile.js` - User profile API (GET, requires auth)
+- `src/modules/community/commentsSection.js` - Comments UI component
+- `src/modules/community/bookmarkButton.js` - Bookmark button component
+- `src/modules/community/userProfileModal.js` - User profile modal component
+
+**Files Modified:**
+- `src/modules/community/communityBrowser.js` - Added comments section, bookmark button, clickable author names
+- `src/modules/community/authButton.js` - Added "My Bookmarks" to profile dropdown
+- `src/modules/admin/adminDashboardModal.js` - Added Comments moderation tab
+- `src/init/moduleInitialization.js` - Exported bookmark and profile functions to window

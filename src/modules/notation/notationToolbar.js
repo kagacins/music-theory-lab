@@ -198,6 +198,7 @@ export class NotationToolbar {
     this.selectionHasSlur = false;  // true if all selected notes are part of a slur
     this.selectionHasHairpin = null;  // null = none, 'crescendo'/'decrescendo' = all same, 'mixed' = multiple
     this.selectionGraceNote = null;  // null = none, 'acciaccatura'/'appoggiatura' = all same, 'mixed' = multiple
+    this.canBreakBeamsBetween = false;  // Whether "Break Beams Between" button should be enabled
 
     // Callbacks
     this.onDurationChange = options.onDurationChange || (() => {});
@@ -359,6 +360,9 @@ export class NotationToolbar {
     this.render();
     this.attachEventListeners();
     this.handleMobileTooltips();
+
+    // Initialize beam button states (disabled by default when no selection)
+    this.updateBeamButtonsForSelection();
 
     // If floating palette is enabled and we're on Composition Studio tab, create it now
     if (this.isFloatingPaletteEnabled && this.isOnCompositionStudioTab()) {
@@ -800,7 +804,7 @@ export class NotationToolbar {
             <div class="toolbar-group-content">
               <button class="toolbar-btn beam-btn" data-beam="start" title="Force start of new beam group here">[</button>
               <button class="toolbar-btn beam-btn" data-beam="end" title="Force end of beam group here">]</button>
-              <button class="toolbar-btn beam-btn" data-beam="breakBetween" title="Break beams between selected notes (select 2+ notes)">⊥</button>
+              <button class="toolbar-btn beam-btn" data-beam="breakBetween" title="Break all beams between 2 selected notes (select exactly 2 notes in same beam group)">⊥</button>
               <button class="toolbar-btn beam-btn" data-beam="unbeam" title="Remove this note from beaming entirely">⊘</button>
               <button class="toolbar-btn beam-btn beam-clear" data-beam="clear" title="Clear manual beam settings">✕</button>
             </div>
@@ -2948,6 +2952,7 @@ export class NotationToolbar {
       this.selectionTuplet = null;
       this.selectionPedal = null;
       this.selectionBeam = { start: false, end: false, break: false };
+      this.canBreakBeamsBetween = false; // Whether "Break Beams Between" button should be enabled
       this.selectionHasLyric = false;
       this.selectionOrnament = null;
       this.selectionHasSlur = false;
@@ -3077,6 +3082,12 @@ export class NotationToolbar {
       end: beamStates.end.size === 1 && [...beamStates.end][0] === true,
       unbeam: beamStates.unbeam.size === 1 && [...beamStates.unbeam][0] === true
     };
+    // Check if "Break Beams Between" should be enabled (exactly 2 notes in same beam group)
+    const notationComposer = window.getNotationComposer?.();
+    const noteEditor = notationComposer?.noteEditor;
+    const breakResult = noteEditor?.canBreakBeamsBetween?.();
+    this.canBreakBeamsBetween = breakResult?.valid || false;
+    console.log('[updateSelectionState] canBreakBeamsBetween:', this.canBreakBeamsBetween, breakResult?.reason || '');
     this.selectionHasLyric = lyricStates.size === 1 && [...lyricStates][0] === 'has-lyric';
 
     // Set ornament/dynamic/slur/hairpin/grace selection state
@@ -3449,6 +3460,7 @@ export class NotationToolbar {
     this.container.querySelectorAll('.beam-btn').forEach(btn => {
       const beamType = btn.dataset.beam;
       let isActive = false;
+      let isDisabled = false;
 
       if (beamType === 'start' && this.selectionBeam?.start) {
         isActive = true;
@@ -3456,10 +3468,15 @@ export class NotationToolbar {
         isActive = true;
       } else if (beamType === 'unbeam' && this.selectionBeam?.unbeam) {
         isActive = true;
+      } else if (beamType === 'breakBetween') {
+        // "Break Beams Between" is only enabled when exactly 2 notes in same beam group are selected
+        isDisabled = !this.canBreakBeamsBetween;
       }
-      // 'clear' and 'breakBetween' buttons are action buttons - never shown as "active"
+      // 'clear' button is an action button - never shown as "active"
 
       btn.classList.toggle('active', isActive);
+      btn.classList.toggle('disabled', isDisabled);
+      btn.disabled = isDisabled;
     });
   }
 

@@ -636,7 +636,7 @@ function showDuplicateFound(result, normalizedProgression) {
             <div class="bg-white dark:bg-gray-700 rounded-lg shadow-md p-4 mb-6 text-left">
                 <div class="flex items-start gap-3">
                     ${match.author.avatarUrl ?
-                        `<img src="${match.author.avatarUrl}" class="w-10 h-10 rounded-full">` :
+                        `<img src="${match.author.avatarUrl}" class="w-10 h-10 rounded-full" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="w-10 h-10 rounded-full bg-indigo-500 items-center justify-center text-white font-bold" style="display:none;">${match.author.displayName.charAt(0)}</div>` :
                         `<div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">${match.author.displayName.charAt(0)}</div>`}
                     <div class="flex-1">
                         <h4 class="font-bold text-gray-800 dark:text-white">${match.title}</h4>
@@ -720,7 +720,7 @@ function showVariantWarning(result, dupData, key, compState) {
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Existing submission:</p>
                 <div class="flex items-start gap-3">
                     ${match.author?.avatarUrl ?
-                        `<img src="${match.author.avatarUrl}" class="w-10 h-10 rounded-full">` :
+                        `<img src="${match.author.avatarUrl}" class="w-10 h-10 rounded-full" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="w-10 h-10 rounded-full bg-indigo-500 items-center justify-center text-white font-bold" style="display:none;">${match.author?.displayName?.charAt(0) || '?'}</div>` :
                         `<div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">${match.author?.displayName?.charAt(0) || '?'}</div>`}
                     <div class="flex-1">
                         <h4 class="font-bold text-gray-800 dark:text-white">${match.title}</h4>

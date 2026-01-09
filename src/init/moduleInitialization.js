@@ -147,6 +147,15 @@ import {
     initCommunityBrowser
 } from '../modules/community/communityBrowser.js';
 
+import {
+    showBookmarksModal,
+    clearBookmarkCache
+} from '../modules/community/bookmarkButton.js';
+
+import {
+    showUserProfileModal
+} from '../modules/community/userProfileModal.js';
+
 // Import mySubmissions module (registers window functions on import)
 import '../modules/community/mySubmissions.js';
 
@@ -406,6 +415,13 @@ export async function initializeModules() {
     // ===========================
     // COMMUNITY FEATURES INITIALIZATION
     // ===========================
+
+    // Export bookmark functions to window for UI access
+    window.showBookmarksModal = showBookmarksModal;
+    window.clearBookmarkCache = clearBookmarkCache;
+
+    // Export user profile modal to window for UI access
+    window.showUserProfileModal = showUserProfileModal;
 
     // Initialize Auth Button (Sign In / User Avatar in header)
     // Now non-blocking - renders immediately, loads auth state in background

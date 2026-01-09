@@ -134,6 +134,10 @@ function renderSignedInState() {
                         <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                         My Submissions
                     </button>
+                    <button id="my-bookmarks-btn" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                        My Bookmarks
+                    </button>
                     <button id="community-btn" class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
                         <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         Browse Community
@@ -155,6 +159,7 @@ function renderSignedInState() {
     const profileSettingsBtn = document.getElementById('profile-settings-btn');
     const shareProgressionBtn = document.getElementById('share-progression-btn');
     const mySubmissionsBtn = document.getElementById('my-submissions-btn');
+    const myBookmarksBtn = document.getElementById('my-bookmarks-btn');
     const communityBtn = document.getElementById('community-btn');
 
     if (avatarBtn) {
@@ -184,6 +189,14 @@ function renderSignedInState() {
             closeDropdown();
             if (window.showMySubmissions) {
                 window.showMySubmissions();
+            }
+        });
+    }
+    if (myBookmarksBtn) {
+        myBookmarksBtn.addEventListener('click', () => {
+            closeDropdown();
+            if (window.showBookmarksModal) {
+                window.showBookmarksModal();
             }
         });
     }

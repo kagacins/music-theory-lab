@@ -12,6 +12,8 @@ import { getInvertedChordNotes } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS } from '../../data/music-data.js';
 import { submitFlag } from '../admin/adminService.js';
 import { toast } from '../ui/toastNotifications.js';
+import { renderCommentsSection } from './commentsSection.js';
+import { createBookmarkButton, showBookmarksModal } from './bookmarkButton.js';
 
 // Request timeout in milliseconds (prevents Chrome lockups)
 const FETCH_TIMEOUT = 10000;
@@ -126,6 +128,14 @@ function getBrowserHTML() {
                             Search
                         </button>
                     </div>
+
+                    <!-- My Bookmarks button -->
+                    <button id="browser-bookmarks-btn" class="px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center gap-1.5 shrink-0" title="My Bookmarks">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                        </svg>
+                        <span class="hidden sm:inline">Bookmarks</span>
+                    </button>
 
                     <button id="browser-close-btn" class="text-white hover:text-gray-200 transition-colors shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,6 +288,11 @@ export function hideCommunityBrowser() {
 function setupBrowserEventListeners() {
     // Close button
     document.getElementById('browser-close-btn').onclick = hideCommunityBrowser;
+
+    // Bookmarks button
+    document.getElementById('browser-bookmarks-btn').onclick = () => {
+        showBookmarksModal();
+    };
 
     // View mode toggles
     const groupedBtn = document.getElementById('browser-view-grouped');
@@ -628,9 +643,9 @@ function renderFamilies() {
                     <div class="flex items-center justify-between mb-1">
                         <div class="flex items-center gap-1.5 min-w-0 flex-1">
                             ${c.author?.avatarUrl ?
-                                `<img src="${c.author.avatarUrl}" class="w-4 h-4 rounded-full shrink-0">` :
+                                `<img src="${c.author.avatarUrl}" class="w-4 h-4 rounded-full shrink-0" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="w-4 h-4 rounded-full bg-indigo-500 items-center justify-center text-white text-[8px] shrink-0" style="display:none;">${avatarLetter}</span>` :
                                 `<span class="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[8px] shrink-0">${avatarLetter}</span>`}
-                            <span class="text-xs text-gray-600 dark:text-gray-400 truncate">${formattedAuthor}</span>
+                            <button class="author-link text-xs text-gray-600 dark:text-gray-400 truncate hover:text-indigo-500 dark:hover:text-indigo-400 hover:underline transition-colors" data-user-id="${c.author?.id || ''}" onclick="event.stopPropagation(); window.showUserProfileModal && window.showUserProfileModal('${c.author?.id || ''}', '${c.author?.displayName?.startsWith('@') ? escapeHtml(c.author.displayName.substring(1)) : ''}')">${formattedAuthor}</button>
                         </div>
                         <div class="flex items-center gap-2 text-[10px] shrink-0">
                             <!-- Type indicator -->
@@ -1012,9 +1027,9 @@ function renderSubmissions() {
                 <div class="flex items-center justify-between mb-1">
                     <div class="flex items-center gap-1.5 min-w-0 flex-1">
                         ${submission.author?.avatarUrl ?
-                            `<img src="${submission.author.avatarUrl}" class="w-4 h-4 rounded-full shrink-0">` :
+                            `<img src="${submission.author.avatarUrl}" class="w-4 h-4 rounded-full shrink-0" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="w-4 h-4 rounded-full bg-indigo-500 items-center justify-center text-white text-[8px] shrink-0" style="display:none;">${avatarLetter}</span>` :
                             `<span class="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[8px] shrink-0">${avatarLetter}</span>`}
-                        <span class="text-xs text-gray-600 dark:text-gray-400 truncate">${formattedAuthor}</span>
+                        <button class="author-link text-xs text-gray-600 dark:text-gray-400 truncate hover:text-indigo-500 dark:hover:text-indigo-400 hover:underline transition-colors" data-user-id="${submission.author?.id || ''}" onclick="event.stopPropagation(); window.showUserProfileModal && window.showUserProfileModal('${submission.author?.id || ''}', '${submission.author?.displayName?.startsWith('@') ? escapeHtml(submission.author.displayName.substring(1)) : ''}')">${formattedAuthor}</button>
                     </div>
                     <span class="text-[10px] px-1.5 py-0.5 rounded ${
                         submission.submission_type === 'full-composition'
@@ -1999,11 +2014,15 @@ export async function viewCommunitySubmission(submissionId) {
                 <div class="flex-1 overflow-y-auto p-6">
                     <!-- Author info -->
                     <div class="flex items-center gap-3 mb-4">
-                        ${submission.author?.avatarUrl ?
-                            `<img src="${submission.author.avatarUrl}" class="w-10 h-10 rounded-full">` :
-                            `<div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">${(submission.author?.displayName || 'A').charAt(0)}</div>`}
+                        ${(() => {
+                                const authorUsername = submission.author?.displayName?.startsWith('@') ? submission.author.displayName.substring(1) : '';
+                                const escapedUsername = authorUsername.replace(/'/g, "\\'");
+                                return submission.author?.avatarUrl ?
+                                    `<img src="${submission.author.avatarUrl}" class="w-10 h-10 rounded-full cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" onclick="window.showUserProfileModal && window.showUserProfileModal('${submission.author?.id || ''}', '${escapedUsername}')"><div class="w-10 h-10 rounded-full bg-indigo-500 items-center justify-center text-white font-bold cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all" style="display:none;" onclick="window.showUserProfileModal && window.showUserProfileModal('${submission.author?.id || ''}', '${escapedUsername}')">${(submission.author?.displayName || 'A').charAt(0)}</div>` :
+                                    `<div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all" onclick="window.showUserProfileModal && window.showUserProfileModal('${submission.author?.id || ''}', '${escapedUsername}')">${(submission.author?.displayName || 'A').charAt(0)}</div>`;
+                            })()}
                         <div>
-                            <p class="font-semibold text-gray-800 dark:text-white">${submission.author?.displayName || 'Anonymous'}</p>
+                            <button class="font-semibold text-gray-800 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-400 hover:underline transition-colors text-left" onclick="window.showUserProfileModal && window.showUserProfileModal('${submission.author?.id || ''}', '${submission.author?.displayName?.startsWith('@') ? submission.author.displayName.substring(1).replace(/'/g, "\\'") : ''}')">${submission.author?.displayName || 'Anonymous'}</button>
                             <p class="text-sm text-gray-500 dark:text-gray-400">${new Date(submission.createdAt).toLocaleDateString()}</p>
                         </div>
                     </div>
@@ -2065,18 +2084,33 @@ export async function viewCommunitySubmission(submissionId) {
                             `).join('')}
                         </div>
                     ` : ''}
+
+                    <!-- Comments section container -->
+                    <div id="comments-section-container"></div>
                 </div>
-                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
-                    <button id="view-modal-close-btn" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
-                        Close
-                    </button>
-                    <button id="view-modal-load-btn" class="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors">
-                        Load into Workspace
-                    </button>
+                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <div id="bookmark-button-container"></div>
+                    <div class="flex gap-3">
+                        <button id="view-modal-close-btn" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
+                            Close
+                        </button>
+                        <button id="view-modal-load-btn" class="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors">
+                            Load into Workspace
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
         document.body.appendChild(detailModal);
+
+        // Add bookmark button
+        const bookmarkContainer = detailModal.querySelector('#bookmark-button-container');
+        const bookmarkBtn = createBookmarkButton(submissionId, { size: 'md', showLabel: true });
+        bookmarkContainer.appendChild(bookmarkBtn);
+
+        // Render comments section
+        const commentsContainer = detailModal.querySelector('#comments-section-container');
+        renderCommentsSection(submissionId, commentsContainer);
 
         // Render notation preview
         const notationContainer = detailModal.querySelector('#notation-preview');

@@ -1459,6 +1459,7 @@ export function generateBeams(notes, options = {}) {
     groups = null,
     stemDirection = null,
     timeSignature = '4/4', // Time signature for beat grouping
+    preserveGrouping = false, // When true, skip beat-based splitting (group was manually defined)
   } = options;
 
   try {
@@ -1478,6 +1479,19 @@ export function generateBeams(notes, options = {}) {
           note.setStemDirection(stemDirection);
         }
       });
+    }
+
+    // When preserveGrouping is true, beam all notes together without beat-based splitting
+    // This is used when manual beam controls have already defined the grouping
+    if (preserveGrouping) {
+      if (beamableNotes.length < 2) return [];
+      try {
+        const beam = new VF.Beam(beamableNotes, false);
+        return [beam];
+      } catch (e) {
+        console.warn('Error creating preserved beam:', e);
+        return [];
+      }
     }
 
     // Parse time signature to determine beat grouping

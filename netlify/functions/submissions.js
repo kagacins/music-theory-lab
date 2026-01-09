@@ -125,6 +125,7 @@ async function handleGet(event, headers) {
             user_id,
             is_anonymous,
             profiles!submissions_user_id_fkey (
+                id,
                 username,
                 display_name,
                 avatar_url
@@ -224,6 +225,7 @@ async function handleGet(event, headers) {
 
             if (s.is_anonymous) {
                 author = {
+                    id: null,
                     displayName: 'Anonymous',
                     avatarUrl: null,
                     isAnonymous: true
@@ -231,6 +233,7 @@ async function handleGet(event, headers) {
             } else if (s.profiles) {
                 // Prefer username over display_name
                 author = {
+                    id: s.profiles.id,
                     displayName: s.profiles.username
                         ? `@${s.profiles.username}`
                         : (s.profiles.display_name || 'Unknown'),

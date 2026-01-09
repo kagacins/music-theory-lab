@@ -352,6 +352,29 @@ When text color isn't working:
 3. Filter for "color"
 4. Check both `color` AND `-webkit-text-fill-color` values
 
+### Modal Headers with Gradient Backgrounds
+
+**Modal titles on dark/gradient backgrounds MUST use inline styles for white text.**
+
+Tailwind's `text-white` class will NOT work due to the `-webkit-text-fill-color` override. Always use inline styles:
+
+```html
+<!-- WRONG - text-white or dark:text-white will appear gray/invisible -->
+<div class="bg-gradient-to-r from-indigo-500 to-purple-600">
+    <h3 class="text-white">Modal Title</h3>
+</div>
+
+<!-- CORRECT - inline styles with both color properties -->
+<div class="bg-gradient-to-r from-indigo-500 to-purple-600">
+    <h3 style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Modal Title</h3>
+</div>
+```
+
+**Apply this pattern to:**
+- Modal header titles (h2, h3)
+- Any text on gradient backgrounds (`bg-gradient-to-r`, etc.)
+- Text in dark-colored headers
+
 ---
 
 ## CRITICAL: User Notifications - Toasts vs Modals
