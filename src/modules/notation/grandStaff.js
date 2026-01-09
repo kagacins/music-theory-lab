@@ -92,9 +92,13 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups, timeSignature = '4/4')
         if (beamableNotes[0].getStemDirection) {
           tupletStemDirection = beamableNotes[0].getStemDirection();
         }
-        // Use generateBeams helper which handles stem direction preservation
-        // while also providing intelligent beat-based grouping
-        const tupletBeams = generateBeams(beamableNotes, { stemDirection: tupletStemDirection, timeSignature });
+        // Use generateBeams with preserveGrouping=true to beam ALL tuplet notes together
+        // Tuplets should always be beamed as a single unit, not split by beat boundaries
+        const tupletBeams = generateBeams(beamableNotes, {
+          stemDirection: tupletStemDirection,
+          timeSignature,
+          preserveGrouping: true  // Critical: beam all tuplet notes together
+        });
         beams.push(...tupletBeams);
       } catch (e) {
         console.warn('[generateBeamsWithTuplets] Error creating tuplet beam:', e);
@@ -5588,6 +5592,8 @@ export function convertToGrandStaffFormat(composerData) {
           duration: note.duration || '4n',
           isRest: note.isRest || false,
           tuplet: note.tuplet || null,
+          tupletType: note.tupletType || null,
+          tupletGroupId: note.tupletGroupId || null,
         }));
     }
 
@@ -5610,6 +5616,8 @@ export function convertToGrandStaffFormat(composerData) {
             duration: note.duration || '1n',
             isRest: note.isRest || false,
             tuplet: note.tuplet || null,
+            tupletType: note.tupletType || null,
+            tupletGroupId: note.tupletGroupId || null,
           }));
       } else {
         // Single bass note - validate before adding (allows double sharps ## and double flats bb)

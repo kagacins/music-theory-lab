@@ -1215,6 +1215,96 @@ export function initEnhancedNotation(options = {}) {
         return;
       }
 
+      // Helper to clean up tuplet group when a note is deleted from it
+      // Converts remaining tuplet notes to regular notes and recalculates beat positions
+      // Returns info about the dissolution so we can handle rests correctly
+      const cleanupTupletGroup = (notes, deletedNoteGroupId, deletedNoteIndex) => {
+        if (!deletedNoteGroupId) return null;
+
+        // Find all notes in this tuplet group (including the one being deleted)
+        // We need to know the original group to find the start beat
+        const tupletNotesWithIndices = [];
+        notes.forEach((n, idx) => {
+          const groupId = n.tupletGroupId || n.tuplet?.groupId;
+          if (groupId === deletedNoteGroupId) {
+            tupletNotesWithIndices.push({ note: n, index: idx });
+          }
+        });
+
+        if (tupletNotesWithIndices.length === 0) return null;
+
+        // Sort by beat to get them in order
+        tupletNotesWithIndices.sort((a, b) => (a.note.beat || 0) - (b.note.beat || 0));
+
+        // Get the start beat from the first note in the tuplet group
+        const groupStartBeat = tupletNotesWithIndices[0].note.beat || 0;
+
+        // Count remaining notes (excluding the one being deleted)
+        const remainingCount = tupletNotesWithIndices.filter(t => t.index !== deletedNoteIndex).length;
+
+        console.log(`[onNoteDelete] Cleaning up tuplet group ${deletedNoteGroupId}: ${tupletNotesWithIndices.length} notes (including deleted), ${remainingCount} remaining, startBeat=${groupStartBeat}`);
+
+        // Determine the base duration in beats (default to eighth note = 0.5 beats)
+        let baseDurationBeats = 0.5;
+        const firstNote = tupletNotesWithIndices[0].note;
+        if (firstNote.duration) {
+          const match = firstNote.duration.match(/^(\d+)[tqxn]?$/);
+          if (match) {
+            const durationMap = { '1': 4, '2': 2, '4': 1, '8': 0.5, '16': 0.25, '32': 0.125 };
+            baseDurationBeats = durationMap[match[1]] || 0.5;
+          }
+        }
+
+        // Convert each tuplet note to a regular note and recalculate beat positions
+        // Notes that come AFTER the deleted note need their beats adjusted
+        let positionInNewSequence = 0;
+        tupletNotesWithIndices.forEach(({ note, index }) => {
+          // Convert tuplet duration to regular duration (e.g., '8q' -> '8n', '8t' -> '8n')
+          if (note.duration) {
+            const match = note.duration.match(/^(\d+)[tqx]$/);
+            if (match) {
+              note.duration = match[1] + 'n';
+            }
+          }
+
+          // Strip all tuplet attributes
+          delete note.tuplet;
+          delete note.tupletGroupId;
+          delete note.tupletType;
+
+          // Recalculate beat position - skip the deleted note's position
+          if (index !== deletedNoteIndex) {
+            const newBeat = groupStartBeat + (positionInNewSequence * baseDurationBeats);
+            console.log(`[onNoteDelete]   Note at index ${index}: beat ${note.beat} -> ${newBeat}`);
+            note.beat = newBeat;
+            positionInNewSequence++;
+          }
+        });
+
+        // Return info about the tuplet dissolution
+        const beatsToDurationMap = {
+          4: '1n',      // whole note
+          2: '2n',      // half note
+          1: '4n',      // quarter note
+          0.5: '8n',    // eighth note
+          0.25: '16n',  // 16th note
+          0.125: '32n', // 32nd note
+        };
+
+        // Calculate where the repositioned notes end
+        const newEndBeat = groupStartBeat + (remainingCount * baseDurationBeats);
+
+        return {
+          duration: beatsToDurationMap[baseDurationBeats] || '8n',
+          baseDurationBeats,
+          groupStartBeat,
+          remainingCount,
+          newEndBeat,
+          // Flag indicating tuplet was dissolved - no replacement rest at old position needed
+          tupletDissolved: true
+        };
+      };
+
       // 1. Handle in compositionState (normal delete - replace with rest)
       if (notationComposer.compositionState) {
         const measure = notationComposer.compositionState.getMeasure(deletion.measureIndex);
@@ -1224,21 +1314,44 @@ export function initEnhancedNotation(options = {}) {
           if (notes && deletion.noteIndex < notes.length) {
             // Deleting a note - replace with rest(s) to preserve rhythmic structure
             const originalNote = notes[deletion.noteIndex];
-            const duration = originalNote.duration || '4n';
+            let duration = originalNote.duration || '4n';
             const startBeat = originalNote.beat || 0;
 
-            // Get the replacement rests - pass voiceIndex and dotted flag for canonical format support
-            const replacementRests = splitDottedDuration(duration, startBeat, voiceIndex, originalNote.dotted);
-            console.log(`[onNoteDelete] Replacing note with ${replacementRests.length} rest(s):`, replacementRests.map(r => ({beat: r.beat, duration: r.duration, voiceIndex: r.voiceIndex})));
+            // Check if deleted note is part of a tuplet - if so, clean up the group
+            // This converts remaining tuplet notes to regular notes with recalculated beats
+            const deletedGroupId = originalNote.tupletGroupId || originalNote.tuplet?.groupId;
+            let tupletInfo = null;
+            if (deletedGroupId) {
+              tupletInfo = cleanupTupletGroup(notes, deletedGroupId, deletion.noteIndex);
+            }
 
-            // Replace the single note with possibly multiple rests
-            notes.splice(deletion.noteIndex, 1, ...replacementRests);
+            if (tupletInfo && tupletInfo.tupletDissolved) {
+              // TUPLET DISSOLUTION: The remaining notes have been repositioned to regular beat positions
+              // (e.g., quintuplet eighths at 0, 0.4, 0.8, 1.2, 1.6 become regular eighths at 0, 0.5, 1, 1.5)
+              //
+              // We just need to REMOVE the deleted note - no replacement rest at the old position
+              // The fillGapsWithRests function will add appropriate rests during rendering
+              // Any consecutive rests will be handled by the rendering layer
+              console.log(`[onNoteDelete] Tuplet dissolved: removing note at index ${deletion.noteIndex}, notes repositioned to regular beats. NewEndBeat: ${tupletInfo.newEndBeat}`);
+              notes.splice(deletion.noteIndex, 1);
+
+              // Sort notes by beat to ensure correct order after repositioning
+              notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+            } else {
+              // NON-TUPLET: Replace with rest(s) at the same position to preserve rhythmic structure
+              // Get the replacement rests - pass voiceIndex and dotted flag for canonical format support
+              const replacementRests = splitDottedDuration(duration, startBeat, voiceIndex, originalNote.dotted);
+              console.log(`[onNoteDelete] Replacing note with ${replacementRests.length} rest(s):`, replacementRests.map(r => ({beat: r.beat, duration: r.duration, voiceIndex: r.voiceIndex})));
+
+              // Replace the single note with possibly multiple rests
+              notes.splice(deletion.noteIndex, 1, ...replacementRests);
+            }
             measure.notation[voiceKey].autoGenerated = false;
           }
         }
       }
 
-      // 2. Handle in measureManager
+      // 2. Handle in measureManager (legacy - mirrors compositionState logic)
       if (notationComposer.measureManager && notationComposer.measureManager.measures) {
         const measure = notationComposer.measureManager.measures[deletion.measureIndex];
         if (measure) {
@@ -1251,11 +1364,24 @@ export function initEnhancedNotation(options = {}) {
             const duration = originalNote.duration || '4n';
             const startBeat = originalNote.beat || 0;
 
-            // Get the replacement rests - pass dotted flag for canonical format support
-            const replacementRests = splitDottedDuration(duration, startBeat, undefined, originalNote.dotted);
+            // Check if deleted note is part of a tuplet
+            const deletedGroupId = originalNote.tupletGroupId || originalNote.tuplet?.groupId;
+            let tupletInfo = null;
+            if (deletedGroupId) {
+              tupletInfo = cleanupTupletGroup(measure[notesArray], deletedGroupId, deletion.noteIndex);
+            }
 
-            // Replace the single note with possibly multiple rests
-            measure[notesArray].splice(deletion.noteIndex, 1, ...replacementRests);
+            if (tupletInfo && tupletInfo.tupletDissolved) {
+              // TUPLET DISSOLUTION: Just remove the note, rests will be filled by rendering
+              measure[notesArray].splice(deletion.noteIndex, 1);
+              measure[notesArray].sort((a, b) => (a.beat || 0) - (b.beat || 0));
+            } else {
+              // NON-TUPLET: Get the replacement rests - pass dotted flag for canonical format support
+              const replacementRests = splitDottedDuration(duration, startBeat, undefined, originalNote.dotted);
+
+              // Replace the single note with possibly multiple rests
+              measure[notesArray].splice(deletion.noteIndex, 1, ...replacementRests);
+            }
           }
         }
       }
@@ -1696,6 +1822,17 @@ export function initEnhancedNotation(options = {}) {
     // Handle beam control application to selected notes
     notationComposer.toolbar.onBeamApply = (beamAction) => {
       noteEditor.applyBeamToSelected(beamAction);
+    };
+
+    // Handle clear all beams in selected measure
+    notationComposer.toolbar.onClearMeasureBeams = () => {
+      // Use selectedMeasureIndex from composerIntegration (set when user clicks a measure)
+      const measureIndex = notationComposer.selectedMeasureIndex;
+      if (measureIndex >= 0) {
+        noteEditor.clearMeasureBeams(measureIndex);
+      } else {
+        console.log('[onClearMeasureBeams] No measure selected - click a measure to select it');
+      }
     };
 
     // Handle copy/paste/octave operations

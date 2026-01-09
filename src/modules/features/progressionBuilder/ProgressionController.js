@@ -516,8 +516,29 @@ function getMaxInversionForLhType(lhType) {
  */
 function calculateScaleNotes(key, octave = 4, octaveShift = 0) {
     const baseOctave = octave + octaveShift;
-    let scaleRootIndex = ALL_NOTES.indexOf(key);
-    if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+
+    // Validate key parameter
+    if (!key || typeof key !== 'string') {
+        console.warn(`[calculateScaleNotes] Invalid key: ${key}, defaulting to C`);
+        key = 'C';
+    }
+
+    // Extract root note from key (handles "Em", "C#m", "Bb", etc.)
+    // Key format: [A-G][#b]?[m]? where 'm' indicates minor
+    let rootNote = key;
+    const keyMatch = key.match(/^([A-Ga-g][#b]?)/);
+    if (keyMatch) {
+        rootNote = keyMatch[1].charAt(0).toUpperCase() + keyMatch[1].slice(1); // Normalize: "c#" -> "C#"
+    }
+
+    let scaleRootIndex = ALL_NOTES.indexOf(rootNote);
+    if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[rootNote]);
+
+    // If still not found, default to C
+    if (scaleRootIndex === -1) {
+        console.warn(`[calculateScaleNotes] Key "${key}" (root: "${rootNote}") not found in ALL_NOTES or ENHARMONIC_MAP, defaulting to C`);
+        scaleRootIndex = 0; // C
+    }
 
     const scaleRootMidi = noteToMidi(ALL_NOTES[scaleRootIndex] + baseOctave);
     const scaleMidiNotes = MAJOR_SCALE_STEPS.map(step => scaleRootMidi + step);

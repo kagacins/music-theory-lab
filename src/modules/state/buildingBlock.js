@@ -992,6 +992,8 @@ export class BuildingBlockSequence {
 
                         // Tuplets - all parts need tuplet info for rendering
                         tuplet: note.tuplet,
+                        tupletType: note.tupletType,
+                        tupletGroupId: note.tupletGroupId,
 
                         // Technique - only on first part
                         fingering: isFirstPart ? note.fingering : null,

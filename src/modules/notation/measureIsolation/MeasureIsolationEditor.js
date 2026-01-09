@@ -197,7 +197,9 @@ export class MeasureIsolationEditor {
         this.TREBLE_CANVAS_HEIGHT = 135; // Treble: room above for 8va brackets, room below for 8vb brackets
         this.BASS_CANVAS_HEIGHT = 140;   // Bass: less above, more room below for low notes
         this.CANVAS_HEIGHT = 140;      // Legacy fallback
-        this.SLOT_WIDTH = null;        // Calculated based on time signature
+        this.SLOT_WIDTH = null;        // Calculated based on time signature (data precision)
+        this.VISUAL_SLOTS_PER_BEAT = 8; // Visual grid divisions per beat (coarser than data slots)
+        this.VISUAL_SLOT_WIDTH = null;  // Width of visual grid cells (for display only)
         this.CLEF_WIDTH = 70;
         this.START_X = 100;            // Where notes begin (after clef)
 
@@ -608,7 +610,7 @@ export class MeasureIsolationEditor {
                     <div class="flex gap-2">
                         <button id="mie-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-200 transition-colors" title="Discard all changes and close">Cancel</button>
                         <button id="mie-apply-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors" title="Apply changes (stays open)">Apply</button>
-                        <button id="mie-close-apply-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors" title="Apply and close">Close</button>
+                        <button id="mie-close-apply-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors" title="Apply changes and close">Apply & Close</button>
                     </div>
                 </div>
             </div>
@@ -773,8 +775,8 @@ export class MeasureIsolationEditor {
         // Apply button - applies changes but keeps modal open
         this.modal.querySelector('#mie-apply-btn')?.addEventListener('click', () => this.applyWithoutClose());
 
-        // Close button (header X) - applies changes and closes modal
-        this.modal.querySelector('#mie-close-btn')?.addEventListener('click', () => this.apply());
+        // Close button (header X) - discards changes and closes modal (same as Cancel)
+        this.modal.querySelector('#mie-close-btn')?.addEventListener('click', () => this.cancel());
 
         // Close button (footer) - applies changes and closes modal
         this.modal.querySelector('#mie-close-apply-btn')?.addEventListener('click', () => this.apply());
@@ -2865,6 +2867,12 @@ export class MeasureIsolationEditor {
         const { clef, voice, slotIndex, pitch } = this.selectedNote;
         const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
 
+        // Check if this is a tuplet note - prevent deletion
+        if (slot.tupletGroupId || slot.tupletType) {
+            this._updateStatus('⚠️ Cannot delete tuplet notes individually. Use Composition Studio to delete entire tuplet groups.');
+            return;
+        }
+
         // Check if this is a chord with multiple pitches and a specific pitch is selected
         if (slot.type === SLOT_TYPES.NOTE_START && slot.pitches?.length > 1 && pitch) {
             // Remove only the selected pitch from the chord
@@ -3070,6 +3078,12 @@ export class MeasureIsolationEditor {
             return;
         }
 
+        // Check if this is a tuplet note - prevent duration changes
+        if (slot.tupletGroupId || slot.tupletType) {
+            this._updateStatus('⚠️ Cannot change tuplet note duration. Use arrow keys to change pitch or Composition Studio for other edits.');
+            return;
+        }
+
         // Calculate new duration in slots
         const newDurationBeats = durationToBeats(newDuration, dotted);
         const newDurationSlots = Math.round(newDurationBeats * SLOTS_PER_BEAT);
@@ -3124,12 +3138,17 @@ export class MeasureIsolationEditor {
         const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
 
         if (slot.type === SLOT_TYPES.NOTE_START) {
-            // Convert note to rest (preserve duration)
+            // Convert note to rest (preserve duration and tuplet properties)
             this.slotGrid.setRest(clef, voice, slotIndex, {
                 duration: slot.duration,
-                dotted: slot.dotted
+                dotted: slot.dotted,
+                // Preserve tuplet properties so the rest maintains its place in the tuplet group
+                tuplet: slot.tuplet,
+                tupletGroupId: slot.tupletGroupId,
+                tupletType: slot.tupletType
             });
-            this._updateStatus(`Converted to rest`);
+            const isTuplet = slot.tupletGroupId || slot.tupletType;
+            this._updateStatus(isTuplet ? 'Converted tuplet note to rest' : 'Converted to rest');
             // Update selection - it's now a rest
             this._selectNoteAtSlot(clef, voice, slotIndex, null);
         } else if (slot.type === SLOT_TYPES.REST) {
@@ -3138,9 +3157,14 @@ export class MeasureIsolationEditor {
             this.slotGrid.setNote(clef, voice, slotIndex, {
                 pitches: [defaultPitch],
                 duration: slot.duration,
-                dotted: slot.dotted
+                dotted: slot.dotted,
+                // Preserve tuplet properties so the note maintains its place in the tuplet group
+                tuplet: slot.tuplet,
+                tupletGroupId: slot.tupletGroupId,
+                tupletType: slot.tupletType
             });
-            this._updateStatus(`Converted to note (${defaultPitch})`);
+            const isTuplet = slot.tupletGroupId || slot.tupletType;
+            this._updateStatus(isTuplet ? `Converted tuplet rest to note (${defaultPitch})` : `Converted to note (${defaultPitch})`);
             // Update selection - it's now a note
             this._selectNoteAtSlot(clef, voice, slotIndex, defaultPitch);
         } else {
@@ -3672,6 +3696,9 @@ export class MeasureIsolationEditor {
         // Calculate slot width based on available space and number of slots
         const totalSlots = Math.round(beatsPerMeasure * SLOTS_PER_BEAT);
         this.SLOT_WIDTH = (this.STAFF_WIDTH - this.START_X - 30) / totalSlots;
+        // Visual slot width for grid display (coarser grid for usability)
+        const totalVisualSlots = Math.round(beatsPerMeasure * this.VISUAL_SLOTS_PER_BEAT);
+        this.VISUAL_SLOT_WIDTH = (this.STAFF_WIDTH - this.START_X - 30) / totalVisualSlots;
 
         // Create slot grid (single measure initially)
         this.slotGrid = new SlotGrid(timeSignature, 2, 1);
@@ -3771,13 +3798,27 @@ export class MeasureIsolationEditor {
         const y = (event.clientY - rect.top) * scaleY;
 
         // Determine slot index from X position
+        // Convert visual position to data slot: click position -> visual slot -> beat -> data slot
         const slotX = x - this.START_X;
         if (slotX < 0) {
             this._updateStatus('Click after the clef to add notes');
             return;
         }
 
-        const slotIndex = Math.floor(slotX / this.SLOT_WIDTH);
+        // Calculate beat position from visual slot, then convert to data slot
+        const visualSlot = slotX / this.VISUAL_SLOT_WIDTH;
+        const beatPosition = visualSlot / this.VISUAL_SLOTS_PER_BEAT;
+        const rawSlotIndex = Math.floor(beatPosition * SLOTS_PER_BEAT);
+
+        // For note placement, snap to the start of the visual slot the user clicked in
+        // This makes placement less finicky - clicking anywhere in a visual slot places at its start
+        const dataSlotsPerVisual = SLOTS_PER_BEAT / this.VISUAL_SLOTS_PER_BEAT;  // 48/8 = 6
+        const snappedSlotIndex = Math.floor(rawSlotIndex / dataSlotsPerVisual) * dataSlotsPerVisual;
+
+        // Use raw slot for selection (finding existing notes), snapped slot for note placement
+        const slotIndex = rawSlotIndex;  // For selection/detection
+        const placementSlotIndex = snappedSlotIndex;  // For placing new notes
+
         if (slotIndex < 0 || slotIndex >= this.slotGrid.totalSlots) {
             this._updateStatus(this.measureCount > 1 ? 'Click within the measure bounds' : 'Click within the measure');
             return;
@@ -3792,11 +3833,13 @@ export class MeasureIsolationEditor {
         // In Select mode, only allow note selection (no adding notes)
         if (!inEntryMode) {
             if (clickedNote) {
-                const noteId = this._makeNoteId(clef, clickedNote.voice, slotIndex, clickedNote.pitch);
+                // Use the actual slot index where the note is stored, not the clicked position
+                const actualSlotIndex = clickedNote.slotIndex;
+                const noteId = this._makeNoteId(clef, clickedNote.voice, actualSlotIndex, clickedNote.pitch);
 
                 if (event.shiftKey) {
                     // Shift+Click: Toggle note in multi-selection
-                    this._toggleNoteInSelection(clef, clickedNote.voice, slotIndex, clickedNote.pitch);
+                    this._toggleNoteInSelection(clef, clickedNote.voice, actualSlotIndex, clickedNote.pitch);
                 } else {
                     // Normal click: Replace selection
                     // If clicking same note that's already selected (and no multi-selection), deselect it
@@ -3804,7 +3847,7 @@ export class MeasureIsolationEditor {
                         this._clearSelection();
                     } else {
                         // Select just this note (clears any multi-selection)
-                        this._selectNoteAtSlot(clef, clickedNote.voice, slotIndex, clickedNote.pitch);
+                        this._selectNoteAtSlot(clef, clickedNote.voice, actualSlotIndex, clickedNote.pitch);
                     }
                 }
             } else {
@@ -3827,8 +3870,9 @@ export class MeasureIsolationEditor {
         }
 
         // Rest mode - don't need pitch
+        // Use placementSlotIndex (snapped to visual slot start) for cleaner placement
         if (this.isRestMode) {
-            this._placeRest(clef, slotIndex);
+            this._placeRest(clef, placementSlotIndex);
             return;
         }
 
@@ -3853,7 +3897,8 @@ export class MeasureIsolationEditor {
         }
 
         const fullPitch = pitch.note + accidental + pitch.octave;
-        this._placeNote(clef, slotIndex, fullPitch);
+        // Use placementSlotIndex (snapped to visual slot start) for cleaner placement
+        this._placeNote(clef, placementSlotIndex, fullPitch);
     }
 
     /**
@@ -3882,8 +3927,11 @@ export class MeasureIsolationEditor {
             return;
         }
 
-        const slotIndex = Math.floor(slotX / this.SLOT_WIDTH);
-        if (slotIndex < 0 || slotIndex >= this.slotGrid.totalSlots) {
+        // Calculate beat position from visual slot, then convert to data slot
+        const visualSlot = slotX / this.VISUAL_SLOT_WIDTH;
+        const beatPosition = visualSlot / this.VISUAL_SLOTS_PER_BEAT;
+        const rawSlotIndex = Math.floor(beatPosition * SLOTS_PER_BEAT);
+        if (rawSlotIndex < 0 || rawSlotIndex >= this.slotGrid.totalSlots) {
             this.lastMousePosition[clef] = null;
             if (this.ghostNote && this.ghostNote.clef === clef) {
                 this.ghostNote = null;
@@ -3891,6 +3939,10 @@ export class MeasureIsolationEditor {
             }
             return;
         }
+
+        // Snap to visual slot start for ghost note positioning (matches note placement)
+        const dataSlotsPerVisual = SLOTS_PER_BEAT / this.VISUAL_SLOTS_PER_BEAT;  // 48/8 = 6
+        const snappedSlotIndex = Math.floor(rawSlotIndex / dataSlotsPerVisual) * dataSlotsPerVisual;
 
         // Get pitch from Y position
         const pitchInfo = this._getPitchFromY(y, clef);
@@ -3914,11 +3966,15 @@ export class MeasureIsolationEditor {
         }
 
         const fullPitch = pitchInfo.note + accidental + pitchInfo.octave;
-        const noteX = this.START_X + (slotIndex * this.SLOT_WIDTH) + (this.SLOT_WIDTH / 2);
+        // Position ghost note at snapped visual slot for consistent alignment
+        // This shows exactly where the note will be placed
+        const snappedBeat = snappedSlotIndex / SLOTS_PER_BEAT;
+        const snappedVisualSlot = snappedBeat * this.VISUAL_SLOTS_PER_BEAT;
+        const noteX = this.START_X + (snappedVisualSlot * this.VISUAL_SLOT_WIDTH) + (this.VISUAL_SLOT_WIDTH / 2);
         const noteY = this._getYFromPitch(fullPitch, clef);
 
         // Always store last mouse position for this clef (so we can restore ghost on Alt press)
-        this.lastMousePosition[clef] = { x: noteX, y: noteY, slotIndex, pitch: fullPitch };
+        this.lastMousePosition[clef] = { x: noteX, y: noteY, slotIndex: snappedSlotIndex, pitch: fullPitch };
 
         // Only show ghost note in entry mode (not in select mode)
         // Also don't show ghost in rest mode
@@ -3931,10 +3987,10 @@ export class MeasureIsolationEditor {
         }
 
         // Update ghost note if changed
-        const newGhost = { clef, slotIndex, pitch: fullPitch, x: noteX, y: noteY };
+        const newGhost = { clef, slotIndex: snappedSlotIndex, pitch: fullPitch, x: noteX, y: noteY };
         const ghostChanged = !this.ghostNote ||
             this.ghostNote.clef !== clef ||
-            this.ghostNote.slotIndex !== slotIndex ||
+            this.ghostNote.slotIndex !== snappedSlotIndex ||
             this.ghostNote.pitch !== fullPitch;
 
         if (ghostChanged) {
@@ -3955,53 +4011,97 @@ export class MeasureIsolationEditor {
     }
 
     /**
-     * Find if a note exists at click position
+     * Find the closest note/rest to the click position within a tolerance
      * Returns { voice, slotIndex, pitch } if found, null otherwise
      * The pitch property allows selecting individual notes within a chord
+     *
+     * Uses distance-based selection to find the closest note/rest, which is
+     * especially useful for polyphony and tuplets where notes may be close together.
      */
-    _findNoteAtClick(clef, slotIndex, clickY) {
-        // Check both voices for notes at this slot
-        for (let v = 0; v < this.slotGrid.voiceCount; v++) {
-            const slot = this.slotGrid.getSlot(clef, v, slotIndex);
+    _findNoteAtClick(clef, clickSlotIndex, clickY) {
+        // Convert click slot index to X position for distance calculations
+        const clickBeat = clickSlotIndex / SLOTS_PER_BEAT;
+        const clickVisualSlot = clickBeat * this.VISUAL_SLOTS_PER_BEAT;
+        const clickX = this.START_X + (clickVisualSlot * this.VISUAL_SLOT_WIDTH) + (this.VISUAL_SLOT_WIDTH / 2);
 
-            // Check for note start or continuation (continuation should select the parent note)
-            if (slot.type === SLOT_TYPES.NOTE_START) {
-                // Check if click is near any of the note's pitches
-                // Must account for ottava shift when comparing Y positions
-                for (const pitch of slot.pitches || []) {
-                    // Get ottava adjustment for this pitch (same logic as _drawNotes)
-                    const ottavaInfo = getOttavaAdjustment(pitch, clef);
-                    const ottavaShift = ottavaInfo.shift;
-                    const noteY = this._getYFromPitch(pitch, clef, ottavaShift);
-                    if (Math.abs(clickY - noteY) < 15) {  // 15px hit zone
-                        return { voice: v, slotIndex, pitch };  // Include specific pitch
-                    }
-                }
-            } else if (slot.type === SLOT_TYPES.CONTINUATION) {
-                // Find the parent note start
-                const parentIndex = this._findNoteStartForContinuation(clef, v, slotIndex);
-                if (parentIndex !== null) {
-                    const parentSlot = this.slotGrid.getSlot(clef, v, parentIndex);
-                    for (const pitch of parentSlot.pitches || []) {
-                        // Get ottava adjustment for this pitch
+        // Tolerance settings
+        const MAX_Y_DISTANCE = 20;  // Maximum vertical distance in pixels
+        const MAX_X_DISTANCE = this.VISUAL_SLOT_WIDTH * 2;  // Maximum horizontal distance (2 visual slots)
+
+        // Track the closest candidate
+        let closestCandidate = null;
+        let closestDistance = Infinity;
+
+        // Search all slots (not just a narrow range) to find the closest note
+        for (let v = 0; v < this.slotGrid.voiceCount; v++) {
+            for (let s = 0; s < this.slotGrid.totalSlots; s++) {
+                const slot = this.slotGrid.getSlot(clef, v, s);
+
+                // Calculate the X position of this slot
+                const slotBeat = s / SLOTS_PER_BEAT;
+                const slotVisualPos = slotBeat * this.VISUAL_SLOTS_PER_BEAT;
+                const slotX = this.START_X + (slotVisualPos * this.VISUAL_SLOT_WIDTH) + (this.VISUAL_SLOT_WIDTH / 2);
+
+                // Quick X distance check - skip if too far horizontally
+                const xDistance = Math.abs(clickX - slotX);
+                if (xDistance > MAX_X_DISTANCE) continue;
+
+                if (slot.type === SLOT_TYPES.NOTE_START) {
+                    // Check each pitch in the note/chord
+                    for (const pitch of slot.pitches || []) {
                         const ottavaInfo = getOttavaAdjustment(pitch, clef);
                         const ottavaShift = ottavaInfo.shift;
                         const noteY = this._getYFromPitch(pitch, clef, ottavaShift);
-                        if (Math.abs(clickY - noteY) < 15) {
-                            return { voice: v, slotIndex: parentIndex, pitch };  // Include specific pitch
+
+                        const yDistance = Math.abs(clickY - noteY);
+                        if (yDistance > MAX_Y_DISTANCE) continue;
+
+                        // Calculate combined distance (weighted: Y is more important for pitch selection)
+                        const distance = Math.sqrt(xDistance * xDistance + yDistance * yDistance * 4);
+
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestCandidate = { voice: v, slotIndex: s, pitch };
                         }
                     }
-                }
-            } else if (slot.type === SLOT_TYPES.REST) {
-                // Check if click is near the rest position (middle of staff)
-                const restY = this.STAFF_TOP_Y + 22;
-                if (Math.abs(clickY - restY) < 15) {
-                    return { voice: v, slotIndex, pitch: null };  // Rests don't have pitch
+                } else if (slot.type === SLOT_TYPES.CONTINUATION) {
+                    // Find the parent note start
+                    const parentIndex = this._findNoteStartForContinuation(clef, v, s);
+                    if (parentIndex !== null) {
+                        const parentSlot = this.slotGrid.getSlot(clef, v, parentIndex);
+                        for (const pitch of parentSlot.pitches || []) {
+                            const ottavaInfo = getOttavaAdjustment(pitch, clef);
+                            const ottavaShift = ottavaInfo.shift;
+                            const noteY = this._getYFromPitch(pitch, clef, ottavaShift);
+
+                            const yDistance = Math.abs(clickY - noteY);
+                            if (yDistance > MAX_Y_DISTANCE) continue;
+
+                            const distance = Math.sqrt(xDistance * xDistance + yDistance * yDistance * 4);
+
+                            if (distance < closestDistance) {
+                                closestDistance = distance;
+                                closestCandidate = { voice: v, slotIndex: parentIndex, pitch };
+                            }
+                        }
+                    }
+                } else if (slot.type === SLOT_TYPES.REST) {
+                    // Rest is positioned in middle of staff
+                    const restY = this.STAFF_TOP_Y + 22;
+                    const yDistance = Math.abs(clickY - restY);
+                    if (yDistance > MAX_Y_DISTANCE) continue;
+
+                    const distance = Math.sqrt(xDistance * xDistance + yDistance * yDistance * 4);
+
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestCandidate = { voice: v, slotIndex: s, pitch: null };
+                    }
                 }
             }
         }
 
-        return null;
+        return closestCandidate;
     }
 
     /**
@@ -4156,6 +4256,23 @@ export class MeasureIsolationEditor {
         // Check if there's already a note at this slot
         const existingSlot = this.slotGrid.getSlot(clef, this.currentVoice, slotIndex);
 
+        // Check if this slot is part of a tuplet - limit editing for tuplets
+        if (existingSlot.tupletGroupId || existingSlot.tupletType) {
+            this._updateStatus('⚠️ Cannot add notes to tuplet. Use arrow keys to change pitch or Composition Studio for complex edits.');
+            return;
+        }
+
+        // Also check if any slot in the duration range would overlap with a tuplet
+        const durationBeats = durationToBeats(this.currentDuration, this.isDotted);
+        const durationSlots = Math.round(durationBeats * SLOTS_PER_BEAT);
+        for (let s = slotIndex; s < slotIndex + durationSlots && s < this.slotGrid.totalSlots; s++) {
+            const checkSlot = this.slotGrid.getSlot(clef, this.currentVoice, s);
+            if (checkSlot.tupletGroupId || checkSlot.tupletType) {
+                this._updateStatus('⚠️ Note would overlap with tuplet. Use Composition Studio for complex tuplet edits.');
+                return;
+            }
+        }
+
         if (existingSlot.type === SLOT_TYPES.NOTE_START) {
             // Add pitch to existing chord (polyphony)
             if (!existingSlot.pitches?.includes(pitch)) {
@@ -4290,6 +4407,12 @@ export class MeasureIsolationEditor {
     _placeRest(clef, slotIndex) {
         const existingSlot = this.slotGrid.getSlot(clef, this.currentVoice, slotIndex);
 
+        // Check if this slot is part of a tuplet - limit editing for tuplets
+        if (existingSlot.tupletGroupId || existingSlot.tupletType) {
+            this._updateStatus('⚠️ Cannot replace tuplet with rest. Use Composition Studio for complex tuplet edits.');
+            return;
+        }
+
         if (existingSlot.type === SLOT_TYPES.CONTINUATION) {
             this._updateStatus('Slot is part of a longer note - use Erase first');
             return;
@@ -4392,13 +4515,13 @@ export class MeasureIsolationEditor {
 
         // Draw measure background shading (prev/next measures get subtle gray)
         if (this.measureCount > 1 && this.visibleMeasureIndices) {
-            const slotsPerMeasure = this.slotGrid?.slotsPerMeasure || 32;
+            const visualSlotsPerMeasure = Math.round(this.slotGrid.beatsPerMeasure * this.VISUAL_SLOTS_PER_BEAT);
             this.visibleMeasureIndices.forEach((measureIndex, viewOffset) => {
                 if (measureIndex !== this.centerMeasureIndex) {
                     // Non-center measures get gray background
-                    const startSlot = viewOffset * slotsPerMeasure;
-                    const x = this.START_X + (startSlot * this.SLOT_WIDTH);
-                    const width = slotsPerMeasure * this.SLOT_WIDTH;
+                    const startVisualSlot = viewOffset * visualSlotsPerMeasure;
+                    const x = this.START_X + (startVisualSlot * this.VISUAL_SLOT_WIDTH);
+                    const width = visualSlotsPerMeasure * this.VISUAL_SLOT_WIDTH;
 
                     ctx.fillStyle = 'rgba(156, 163, 175, 0.15)';  // Gray-400 at 15% opacity
                     ctx.fillRect(x, 0, width, canvas.height);
@@ -4430,10 +4553,13 @@ export class MeasureIsolationEditor {
 
     /**
      * Draw slot fill shading - green for filled, red for unfilled
+     * Uses visual slots for display (coarser than data slots) to avoid performance issues
      * If both voices are in use, split vertically: top half = V1, bottom half = V2
      */
     _drawSlotFillShading(ctx, clef) {
-        const totalSlots = this.slotGrid.totalSlots;
+        const beatsPerMeasure = this.slotGrid.beatsPerMeasure * this.slotGrid.measureCount;
+        const totalVisualSlots = Math.round(beatsPerMeasure * this.VISUAL_SLOTS_PER_BEAT);
+        const dataSlotsPerVisualSlot = SLOTS_PER_BEAT / this.VISUAL_SLOTS_PER_BEAT;
 
         // Check if both voices have content
         const v0HasContent = this.slotGrid.voiceHasContent(clef, 0);
@@ -4450,24 +4576,32 @@ export class MeasureIsolationEditor {
         const filledColor = 'rgba(34, 197, 94, 0.15)';   // Light green
         const unfilledColor = 'rgba(239, 68, 68, 0.15)'; // Light red
 
-        for (let s = 0; s < totalSlots; s++) {
-            const x = this.START_X + (s * this.SLOT_WIDTH);
+        for (let vs = 0; vs < totalVisualSlots; vs++) {
+            const x = this.START_X + (vs * this.VISUAL_SLOT_WIDTH);
+
+            // Check if ANY data slot in this visual slot range is filled
+            const dataSlotStart = Math.floor(vs * dataSlotsPerVisualSlot);
+            const dataSlotEnd = Math.floor((vs + 1) * dataSlotsPerVisualSlot);
 
             if (bothVoicesActive) {
-                // Split shading: top half for V1, bottom half for V2
-                const v0Slot = this.slotGrid.getSlot(clef, 0, s);
-                const v1Slot = this.slotGrid.getSlot(clef, 1, s);
+                // Check fill status for each voice across the data slot range
+                let v0Filled = false;
+                let v1Filled = false;
 
-                const v0Filled = v0Slot.type !== SLOT_TYPES.EMPTY;
-                const v1Filled = v1Slot.type !== SLOT_TYPES.EMPTY;
+                for (let s = dataSlotStart; s < dataSlotEnd && s < this.slotGrid.totalSlots; s++) {
+                    const v0Slot = this.slotGrid.getSlot(clef, 0, s);
+                    const v1Slot = this.slotGrid.getSlot(clef, 1, s);
+                    if (v0Slot.type !== SLOT_TYPES.EMPTY) v0Filled = true;
+                    if (v1Slot.type !== SLOT_TYPES.EMPTY) v1Filled = true;
+                }
 
                 // Top half (V1)
                 ctx.fillStyle = v0Filled ? filledColor : unfilledColor;
-                ctx.fillRect(x, shadingTop, this.SLOT_WIDTH, halfHeight);
+                ctx.fillRect(x, shadingTop, this.VISUAL_SLOT_WIDTH, halfHeight);
 
                 // Bottom half (V2)
                 ctx.fillStyle = v1Filled ? filledColor : unfilledColor;
-                ctx.fillRect(x, shadingTop + halfHeight, this.SLOT_WIDTH, halfHeight);
+                ctx.fillRect(x, shadingTop + halfHeight, this.VISUAL_SLOT_WIDTH, halfHeight);
 
                 // Draw a subtle divider line between V1 and V2 areas
                 ctx.strokeStyle = 'rgba(156, 163, 175, 0.3)';
@@ -4475,45 +4609,163 @@ export class MeasureIsolationEditor {
                 ctx.setLineDash([2, 2]);
                 ctx.beginPath();
                 ctx.moveTo(x, shadingTop + halfHeight);
-                ctx.lineTo(x + this.SLOT_WIDTH, shadingTop + halfHeight);
+                ctx.lineTo(x + this.VISUAL_SLOT_WIDTH, shadingTop + halfHeight);
                 ctx.stroke();
                 ctx.setLineDash([]);
             } else {
                 // Single voice mode: use whichever voice has content (or V0 by default)
                 const activeVoice = v1HasContent ? 1 : 0;
-                const slot = this.slotGrid.getSlot(clef, activeVoice, s);
-                const isFilled = slot.type !== SLOT_TYPES.EMPTY;
+                let isFilled = false;
+
+                for (let s = dataSlotStart; s < dataSlotEnd && s < this.slotGrid.totalSlots; s++) {
+                    const slot = this.slotGrid.getSlot(clef, activeVoice, s);
+                    if (slot.type !== SLOT_TYPES.EMPTY) {
+                        isFilled = true;
+                        break;
+                    }
+                }
 
                 ctx.fillStyle = isFilled ? filledColor : unfilledColor;
-                ctx.fillRect(x, shadingTop, this.SLOT_WIDTH, shadingHeight);
+                ctx.fillRect(x, shadingTop, this.VISUAL_SLOT_WIDTH, shadingHeight);
             }
+        }
+
+        // Draw tuplet group indicators on top of the slot shading
+        this._drawTupletGroupIndicators(ctx, clef);
+    }
+
+    /**
+     * Draw visual indicators for tuplet groups in the slot grid
+     * Shows purple borders/highlights around slots that contain tuplet notes
+     * This helps users identify which notes belong to a tuplet group
+     */
+    _drawTupletGroupIndicators(ctx, clef) {
+        const dataSlotsPerVisualSlot = SLOTS_PER_BEAT / this.VISUAL_SLOTS_PER_BEAT;
+
+        // Collect tuplet groups from the slot grid
+        const tupletGroups = {};  // groupId -> { slots: [], color }
+
+        // Scan all slots for tuplet notes
+        for (let v = 0; v < this.slotGrid.voiceCount; v++) {
+            for (let s = 0; s < this.slotGrid.totalSlots; s++) {
+                const slot = this.slotGrid.getSlot(clef, v, s);
+                if (slot.type === SLOT_TYPES.NOTE_START && slot.tupletGroupId) {
+                    if (!tupletGroups[slot.tupletGroupId]) {
+                        tupletGroups[slot.tupletGroupId] = {
+                            slots: [],
+                            tupletType: slot.tupletType || 'triplet',
+                            voice: v
+                        };
+                    }
+                    // Track the visual slot range this note occupies
+                    const visualSlotStart = Math.floor(s / dataSlotsPerVisualSlot);
+                    const durationSlots = slot.durationSlots || dataSlotsPerVisualSlot;
+                    const visualSlotEnd = Math.ceil((s + durationSlots) / dataSlotsPerVisualSlot);
+                    tupletGroups[slot.tupletGroupId].slots.push({
+                        dataSlot: s,
+                        visualStart: visualSlotStart,
+                        visualEnd: visualSlotEnd,
+                        pitches: slot.pitches
+                    });
+                }
+            }
+        }
+
+        // Draw indicators for each tuplet group
+        const shadingTop = this.STAFF_TOP_Y - 20;
+        const shadingHeight = this.STAFF_HEIGHT + 40;
+
+        for (const [groupId, group] of Object.entries(tupletGroups)) {
+            if (group.slots.length === 0) continue;
+
+            // Find the full span of this tuplet group
+            const minVisualSlot = Math.min(...group.slots.map(s => s.visualStart));
+            const maxVisualSlot = Math.max(...group.slots.map(s => s.visualEnd));
+
+            const startX = this.START_X + (minVisualSlot * this.VISUAL_SLOT_WIDTH);
+            const endX = this.START_X + (maxVisualSlot * this.VISUAL_SLOT_WIDTH);
+            const width = endX - startX;
+
+            // Draw a colored border around the tuplet span
+            ctx.save();
+            ctx.strokeStyle = '#7c3aed';  // Purple
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 2]);  // Dashed line
+
+            // Draw top and bottom borders
+            ctx.beginPath();
+            ctx.moveTo(startX, shadingTop);
+            ctx.lineTo(endX, shadingTop);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(startX, shadingTop + shadingHeight);
+            ctx.lineTo(endX, shadingTop + shadingHeight);
+            ctx.stroke();
+
+            // Draw left and right borders
+            ctx.beginPath();
+            ctx.moveTo(startX, shadingTop);
+            ctx.lineTo(startX, shadingTop + shadingHeight);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(endX, shadingTop);
+            ctx.lineTo(endX, shadingTop + shadingHeight);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // Draw subtle background fill
+            ctx.fillStyle = 'rgba(124, 58, 237, 0.06)';  // Very light purple
+            ctx.fillRect(startX, shadingTop, width, shadingHeight);
+
+            // Draw tuplet label at the top
+            const tupletLabel = group.tupletType === 'triplet' ? '3' :
+                               group.tupletType === 'quintuplet' ? '5' :
+                               group.tupletType === 'sextuplet' ? '6' : '?';
+            ctx.fillStyle = '#7c3aed';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(`[${tupletLabel}]`, startX + width / 2, shadingTop - 2);
+
+            ctx.restore();
         }
     }
 
     /**
      * Draw vertical slot grid lines
+     * Uses visual slots (coarser) for display while data uses full 48-slot resolution
      * Handles both simple and compound meters with appropriate beat groupings
      */
     _drawSlotGrid(ctx) {
-        const totalSlots = this.slotGrid.totalSlots;
+        const beatsPerMeasure = this.slotGrid.beatsPerMeasure * this.slotGrid.measureCount;
+        const totalVisualSlots = Math.round(beatsPerMeasure * this.VISUAL_SLOTS_PER_BEAT);
         const isCompound = this.slotGrid.isCompoundMeter();
 
-        for (let s = 0; s <= totalSlots; s++) {
-            const x = this.START_X + (s * this.SLOT_WIDTH);
-            const beatInfo = this.slotGrid.getSlotBeatInfo(s);
+        for (let s = 0; s <= totalVisualSlots; s++) {
+            const x = this.START_X + (s * this.VISUAL_SLOT_WIDTH);
+            const beat = s / this.VISUAL_SLOTS_PER_BEAT;
+            const subBeat = s % this.VISUAL_SLOTS_PER_BEAT;
+
+            // Calculate beat info for visual slot
+            const isDownbeat = subBeat === 0;
+            const isHalfBeat = subBeat === this.VISUAL_SLOTS_PER_BEAT / 2;
+            const isQuarterBeat = subBeat % (this.VISUAL_SLOTS_PER_BEAT / 4) === 0;
 
             // Different styles for beat markers - DARKER colors
-            if (beatInfo.isDownbeat) {
+            if (isDownbeat) {
                 ctx.strokeStyle = '#6b7280';  // Darker gray for downbeats (felt beats)
                 ctx.lineWidth = 1.5;
-            } else if (isCompound && beatInfo.isTripletBeat) {
+            } else if (isCompound && (subBeat % Math.round(this.VISUAL_SLOTS_PER_BEAT / 3) === 0)) {
                 // In compound meter, show triplet divisions (eighth notes) more prominently
                 ctx.strokeStyle = '#9ca3af';  // Medium gray for triplet eighth notes
                 ctx.lineWidth = 1;
-            } else if (!isCompound && beatInfo.isHalfBeat) {
+            } else if (!isCompound && isHalfBeat) {
                 ctx.strokeStyle = '#9ca3af';  // Medium gray for half beats (simple meter)
                 ctx.lineWidth = 1;
-            } else if (beatInfo.isQuarterBeat) {
+            } else if (isQuarterBeat) {
                 ctx.strokeStyle = '#c9cdd4';  // Lighter gray for subdivisions
                 ctx.lineWidth = 0.75;
             } else {
@@ -4532,16 +4784,16 @@ export class MeasureIsolationEditor {
 
             // Beat numbers on downbeats - draw above the grid lines
             // For multi-measure, restart beat numbering at 1 for each measure
-            if (beatInfo.isDownbeat && s < totalSlots) {
+            if (isDownbeat && s < totalVisualSlots) {
                 ctx.fillStyle = '#1f2937';  // Dark gray
                 ctx.font = 'bold 12px Arial';
 
-                // For compound meters, use felt beat numbers (1, 2 for 6/8; 1, 2, 3 for 9/8; etc.)
-                // For simple meters, use quarter note beat numbers
-                const beatNumber = beatInfo.beat;
+                // Calculate beat number within measure
+                const measureIndex = Math.floor(beat / this.slotGrid.beatsPerMeasure);
+                const beatInMeasure = Math.floor(beat % this.slotGrid.beatsPerMeasure) + 1;
 
                 // Offset to the right to avoid overlap with bar lines
-                ctx.fillText(beatNumber.toString(), x + 8, 18);
+                ctx.fillText(beatInMeasure.toString(), x + 8, 18);
             }
         }
     }
@@ -4582,7 +4834,7 @@ export class MeasureIsolationEditor {
     _drawMeasureBarLines() {
         if (this.measureCount <= 1) return;
 
-        const slotsPerMeasure = this.slotGrid?.slotsPerMeasure || 32;
+        const visualSlotsPerMeasure = Math.round(this.slotGrid.beatsPerMeasure * this.VISUAL_SLOTS_PER_BEAT);
 
         // Draw bar lines on both canvases
         [this.trebleCanvas, this.bassCanvas].forEach(canvas => {
@@ -4594,8 +4846,8 @@ export class MeasureIsolationEditor {
             ctx.lineWidth = 3;
 
             for (let m = 1; m < this.measureCount; m++) {
-                const slotOffset = m * slotsPerMeasure;
-                const x = this.START_X + (slotOffset * this.SLOT_WIDTH);
+                const visualSlotOffset = m * visualSlotsPerMeasure;
+                const x = this.START_X + (visualSlotOffset * this.VISUAL_SLOT_WIDTH);
 
                 // Draw thicker, more prominent bar line - full canvas height like slot grid lines
                 ctx.beginPath();
@@ -4828,13 +5080,23 @@ export class MeasureIsolationEditor {
         const ottavaBrackets = [];
         let currentBracket = null;
 
+        // Collect beam groups and tuplet groups for later rendering
+        // We need to track stem positions, so we'll do this in a separate pass
+        const beamGroups = [];
+        const tupletGroups = {};  // Keyed by tupletGroupId
+        const notePositions = [];  // Store position info for each note
+
         for (let v = 0; v < this.slotGrid.voiceCount; v++) {
             // Reset bracket tracking for each voice
             currentBracket = null;
 
             for (let s = 0; s < this.slotGrid.totalSlots; s++) {
                 const slot = this.slotGrid.getSlot(clef, v, s);
-                const x = this.START_X + (s * this.SLOT_WIDTH) + (this.SLOT_WIDTH / 2);
+                // Position notes based on their beat position, not slot index
+                // This gives better visual alignment since the visual grid uses VISUAL_SLOT_WIDTH
+                const beatPosition = s / SLOTS_PER_BEAT;
+                const visualSlotPosition = beatPosition * this.VISUAL_SLOTS_PER_BEAT;
+                const x = this.START_X + (visualSlotPosition * this.VISUAL_SLOT_WIDTH) + (this.VISUAL_SLOT_WIDTH / 2);
 
                 if (slot.type === SLOT_TYPES.NOTE_START) {
                     // For Voice 1, check if Voice 0 has identical pitches at same slot
@@ -4914,6 +5176,65 @@ export class MeasureIsolationEditor {
                     // Draw the note with ottava adjustment
                     this._drawNoteHead(ctx, x, slot, v, clef, s, noteOttavaShift);
 
+                    // Collect position info for beams and tuplets
+                    const notePitches = slot.pitches || [];
+                    const noteDuration = slot.duration || '4n';
+                    const isBeamable = ['8n', '16n', '32n', '64n'].includes(noteDuration);
+
+                    if (notePitches.length > 0 && isBeamable) {
+                        // Calculate stem info (same logic as _drawNoteHead)
+                        const v0HasContent = this.slotGrid.voiceHasContent(clef, 0);
+                        const v1HasContent = this.slotGrid.voiceHasContent(clef, 1);
+                        const bothVoicesActive = v0HasContent && v1HasContent;
+
+                        const primaryPitch = notePitches[0];
+                        const y = this._getYFromPitch(primaryPitch, clef, noteOttavaShift);
+                        const middleY = this.STAFF_TOP_Y + (this.STAFF_HEIGHT / 2);
+
+                        let stemUp;
+                        if (slot.stemDirection !== undefined) {
+                            stemUp = slot.stemDirection > 0;
+                        } else if (bothVoicesActive) {
+                            stemUp = v === 0;
+                        } else {
+                            stemUp = y > middleY;
+                        }
+
+                        const stemX = stemUp ? x + 6 : x - 6;
+                        const stemLength = 30;
+                        const stemEndY = stemUp ? y - stemLength : y + stemLength;
+
+                        const noteInfo = {
+                            slotIndex: s,
+                            voice: v,
+                            x,
+                            y,
+                            stemX,
+                            stemEndY,
+                            stemUp,
+                            duration: noteDuration,
+                            beamLevels: this._getBeamLevelCount(noteDuration),
+                            color: '#1e40af',  // Default blue
+                            tupletGroupId: slot.tupletGroupId,
+                            tupletType: slot.tupletType
+                        };
+
+                        notePositions.push(noteInfo);
+
+                        // Track tuplet groups
+                        if (slot.tupletGroupId) {
+                            if (!tupletGroups[slot.tupletGroupId]) {
+                                tupletGroups[slot.tupletGroupId] = {
+                                    notes: [],
+                                    tupletNumber: slot.tupletType === 'triplet' ? 3 :
+                                                  slot.tupletType === 'quintuplet' ? 5 :
+                                                  slot.tupletType === 'sextuplet' ? 6 : 3
+                                };
+                            }
+                            tupletGroups[slot.tupletGroupId].notes.push(noteInfo);
+                        }
+                    }
+
                 } else if (slot.type === SLOT_TYPES.REST) {
                     // Rests terminate any active ottava bracket
                     if (v === 0 && currentBracket) {
@@ -4943,6 +5264,98 @@ export class MeasureIsolationEditor {
 
         // Draw ottava brackets after all notes
         this._drawOttavaBrackets(ctx, clef, ottavaBrackets);
+
+        // Process beam groups from notePositions
+        // Group consecutive beamable notes (same voice, not in tuplets, no rests between)
+        if (notePositions.length > 0) {
+            // Separate notes by voice
+            const notesByVoice = {};
+            notePositions.forEach(n => {
+                if (!notesByVoice[n.voice]) notesByVoice[n.voice] = [];
+                notesByVoice[n.voice].push(n);
+            });
+
+            // For each voice, find consecutive beamable notes (excluding tuplet notes)
+            for (const voice of Object.keys(notesByVoice)) {
+                const voiceNotes = notesByVoice[voice].filter(n => !n.tupletGroupId);
+                voiceNotes.sort((a, b) => a.slotIndex - b.slotIndex);
+
+                let currentGroup = [];
+                let lastSlotIndex = -2;
+
+                for (const note of voiceNotes) {
+                    // Check if this note is consecutive with previous
+                    // (allowing for small gaps due to duration)
+                    const isConsecutive = note.slotIndex <= lastSlotIndex + 8;  // Allow gap up to 1 beat
+
+                    if (isConsecutive && currentGroup.length > 0) {
+                        // Check stem direction consistency
+                        if (note.stemUp === currentGroup[0].stemUp) {
+                            currentGroup.push(note);
+                        } else {
+                            // Stem direction changed - end group and start new
+                            if (currentGroup.length >= 2) {
+                                beamGroups.push({
+                                    notes: [...currentGroup],
+                                    beamLevels: Math.min(...currentGroup.map(n => n.beamLevels))
+                                });
+                            }
+                            currentGroup = [note];
+                        }
+                    } else {
+                        // Gap found - end current group
+                        if (currentGroup.length >= 2) {
+                            beamGroups.push({
+                                notes: [...currentGroup],
+                                beamLevels: Math.min(...currentGroup.map(n => n.beamLevels))
+                            });
+                        }
+                        currentGroup = [note];
+                    }
+
+                    lastSlotIndex = note.slotIndex + (note.beamLevels > 1 ? 2 : 4);  // Approximate note duration
+                }
+
+                // Don't forget last group
+                if (currentGroup.length >= 2) {
+                    beamGroups.push({
+                        notes: [...currentGroup],
+                        beamLevels: Math.min(...currentGroup.map(n => n.beamLevels))
+                    });
+                }
+            }
+
+            // Draw beams (drawn OVER note heads, so flags are hidden)
+            this._drawBeams(ctx, clef, beamGroups);
+
+            // Draw tuplet brackets (includes beams for tuplet notes)
+            const tupletGroupArray = Object.values(tupletGroups).filter(g => g.notes.length >= 2);
+
+            // Also create beam groups for tuplet notes
+            for (const tg of tupletGroupArray) {
+                // Sort notes by slot index
+                tg.notes.sort((a, b) => a.slotIndex - b.slotIndex);
+
+                // Create beam group for tuplet
+                if (tg.notes.length >= 2) {
+                    beamGroups.push({
+                        notes: [...tg.notes],
+                        beamLevels: Math.min(...tg.notes.map(n => n.beamLevels))
+                    });
+                }
+            }
+
+            // Re-draw beams to include tuplet beams
+            // Clear the beam area first would require more complex logic
+            // For now, tuplet beams are drawn on top
+            this._drawBeams(ctx, clef, tupletGroupArray.map(tg => ({
+                notes: tg.notes,
+                beamLevels: Math.min(...tg.notes.map(n => n.beamLevels))
+            })));
+
+            // Draw tuplet brackets
+            this._drawTupletBrackets(ctx, clef, tupletGroupArray);
+        }
     }
 
     /**
@@ -5700,6 +6113,222 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Draw beams connecting consecutive beamable notes
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {string} clef - 'treble' or 'bass'
+     * @param {Array} beamGroups - Array of beam group objects with note info
+     */
+    _drawBeams(ctx, clef, beamGroups) {
+        if (!beamGroups || beamGroups.length === 0) return;
+
+        const BEAM_THICKNESS = 4;
+        const BEAM_SPACING = 6;  // Space between primary and secondary beams
+
+        for (const group of beamGroups) {
+            if (!group.notes || group.notes.length < 2) continue;
+
+            const notes = group.notes;
+            const firstNote = notes[0];
+            const lastNote = notes[notes.length - 1];
+
+            // All notes in a beam group should have same stem direction
+            const stemUp = firstNote.stemUp;
+            const color = firstNote.color || '#1e40af';
+
+            ctx.fillStyle = color;
+            ctx.strokeStyle = color;
+
+            // Calculate beam Y position (at the stem ends)
+            // Use linear interpolation between first and last stem ends
+            const startStemEndY = firstNote.stemEndY;
+            const endStemEndY = lastNote.stemEndY;
+
+            // Draw primary beam (connects all notes)
+            ctx.beginPath();
+            ctx.moveTo(firstNote.stemX, startStemEndY);
+            ctx.lineTo(lastNote.stemX, endStemEndY);
+            ctx.lineTo(lastNote.stemX, endStemEndY + (stemUp ? BEAM_THICKNESS : -BEAM_THICKNESS));
+            ctx.lineTo(firstNote.stemX, startStemEndY + (stemUp ? BEAM_THICKNESS : -BEAM_THICKNESS));
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw secondary beams for 16th notes and shorter
+            const beamLevels = group.beamLevels || 1;
+            for (let level = 1; level < beamLevels; level++) {
+                const beamOffset = (BEAM_THICKNESS + BEAM_SPACING) * level * (stemUp ? 1 : -1);
+
+                // For secondary beams, we need to check which notes have this beam level
+                // For simplicity, draw full secondary beam if all notes are 16th or shorter
+                ctx.beginPath();
+                ctx.moveTo(firstNote.stemX, startStemEndY + beamOffset);
+                ctx.lineTo(lastNote.stemX, endStemEndY + beamOffset);
+                ctx.lineTo(lastNote.stemX, endStemEndY + beamOffset + (stemUp ? BEAM_THICKNESS : -BEAM_THICKNESS));
+                ctx.lineTo(firstNote.stemX, startStemEndY + beamOffset + (stemUp ? BEAM_THICKNESS : -BEAM_THICKNESS));
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+    }
+
+    /**
+     * Draw tuplet brackets with numbers and duration span
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {string} clef - 'treble' or 'bass'
+     * @param {Array} tupletGroups - Array of tuplet group objects
+     */
+    _drawTupletBrackets(ctx, clef, tupletGroups) {
+        if (!tupletGroups || tupletGroups.length === 0) return;
+
+        const BRACKET_OFFSET = 25;  // Distance from stem end to bracket
+        const BRACKET_HEIGHT = 8;   // Height of bracket hooks
+
+        // Tuplet ratios for duration span display
+        const TUPLET_RATIOS = {
+            3: { actual: 3, normal: 2, name: 'triplet' },      // 3 notes in time of 2
+            5: { actual: 5, normal: 4, name: 'quintuplet' },   // 5 notes in time of 4
+            6: { actual: 6, normal: 4, name: 'sextuplet' },    // 6 notes in time of 4
+        };
+
+        for (const group of tupletGroups) {
+            if (!group.notes || group.notes.length < 2) continue;
+
+            const notes = group.notes;
+            const firstNote = notes[0];
+            const lastNote = notes[notes.length - 1];
+            const tupletNumber = group.tupletNumber || 3;
+            const ratio = TUPLET_RATIOS[tupletNumber] || { actual: tupletNumber, normal: 2 };
+
+            // Determine bracket position (above or below based on stem direction)
+            const stemUp = firstNote.stemUp;
+            const bracketAbove = stemUp;  // Bracket goes opposite of stem direction... actually same direction for tuplets
+
+            // Find the extreme Y positions for bracket placement
+            let bracketY;
+            if (bracketAbove) {
+                // Find the minimum (highest) stem end Y and go above it
+                const minY = Math.min(...notes.map(n => n.stemEndY));
+                bracketY = minY - BRACKET_OFFSET;
+            } else {
+                // Find the maximum (lowest) stem end Y and go below it
+                const maxY = Math.max(...notes.map(n => n.stemEndY));
+                bracketY = maxY + BRACKET_OFFSET;
+            }
+
+            const startX = firstNote.stemX;
+            const endX = lastNote.stemX;
+            const midX = (startX + endX) / 2;
+
+            // Use a distinct tuplet color for visibility
+            ctx.strokeStyle = '#7c3aed';  // Purple for tuplet bracket
+            ctx.fillStyle = '#7c3aed';
+            ctx.lineWidth = 2;
+
+            // Draw bracket hooks
+            const hookDir = bracketAbove ? 1 : -1;
+
+            // Left hook
+            ctx.beginPath();
+            ctx.moveTo(startX, bracketY + BRACKET_HEIGHT * hookDir);
+            ctx.lineTo(startX, bracketY);
+            ctx.stroke();
+
+            // Right hook
+            ctx.beginPath();
+            ctx.moveTo(endX, bracketY + BRACKET_HEIGHT * hookDir);
+            ctx.lineTo(endX, bracketY);
+            ctx.stroke();
+
+            // Horizontal lines (with gap for number and ratio)
+            const numberWidth = 30;  // Wider gap for "3:2" style notation
+            const gapStart = midX - numberWidth / 2;
+            const gapEnd = midX + numberWidth / 2;
+
+            // Left horizontal
+            if (gapStart > startX + 5) {
+                ctx.beginPath();
+                ctx.moveTo(startX, bracketY);
+                ctx.lineTo(gapStart, bracketY);
+                ctx.stroke();
+            }
+
+            // Right horizontal
+            if (gapEnd < endX - 5) {
+                ctx.beginPath();
+                ctx.moveTo(gapEnd, bracketY);
+                ctx.lineTo(endX, bracketY);
+                ctx.stroke();
+            }
+
+            // Draw tuplet ratio (e.g., "3:2" for triplet)
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const ratioText = `${ratio.actual}:${ratio.normal}`;
+            ctx.fillText(ratioText, midX, bracketY);
+
+            // Draw duration span indicator below the bracket
+            // Calculate total beats this tuplet spans
+            const noteBaseDuration = firstNote.duration || '8n';
+            const singleNoteDuration = {
+                '4n': 1, '8n': 0.5, '16n': 0.25, '32n': 0.125
+            }[noteBaseDuration] || 0.5;
+            const totalSpanBeats = singleNoteDuration * ratio.normal;  // e.g., triplet 8ths = 0.5 * 2 = 1 beat
+
+            // Show span text (e.g., "= 2 beats" or "= 1 beat")
+            ctx.font = 'italic 9px Arial';
+            ctx.fillStyle = '#7c3aed';
+            const spanText = totalSpanBeats === 1 ? '= 1 beat' : `= ${totalSpanBeats} beats`;
+            const spanTextY = bracketAbove ? bracketY - 12 : bracketY + 12;
+            ctx.fillText(spanText, midX, spanTextY);
+
+            // Draw visual grouping indicator on each note in the tuplet
+            // Small purple dots or markers to show these notes are grouped
+            ctx.fillStyle = '#7c3aed';
+            for (const note of notes) {
+                // Draw a small marker above/below each note head
+                const markerY = bracketAbove ? note.y - 20 : note.y + 20;
+                ctx.beginPath();
+                ctx.arc(note.x, markerY, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw a subtle background highlight for the tuplet span in the slot grid area
+            // This helps visualize which slots the tuplet occupies
+            if (this.VISUAL_SLOT_WIDTH) {
+                const firstSlot = firstNote.slotIndex;
+                const lastSlot = lastNote.slotIndex;
+
+                // Convert to visual X positions - calculate actual tuplet span
+                const spanStartBeat = firstSlot / SLOTS_PER_BEAT;
+                // Calculate end based on actual tuplet duration, not arbitrary +16
+                const lastNoteDurationSlots = Math.round(singleNoteDuration * SLOTS_PER_BEAT * (ratio.normal / ratio.actual));
+                const spanEndBeat = (lastSlot + lastNoteDurationSlots) / SLOTS_PER_BEAT;
+                const spanStartX = this.START_X + (spanStartBeat * this.VISUAL_SLOTS_PER_BEAT * this.VISUAL_SLOT_WIDTH);
+                const spanEndX = this.START_X + (spanEndBeat * this.VISUAL_SLOTS_PER_BEAT * this.VISUAL_SLOT_WIDTH);
+
+                // Draw subtle highlight under the tuplet span
+                ctx.fillStyle = 'rgba(124, 58, 237, 0.08)';  // Very light purple
+                const highlightTop = this.STAFF_TOP_Y - 10;
+                const highlightHeight = this.STAFF_HEIGHT + 20;
+                ctx.fillRect(spanStartX, highlightTop, spanEndX - spanStartX, highlightHeight);
+            }
+        }
+    }
+
+    /**
+     * Get beam level count based on duration (1 for 8th, 2 for 16th, etc.)
+     */
+    _getBeamLevelCount(duration) {
+        switch (duration) {
+            case '8n': return 1;
+            case '16n': return 2;
+            case '32n': return 3;
+            case '64n': return 4;
+            default: return 0;
+        }
+    }
+
+    /**
      * Draw ledger lines for notes outside staff
      */
     _drawLedgerLines(ctx, x, y) {
@@ -5771,10 +6400,16 @@ export class MeasureIsolationEditor {
 
     /**
      * Draw continuation mark
+     * Note: With 48 slots per beat, we don't draw individual continuation marks
+     * as they would be too numerous and cluttered. The green/red shading shows
+     * which areas are filled vs empty.
      */
     _drawContinuation(ctx, x) {
-        ctx.fillStyle = '#d1d5db';
-        ctx.fillRect(x - 3, this.STAFF_TOP_Y + 15, 6, 10);
+        // Don't draw continuation marks - the slot fill shading already indicates
+        // which slots are occupied. Drawing 47 grey bars for a single quarter note
+        // would be too cluttered.
+        // ctx.fillStyle = '#d1d5db';
+        // ctx.fillRect(x - 3, this.STAFF_TOP_Y + 15, 6, 10);
     }
 
     /**
@@ -6138,9 +6773,12 @@ export class MeasureIsolationEditor {
         const timeSignature = this.compositionState.getTimeSignature();
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
         const slotsPerMeasure = Math.round(beatsPerMeasure * SLOTS_PER_BEAT);
+        const visualSlotsPerMeasure = Math.round(beatsPerMeasure * this.VISUAL_SLOTS_PER_BEAT);
 
         // Update slot width - slots stay consistent size across all measures
         this.SLOT_WIDTH = this.BASE_MEASURE_WIDTH / slotsPerMeasure;
+        // Visual slot width for grid display
+        this.VISUAL_SLOT_WIDTH = this.BASE_MEASURE_WIDTH / visualSlotsPerMeasure;
 
         // Create multi-measure SlotGrid
         this.slotGrid = new SlotGrid(timeSignature, 2, this.measureCount);

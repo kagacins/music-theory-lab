@@ -80,7 +80,9 @@ function parseTupletDuration(duration) {
  * Convert a duration string to seconds, with tuplet support
  * @param {string} duration - Duration string (e.g., '4n', '8t', '4q')
  * @param {number} tempo - Tempo in BPM
- * @param {Object} [tuplet] - Optional tuplet attribute from note { type: 'triplet', actual: 3, normal: 2 }
+ * @param {Object|string} [tuplet] - Optional tuplet attribute from note. Can be:
+ *   - Object: { type: 'triplet', actual: 3, normal: 2 }
+ *   - String: 'triplet', 'quintuplet', 'sextuplet' (flat tupletType format)
  * @returns {number} - Duration in seconds
  */
 function getDurationInSeconds(duration, tempo, tuplet = null, dotted = false) {
@@ -93,10 +95,24 @@ function getDurationInSeconds(duration, tempo, tuplet = null, dotted = false) {
     const isDotted = dotted || hasDotInString;
 
     // Normalize duration by removing dot suffix (we'll apply dot multiplier separately)
-    const baseDurationStr = duration ? duration.replace('.', '') : '4n';
+    let baseDurationStr = duration ? duration.replace('.', '') : '4n';
+
+    // CRITICAL: Strip tuplet suffixes (t, q, x) from duration string BEFORE passing to Tone.js
+    // These suffixes are used for SlotGrid positioning but Tone.js doesn't understand them
+    // e.g., '8q' (quintuplet eighth) should become '8n' for Tone.js
+    // Without this fix, Tone.Time('8q') interprets '8q' as 8 seconds instead of an eighth note!
+    // We'll apply the tuplet ratio separately below
+    const tupletSuffixMatch = baseDurationStr.match(/^(\d+)[tqx]$/);
+    if (tupletSuffixMatch) {
+        baseDurationStr = tupletSuffixMatch[1] + 'n';
+    }
+
+    // Handle tuplet attribute - can be object { type: 'triplet' } or string 'triplet'
+    // Notes may store tuplet info as note.tuplet (object) or note.tupletType (string)
+    const tupletType = typeof tuplet === 'string' ? tuplet : tuplet?.type;
 
     // First check if note has a tuplet attribute (from notation system)
-    if (tuplet && tuplet.type && TUPLET_RATIOS[tuplet.type]) {
+    if (tupletType && TUPLET_RATIOS[tupletType]) {
         // Get base duration in seconds using the standard duration
         try {
             let baseDuration = Tone.Time(baseDurationStr).toSeconds();
@@ -104,8 +120,8 @@ function getDurationInSeconds(duration, tempo, tuplet = null, dotted = false) {
             if (isDotted) {
                 baseDuration *= 1.5;
             }
-            // Apply tuplet ratio (e.g., triplet: multiply by 2/3)
-            const ratio = TUPLET_RATIOS[tuplet.type];
+            // Apply tuplet ratio (e.g., triplet: multiply by 2/3, quintuplet: multiply by 4/5)
+            const ratio = TUPLET_RATIOS[tupletType];
             return baseDuration * (ratio.normal / ratio.actual);
         } catch (e) {
             console.warn(`[getDurationInSeconds] Error parsing duration ${duration} with tuplet, falling back`);
@@ -2796,7 +2812,8 @@ function startMeasurePlayback(canvas, measureIndex) {
             const noteBeat = bassNote.beat || 0;
             const delay = noteBeat * beatDuration; // Calculate delay based on beat position
             // Use tuplet-aware duration calculation (pass tuplet attribute AND dotted flag for correct rhythm)
-            const noteDuration = bassNote.duration ? getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted) : beatDuration;
+            // Pass tupletType (string) OR tuplet (object) - function handles both formats
+            const noteDuration = bassNote.duration ? getDurationInSeconds(bassNote.duration, tempo, bassNote.tupletType || bassNote.tuplet, bassNote.dotted) : beatDuration;
 
             // Schedule the bass note to play at its proper beat timing
             const timeoutId = setTimeout(() => {
@@ -2890,14 +2907,34 @@ function startMeasurePlayback(canvas, measureIndex) {
         const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
         const currentKey = getCurrentKey() || 'C';
 
+        // DEBUG: Log all notes to see their properties
+        console.log(`[playMeasureNotes] All ${measureMelodyNotes.length} notes in measure ${measureIndex}:`,
+            measureMelodyNotes.map(n => ({
+                pitch: n.pitches?.[0] || n.pitch,
+                beat: n.beat,
+                duration: n.duration,
+                tupletType: n.tupletType,
+                tuplet: n.tuplet,
+                tupletGroupId: n.tupletGroupId
+            }))
+        );
+
         measureMelodyNotes.forEach((note, index) => {
-            const delay = index * beatDuration;
+            // Use actual beat position for delay calculation (supports tuplets and complex rhythms)
+            const noteBeat = typeof note.beat === 'number' ? note.beat : index;
+            const delay = noteBeat * beatDuration;
 
             const timeoutId = setTimeout(() => {
                 // Handle polyphony - play all pitches in the note
                 const pitches = getNotePitches(note);
-                const noteBeat = typeof note.beat === 'number' ? note.beat : index;
-                const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : beatDuration;
+                // Use tuplet-aware duration calculation (like bass notes) for correct timing
+                // Pass tupletType (string) OR tuplet (object) - function handles both formats
+                const noteDuration = note.duration ? getDurationInSeconds(note.duration, tempo, note.tupletType || note.tuplet, note.dotted) : beatDuration;
+
+                // DEBUG: Log tuplet note duration calculation
+                if (note.tupletType || note.tuplet) {
+                    console.log(`[playMeasureNotes] TUPLET note: pitch=${pitches[0]}, duration=${note.duration}, tupletType=${note.tupletType}, tuplet=${JSON.stringify(note.tuplet)}, calculatedDuration=${noteDuration.toFixed(4)}s`);
+                }
 
                 // Handle ornaments if present - expand into multiple notes
                 if (note.ornament && pitches.length > 0) {
@@ -2978,15 +3015,30 @@ function startMeasurePlayback(canvas, measureIndex) {
                     window.refreshNotationFromProgression();
                 }
 
-                // Remove from activeNotes after note duration
+                // Release notes and remove from activeNotes after note duration
                 setTimeout(() => {
                     pitches.forEach(pitch => {
+                        // CRITICAL: Release the note to stop the sound
+                        synth.triggerRelease(pitch, Tone.now());
+
                         const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
                         activeNotes.delete(noteId);
+
+                        // Remove from activeMelodyNotes tracking array
+                        const melodyNoteIdx = state.activeMelodyNotes.indexOf(pitch);
+                        if (melodyNoteIdx > -1) {
+                            state.activeMelodyNotes.splice(melodyNoteIdx, 1);
+                        }
 
                         // Notify new notation system to remove red highlighting
                         if (window.removeNotationActiveNote) {
                             window.removeNotationActiveNote(noteId);
+                        }
+
+                        // Remove visual feedback from keyboard
+                        const keyEl = document.getElementById(getNoteKeyId(pitch));
+                        if (keyEl) {
+                            keyEl.classList.remove('active-melody-playback');
                         }
                     });
 
@@ -3358,7 +3410,7 @@ export function playSelectedMeasure() {
 
 /**
  * Play from the selected measure to the end
- * Uses gapless approach with compositionState for bass notes
+ * Uses the unified playback engine with startMeasure parameter.
  */
 export function playFromSelectedMeasure() {
     // If already playing, stop instead
@@ -3367,700 +3419,49 @@ export function playFromSelectedMeasure() {
         return;
     }
 
-    const progressionData = getProgressionData();
+    // Determine start measure from selection
+    let startMeasureIndex = 0;
+    let numMeasures = 0;
 
-    // Use compositionState to check for melody notes
-    const hasMelody = window.getCompositionState?.().hasMelodyNotes() || false;
-    const hasChords = progressionData && progressionData.length > 0;
-
-    if (!hasMelody && !hasChords) {
-        showAlertModal({
-            title: 'Nothing to Play',
-            message: 'Please add melody notes or chords first.',
-            type: 'warning'
-        });
-        return;
-    }
-
-    // Stop any currently playing audio immediately
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
-    Tone.Transport.position = 0;
-
-    // Also stop any hold-to-play measures
-    const canvas = document.getElementById('interactive-melody-notation-canvas');
-    if (canvas) {
-        const state = activePlaybackState.get(canvas);
-        if (state && state.isPlaying) {
-            stopMeasurePlayback(canvas);
-        }
-    }
-
-    // Calculate total measures from compositionState
-    let measureCountFromState = 0;
-    let maxMeasureFromMelody = 0;
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        measureCountFromState = compositionState.getMeasureCount();
-        if (hasMelody) {
-            const allMelodyNotes = compositionState.getAllMelodyNotes();
-            if (allMelodyNotes.length > 0) {
-                maxMeasureFromMelody = Math.max(...allMelodyNotes.map(n => n.measure)) + 1;
-            }
-        }
+        numMeasures = compositionState.getMeasureCount();
     }
-    const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, measureCountFromState, interactiveMelody.numMeasures || 4);
 
-    // Determine start measure
-    let startMeasure = 0;
     const notationSelectedMeasure = window.getNotationSelectedMeasure?.() ?? -1;
     if (notationSelectedMeasure >= 0 && notationSelectedMeasure < numMeasures) {
-        startMeasure = notationSelectedMeasure;
+        startMeasureIndex = notationSelectedMeasure;
         selectedMeasureIndex = notationSelectedMeasure;
     } else if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures) {
-        startMeasure = selectedMeasureIndex;
+        startMeasureIndex = selectedMeasureIndex;
     }
 
-    const hasMelodyNotes = hasMelody;
-
-    initAudio();
-    if (!getAudioIsReady()) {
-        toast.warning('Audio not ready. Please wait...');
-        return;
-    }
-
-    const piano = getPiano();
-    const synth = getInstrument();
-
-    // Parse time signature (default to 4/4)
-    const [beatsPerMeasure, beatValue] = interactiveMelody.timeSignature.split('/').map(Number);
-    const tempo = interactiveMelody.tempo || 120;
-
-    // Set Transport BPM
-    Tone.Transport.bpm.value = tempo;
-
-    const beatDuration = 60.0 / tempo;
-    const measureDuration = beatDuration * beatsPerMeasure;
-
-    // Helper function to update canvas rendering (throttled)
-    let canvasUpdatePending = false;
-    const updateCanvas = () => {
-        if (canvasUpdatePending) return;
-        canvasUpdatePending = true;
-        requestAnimationFrame(() => {
-            canvasUpdatePending = false;
-            const canvas = document.getElementById('interactive-melody-notation-canvas');
-            if (canvas && window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            }
-        });
-    };
-
-    // Schedule melody notes (from start measure onwards)
-    let melodyPart = null;
-    if (hasMelodyNotes && window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        const allMelodyNotes = compositionState.getAllMelodyNotes();
-        const notesFromStart = allMelodyNotes.filter(note => note.measure >= startMeasure && !note.isTied);
-
-        if (notesFromStart.length > 0) {
-            melodyPart = new Tone.Part((time, noteData) => {
-                const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
-                const currentKey = getCurrentKey() || 'C';
-
-                // Handle ornaments if present
-                if (noteData.ornament && pitches.length > 0) {
-                    const topPitch = pitches[pitches.length - 1];
-                    const sustainPitches = pitches.slice(0, -1);
-                    const durationSeconds = Tone.Time(noteData.duration).toSeconds();
-                    const expandedNotes = expandOrnament(topPitch, noteData.ornament, durationSeconds, currentKey, tempo);
-
-                    // Play sustained lower notes
-                    sustainPitches.forEach(pitch => {
-                        synth.triggerAttackRelease(pitch, noteData.duration, time);
-                    });
-
-                    // Play expanded ornament
-                    expandedNotes.forEach(ornamentNote => {
-                        const ornamentTime = time + ornamentNote.offset;
-                        if (ornamentTime >= 0) {
-                            synth.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
-                        }
-                    });
-
-                    // Visual feedback for all pitches
-                    pitches.forEach(pitch => {
-                        Tone.Draw.schedule(() => {
-                            const keyEl = document.getElementById(getNoteKeyId(pitch));
-                            if (keyEl) keyEl.classList.add('active-melody-playback');
-                        }, time);
-
-                        const noteDuration = Tone.Time(noteData.duration).toSeconds();
-                        Tone.Draw.schedule(() => {
-                            const keyEl = document.getElementById(getNoteKeyId(pitch));
-                            if (keyEl) keyEl.classList.remove('active-melody-playback');
-                        }, time + noteDuration);
-                    });
-                } else {
-                    // No ornament - play normally
-                    pitches.forEach(pitch => {
-                        synth.triggerAttackRelease(pitch, noteData.duration, time);
-
-                        Tone.Draw.schedule(() => {
-                            const keyEl = document.getElementById(getNoteKeyId(pitch));
-                            if (keyEl) keyEl.classList.add('active-melody-playback');
-                        }, time);
-
-                        const noteDuration = Tone.Time(noteData.duration).toSeconds();
-                        Tone.Draw.schedule(() => {
-                            const keyEl = document.getElementById(getNoteKeyId(pitch));
-                            if (keyEl) keyEl.classList.remove('active-melody-playback');
-                        }, time + noteDuration);
-                    });
-                }
-            }, notesFromStart.map(note => ({
-                time: ((note.measure - startMeasure) * measureDuration) + (note.beat * beatDuration),
-                pitch: note.pitch,
-                pitches: note.pitches,
-                duration: note.duration,
-                ornament: note.ornament
-            })));
-        }
-    }
-
-    // Track the current chord to detect chord changes for gapless playback
-    let lastChordIndex = -1;
-
-    // Schedule chord/bass notes using gapless approach
-    const chordPart = new Tone.Part((time, chordData) => {
-        const chord = chordData.chord;
-        const measureIndex = chordData.measureIndex;
-        const specificNote = chordData.specificNote;
-
-        const chordIndex = specificNote?.chordIndex ?? chord.chordIndex;
-        const isNewChord = chordIndex !== lastChordIndex;
-
-        // Release previous chord if starting a different chord (gapless transition)
-        if (currentlyPlayingChordNotes.length > 0 && isNewChord) {
-            try {
-                piano.releaseAll(time);
-            } catch (e) {
-                // Ignore errors
-            }
-            currentlyPlayingChordNotes = [];
-        }
-
-        lastChordIndex = chordIndex;
-
-        // Read bass notes from compositionState
-        let bassNoteData = [];
-
-        if (chordData.specificNote) {
-            bassNoteData = [chordData.specificNote];
-        } else if (window.getCompositionState) {
-            const compositionState = window.getCompositionState();
-            if (compositionState.getMeasureCount() > measureIndex) {
-                const measureData = compositionState.getMeasure(measureIndex);
-                if (measureData?.notation?.bass) {
-                    const bassVoices = measureData.notation.bass.voices || [];
-                    const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
-                    bassNoteData = allBassNotes.filter(note => note.type !== 'rest');
-                }
-            }
-        }
-
-        if (bassNoteData.length > 0) {
-            // Set active measure and chord highlighting
-            Tone.Draw.schedule(() => {
-                if (window.setNotationPlaybackCursor) {
-                    window.setNotationPlaybackCursor(measureIndex, 0);
-                }
-                if (window.isNotationInitialized?.()) {
-                    if (window.setNotationActiveMeasure) {
-                        window.setNotationActiveMeasure(measureIndex);
-                    }
-                }
-                if (chordIndex !== undefined && window.highlightChordCard) {
-                    window.highlightChordCard(chordIndex);
-                }
-            }, time);
-
-            bassNoteData.forEach((bassNote, bassNoteIndex) => {
-                const bassTime = chordData.specificNote ? time : time + (bassNote.beat * beatDuration);
-                const notesToPlay = bassNote.pitches || (bassNote.pitch ? [bassNote.pitch] : []);
-
-                if (notesToPlay.length === 0) return;
-
-                // Use pre-calculated merged duration if available (from tie-merging in event building)
-                // Otherwise calculate using getDurationInSeconds which handles dotted/tuplet notes
-                let totalDuration = bassNote.mergedDuration || getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted);
-
-                piano.triggerAttackRelease(notesToPlay, totalDuration, bassTime);
-
-                // Visual feedback
-                Tone.Draw.schedule(() => {
-                    if (bassNoteIndex === 0 && isNewChord) {
-                        currentlyPlayingChordNotes.push(...notesToPlay);
-                    }
-
-                    notesToPlay.forEach(pitch => {
-                        const highlightMeasure = bassNote.sourceMeasureIndex !== undefined ? bassNote.sourceMeasureIndex : measureIndex;
-                        const noteId = `${highlightMeasure}-${bassNote.beat}-${pitch}`;
-                        activeNotes.add(noteId);
-                        if (window.addNotationActiveNote) {
-                            window.addNotationActiveNote(noteId);
-                        }
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) keyEl.classList.add('active-progression');
-                    });
-                    updateCanvas();
-                }, bassTime);
-
-                Tone.Draw.schedule(() => {
-                    notesToPlay.forEach(pitch => {
-                        const highlightMeasure = bassNote.sourceMeasureIndex !== undefined ? bassNote.sourceMeasureIndex : measureIndex;
-                        const noteId = `${highlightMeasure}-${bassNote.beat}-${pitch}`;
-                        activeNotes.delete(noteId);
-                        if (window.removeNotationActiveNote) {
-                            window.removeNotationActiveNote(noteId);
-                        }
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) keyEl.classList.remove('active-progression');
-                    });
-                    updateCanvas();
-                }, bassTime + totalDuration);
-            });
-        }
-    }, (() => {
-        // Schedule bass notes from compositionState, starting from startMeasure
-        if (window.getCompositionState) {
-            const compositionState = window.getCompositionState();
-            const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
-            const beatsPerMeasureFromTS = getBeatsPerMeasureFromTimeSignature(timeSignature);
-
-            const events = [];
-            const measureCount = compositionState.getMeasureCount();
-
-            for (let measureIndex = startMeasure; measureIndex < measureCount; measureIndex++) {
-                const measureData = compositionState.getMeasure(measureIndex);
-                const bassVoices = measureData?.notation?.bass?.voices || [];
-
-                if (bassVoices.length === 0) continue;
-
-                const chord = measureData.chord || {};
-
-                bassVoices.forEach((bassVoice, voiceIndex) => {
-                    if (!bassVoice?.notes?.length) return;
-
-                    bassVoice.notes.forEach((note) => {
-                        if (note.type === 'rest' || note.isRest || note.isTied) return;
-
-                        // Calculate time relative to startMeasure
-                        const relativeMeasure = measureIndex - startMeasure;
-                        const measureStartBeat = relativeMeasure * beatsPerMeasureFromTS;
-                        const noteBeat = note.beat || 0;
-                        const absoluteBeat = measureStartBeat + noteBeat;
-                        const noteTime = absoluteBeat * beatDuration;
-
-                        const specificNote = {
-                            ...note,
-                            sourceMeasureIndex: measureIndex,
-                            voiceIndex: voiceIndex
-                        };
-
-                        events.push({
-                            time: Math.max(0, noteTime),
-                            chord,
-                            measureIndex,
-                            specificNote
-                        });
-                    });
-                });
-            }
-
-            events.sort((a, b) => a.time - b.time);
-            return events;
-        }
-
-        // Fallback
-        return progressionData.slice(startMeasure).map((chord, index) => ({
-            time: Math.max(0, index * measureDuration),
-            chord: chord,
-            measureIndex: startMeasure + index
-        }));
-    })());
-
-    // Store parts for stopping
-    playAllParts.melodyPart = melodyPart;
-    playAllParts.chordPart = chordPart;
-
-    // Clear active notes
-    activeNotes.clear();
-    currentlyPlayingChordNotes = [];
-
-    // Set playback state
-    isPlayAllActive = true;
-    window._playbackScrollLock = true;
-
-    // Start parts
-    if (melodyPart) {
-        melodyPart.start(0);
-    }
-    chordPart.start(0);
-
-    // Calculate measures to play for metronome
-    const measuresToPlay = measureCountFromState - startMeasure;
-
-    // Start metronome if enabled (pass time signature for compound meter support)
-    if (getMetronomeEnabled()) {
-        const timeSignatureObj = { num: beatsPerMeasure, denom: beatValue };
-        startMetronome(beatsPerMeasure, measuresToPlay, timeSignatureObj);
-    }
-
-    Tone.Transport.start('+0.05');
-
-    // Dispatch event for guided mode tutorials
-    dispatchBuilderEvent('progressionPlayed', {
-        chordCount: progressionData.length,
-        key: getCurrentKey()
+    // Use the unified playback engine with startMeasure bound
+    playAllMelody({
+        startMeasure: startMeasureIndex
+        // endMeasure defaults to last measure
     });
-
-    // Calculate total duration
-    let maxMeasure = measureCountFromState - 1;
-    if (hasMelodyNotes && window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        const allMelodyNotes = compositionState.getAllMelodyNotes();
-        const melodyNotesFromStart = allMelodyNotes.filter(n => n.measure >= startMeasure);
-        if (melodyNotesFromStart.length > 0) {
-            const maxMelodyMeasure = Math.max(...melodyNotesFromStart.map(n => n.measure));
-            maxMeasure = Math.max(maxMeasure, maxMelodyMeasure);
-        }
-    }
-    const totalDuration = (maxMeasure - startMeasure + 1) * measureDuration + 0.5;
-
-    // Stop after all notes have played
-    Tone.Transport.scheduleOnce(() => {
-        if (!isPlayAllActive) return;
-
-        stopPlayAllMelody();
-        activeNotes.clear();
-
-        const canvas = document.getElementById('interactive-melody-notation-canvas');
-        if (canvas && window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
-        }
-    }, totalDuration);
 }
 
 /**
  * Play a specific measure (melody notes and chord)
+ * Uses the unified playback engine with bounded start/end measures.
  * @param {number} measureIndex - Index of the measure to play (0-based)
  */
 export function playMeasure(measureIndex) {
-    const progressionData = getProgressionData();
+    // Validate measure index
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const measureCount = compositionState.getMeasureCount();
+        if (measureIndex < 0 || measureIndex >= measureCount) return;
+    }
 
-    // Use compositionState to check for melody notes
-    const hasMelody = window.getCompositionState?.().hasMelodyNotes() || false;
-    const hasChords = progressionData && progressionData.length > 0;
-
-    // Allow playback if there are melody notes or chords
-    if (!hasMelody && !hasChords) return;
-
-    // Clear any previous timeouts from a prior playMeasure call
-    measurePlaybackTimeouts.forEach(timeoutId => {
-        clearTimeout(timeoutId);
+    // Use the unified playback engine with single measure bounds
+    playAllMelody({
+        startMeasure: measureIndex,
+        endMeasure: measureIndex,
+        showNoContentWarning: false
     });
-    measurePlaybackTimeouts = [];
-
-    // Calculate numMeasures to allow melody notes and bass notes beyond chord progression
-    // Include compositionState.getMeasureCount() which accounts for chord duration changes
-    let maxMeasureFromMelody = 0;
-    let measureCountFromState = 0;
-    if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        measureCountFromState = compositionState.getMeasureCount();
-        if (hasMelody) {
-            const allMelodyNotes = compositionState.getAllMelodyNotes();
-            if (allMelodyNotes.length > 0) {
-                maxMeasureFromMelody = Math.max(...allMelodyNotes.map(n => n.measure)) + 1;
-            }
-        }
-    }
-    const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, measureCountFromState, interactiveMelody.numMeasures || 4);
-
-    if (measureIndex < 0 || measureIndex >= numMeasures) return;
-
-    initAudio();
-    if (!getAudioIsReady()) {
-        toast.warning('Audio not ready. Please wait...');
-        return;
-    }
-
-    const piano = getPiano();
-    const synth = getInstrument();
-
-    // Helper function to update canvas rendering (throttled to prevent stuttering)
-    let canvasUpdatePending = false;
-    const updateCanvas = () => {
-        // Throttle: only allow one update per animation frame
-        if (canvasUpdatePending) return;
-        canvasUpdatePending = true;
-
-        requestAnimationFrame(() => {
-            canvasUpdatePending = false;
-            const canvas = document.getElementById('interactive-melody-notation-canvas');
-            if (canvas && window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            }
-        });
-    };
-
-    // Read bass notes from compositionState (single source of truth)
-    // compositionState always has bass now (either pattern-based or simple chord)
-    let bassNoteData = [];
-
-    if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        if (compositionState.getMeasureCount() > measureIndex) {
-            const measure = compositionState.getMeasure(measureIndex);
-            if (measure && measure.notation && measure.notation.bass) {
-                const bassVoices = measure.notation.bass.voices || [];
-                // MULTI-VOICE: Gather notes from ALL bass voices
-                const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
-                if (allBassNotes.length > 0) {
-                    bassNoteData = allBassNotes.filter(note => note.type !== 'rest');
-                }
-            }
-        }
-    }
-
-    // Set active measure for highlighting
-    activeMeasureIndex = measureIndex;
-
-    // Notify new notation system of active measure for yellow highlighting
-    if (window.setNotationActiveMeasure) {
-        window.setNotationActiveMeasure(measureIndex);
-    }
-
-    // Highlight the corresponding chord card based on measure's chordIndex
-    if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        const measure = compositionState.getMeasure(measureIndex);
-        if (measure && measure.chord && measure.chord.chordIndex !== undefined) {
-            const chordIndex = measure.chord.chordIndex;
-            // Call highlightChordCard if available (from progressionBuilder)
-            if (window.highlightChordCard) {
-                window.highlightChordCard(chordIndex);
-            }
-        }
-    }
-
-    // Play bass notes with proper timing whenever they exist in the rendered notation
-    if (bassNoteData.length > 0) {
-        const tempo = interactiveMelody.tempo || 120;
-        const beatDuration = 60.0 / tempo; // seconds per beat
-
-        bassNoteData.forEach(bassNote => {
-            const noteBeat = bassNote.beat || 0;
-            const delay = noteBeat * beatDuration;
-            // Use tuplet-aware duration calculation (pass tuplet attribute AND dotted flag for correct rhythm)
-            const noteDuration = bassNote.duration ? getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted) : beatDuration;
-
-            // Handle both single notes (pitch) and chords (pitches)
-            const notesToPlay = bassNote.pitches || (bassNote.pitch ? [bassNote.pitch] : []);
-
-            if (notesToPlay.length === 0) {
-                return;
-            }
-
-            // Schedule the bass note(s) to play at proper beat timing
-            const timeoutId = setTimeout(() => {
-                piano.triggerAttackRelease(notesToPlay, noteDuration, Tone.now());
-
-                // Add to activeNotes for highlighting (each pitch in the chord)
-                notesToPlay.forEach(pitch => {
-                    const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
-                    activeNotes.add(noteId);
-
-                    // Notify new notation system for red note highlighting
-                    if (window.addNotationActiveNote) {
-                        window.addNotationActiveNote(noteId);
-                    }
-
-                    // Visual feedback on keyboard
-                    const keyEl = document.getElementById(getNoteKeyId(pitch));
-                    if (keyEl) {
-                        keyEl.classList.add('active-progression');
-                    }
-                });
-
-                // Update canvas to show bass note highlighting
-                updateCanvas();
-
-                // Remove from activeNotes after note duration
-                const cleanupId = setTimeout(() => {
-                    notesToPlay.forEach(pitch => {
-                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
-                        activeNotes.delete(noteId);
-
-                        // Notify new notation system to remove red highlighting
-                        if (window.removeNotationActiveNote) {
-                            window.removeNotationActiveNote(noteId);
-                        }
-
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) {
-                            keyEl.classList.remove('active-progression');
-                        }
-                    });
-                    updateCanvas();
-                }, noteDuration * 1000);
-                measurePlaybackTimeouts.push(cleanupId);
-            }, delay * 1000);
-            measurePlaybackTimeouts.push(timeoutId);
-        });
-    }
-
-    // Get melody notes for this measure from compositionState
-    let measureMelodyNotes = [];
-    if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        measureMelodyNotes = compositionState.getMelodyNotesInMeasure(measureIndex);
-    }
-
-    // Get common start time for perfect synchronization
-    const startTime = Tone.now() + 0.01; // Small buffer to ensure scheduling works
-
-    // Calculate measure duration for cleanup
-    const tempo = interactiveMelody.tempo || 120;
-    const beatDuration = 60.0 / tempo;
-    const measureDuration = beatDuration * 4; // 4/4 time
-
-    // Schedule cleanup of all highlights after measure is done
-    const measureCleanupTimeout = setTimeout(() => {
-        // Clear active measure highlighting (yellow background)
-        activeMeasureIndex = -1;
-
-        // Clear all note highlights and re-render
-        if (window.stopNotationPlaybackHighlighting) {
-            window.stopNotationPlaybackHighlighting();
-        }
-    }, (measureDuration + 0.1) * 1000); // Add 100ms buffer to ensure all notes are done
-    measurePlaybackTimeouts.push(measureCleanupTimeout);
-
-    // All bass notes now come from compositionState - no need for fallback chord playback
-
-    // Play melody notes with Tone.js scheduling for perfect sync
-    if (measureMelodyNotes.length > 0) {
-
-        measureMelodyNotes.forEach((note, index) => {
-            if (note.type === 'rest') {
-                return; // Skip rests
-            }
-
-            // Skip tied notes - they are continuations from previous measures, not new attacks
-            if (note.isTied) {
-                return;
-            }
-
-            const delay = note.beat * beatDuration; // Use actual beat position for timing
-            // Use tuplet-aware duration calculation (pass tuplet attribute AND dotted flag for correct rhythm)
-            const noteDuration = note.duration ? getDurationInSeconds(note.duration, tempo, note.tuplet, note.dotted) : 0.5;
-            const noteStartTime = startTime + delay;
-
-            // Debug logging for tuplet timing
-            console.log(`[playMeasure] Note ${index}: pitch=${note.pitch || note.pitches?.[0]}, beat=${note.beat}, duration=${note.duration}, tuplet=${JSON.stringify(note.tuplet)}`);
-            console.log(`[playMeasure]   -> delay=${delay.toFixed(3)}s, noteDuration=${noteDuration.toFixed(3)}s, startTime=${noteStartTime.toFixed(3)}s`);
-
-            // PHASE 1.4: Handle both single notes (pitch) and chords (pitches)
-            const notesToPlay = note.pitches || (note.pitch ? [note.pitch] : []);
-
-            if (notesToPlay.length === 0) {
-                return;
-            }
-
-            // Schedule all pitches in the chord at exact time using Tone.js
-            // Handle ornaments if present - expand into multiple notes
-            if (synth) {
-                const currentKey = getCurrentKey() || 'C';
-
-                if (note.ornament && notesToPlay.length > 0) {
-                    // For chords with ornaments, apply ornament to the top (melody) note only
-                    // Other notes in the chord sustain normally
-                    const topPitch = notesToPlay[notesToPlay.length - 1]; // Top note gets ornament
-                    const sustainPitches = notesToPlay.slice(0, -1); // Lower notes sustain
-
-                    // Expand ornament into note sequence
-                    const expandedNotes = expandOrnament(topPitch, note.ornament, noteDuration, currentKey, tempo);
-
-                    // Play sustained lower notes (if any) for full duration
-                    sustainPitches.forEach(pitch => {
-                        synth.triggerAttackRelease(pitch, noteDuration, noteStartTime);
-                    });
-
-                    // Play expanded ornament notes on top pitch
-                    expandedNotes.forEach(ornamentNote => {
-                        const ornamentTime = noteStartTime + ornamentNote.offset;
-                        if (ornamentTime >= 0) {
-                            synth.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
-                        }
-                    });
-                } else {
-                    // No ornament - play all pitches normally
-                    notesToPlay.forEach(pitch => {
-                        synth.triggerAttackRelease(pitch, noteDuration, noteStartTime);
-                    });
-                }
-            }
-
-            // Use setTimeout for visual feedback since it needs DOM updates
-            const melodyTimeoutId = setTimeout(() => {
-                const noteBeat = typeof note.beat === 'number' ? note.beat : index;
-
-                // Add to activeNotes for highlighting (each pitch in the chord)
-                notesToPlay.forEach(pitch => {
-                    const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
-                    activeNotes.add(noteId);
-
-                    // Notify new notation system for red note highlighting
-                    if (window.addNotationActiveNote) {
-                        window.addNotationActiveNote(noteId);
-                    }
-
-                    // Visual feedback on keyboard
-                    const keyEl = document.getElementById(getNoteKeyId(pitch));
-                    if (keyEl) {
-                        keyEl.classList.add('active-melody-playback');
-                    }
-                });
-
-                // Update canvas to show note highlighting
-                updateCanvas();
-
-                // Remove highlights after note duration
-                const melodyCleanupId = setTimeout(() => {
-                    notesToPlay.forEach(pitch => {
-                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
-                        activeNotes.delete(noteId);
-
-                        // Notify new notation system to remove red highlighting
-                        if (window.removeNotationActiveNote) {
-                            window.removeNotationActiveNote(noteId);
-                        }
-
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) {
-                            keyEl.classList.remove('active-melody-playback');
-                        }
-                    });
-
-                    updateCanvas();
-                }, noteDuration * 1000);
-                measurePlaybackTimeouts.push(melodyCleanupId);
-            }, delay * 1000);
-            measurePlaybackTimeouts.push(melodyTimeoutId);
-        });
-    }
 }
 
 /**
@@ -4494,9 +3895,25 @@ function updatePlayAllButton() {
 }
 
 /**
- * Play all melody notes with proper timing (respecting time signature)
+ * Play melody notes with proper timing (respecting time signature)
+ * This is the UNIFIED PLAYBACK ENGINE - all playback methods should use this.
+ *
+ * @param {Object} options - Playback options
+ * @param {number} [options.startMeasure=0] - First measure to play (0-indexed)
+ * @param {number} [options.endMeasure] - Last measure to play (inclusive, defaults to last measure)
+ * @param {boolean} [options.includeTreble=true] - Whether to play treble/melody notes
+ * @param {boolean} [options.includeBass=true] - Whether to play bass/chord notes
+ * @param {boolean} [options.showNoContentWarning=true] - Whether to show warning if nothing to play
  */
-export async function playAllMelody() {
+export async function playAllMelody(options = {}) {
+    const {
+        startMeasure = 0,
+        endMeasure = null,
+        includeTreble = true,
+        includeBass = true,
+        showNoContentWarning = true
+    } = options;
+
     // If already playing, stop instead
     if (isPlayAllActive) {
         stopPlayAllMelody();
@@ -4510,11 +3927,13 @@ export async function playAllMelody() {
     const hasChords = progressionData && progressionData.length > 0;
 
     if (!hasMelody && !hasChords) {
-        showAlertModal({
-            title: 'Nothing to Play',
-            message: 'Please add melody notes or chords first.',
-            type: 'warning'
-        });
+        if (showNoContentWarning) {
+            showAlertModal({
+                title: 'Nothing to Play',
+                message: 'Please add melody notes or chords first.',
+                type: 'warning'
+            });
+        }
         return;
     }
 
@@ -4571,8 +3990,26 @@ export async function playAllMelody() {
         });
     };
 
+    // Track currently playing melody notes for proper release when next note starts
+    // This ensures notes don't resonate beyond their duration (especially important for tuplets)
+    let currentlyPlayingMelodyNotes = [];
+
     // Schedule melody notes
     const melodyPart = new Tone.Part((time, noteData) => {
+        // CRITICAL: Release any currently playing melody notes BEFORE playing new ones
+        // This ensures previous notes don't resonate beyond their intended duration
+        // Piano samplers have natural decay, so we need explicit release to cut them off
+        if (currentlyPlayingMelodyNotes.length > 0) {
+            currentlyPlayingMelodyNotes.forEach(pitch => {
+                try {
+                    synth.triggerRelease(pitch, time);
+                } catch (e) {
+                    // Ignore errors (note might already be released)
+                }
+            });
+            currentlyPlayingMelodyNotes = [];
+        }
+
         // Get effective dynamic for this note (either stored or inherited)
         const effectiveDynamic = noteData.dynamic || getEffectiveDynamicForNote(noteData.noteIndex);
         const volume = getVolumeFromDynamic(effectiveDynamic);
@@ -4653,11 +4090,23 @@ export async function playAllMelody() {
                     synth.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
                 }
             });
+            // Track all notes (sustained + ornament pitches) for release
+            currentlyPlayingMelodyNotes = [...sustainPitches, topPitch];
         } else {
             // No ornament - play all pitches normally
+            // Use triggerAttack + scheduled triggerRelease for precise duration control
+            // This ensures notes stop EXACTLY at their duration end, not relying on
+            // piano sample's natural decay which can be longer than intended
             notesToPlay.forEach(pitch => {
-                synth.triggerAttackRelease(pitch, noteData.duration, principalNoteTime);
+                synth.triggerAttack(pitch, principalNoteTime);
             });
+            // Schedule explicit release at exact end time
+            const releaseTime = principalNoteTime + noteData.duration;
+            notesToPlay.forEach(pitch => {
+                synth.triggerRelease(pitch, releaseTime);
+            });
+            // Track these notes so they can be released early if next note starts sooner
+            currentlyPlayingMelodyNotes = [...notesToPlay];
         }
 
         // Create note identifier: "measure-beat-pitch" for each pitch in the chord
@@ -4727,12 +4176,30 @@ export async function playAllMelody() {
             }, removeTime);
         }
     }, (() => {
+        // Skip if treble playback is disabled
+        if (!includeTreble) return [];
+
         // Get melody notes from compositionState, respecting repeat signs
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
 
-            // Build playback order considering repeat signs
-            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+            // Determine effective end measure (defaults to last measure)
+            const measureCount = compositionState.getMeasureCount();
+            const effectiveEndMeasure = endMeasure !== null ? Math.min(endMeasure, measureCount - 1) : measureCount - 1;
+            const effectiveStartMeasure = Math.max(0, startMeasure);
+
+            // Build playback order considering repeat signs, then filter by measure range
+            const fullPlaybackOrder = buildPlaybackMeasureOrder(compositionState);
+
+            // Filter to only include measures in our range
+            // For bounded playback, we use sequential playback positions starting from 0
+            let filteredPlaybackPosition = 0;
+            const playbackOrder = fullPlaybackOrder
+                .filter(({ measureIndex }) => measureIndex >= effectiveStartMeasure && measureIndex <= effectiveEndMeasure)
+                .map(({ measureIndex }) => ({
+                    measureIndex,
+                    playbackPosition: filteredPlaybackPosition++
+                }));
 
             // Helper to compare pitches (handles both single notes and chords)
             const samePitches = (a, b) => {
@@ -4812,7 +4279,8 @@ export async function playAllMelody() {
                 const safeTime = Math.max(0, baseTime);
 
                 // Start with this note's duration - use tuplet-aware AND dotted-aware calculation
-                let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tuplet, note.dotted);
+                // Pass tupletType (string) OR tuplet (object) - function handles both formats
+                let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tupletType || note.tuplet, note.dotted);
 
                 // Look ahead to merge durations of tied continuation notes
                 // (Only within the same playback position)
@@ -4837,7 +4305,8 @@ export async function playAllMelody() {
                     }
 
                     // Merge this continuation note's duration into the total
-                    totalDurationSeconds += getDurationInSeconds(next.duration, tempo, next.tuplet, next.dotted);
+                    // Pass tupletType (string) OR tuplet (object) - function handles both formats
+                    totalDurationSeconds += getDurationInSeconds(next.duration, tempo, next.tupletType || next.tuplet, next.dotted);
 
                     // Advance chain
                     j++;
@@ -4962,7 +4431,8 @@ export async function playAllMelody() {
 
                 // Use pre-calculated merged duration if available (from tie-merging in event building)
                 // Otherwise calculate using getDurationInSeconds which handles dotted/tuplet notes
-                let totalDuration = bassNote.mergedDuration || getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted);
+                // Pass tupletType (string) OR tuplet (object) - function handles both formats
+                let totalDuration = bassNote.mergedDuration || getDurationInSeconds(bassNote.duration, tempo, bassNote.tupletType || bassNote.tuplet, bassNote.dotted);
 
                 // Track for chord release scheduling
                 if (bassNoteIndex === 0) {
@@ -4970,7 +4440,16 @@ export async function playAllMelody() {
                 }
 
                 // Play the bass note(s) with the exact calculated duration
-                piano.triggerAttackRelease(notesToPlay, totalDuration, bassTime);
+                // Use triggerAttack + scheduled triggerRelease for precise duration control
+                // (triggerAttackRelease has natural decay that continues past the release time)
+                notesToPlay.forEach(pitch => {
+                    piano.triggerAttack(pitch, bassTime);
+                });
+                // Schedule explicit release at exact end time
+                const bassReleaseTime = bassTime + totalDuration;
+                notesToPlay.forEach(pitch => {
+                    piano.triggerRelease(pitch, bassReleaseTime);
+                });
 
                 // Add to activeNotes when bass note starts (each pitch in the chord)
                 Tone.Draw.schedule(() => {
@@ -5016,6 +4495,9 @@ export async function playAllMelody() {
             // No fallback release needed - the next chord will release this one via releaseAll
         }
     }, (() => {
+        // Skip if bass playback is disabled
+        if (!includeBass) return [];
+
         // Schedule ALL bass notes from compositionState, not just one per chord
         // This ensures patterns like arpeggio, alberti, boogie etc. play correctly
         // Uses tie-merging approach (same as treble) for seamless playback
@@ -5024,8 +4506,23 @@ export async function playAllMelody() {
             const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
             const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
-            // Build playback order considering repeat signs
-            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+            // Determine effective end measure (defaults to last measure)
+            const measureCount = compositionState.getMeasureCount();
+            const effectiveEndMeasure = endMeasure !== null ? Math.min(endMeasure, measureCount - 1) : measureCount - 1;
+            const effectiveStartMeasure = Math.max(0, startMeasure);
+
+            // Build playback order considering repeat signs, then filter by measure range
+            const fullPlaybackOrder = buildPlaybackMeasureOrder(compositionState);
+
+            // Filter to only include measures in our range
+            // For bounded playback, we use sequential playback positions starting from 0
+            let filteredPlaybackPosition = 0;
+            const playbackOrder = fullPlaybackOrder
+                .filter(({ measureIndex }) => measureIndex >= effectiveStartMeasure && measureIndex <= effectiveEndMeasure)
+                .map(({ measureIndex }) => ({
+                    measureIndex,
+                    playbackPosition: filteredPlaybackPosition++
+                }));
 
             // Helper to compare pitches (handles both single notes and chords)
             const samePitches = (a, b) => {
@@ -5125,7 +4622,8 @@ export async function playAllMelody() {
                     const safeTime = Math.max(0, noteTime);
 
                     // Start with this note's duration - use tuplet-aware AND dotted-aware calculation
-                    let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tuplet, note.dotted);
+                    // Pass tupletType (string) OR tuplet (object) - function handles both formats
+                    let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tupletType || note.tuplet, note.dotted);
 
                     // Look ahead to merge durations of tied continuation notes
                     let j = i + 1;
@@ -5148,7 +4646,8 @@ export async function playAllMelody() {
                         }
 
                         // Merge this continuation note's duration into the total
-                        totalDurationSeconds += getDurationInSeconds(next.duration, tempo, next.tuplet, next.dotted);
+                        // Pass tupletType (string) OR tuplet (object) - function handles both formats
+                        totalDurationSeconds += getDurationInSeconds(next.duration, tempo, next.tupletType || next.tuplet, next.dotted);
 
                         // Advance chain
                         j++;
@@ -5271,8 +4770,24 @@ export async function playAllMelody() {
         const events = [];
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
-            // Use playback order to honor repeat signs
-            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+
+            // Determine effective end measure (defaults to last measure)
+            const measureCount = compositionState.getMeasureCount();
+            const effectiveEndMeasure = endMeasure !== null ? Math.min(endMeasure, measureCount - 1) : measureCount - 1;
+            const effectiveStartMeasure = Math.max(0, startMeasure);
+
+            // Use playback order to honor repeat signs, filtered by measure range
+            const fullPlaybackOrder = buildPlaybackMeasureOrder(compositionState);
+
+            // Filter to only include measures in our range
+            let filteredPlaybackPosition = 0;
+            const playbackOrder = fullPlaybackOrder
+                .filter(({ measureIndex }) => measureIndex >= effectiveStartMeasure && measureIndex <= effectiveEndMeasure)
+                .map(({ measureIndex }) => ({
+                    measureIndex,
+                    playbackPosition: filteredPlaybackPosition++
+                }));
+
             playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
                 const measure = compositionState.getMeasure(measureIndex);
                 const chordIndex = measure?.chord?.chordIndex;
@@ -5296,11 +4811,14 @@ export async function playAllMelody() {
     chordPart.start(0);
     measureHighlightPart.start(0);
 
-    // Calculate total measures for metronome
+    // Calculate total measures for metronome (accounting for measure range)
     let totalMeasuresForMetronome = progressionData.length;
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        totalMeasuresForMetronome = compositionState.getMeasureCount();
+        const measureCount = compositionState.getMeasureCount();
+        const effectiveEndMeasure = endMeasure !== null ? Math.min(endMeasure, measureCount - 1) : measureCount - 1;
+        const effectiveStartMeasure = Math.max(0, startMeasure);
+        totalMeasuresForMetronome = effectiveEndMeasure - effectiveStartMeasure + 1;
     }
 
     // Start metronome if enabled (pass time signature for compound meter support)
@@ -5319,12 +4837,20 @@ export async function playAllMelody() {
         key: getCurrentKey()
     });
 
-    // Calculate total duration - use playback order which accounts for repeats
+    // Calculate total duration - use filtered measure count
     let totalPlaybackMeasures = progressionData.length; // Fallback
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        const playbackOrder = buildPlaybackMeasureOrder(compositionState);
-        totalPlaybackMeasures = playbackOrder.length;
+        const measureCount = compositionState.getMeasureCount();
+        const effectiveEndMeasure = endMeasure !== null ? Math.min(endMeasure, measureCount - 1) : measureCount - 1;
+        const effectiveStartMeasure = Math.max(0, startMeasure);
+
+        // Build playback order and filter to our range
+        const fullPlaybackOrder = buildPlaybackMeasureOrder(compositionState);
+        const filteredOrder = fullPlaybackOrder.filter(
+            ({ measureIndex }) => measureIndex >= effectiveStartMeasure && measureIndex <= effectiveEndMeasure
+        );
+        totalPlaybackMeasures = filteredOrder.length;
     }
     // Add small buffer to ensure last chord finishes (reverb will decay naturally)
     // No need for large buffer since we're releasing notes at exact measure boundaries
@@ -5350,368 +4876,14 @@ export async function playAllMelody() {
 
 /**
  * Play only the chord progression (bass clef) without melody notes
- * Uses the same gapless approach as playAllMelody
+ * Uses the unified playback engine with includeTreble=false.
  */
 export function playProgressionOnly() {
-    // If already playing, stop instead
-    if (isPlayAllActive) {
-        stopPlayAllMelody();
-        return;
-    }
-
-    const progressionData = getProgressionData();
-    const hasChords = progressionData && progressionData.length > 0;
-
-    if (!hasChords) {
-        showAlertModal({
-            title: 'No Chords',
-            message: 'Please add chords first.',
-            type: 'warning'
-        });
-        return;
-    }
-
-    // Stop any currently playing audio immediately
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
-    Tone.Transport.position = 0;
-
-    // Also stop any hold-to-play measures
-    const canvas = document.getElementById('interactive-melody-notation-canvas');
-    if (canvas) {
-        const state = activePlaybackState.get(canvas);
-        if (state && state.isPlaying) {
-            stopMeasurePlayback(canvas);
-        }
-    }
-
-    initAudio();
-    if (!getAudioIsReady()) {
-        toast.warning('Audio not ready. Please wait...');
-        return;
-    }
-
-    const piano = getPiano();
-
-    // Parse time signature (default to 4/4)
-    const [beatsPerMeasure, beatValue] = interactiveMelody.timeSignature.split('/').map(Number);
-    const tempo = interactiveMelody.tempo || 120;
-
-    // Set Transport BPM to match tempo
-    Tone.Transport.bpm.value = tempo;
-
-    // Calculate timing based on time signature and tempo
-    const beatDuration = 60.0 / tempo; // seconds per beat
-    const measureDuration = beatDuration * beatsPerMeasure; // seconds per measure
-
-    // Helper function to update canvas rendering (throttled)
-    let canvasUpdatePending = false;
-    const updateCanvas = () => {
-        if (canvasUpdatePending) return;
-        canvasUpdatePending = true;
-
-        requestAnimationFrame(() => {
-            canvasUpdatePending = false;
-            const canvas = document.getElementById('interactive-melody-notation-canvas');
-            if (canvas && window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            }
-        });
-    };
-
-    // Track the current chord to detect chord changes
-    let lastChordIndex = -1;
-
-    // Schedule chord/bass notes using gapless approach
-    const chordPart = new Tone.Part((time, chordData) => {
-        const chord = chordData.chord;
-        const measureIndex = chordData.measureIndex;
-        const specificNote = chordData.specificNote;
-
-        const chordIndex = specificNote?.chordIndex ?? chord.chordIndex;
-
-        // Detect if this is a new chord
-        const isNewChord = chordIndex !== lastChordIndex;
-
-        // Release previous chord if starting a different chord
-        if (currentlyPlayingChordNotes.length > 0 && isNewChord) {
-            try {
-                piano.releaseAll(time);
-            } catch (e) {
-                // Ignore errors
-            }
-            currentlyPlayingChordNotes = [];
-        }
-
-        lastChordIndex = chordIndex;
-
-        // Read bass notes from compositionState
-        let bassNoteData = [];
-
-        if (chordData.specificNote) {
-            bassNoteData = [chordData.specificNote];
-        } else if (window.getCompositionState) {
-            const compositionState = window.getCompositionState();
-
-            if (compositionState.getMeasureCount() > measureIndex) {
-                const measureData = compositionState.getMeasure(measureIndex);
-                if (measureData && measureData.notation && measureData.notation.bass) {
-                    const bassVoices = measureData.notation.bass.voices || [];
-                    const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
-                    if (allBassNotes.length > 0) {
-                        bassNoteData = allBassNotes.filter(note => note.type !== 'rest');
-                    }
-                }
-            }
-        }
-
-        // Schedule bass notes
-        if (bassNoteData.length > 0) {
-            // Set active measure and chord highlighting
-            Tone.Draw.schedule(() => {
-                if (window.setNotationPlaybackCursor) {
-                    window.setNotationPlaybackCursor(measureIndex, 0);
-                }
-                if (window.isNotationInitialized && window.isNotationInitialized()) {
-                    if (window.setNotationActiveMeasure) {
-                        window.setNotationActiveMeasure(measureIndex);
-                    }
-                }
-                if (chordIndex !== undefined && window.highlightChordCard) {
-                    window.highlightChordCard(chordIndex);
-                }
-            }, time);
-
-            bassNoteData.forEach((bassNote, bassNoteIndex) => {
-                const bassTime = chordData.specificNote ? time : time + (bassNote.beat * beatDuration);
-                const notesToPlay = bassNote.pitches || (bassNote.pitch ? [bassNote.pitch] : []);
-
-                if (notesToPlay.length === 0) return;
-
-                // Use pre-calculated merged duration if available (from tie-merging in event building)
-                // Otherwise calculate using getDurationInSeconds which handles dotted/tuplet notes
-                let totalDuration = bassNote.mergedDuration || getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet, bassNote.dotted);
-
-                // Play the bass notes
-                piano.triggerAttackRelease(notesToPlay, totalDuration, bassTime);
-
-                // Visual feedback
-                Tone.Draw.schedule(() => {
-                    if (bassNoteIndex === 0 && isNewChord) {
-                        currentlyPlayingChordNotes.push(...notesToPlay);
-                    }
-
-                    notesToPlay.forEach(pitch => {
-                        const highlightMeasure = bassNote.sourceMeasureIndex !== undefined ? bassNote.sourceMeasureIndex : measureIndex;
-                        const noteId = `${highlightMeasure}-${bassNote.beat}-${pitch}`;
-                        activeNotes.add(noteId);
-                        if (window.addNotationActiveNote) {
-                            window.addNotationActiveNote(noteId);
-                        }
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) keyEl.classList.add('active-progression');
-                    });
-                    updateCanvas();
-                }, bassTime);
-
-                // Remove highlighting when note ends
-                Tone.Draw.schedule(() => {
-                    notesToPlay.forEach(pitch => {
-                        const highlightMeasure = bassNote.sourceMeasureIndex !== undefined ? bassNote.sourceMeasureIndex : measureIndex;
-                        const noteId = `${highlightMeasure}-${bassNote.beat}-${pitch}`;
-                        activeNotes.delete(noteId);
-                        if (window.removeNotationActiveNote) {
-                            window.removeNotationActiveNote(noteId);
-                        }
-                        const keyEl = document.getElementById(getNoteKeyId(pitch));
-                        if (keyEl) keyEl.classList.remove('active-progression');
-                    });
-                    updateCanvas();
-                }, bassTime + totalDuration);
-            });
-        }
-    }, (() => {
-        // Schedule ALL bass notes from compositionState, respecting repeat signs
-        if (window.getCompositionState) {
-            const compositionState = window.getCompositionState();
-            const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
-            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
-
-            const events = [];
-
-            // Build playback order considering repeat signs
-            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
-
-            playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
-                const measureData = compositionState.getMeasure(measureIndex);
-                const bassVoices = measureData?.notation?.bass?.voices || [];
-
-                if (bassVoices.length === 0) return;
-
-                const chord = measureData.chord || {};
-
-                bassVoices.forEach((bassVoice, voiceIndex) => {
-                    if (!bassVoice || !bassVoice.notes || bassVoice.notes.length === 0) return;
-
-                    bassVoice.notes.forEach((note) => {
-                        if (note.type === 'rest' || note.isRest || note.isTied) return;
-
-                        // Use playbackPosition for timing (not measureIndex)
-                        const measureStartBeat = playbackPosition * beatsPerMeasure;
-                        const noteBeat = note.beat || 0;
-                        const absoluteBeat = measureStartBeat + noteBeat;
-                        const noteTime = absoluteBeat * beatDuration;
-                        const safeTime = Math.max(0, noteTime);
-
-                        const specificNote = {
-                            ...note,
-                            sourceMeasureIndex: measureIndex,
-                            voiceIndex: voiceIndex
-                        };
-
-                        events.push({
-                            time: safeTime,
-                            chord,
-                            measureIndex, // Keep original for highlighting
-                            specificNote
-                        });
-                    });
-                });
-            });
-
-            events.sort((a, b) => a.time - b.time);
-            return events;
-        }
-
-        // Fallback
-        return progressionData.map((chord, index) => ({
-            time: Math.max(0, index * measureDuration),
-            chord: chord,
-            measureIndex: index
-        }));
-    })());
-
-    // Store parts for stopping
-    playAllParts.melodyPart = null;
-    playAllParts.chordPart = chordPart;
-
-    // Clear active notes
-    activeNotes.clear();
-
-    // Initial render
-    const initialCanvas = document.getElementById('interactive-melody-notation-canvas');
-    if (initialCanvas && window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
-    }
-
-    // Set playback state
-    isPlayAllActive = true;
-
-    // Enable global scroll lock during playback
-    window._playbackScrollLock = true;
-
-    if (!window._originalScrollTo) {
-        window._originalScrollTo = window.scrollTo.bind(window);
-        window._originalScrollBy = window.scrollBy.bind(window);
-        window._originalScrollIntoView = Element.prototype.scrollIntoView;
-
-        window.scrollTo = function(...args) {
-            if (!window._playbackScrollLock) {
-                window._originalScrollTo(...args);
-            }
-        };
-        window.scrollBy = function(...args) {
-            if (!window._playbackScrollLock) {
-                window._originalScrollBy(...args);
-            }
-        };
-        Element.prototype.scrollIntoView = function(...args) {
-            if (!window._playbackScrollLock) {
-                window._originalScrollIntoView.apply(this, args);
-            }
-        };
-    }
-
-    updatePlayAllButton();
-    setTimeout(() => updatePlayAllButton(), 50);
-    requestAnimationFrame(() => updatePlayAllButton());
-
-    // Clear any previously tracked chord notes
-    currentlyPlayingChordNotes = [];
-
-    // Schedule chord card highlighting at measure boundaries (respecting repeats)
-    const measureHighlightPart = new Tone.Part((time, data) => {
-        Tone.Draw.schedule(() => {
-            if (window.highlightChordCard && data.chordIndex !== undefined) {
-                window.highlightChordCard(data.chordIndex);
-            }
-            if (window.setNotationActiveMeasure) {
-                window.setNotationActiveMeasure(data.measureIndex);
-            }
-        }, time);
-    }, (() => {
-        const events = [];
-        if (window.getCompositionState) {
-            const compositionState = window.getCompositionState();
-            // Build playback order considering repeat signs
-            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
-
-            playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
-                const measure = compositionState.getMeasure(measureIndex);
-                const chordIndex = measure?.chord?.chordIndex;
-                events.push({
-                    time: playbackPosition * measureDuration,
-                    measureIndex: measureIndex, // Original measure for highlighting
-                    chordIndex: chordIndex
-                });
-            });
-        }
-        return events;
-    })());
-
-    playAllParts.measureHighlightPart = measureHighlightPart;
-
-    // Start parts
-    chordPart.start(0);
-    measureHighlightPart.start(0);
-
-    // Calculate total measures for metronome - use playback order for repeat support
-    let totalMeasuresForMetronome = progressionData.length;
-    if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        const playbackOrder = buildPlaybackMeasureOrder(compositionState);
-        totalMeasuresForMetronome = playbackOrder.length;
-    }
-
-    // Start metronome if enabled (pass time signature for compound meter support)
-    if (getMetronomeEnabled()) {
-        const timeSignatureObj = { num: beatsPerMeasure, denom: beatValue };
-        startMetronome(beatsPerMeasure, totalMeasuresForMetronome, timeSignatureObj);
-    }
-
-    Tone.Transport.start('+0.05');
-
-    // Dispatch event for guided mode tutorials
-    dispatchBuilderEvent('progressionPlayed', {
-        chordCount: progressionData.length,
-        key: getCurrentKey()
+    // Use the unified playback engine with treble disabled
+    playAllMelody({
+        includeTreble: false,
+        includeBass: true
     });
-
-    // Calculate total duration - use playback order for repeat support
-    const totalDuration = totalMeasuresForMetronome * measureDuration + 0.5;
-
-    // Stop after all notes have played
-    Tone.Transport.scheduleOnce(() => {
-        if (!isPlayAllActive) return;
-
-        stopPlayAllMelody();
-        activeNotes.clear();
-
-        const canvas = document.getElementById('interactive-melody-notation-canvas');
-        if (canvas && window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
-        }
-    }, totalDuration);
 }
 
 // ============================================================================

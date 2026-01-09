@@ -1751,6 +1751,8 @@ export class CompositionState {
                     glissando: note.glissando,
                     arpeggio: note.arpeggio,
                     tuplet: note.tuplet,
+                    tupletType: note.tupletType,
+                    tupletGroupId: note.tupletGroupId,
                     fingering: note.fingering,
                     pedal: note.pedal,
                     text: note.text,
@@ -1873,6 +1875,8 @@ export class CompositionState {
                     glissando: note.glissando,
                     arpeggio: note.arpeggio,
                     tuplet: note.tuplet,
+                    tupletType: note.tupletType,
+                    tupletGroupId: note.tupletGroupId,
                     fingering: note.fingering,
                     pedal: note.pedal,
                     text: note.text,
@@ -1938,6 +1942,8 @@ export class CompositionState {
                         glissando: note.glissando,
                         arpeggio: note.arpeggio,
                         tuplet: note.tuplet,
+                        tupletType: note.tupletType,
+                        tupletGroupId: note.tupletGroupId,
                         fingering: note.fingering,
                         pedal: note.pedal,
                         text: note.text,
@@ -2442,6 +2448,8 @@ export class CompositionState {
                             glissando: note.glissando,
                             arpeggio: note.arpeggio,
                             tuplet: note.tuplet,
+                            tupletType: note.tupletType,
+                            tupletGroupId: note.tupletGroupId,
                             fingering: note.fingering,
                             pedal: note.pedal,
                             text: note.text,
@@ -2702,6 +2710,8 @@ export class CompositionState {
                     glissando: isLastPart ? note.glissando : null,
                     arpeggio: isFirstPart ? note.arpeggio : null,
                     tuplet: note.tuplet,
+                    tupletType: note.tupletType,
+                    tupletGroupId: note.tupletGroupId,
                     fingering: isFirstPart ? note.fingering : null,
                     pedal: isFirstPart ? note.pedal : null,
                     text: isFirstPart ? note.text : null,
@@ -3663,6 +3673,8 @@ export class CompositionState {
                 fermata: noteData.fermata,
                 ornament: noteData.ornament,
                 tuplet: noteData.tuplet,
+                tupletType: noteData.tupletType,
+                tupletGroupId: noteData.tupletGroupId,
                 voice: noteData.voice || 1,
                 stemDirection: noteData.stemDirection,
             };
@@ -7528,6 +7540,8 @@ export class CompositionState {
                     if (note.accidentals) attributes.accidentals = note.accidentals;
                     if (note.slur) attributes.slur = note.slur;
                     if (note.tuplet) attributes.tuplet = note.tuplet;
+                    if (note.tupletType) attributes.tupletType = note.tupletType;
+                    if (note.tupletGroupId) attributes.tupletGroupId = note.tupletGroupId;
 
                     trebleBlock.setNote(newStartUnit, note.durationUnits, note.pitches || [], attributes);
                 }

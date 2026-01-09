@@ -16,9 +16,56 @@ import { getBeatsPerMeasureFromTimeSignature } from '../../state/compositionStat
 import { durationToBeats, beatsToDuration } from '../durationUtils.js';
 import { noteToMidi } from '../vexFlowRenderer.js';
 
+// Tuplet ratios - how many notes in the time of how many regular notes
+const TUPLET_RATIOS = {
+    triplet: { actual: 3, normal: 2 },      // 3 notes in time of 2
+    quintuplet: { actual: 5, normal: 4 },   // 5 notes in time of 4
+    sextuplet: { actual: 6, normal: 4 },    // 6 notes in time of 4
+};
+
+/**
+ * Get the effective beat duration for a note, accounting for tuplet timing
+ * @param {string} duration - Base duration (e.g., '8n')
+ * @param {boolean} dotted - Whether the note is dotted
+ * @param {Object} note - Note object (may contain tuplet info)
+ * @returns {number} Effective duration in beats
+ */
+function getEffectiveBeatDuration(duration, dotted, note) {
+    let beats = durationToBeats(duration, dotted);
+
+    // Check for tuplet - can be stored in multiple ways
+    const tupletType = note?.tupletType || note?.tuplet?.type;
+    if (tupletType && TUPLET_RATIOS[tupletType]) {
+        const ratio = TUPLET_RATIOS[tupletType];
+        beats = beats * (ratio.normal / ratio.actual);
+    }
+
+    return beats;
+}
+
+/**
+ * Check if a note is part of a tuplet
+ * @param {Object} note - Note object
+ * @returns {boolean} True if note is part of a tuplet
+ */
+function isTupletNote(note) {
+    return !!(note?.tupletGroupId || note?.tupletType || note?.tuplet?.groupId || note?.tuplet?.type);
+}
+
+/**
+ * Get the tuplet group ID from a note (handles various formats)
+ * @param {Object} note - Note object
+ * @returns {string|null} Tuplet group ID or null
+ */
+function getTupletGroupId(note) {
+    return note?.tupletGroupId || note?.tuplet?.groupId || null;
+}
+
 // Constants
-export const UNITS_PER_SLOT = 6;  // 32nd note = smallest slot
-export const SLOTS_PER_BEAT = UNITS_PER_BEAT / UNITS_PER_SLOT;  // 48 / 6 = 8 slots per beat
+// Use 1 unit per slot to match the underlying 48-units-per-beat system exactly
+// This allows perfect representation of triplets (48/3=16 slots) and other tuplets
+export const UNITS_PER_SLOT = 1;  // 1 unit = 1 slot for maximum precision
+export const SLOTS_PER_BEAT = UNITS_PER_BEAT / UNITS_PER_SLOT;  // 48 / 1 = 48 slots per beat
 
 /**
  * Slot types
@@ -85,6 +132,13 @@ export class SlotGrid {
         // Track the original measure data for comparison (array for multi-measure)
         this.originalMeasure = null;
         this.originalMeasures = [];
+
+        // Store tuplet groups separately - these are preserved exactly as-is
+        // Structure: { treble: { voiceIndex: { groupId: { notes: [...], startBeat, endBeat } } }, bass: {...} }
+        this.tupletGroups = {
+            treble: [{}, {}],  // [v0 groups, v1 groups]
+            bass: [{}, {}]
+        };
     }
 
     /**
@@ -197,6 +251,142 @@ export class SlotGrid {
     }
 
     /**
+     * Calculate corrected beat positions for tuplet groups
+     * When tuplets are created, their beat positions may be stored as regular note spacing
+     * (e.g., 0, 0.5, 1, 1.5, 2 for 5 eighth notes) instead of true tuplet spacing
+     * (e.g., 0, 0.4, 0.8, 1.2, 1.6 for quintuplet eighths in 2 beats)
+     *
+     * Also handles incomplete tuplet groups (e.g., 3 notes remaining from a quintuplet)
+     * by stripping tuplet attributes and converting to regular notes.
+     *
+     * This function identifies tuplet groups and recalculates correct positions
+     * @private
+     * @param {Array} notes - Array of note objects
+     * @returns {Object} Map of noteIndex -> correctedBeat (only for tuplet notes needing correction)
+     */
+    _calculateCorrectedTupletBeats(notes) {
+        const correctedBeats = {};
+
+        // Group notes by tupletGroupId
+        const tupletGroups = {};
+        notes.forEach((note, idx) => {
+            const groupId = note.tupletGroupId || note.tuplet?.groupId;
+            if (groupId) {
+                if (!tupletGroups[groupId]) {
+                    tupletGroups[groupId] = [];
+                }
+                tupletGroups[groupId].push({ note, idx });
+            }
+        });
+
+        // Process each tuplet group
+        for (const groupId of Object.keys(tupletGroups)) {
+            const group = tupletGroups[groupId];
+            if (group.length < 2) continue;
+
+            // Get tuplet type from first note
+            const firstNote = group[0].note;
+            const tupletType = firstNote.tupletType || firstNote.tuplet?.type;
+            const ratio = TUPLET_RATIOS[tupletType];
+
+            if (!ratio) {
+                console.warn(`[SlotGrid] Unknown tuplet type: ${tupletType}`);
+                continue;
+            }
+
+            // Check if tuplet group is incomplete (fewer notes than expected)
+            const expectedNotes = ratio.actual;
+            const actualNotes = group.length;
+
+            if (actualNotes < expectedNotes) {
+                console.log(`[SlotGrid] Incomplete tuplet group ${groupId}: ${actualNotes}/${expectedNotes} notes - stripping tuplet attributes and recalculating beats`);
+
+                // Sort by original beat position first
+                group.sort((a, b) => {
+                    const beatA = a.note.beat !== undefined ? a.note.beat : 0;
+                    const beatB = b.note.beat !== undefined ? b.note.beat : 0;
+                    return beatA - beatB;
+                });
+
+                // Get the start beat from the first note
+                const groupStartBeat = group[0].note.beat !== undefined ? group[0].note.beat : 0;
+
+                // Strip tuplet attributes and recalculate beat positions
+                group.forEach((item, positionInGroup) => {
+                    // Clear tuplet attributes from the note
+                    item.note.tuplet = null;
+                    item.note.tupletGroupId = null;
+                    item.note.tupletType = null;
+
+                    // Convert tuplet duration to normal duration (e.g., '8q' -> '8n')
+                    let baseDurationBeats = 0.5; // Default to eighth note
+                    if (item.note.duration) {
+                        const match = item.note.duration.match(/^(\d+)[tqx]$/);
+                        if (match) {
+                            item.note.duration = match[1] + 'n';
+                            // Calculate the base duration in beats
+                            const durationMap = { '1': 4, '2': 2, '4': 1, '8': 0.5, '16': 0.25, '32': 0.125 };
+                            baseDurationBeats = durationMap[match[1]] || 0.5;
+                        }
+                    }
+
+                    // Recalculate beat position based on regular note spacing
+                    // Each note now takes its full duration (e.g., 0.5 beats for eighth notes)
+                    const newBeat = groupStartBeat + (positionInGroup * baseDurationBeats);
+                    correctedBeats[item.idx] = newBeat;
+                    console.log(`[SlotGrid]   Note ${item.idx}: original beat=${item.note.beat}, new beat=${newBeat} (converted to regular ${item.note.duration})`);
+                });
+
+                continue;
+            }
+
+            // Get the start beat of the tuplet group (from the first note)
+            const startBeat = firstNote.beat !== undefined ? firstNote.beat : 0;
+
+            // Calculate duration of each tuplet note
+            // The effective duration accounts for the tuplet ratio
+            const noteDurationBeats = getEffectiveBeatDuration(firstNote.duration, firstNote.dotted, firstNote);
+
+            // Sort group by original beat position to get note order
+            group.sort((a, b) => {
+                const beatA = a.note.beat !== undefined ? a.note.beat : 0;
+                const beatB = b.note.beat !== undefined ? b.note.beat : 0;
+                return beatA - beatB;
+            });
+
+            // Calculate what the beat spacing SHOULD be for this tuplet
+            // For quintuplet eighths: each note takes 0.4 beats (2 beats / 5 notes)
+            // For triplet eighths: each note takes 0.333... beats (1 beat / 3 notes)
+            const tupletNoteSpacing = noteDurationBeats;
+
+            // Check if beats are already correct by comparing spacing
+            const actualFirstBeat = group[0].note.beat !== undefined ? group[0].note.beat : 0;
+            const actualSecondBeat = group.length > 1 ? (group[1].note.beat !== undefined ? group[1].note.beat : 0) : 0;
+            const actualSpacing = actualSecondBeat - actualFirstBeat;
+
+            // If the actual spacing is close to the expected tuplet spacing, beats are correct
+            const spacingTolerance = 0.05;
+            const spacingIsCorrect = Math.abs(actualSpacing - tupletNoteSpacing) < spacingTolerance;
+
+            if (spacingIsCorrect) {
+                // Beats are already correct, no correction needed
+                console.log(`[SlotGrid] Tuplet group ${groupId}: beats already correct (spacing=${actualSpacing.toFixed(3)}, expected=${tupletNoteSpacing.toFixed(3)})`);
+                continue;
+            }
+
+            // Recalculate correct beat positions for each note in the group
+            console.log(`[SlotGrid] Tuplet group ${groupId}: correcting beats (actualSpacing=${actualSpacing.toFixed(3)}, expectedSpacing=${tupletNoteSpacing.toFixed(3)})`);
+            group.forEach((item, positionInGroup) => {
+                const correctedBeat = startBeat + (positionInGroup * tupletNoteSpacing);
+                correctedBeats[item.idx] = correctedBeat;
+                console.log(`[SlotGrid]   Note ${item.idx}: original=${item.note.beat}, corrected=${correctedBeat.toFixed(4)}`);
+            });
+        }
+
+        return correctedBeats;
+    }
+
+    /**
      * Load voices from notation format into slots
      * @private
      * @param {string} clef - 'treble' or 'bass'
@@ -210,17 +400,75 @@ export class SlotGrid {
             const notes = voice.notes || [];
             let currentBeat = 0;
 
+            // CRITICAL: Pre-process tuplet groups to fix incorrect beat positions
+            // The source data often has wrong beat values (regular note spacing instead of tuplet spacing)
+            // We need to recalculate correct positions based on tuplet ratios
+            const correctedBeats = this._calculateCorrectedTupletBeats(notes);
+
+            // DEBUG: Log tuplet notes being loaded
+            const tupletNotes = notes.filter(n => n.tuplet || n.tupletGroupId || n.tupletType);
+            if (tupletNotes.length > 0) {
+                console.log(`[SlotGrid._loadVoicesToSlots] Loading ${tupletNotes.length} tuplet notes in ${clef} voice ${voiceIndex}:`,
+                    tupletNotes.map((n, idx) => {
+                        const noteIdx = notes.indexOf(n);
+                        return {
+                            pitch: n.pitches?.[0] || n.pitch,
+                            originalBeat: n.beat,
+                            correctedBeat: correctedBeats[noteIdx],
+                            duration: n.duration,
+                            tupletType: n.tupletType || n.tuplet?.type,
+                            tupletGroupId: n.tupletGroupId || n.tuplet?.groupId
+                        };
+                    })
+                );
+            }
+
             notes.forEach((note, noteIndex) => {
-                // Get beat position - use note.beat if available, otherwise use running total
-                const noteBeat = note.beat !== undefined ? note.beat : currentBeat;
+                // Use corrected beat position for tuplets, otherwise original beat
+                const noteBeat = correctedBeats[noteIndex] !== undefined
+                    ? correctedBeats[noteIndex]
+                    : (note.beat !== undefined ? note.beat : currentBeat);
                 // Local slot index within the measure
                 const localSlotIndex = Math.round(noteBeat * SLOTS_PER_BEAT);
                 // Global slot index including offset for multi-measure
                 const slotIndex = slotOffset + localSlotIndex;
 
-                // Get duration in beats, then convert to slots
-                const durationBeats = durationToBeats(note.duration, note.dotted);
-                const durationSlots = Math.round(durationBeats * SLOTS_PER_BEAT);
+                // Get duration in beats, accounting for tuplet timing
+                const durationBeats = getEffectiveBeatDuration(note.duration, note.dotted, note);
+                let durationSlots = Math.max(1, Math.round(durationBeats * SLOTS_PER_BEAT));
+
+                // CRITICAL FIX: For tuplet notes, calculate durationSlots to fill gap to next note
+                // This prevents rounding errors from creating small gaps between tuplet notes
+                const isTuplet = note.tuplet || note.tupletGroupId || note.tupletType;
+                if (isTuplet) {
+                    const groupId = note.tupletGroupId || note.tuplet?.groupId;
+                    // Find next note in same tuplet group
+                    let nextTupletNoteIndex = -1;
+                    for (let i = noteIndex + 1; i < notes.length; i++) {
+                        const nextNote = notes[i];
+                        const nextGroupId = nextNote.tupletGroupId || nextNote.tuplet?.groupId;
+                        if (nextGroupId === groupId) {
+                            nextTupletNoteIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (nextTupletNoteIndex !== -1) {
+                        // Calculate slot of next tuplet note
+                        const nextNoteBeat = correctedBeats[nextTupletNoteIndex] !== undefined
+                            ? correctedBeats[nextTupletNoteIndex]
+                            : (notes[nextTupletNoteIndex].beat !== undefined ? notes[nextTupletNoteIndex].beat : 0);
+                        const nextSlotIndex = slotOffset + Math.round(nextNoteBeat * SLOTS_PER_BEAT);
+                        // Duration extends from current slot to next note's slot
+                        durationSlots = Math.max(1, nextSlotIndex - slotIndex);
+                    }
+                    // For last note in tuplet group, keep the calculated durationSlots
+                }
+
+                // DEBUG: Log each tuplet note placement
+                if (isTuplet) {
+                    console.log(`[SlotGrid._loadVoicesToSlots] Tuplet note ${noteIndex}: originalBeat=${note.beat}, correctedBeat=${noteBeat}, slotIndex=${slotIndex}, durationBeats=${durationBeats}, durationSlots=${durationSlots}, type=${note.tupletType || note.tuplet?.type}`);
+                }
 
                 if (slotIndex >= 0 && slotIndex < this.totalSlots) {
                     if (note.isRest || note.type === 'rest') {
@@ -250,12 +498,18 @@ export class SlotGrid {
                             }
                         }
 
+                        // Extract tuplet properties - check both direct properties and nested tuplet object
+                        const tupletGroupId = note.tupletGroupId || note.tuplet?.groupId || null;
+                        const tupletType = note.tupletType || note.tuplet?.type || null;
+
                         this._setSlotContent(clef, voiceIndex, slotIndex, {
                             type: SLOT_TYPES.NOTE_START,
                             pitches: pitches,
                             duration: note.duration,
                             dotted: note.dotted || false,
                             durationSlots: durationSlots,
+                            // Store original beat position for tuplet notes (critical for accurate export)
+                            originalBeat: note.beat,
                             // Preserve other note properties
                             articulation: note.articulation,
                             dynamic: note.dynamic,
@@ -266,7 +520,14 @@ export class SlotGrid {
                             fermata: note.fermata,
                             slur: note.slur,
                             stemDirection: note.stemDirection,
-                            voice: note.voice
+                            voice: note.voice,
+                            // Tuplet properties - stored both as nested object and flat properties
+                            tuplet: note.tuplet,
+                            tupletGroupId: tupletGroupId,
+                            tupletType: tupletType,
+                            // Beam properties
+                            beam: note.beam,
+                            beamControl: note.beamControl
                         });
                     }
                 }
@@ -473,10 +734,10 @@ export class SlotGrid {
      */
     getSlotsPerFeltBeat() {
         if (this.isCompoundMeter()) {
-            // Compound: dotted quarter = 1.5 beats = 12 slots
+            // Compound: dotted quarter = 1.5 beats = 72 slots (with 48 slots/beat)
             return SLOTS_PER_BEAT * 1.5;
         }
-        // Simple: quarter = 1 beat = 8 slots
+        // Simple: quarter = 1 beat = 48 slots
         return SLOTS_PER_BEAT;
     }
 
@@ -491,14 +752,15 @@ export class SlotGrid {
         const localSlot = slotIndex % this.slotsPerMeasure;
 
         if (this.isCompoundMeter()) {
-            // Compound meter (6/8, 9/8, 12/8): group by dotted quarters (12 slots each)
-            const slotsPerFeltBeat = 12;  // dotted quarter = 1.5 * 8 slots
+            // Compound meter (6/8, 9/8, 12/8): group by dotted quarters
+            // Dotted quarter = 1.5 beats × 48 slots/beat = 72 slots
+            const slotsPerFeltBeat = Math.round(1.5 * SLOTS_PER_BEAT);  // 72 slots
             const feltBeat = Math.floor(localSlot / slotsPerFeltBeat) + 1;
             const subBeat = localSlot % slotsPerFeltBeat;
 
             // In compound, each felt beat divides into 3 equal parts (triplet feel)
-            // Each part = 4 slots (eighth note)
-            const eighthNoteSlots = 4;  // 8th note = 0.5 beat = 4 slots
+            // Each part = 24 slots (eighth note = 0.5 beat × 48 = 24 slots)
+            const eighthNoteSlots = SLOTS_PER_BEAT / 2;  // 24 slots
 
             return {
                 beat: feltBeat,
@@ -518,8 +780,8 @@ export class SlotGrid {
                 beat,
                 subBeat,
                 isDownbeat: subBeat === 0,
-                isHalfBeat: subBeat === SLOTS_PER_BEAT / 2,  // 4 for 8 slots/beat
-                isQuarterBeat: subBeat % (SLOTS_PER_BEAT / 4) === 0,  // Every 2 slots
+                isHalfBeat: subBeat === SLOTS_PER_BEAT / 2,  // 24 for 48 slots/beat
+                isQuarterBeat: subBeat % (SLOTS_PER_BEAT / 4) === 0,  // Every 12 slots
                 isTripletBeat: false,
                 isCompound: false
             };
@@ -661,13 +923,44 @@ export class SlotGrid {
                     i++;
                 } else if (slot.type === SLOT_TYPES.NOTE_START) {
                     // Convert note to notation format
-                    const beat = i / SLOTS_PER_BEAT;
+                    const calculatedBeat = i / SLOTS_PER_BEAT;
                     const notePitches = slot.pitches || [];
 
-                    // IMPORTANT: Recalculate duration from actual durationSlots
-                    // This ensures truncated notes get the correct shorter duration
-                    const actualSlots = slot.durationSlots || 1;
-                    const { duration: actualDuration, dotted: actualDotted } = slotsToDuration(actualSlots);
+                    // For tuplet notes, preserve original duration and beat position
+                    // For non-tuplet notes, recalculate from slots (handles truncation)
+                    const isTupletNote = slot.tupletGroupId || slot.tupletType || slot.tuplet;
+                    let actualDuration, actualDotted, actualBeat;
+
+                    // DEBUG: Log tuplet note export
+                    if (isTupletNote) {
+                        console.log(`[SlotGrid._voiceSlotsToNotation] Exporting tuplet note at slot ${i}:`, {
+                            pitches: notePitches,
+                            calculatedBeat,
+                            originalBeat: slot.originalBeat,
+                            duration: slot.duration,
+                            durationSlots: slot.durationSlots,
+                            tupletType: slot.tupletType,
+                            tupletGroupId: slot.tupletGroupId,
+                            tuplet: slot.tuplet
+                        });
+                    }
+
+                    if (isTupletNote && slot.duration) {
+                        // Preserve original duration for tuplet notes
+                        actualDuration = slot.duration;
+                        actualDotted = slot.dotted || false;
+                        // CRITICAL: Use calculatedBeat (from slot position) NOT originalBeat
+                        // The slot position has been corrected during import via _calculateCorrectedTupletBeats
+                        // The originalBeat may have been wrong (e.g., regular 8th spacing instead of tuplet spacing)
+                        actualBeat = calculatedBeat;
+                    } else {
+                        // Recalculate duration from actual durationSlots for regular notes
+                        const actualSlots = slot.durationSlots || 1;
+                        const durationResult = slotsToDuration(actualSlots);
+                        actualDuration = durationResult.duration;
+                        actualDotted = durationResult.dotted;
+                        actualBeat = calculatedBeat;
+                    }
 
                     notes.push({
                         pitches: notePitches,
@@ -675,7 +968,7 @@ export class SlotGrid {
                         pitch: notePitches.length > 0 ? notePitches[0] : undefined,
                         duration: actualDuration,
                         dotted: actualDotted,
-                        beat: beat,
+                        beat: actualBeat,
                         type: 'note',  // Required for playback to work
                         isRest: false,
                         // Preserve all note properties
@@ -688,10 +981,28 @@ export class SlotGrid {
                         fermata: slot.fermata,
                         slur: slot.slur,
                         stemDirection: slot.stemDirection,
-                        voice: v
+                        voice: v,
+                        // Tuplet properties
+                        tuplet: slot.tuplet,
+                        tupletGroupId: slot.tupletGroupId,
+                        tupletType: slot.tupletType,
+                        // Beam properties
+                        beam: slot.beam,
+                        beamControl: slot.beamControl
                     });
-                    // Skip the duration of this note
-                    i += actualSlots;
+                    // CRITICAL FIX: For tuplet notes, we must iterate slot-by-slot to avoid
+                    // missing notes due to rounding errors in beat/slot calculations.
+                    // Tuplet note positions and durations can have fractional slots that
+                    // round differently, causing misalignment.
+                    // For non-tuplet notes, skip by durationSlots for efficiency.
+                    if (isTupletNote) {
+                        // Move to next slot (will skip CONTINUATIONs via the earlier check)
+                        i++;
+                    } else {
+                        // Skip the duration of this note
+                        const actualSlots = slot.durationSlots || 1;
+                        i += actualSlots;
+                    }
                 } else if (slot.type === SLOT_TYPES.REST) {
                     // User-placed rest
                     const beat = i / SLOTS_PER_BEAT;
@@ -729,7 +1040,24 @@ export class SlotGrid {
                 }
             }
 
-            voices.push({ notes });
+            // DEBUG: Log summary of exported notes including tuplets
+            const tupletNotesExported = notes.filter(n => n.tuplet || n.tupletGroupId || n.tupletType);
+            if (tupletNotesExported.length > 0) {
+                console.log(`[SlotGrid._voiceSlotsToNotation] EXPORT SUMMARY - ${tupletNotesExported.length} tuplet notes from ${clef} voice ${v}:`,
+                    tupletNotesExported.map(n => ({
+                        pitch: n.pitches?.[0] || n.pitch,
+                        beat: n.beat,
+                        duration: n.duration,
+                        tupletType: n.tupletType || n.tuplet?.type,
+                        tupletGroupId: n.tupletGroupId || n.tuplet?.groupId
+                    }))
+                );
+            }
+
+            // Merge consecutive rests into optimal single rests
+            const mergedNotes = this._mergeConsecutiveRests(notes);
+
+            voices.push({ notes: mergedNotes });
         }
 
         return voices;
@@ -845,13 +1173,33 @@ export class SlotGrid {
                     i++;
                 } else if (slot.type === SLOT_TYPES.NOTE_START) {
                     // Convert note to notation format with local beat
-                    const localBeat = (i - startSlot) / SLOTS_PER_BEAT;
+                    const calculatedLocalBeat = (i - startSlot) / SLOTS_PER_BEAT;
                     const notePitches = slot.pitches || [];
 
                     // Calculate actual slots (may be truncated at measure boundary)
                     const noteEndSlot = i + (slot.durationSlots || 1);
                     const slotsInThisMeasure = Math.min(noteEndSlot, endSlot) - i;
-                    const { duration: actualDuration, dotted: actualDotted } = slotsToDuration(slotsInThisMeasure);
+
+                    // For tuplet notes, preserve original duration but use calculated beat
+                    // For non-tuplet notes, recalculate from slots (handles truncation)
+                    const isTupletNote = slot.tupletGroupId || slot.tupletType || slot.tuplet;
+                    let actualDuration, actualDotted, actualBeat;
+
+                    if (isTupletNote && slot.duration) {
+                        // Preserve original duration for tuplet notes
+                        actualDuration = slot.duration;
+                        actualDotted = slot.dotted || false;
+                        // CRITICAL: Use calculatedLocalBeat (from slot position) NOT originalBeat
+                        // The slot position has been corrected during import via _calculateCorrectedTupletBeats
+                        // The originalBeat may have been wrong (e.g., regular 8th spacing instead of tuplet spacing)
+                        actualBeat = calculatedLocalBeat;
+                    } else {
+                        // Recalculate duration from actual slots for regular notes
+                        const durationResult = slotsToDuration(slotsInThisMeasure);
+                        actualDuration = durationResult.duration;
+                        actualDotted = durationResult.dotted;
+                        actualBeat = calculatedLocalBeat;
+                    }
 
                     // Determine tie status
                     const originallyTied = slot.tied;
@@ -862,7 +1210,7 @@ export class SlotGrid {
                         pitch: notePitches.length > 0 ? notePitches[0] : undefined,
                         duration: actualDuration,
                         dotted: actualDotted,
-                        beat: localBeat,
+                        beat: actualBeat,
                         type: 'note',
                         isRest: false,
                         articulation: slot.articulation,
@@ -874,7 +1222,14 @@ export class SlotGrid {
                         fermata: slot.fermata,
                         slur: slot.slur,
                         stemDirection: slot.stemDirection,
-                        voice: v
+                        voice: v,
+                        // Tuplet properties
+                        tuplet: slot.tuplet,
+                        tupletGroupId: slot.tupletGroupId,
+                        tupletType: slot.tupletType,
+                        // Beam properties
+                        beam: slot.beam,
+                        beamControl: slot.beamControl
                     });
                     i += slotsInThisMeasure;
                 } else if (slot.type === SLOT_TYPES.REST) {
@@ -908,7 +1263,10 @@ export class SlotGrid {
                 }
             }
 
-            voices.push({ notes });
+            // Merge consecutive rests into optimal single rests
+            const mergedNotes = this._mergeConsecutiveRests(notes);
+
+            voices.push({ notes: mergedNotes });
         }
 
         return voices;
@@ -945,18 +1303,19 @@ export class SlotGrid {
         let currentSlot = startSlot;
 
         // Standard durations in slots (largest to smallest)
+        // With 48 slots per beat, durations are: whole=192, half=96, quarter=48, etc.
         // We prefer undotted durations for cleaner notation
         const DURATION_OPTIONS = [
-            { slots: 32, duration: '1n', dotted: false },    // Whole note = 4 beats = 32 slots
-            { slots: 24, duration: '2n', dotted: true },     // Dotted half = 3 beats = 24 slots
-            { slots: 16, duration: '2n', dotted: false },    // Half note = 2 beats = 16 slots
-            { slots: 12, duration: '4n', dotted: true },     // Dotted quarter = 1.5 beats = 12 slots
-            { slots: 8, duration: '4n', dotted: false },     // Quarter = 1 beat = 8 slots
-            { slots: 6, duration: '8n', dotted: true },      // Dotted eighth = 0.75 beats = 6 slots
-            { slots: 4, duration: '8n', dotted: false },     // Eighth = 0.5 beats = 4 slots
-            { slots: 3, duration: '16n', dotted: true },     // Dotted 16th = 0.375 beats = 3 slots
-            { slots: 2, duration: '16n', dotted: false },    // 16th = 0.25 beats = 2 slots
-            { slots: 1, duration: '32n', dotted: false },    // 32nd = 0.125 beats = 1 slot
+            { slots: 192, duration: '1n', dotted: false },   // Whole note = 4 beats × 48 = 192 slots
+            { slots: 144, duration: '2n', dotted: true },    // Dotted half = 3 beats × 48 = 144 slots
+            { slots: 96, duration: '2n', dotted: false },    // Half note = 2 beats × 48 = 96 slots
+            { slots: 72, duration: '4n', dotted: true },     // Dotted quarter = 1.5 beats × 48 = 72 slots
+            { slots: 48, duration: '4n', dotted: false },    // Quarter = 1 beat × 48 = 48 slots
+            { slots: 36, duration: '8n', dotted: true },     // Dotted eighth = 0.75 beats × 48 = 36 slots
+            { slots: 24, duration: '8n', dotted: false },    // Eighth = 0.5 beats × 48 = 24 slots
+            { slots: 18, duration: '16n', dotted: true },    // Dotted 16th = 0.375 beats × 48 = 18 slots
+            { slots: 12, duration: '16n', dotted: false },   // 16th = 0.25 beats × 48 = 12 slots
+            { slots: 6, duration: '32n', dotted: false },    // 32nd = 0.125 beats × 48 = 6 slots
         ];
 
         while (remainingSlots > 0) {
@@ -969,13 +1328,13 @@ export class SlotGrid {
                     // Prefer rests that start on beat boundaries
                     const beatInfo = this.getSlotBeatInfo(currentSlot);
 
-                    // For whole/half rests, prefer starting on downbeats
-                    if (option.slots >= 16 && !beatInfo.isDownbeat) {
+                    // For whole/half rests (>=96 slots = 2+ beats), prefer starting on downbeats
+                    if (option.slots >= 96 && !beatInfo.isDownbeat) {
                         continue;
                     }
 
-                    // For quarter rests, prefer starting on beat boundaries
-                    if (option.slots >= 8 && !beatInfo.isDownbeat && !beatInfo.isHalfBeat) {
+                    // For quarter rests (>=48 slots = 1 beat), prefer starting on beat boundaries
+                    if (option.slots >= 48 && !beatInfo.isDownbeat && !beatInfo.isHalfBeat) {
                         continue;
                     }
 
@@ -996,6 +1355,81 @@ export class SlotGrid {
         }
 
         return rests;
+    }
+
+    /**
+     * Merge consecutive rests into optimal single rests
+     * For example: 8th rest + dotted quarter rest at consecutive beats → half rest
+     * @private
+     * @param {Array} notes - Array of note/rest objects
+     * @returns {Array} Array with consecutive rests merged
+     */
+    _mergeConsecutiveRests(notes) {
+        if (notes.length === 0) return notes;
+
+        const result = [];
+        let i = 0;
+
+        while (i < notes.length) {
+            const current = notes[i];
+
+            // If not a rest, just add it and continue
+            if (!current.isRest) {
+                result.push(current);
+                i++;
+                continue;
+            }
+
+            // Found a rest - look for consecutive rests to merge
+            let totalSlots = durationToSlots(current.duration, current.dotted);
+            let restStartBeat = current.beat;
+            let lastRestIndex = i;
+
+            // Scan ahead for consecutive rests
+            for (let j = i + 1; j < notes.length; j++) {
+                const next = notes[j];
+                if (!next.isRest) break;
+
+                // Check if this rest is consecutive (starts right after previous ends)
+                const expectedNextBeat = restStartBeat + (totalSlots / SLOTS_PER_BEAT);
+                const tolerance = 0.01; // Small tolerance for floating point
+                if (Math.abs(next.beat - expectedNextBeat) > tolerance) break;
+
+                // Merge this rest
+                totalSlots += durationToSlots(next.duration, next.dotted);
+                lastRestIndex = j;
+            }
+
+            // If we merged multiple rests, generate optimal rest(s) for the total duration
+            if (lastRestIndex > i) {
+                const optimalRests = this._generateOptimalRests(
+                    Math.round(restStartBeat * SLOTS_PER_BEAT),
+                    totalSlots
+                );
+
+                // Add the optimal rests (usually just one if they combine well)
+                optimalRests.forEach(rest => {
+                    result.push({
+                        pitches: [],
+                        duration: rest.duration,
+                        dotted: rest.dotted,
+                        beat: rest.beat,
+                        isRest: true,
+                        type: 'rest',
+                        voice: current.voice,
+                        _restDisplay: current._restDisplay
+                    });
+                });
+
+                i = lastRestIndex + 1;
+            } else {
+                // Single rest, just add it
+                result.push(current);
+                i++;
+            }
+        }
+
+        return result;
     }
 
     /**

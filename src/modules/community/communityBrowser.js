@@ -12,6 +12,7 @@ import { getInvertedChordNotes } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS } from '../../data/music-data.js';
 import { submitFlag } from '../admin/adminService.js';
 import { toast } from '../ui/toastNotifications.js';
+import { showConfirmModal } from '../ui/modals.js';
 import { renderCommentsSection } from './commentsSection.js';
 import { createBookmarkButton, showBookmarksModal } from './bookmarkButton.js';
 
@@ -2303,9 +2304,15 @@ export async function loadCommunitySubmission(submissionId) {
 
         if (isFullComposition) {
             // Full compositions: use saved key (specific pitches matter)
-            // Just confirm before loading
-            const confirmMsg = `Load "${submission.title}" into your workspace?\n\nThis full composition will replace your current work including melody and bass.`;
-            if (!confirm(confirmMsg)) {
+            // Confirm before loading
+            const confirmed = await showConfirmModal({
+                title: 'Load Full Composition',
+                message: `Load "${submission.title}" into your workspace?\n\nThis full composition will replace your current work including melody and bass.`,
+                confirmText: 'Load',
+                cancelText: 'Cancel',
+                danger: false
+            });
+            if (!confirmed) {
                 return;
             }
             targetKey = originalKey;

@@ -381,6 +381,11 @@ Tailwind's `text-white` class will NOT work due to the `-webkit-text-fill-color`
 
 **NEVER use native browser `alert()`, `prompt()`, or `confirm()` dialogs. Use the themed alternatives instead.**
 
+This is a **hard requirement** that applies to:
+- **New code:** Always use `toast` or `showConfirmModal`/`showPromptModal`/`showAlertModal`
+- **Existing code:** If you encounter native dialogs, migrate them to the themed system immediately
+- **All interactions:** Even "simple" confirmations must use `showConfirmModal()`, not `confirm()`
+
 This project has a themed notification system that provides a consistent, non-blocking user experience.
 
 ### Toast Notifications (Non-blocking, Auto-dismiss)
@@ -627,6 +632,17 @@ Notes have MANY properties beyond just pitch and duration:
 - `lyric` (syllable text)
 - `pedal` (down, up, half, change)
 - `slur`, `beam`, `stemDirection`, `velocity`, etc.
+- **CRITICAL FOR PLAYBACK:** `tuplet`, `tupletType`, `tupletGroupId` (see below)
+
+### Tuplet Properties - THREE Formats Must Be Preserved
+
+Tuplet information is stored in **THREE different formats** across the codebase. ALL THREE must be preserved when copying notes, or playback duration will be wrong:
+
+1. **`note.tuplet`** - Object format: `{ type: 'triplet', groupId: 'abc123', actual: 3, normal: 2 }`
+2. **`note.tupletType`** - Flat string format: `'triplet'`, `'quintuplet'`, `'sextuplet'`
+3. **`note.tupletGroupId`** - Flat string for grouping notes in the same tuplet
+
+The playback engine checks `note.tupletType || note.tuplet` to determine note duration. If either is missing, tuplet notes will play with wrong duration (resonating too long).
 
 Previously, code that copied notes manually would forget properties, causing them to be lost during:
 - `.imtl` file import

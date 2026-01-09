@@ -117,7 +117,14 @@ export function isDotted(note) {
  */
 export function getBaseDuration(duration) {
   if (!duration) return '4n';
-  return duration.replace('.', '');
+  // Remove dot suffix and tuplet suffixes (t=triplet, q=quintuplet, x=sextuplet)
+  // e.g., '8n.' → '8n', '8t' → '8n', '8q' → '8n', '8x' → '8n'
+  let base = duration.replace('.', '');
+  // Handle tuplet suffixes - convert to normal duration
+  if (base.endsWith('t') || base.endsWith('q') || base.endsWith('x')) {
+    base = base.slice(0, -1) + 'n';
+  }
+  return base;
 }
 
 // ============================================================================

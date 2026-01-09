@@ -73,8 +73,14 @@ export function copyNoteWithAllProperties(note, voiceIndex = 0) {
     isTied: note.isTied,
     slur: note.slur || null,
 
-    // Tuplet and voice
+    // Tuplet and voice - IMPORTANT: Notes store tuplet info in THREE possible ways:
+    // 1. note.tuplet (object with type, groupId, actual, normal)
+    // 2. note.tupletType (flat string: 'triplet', 'quintuplet', 'sextuplet')
+    // 3. note.tupletGroupId (flat string for grouping)
+    // ALL THREE must be preserved for playback to work correctly!
     tuplet: note.tuplet || null,
+    tupletType: note.tupletType || null,
+    tupletGroupId: note.tupletGroupId || null,
     voiceIndex: voiceIndex,
 
     // Accidentals
@@ -991,6 +997,8 @@ export class NotationComposer {
               isChordTone: note.isChordTone,
               isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
               tuplet: note.tuplet || null,  // CRITICAL: Preserve tuplet grouping for rendering
+              tupletType: note.tupletType || null,  // CRITICAL: Flat tuplet type for playback
+              tupletGroupId: note.tupletGroupId || null,  // CRITICAL: Tuplet group ID for playback
               voiceIndex: voiceIndex,  // CRITICAL: Track which voice this note belongs to
               _restDisplay: note._restDisplay,  // CRITICAL: Preserve cue/hidden rest styling for multi-voice
               graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)
@@ -1021,6 +1029,8 @@ export class NotationComposer {
               isChordTone: note.isChordTone,
               isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
               tuplet: note.tuplet || null,  // CRITICAL: Preserve tuplet grouping
+              tupletType: note.tupletType || null,  // CRITICAL: Flat tuplet type for playback
+              tupletGroupId: note.tupletGroupId || null,  // CRITICAL: Tuplet group ID for playback
               voiceIndex: voiceIndex,  // CRITICAL: Track which voice this note belongs to
               _restDisplay: note._restDisplay,  // CRITICAL: Preserve cue/hidden rest styling for multi-voice
               graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)
@@ -1355,6 +1365,8 @@ export class NotationComposer {
           isChordTone: note.isChordTone,
           isRest: note.isRest || note.type === 'rest',
           tuplet: note.tuplet || null,
+          tupletType: note.tupletType || null,
+          tupletGroupId: note.tupletGroupId || null,
           voiceIndex: voiceIndex,
           _restDisplay: note._restDisplay,
           graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)
@@ -1384,6 +1396,8 @@ export class NotationComposer {
           isChordTone: note.isChordTone,
           isRest: note.isRest || note.type === 'rest',
           tuplet: note.tuplet || null,
+          tupletType: note.tupletType || null,
+          tupletGroupId: note.tupletGroupId || null,
           voiceIndex: voiceIndex,
           _restDisplay: note._restDisplay,
           graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)

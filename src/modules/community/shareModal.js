@@ -153,19 +153,19 @@ function getModalHTML() {
                         </label>
                         <div class="grid grid-cols-2 gap-3">
                             <label class="flex items-start p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
-                                <input type="radio" name="share-type" value="chord-progression" class="sr-only" checked>
-                                <span class="flex flex-col">
-                                    <span class="text-sm font-semibold text-gray-800 dark:text-white">Chord Progression</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Chords, inversions, key, beats</span>
-                                    <span class="text-xs text-amber-600 dark:text-amber-400 mt-1">No melody/bass/notation</span>
-                                </span>
-                            </label>
-                            <label class="flex items-start p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
-                                <input type="radio" name="share-type" value="full-composition" class="sr-only">
+                                <input type="radio" name="share-type" value="full-composition" class="sr-only" checked>
                                 <span class="flex flex-col">
                                     <span class="text-sm font-semibold text-gray-800 dark:text-white">Full Composition</span>
                                     <span class="text-xs text-gray-500 dark:text-gray-400">Everything including notation</span>
                                     <span class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Preserves complete work</span>
+                                </span>
+                            </label>
+                            <label class="flex items-start p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-900/30">
+                                <input type="radio" name="share-type" value="chord-progression" class="sr-only">
+                                <span class="flex flex-col">
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-white">Chord Progression</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Chords, inversions, key, beats</span>
+                                    <span class="text-xs text-amber-600 dark:text-amber-400 mt-1">No melody/bass/notation</span>
                                 </span>
                             </label>
                         </div>

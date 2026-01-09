@@ -198,7 +198,22 @@ export class NotationToolbar {
     this.selectionHasSlur = false;  // true if all selected notes are part of a slur
     this.selectionHasHairpin = null;  // null = none, 'crescendo'/'decrescendo' = all same, 'mixed' = multiple
     this.selectionGraceNote = null;  // null = none, 'acciaccatura'/'appoggiatura' = all same, 'mixed' = multiple
-    this.canBreakBeamsBetween = false;  // Whether "Break Beams Between" button should be enabled
+
+    // Contextual button validation flags
+    this.canBreakBeamsBetween = false;  // Exactly 2 notes in same beam group
+    this.canTie = false;                // 2+ notes with at least one common pitch
+    this.canSlur = false;               // 2+ notes selected
+    this.canHairpin = false;            // 2+ notes selected
+    this.canTriplet = false;            // 3+ consecutive notes in same measure
+    this.canQuintuplet = false;         // 5+ consecutive notes in same measure
+    this.canSextuplet = false;          // 6+ consecutive notes in same measure
+    this.hasNoteSelection = false;      // 1+ notes selected (for articulation, dynamics, etc.)
+    this.hasMeasureSelection = false;   // Measure is selected (blue outline) for volta, repeats, etc.
+    this.selectedMeasureIndex = -1;     // Which measure is selected (-1 = none)
+    this.hasGraceNotes = false;         // Selected notes have grace notes (for remove/transpose grace)
+    this.hasOrnaments = false;          // Selected notes have ornaments (for remove ornament)
+    this.notesInSlur = false;           // Selected notes are in a slur (for remove slur)
+    this.notesInHairpin = false;        // Selected notes are in a hairpin (for remove hairpin)
 
     // Callbacks
     this.onDurationChange = options.onDurationChange || (() => {});
@@ -234,6 +249,7 @@ export class NotationToolbar {
     this.onLyricApply = options.onLyricApply || (() => {});  // Apply lyric to selected note
     this.onPedalApply = options.onPedalApply || (() => {});  // Apply pedal marking to selected note
     this.onBeamApply = options.onBeamApply || (() => {});  // Apply beam control to selected notes
+    this.onClearMeasureBeams = options.onClearMeasureBeams || (() => {});  // Clear all beams in selected measure
     this.onCopy = options.onCopy || (() => {});
     this.onPaste = options.onPaste || (() => {});
     this.onCopyBlock = options.onCopyBlock || (() => {});
@@ -806,7 +822,9 @@ export class NotationToolbar {
               <button class="toolbar-btn beam-btn" data-beam="end" title="Force end of beam group here">]</button>
               <button class="toolbar-btn beam-btn" data-beam="breakBetween" title="Break all beams between 2 selected notes (select exactly 2 notes in same beam group)">⊥</button>
               <button class="toolbar-btn beam-btn" data-beam="unbeam" title="Remove this note from beaming entirely">⊘</button>
-              <button class="toolbar-btn beam-btn beam-clear" data-beam="clear" title="Clear manual beam settings">✕</button>
+              <button class="toolbar-btn beam-btn beam-clear" data-beam="clear" title="Clear manual beam settings on selected notes">✕</button>
+              <span class="toolbar-divider">|</span>
+              <button class="toolbar-btn beam-btn" data-action="clearMeasureBeams" title="Clear ALL beam settings in selected measure (click measure to select)">⌧</button>
             </div>
           </div>
         </div>
@@ -1249,6 +1267,13 @@ export class NotationToolbar {
       .notation-floating-palette .toolbar-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+
+      .notation-toolbar .toolbar-divider {
+        color: #999;
+        margin: 0 4px;
+        font-size: 12px;
+        user-select: none;
       }
 
       .duration-btn {
@@ -2086,6 +2111,11 @@ export class NotationToolbar {
           this.onBeamApply(beamAction);
         }
       });
+    });
+
+    // Clear All Beams in Measure button
+    this.container.querySelector('[data-action="clearMeasureBeams"]')?.addEventListener('click', () => {
+      this.onClearMeasureBeams();
     });
 
     // Rest display mode buttons
@@ -2952,13 +2982,26 @@ export class NotationToolbar {
       this.selectionTuplet = null;
       this.selectionPedal = null;
       this.selectionBeam = { start: false, end: false, break: false };
-      this.canBreakBeamsBetween = false; // Whether "Break Beams Between" button should be enabled
       this.selectionHasLyric = false;
       this.selectionOrnament = null;
       this.selectionHasSlur = false;
       this.selectionHasHairpin = null;
       this.selectionGraceNote = null;
       this.selectionDynamic = null;
+
+      // Reset all contextual validation flags
+      this.canBreakBeamsBetween = false;
+      this.canTie = false;
+      this.canSlur = false;
+      this.canHairpin = false;
+      this.canTriplet = false;
+      this.canQuintuplet = false;
+      this.canSextuplet = false;
+      this.hasNoteSelection = false;
+      this.hasGraceNotes = false;
+      this.hasOrnaments = false;
+      this.notesInSlur = false;
+      this.notesInHairpin = false;
 
       // Hide selection indicator
       const indicator = this.container?.querySelector('.selection-indicator');
@@ -2990,6 +3033,9 @@ export class NotationToolbar {
       this.updateSlurButtonsForSelection();
       this.updateHairpinButtonsForSelection();
       this.updateGraceButtonsForSelection();
+
+      // Update all contextual button states
+      this.updateContextualButtonStates();
 
       return;
     }
@@ -3087,7 +3133,6 @@ export class NotationToolbar {
     const noteEditor = notationComposer?.noteEditor;
     const breakResult = noteEditor?.canBreakBeamsBetween?.();
     this.canBreakBeamsBetween = breakResult?.valid || false;
-    console.log('[updateSelectionState] canBreakBeamsBetween:', this.canBreakBeamsBetween, breakResult?.reason || '');
     this.selectionHasLyric = lyricStates.size === 1 && [...lyricStates][0] === 'has-lyric';
 
     // Set ornament/dynamic/slur/hairpin/grace selection state
@@ -3133,6 +3178,9 @@ export class NotationToolbar {
     });
     this.selectionMeasureIndices = measureIndices;
 
+    // Compute contextual validation flags for button enable/disable states
+    this.computeContextualValidationFlags(selectedNotes, noteEditor);
+
     // Update button states to reflect selection
     this.updateDurationButtonsForSelection();
     this.updateArticulationButtonsForSelection();
@@ -3151,6 +3199,163 @@ export class NotationToolbar {
     this.updateSlurButtonsForSelection();
     this.updateHairpinButtonsForSelection();
     this.updateGraceButtonsForSelection();
+
+    // Update all contextual button enable/disable states
+    this.updateContextualButtonStates();
+  }
+
+  /**
+   * Compute contextual validation flags based on selected notes
+   * These flags determine which toolbar buttons should be enabled/disabled
+   * @param {Array} selectedNotes - Array of selected note objects
+   * @param {Object} noteEditor - The note editor instance
+   */
+  computeContextualValidationFlags(selectedNotes, noteEditor) {
+    const count = selectedNotes.length;
+
+    // Basic selection flags
+    this.hasNoteSelection = count >= 1;
+    this.canSlur = count >= 2;
+    this.canHairpin = count >= 2;
+
+    // Check for grace notes, ornaments, slurs, hairpins in selection
+    this.hasGraceNotes = selectedNotes.some(n => n.graceNotes && n.graceNotes.length > 0);
+    this.hasOrnaments = selectedNotes.some(n => n.ornament && n.ornament !== 'none');
+    this.notesInSlur = selectedNotes.some(n => n.slurStart || n.slurEnd || n.inSlur);
+    this.notesInHairpin = selectedNotes.some(n => n.hairpin || n.inHairpin);
+
+    // Check if selected notes can be tied (2+ notes with at least one common pitch)
+    this.canTie = false;
+    if (count >= 2) {
+      // Get all pitches from all notes
+      const allPitches = selectedNotes.map(n => {
+        if (n.pitches && Array.isArray(n.pitches)) {
+          return n.pitches.map(p => p.replace(/\d+$/, '')); // Strip octave for comparison
+        }
+        return [];
+      });
+      // Check if any pitch appears in multiple notes
+      const pitchCounts = {};
+      allPitches.flat().forEach(p => {
+        pitchCounts[p] = (pitchCounts[p] || 0) + 1;
+      });
+      // If we have 2+ notes, we can potentially tie them
+      // More sophisticated check could verify they're consecutive and same pitch
+      this.canTie = count >= 2;
+    }
+
+    // Check for consecutive notes in same measure for tuplets
+    // IMPORTANT: Each tuplet type requires EXACTLY the right number of notes:
+    // - Triplet: exactly 3 notes
+    // - Quintuplet: exactly 5 notes
+    // - Sextuplet: exactly 6 notes
+    // Using >= would incorrectly enable triplet button when 5 or 6 notes are selected
+    this.canTriplet = false;
+    this.canQuintuplet = false;
+    this.canSextuplet = false;
+
+    if (count >= 3) {
+      // Check if all notes are in the same measure and consecutive
+      const measureGroups = {};
+      selectedNotes.forEach(note => {
+        const key = `${note.measureIndex}-${note.staff}-${note.voiceIndex}`;
+        if (!measureGroups[key]) measureGroups[key] = [];
+        measureGroups[key].push(note);
+      });
+
+      // Check each group for consecutive notes
+      for (const group of Object.values(measureGroups)) {
+        if (group.length >= 3) {
+          // Sort by noteIndex
+          const sorted = group.sort((a, b) => a.noteIndex - b.noteIndex);
+          // Check if consecutive
+          let isConsecutive = true;
+          for (let i = 1; i < sorted.length; i++) {
+            if (sorted[i].noteIndex !== sorted[i - 1].noteIndex + 1) {
+              isConsecutive = false;
+              break;
+            }
+          }
+          if (isConsecutive) {
+            // Only enable for EXACT count matches
+            // This prevents showing triplet as available when 5 notes are selected
+            if (group.length === 3) this.canTriplet = true;
+            if (group.length === 5) this.canQuintuplet = true;
+            if (group.length === 6) this.canSextuplet = true;
+          }
+        }
+      }
+    }
+
+    // Get measure selection state from composerIntegration
+    const notationComposer = window.getNotationComposer?.();
+    this.selectedMeasureIndex = notationComposer?.selectedMeasureIndex ?? -1;
+    this.hasMeasureSelection = this.selectedMeasureIndex >= 0;
+  }
+
+  /**
+   * Update all contextual button enable/disable states
+   * Call this after selection changes or measure selection changes
+   */
+  updateContextualButtonStates() {
+    if (!this.container) return;
+
+    // Helper to set button disabled state
+    const setButtonState = (selector, enabled, title = null) => {
+      const btns = this.container.querySelectorAll(selector);
+      btns.forEach(btn => {
+        btn.disabled = !enabled;
+        btn.classList.toggle('disabled', !enabled);
+        if (title) btn.title = title;
+      });
+    };
+
+    // --- Buttons requiring 1+ notes selected ---
+    const has1 = this.hasNoteSelection;
+    setButtonState('.articulation-btn', has1);
+    setButtonState('.dynamic-btn', has1);
+    setButtonState('.pedal-btn', has1);
+    setButtonState('.beam-btn[data-beam="start"]', has1);
+    setButtonState('.beam-btn[data-beam="end"]', has1);
+    setButtonState('.beam-btn[data-beam="unbeam"]', has1);
+    setButtonState('.beam-btn[data-beam="clear"]', has1);
+    setButtonState('.grace-btn', has1);
+    setButtonState('.ornament-btn', has1);
+    setButtonState('[data-action="delete"]', has1);
+    setButtonState('[data-action="copy"]', has1);
+    setButtonState('.apply-lyric-btn', has1);
+    setButtonState('[data-action="applyChord"]', has1);
+
+    // --- Buttons requiring 2+ notes selected ---
+    const has2 = this.selectedNotesCount >= 2;
+    setButtonState('[data-action="tie"]', this.canTie);
+    setButtonState('[data-action="slur"]', this.canSlur);
+    setButtonState('.hairpin-btn[data-hairpin]', this.canHairpin);
+
+    // --- Break beams between (already tracked separately) ---
+    // Already handled in updateBeamButtonsForSelection
+
+    // --- Tuplet buttons ---
+    // Note: tuplet buttons may also act as mode toggles, so we may want different behavior
+    // For now, disable when not enough consecutive notes
+    setButtonState('[data-tuplet="triplet"]', this.canTriplet || this.selectedNotesCount === 0);
+    setButtonState('[data-tuplet="quintuplet"]', this.canQuintuplet || this.selectedNotesCount === 0);
+    setButtonState('[data-tuplet="sextuplet"]', this.canSextuplet || this.selectedNotesCount === 0);
+
+    // --- Remove buttons (require notes with that feature) ---
+    setButtonState('[data-action="remove-slur"]', this.notesInSlur);
+    setButtonState('[data-action="remove-hairpin"]', this.notesInHairpin);
+    setButtonState('[data-action="remove-ornament"]', this.hasOrnaments);
+    setButtonState('[data-action="remove-grace"]', this.hasGraceNotes);
+    setButtonState('[data-grace-transpose]', this.hasGraceNotes);
+
+    // --- Buttons requiring measure selection (blue outline) ---
+    const hasMeasure = this.hasMeasureSelection;
+    setButtonState('.volta-btn', hasMeasure);
+    setButtonState('.volta-extend-btn', hasMeasure);
+    setButtonState('.repeat-btn', hasMeasure);
+    setButtonState('[data-action="measureEdit"]', hasMeasure || has1);
+    setButtonState('[data-action="clearMeasureBeams"]', hasMeasure);
   }
 
   /**

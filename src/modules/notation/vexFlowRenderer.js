@@ -599,9 +599,14 @@ export function getVexFlowKeySignature(key) {
   };
 
   // Handle enharmonic equivalents for minor keys
+  // VexFlow doesn't support keys with double flats/sharps, so we convert to enharmonic equivalents
+  // Preference: Keep the "character" of the key (flat keys stay flat, sharp keys stay sharp when possible)
   const minorEnharmonics = {
     'D#m': 'Ebm', 'A#m': 'Bbm', 'E#m': 'Fm', 'B#m': 'Cm',
-    'Fbm': 'Em', 'Cbm': 'Bm',
+    'Fbm': 'Em',
+    'Cbm': 'Abm',  // Cb minor (10 flats) → Ab minor (7 flats) - preserve flat character
+    'Dbm': 'C#m',  // Db minor (8 flats) → C# minor (4 sharps)
+    'Gbm': 'F#m',  // Gb minor (9 flats) → F# minor (3 sharps)
   };
 
   // Check for enharmonic conversion needed
@@ -1631,8 +1636,31 @@ export function generateBeams(notes, options = {}) {
 export function drawBeams(context, beams) {
   if (!beams) return;
   beams.forEach(beam => {
-    beam.setContext(context);
-    beam.draw();
+    try {
+      // Validate that all notes in the beam have tick contexts before drawing
+      // This prevents "NoTickContext: Can't getAbsoluteX()" errors
+      const notes = beam.getNotes ? beam.getNotes() : beam.notes;
+      if (notes && notes.length > 0) {
+        const allNotesHaveTickContext = notes.every(note => {
+          try {
+            // Try to access the tick context - if it throws, the note isn't formatted
+            return note.getTickContext && note.getTickContext() !== null;
+          } catch {
+            return false;
+          }
+        });
+
+        if (!allNotesHaveTickContext) {
+          console.warn('[drawBeams] Skipping beam - some notes missing tick context');
+          return;
+        }
+      }
+
+      beam.setContext(context);
+      beam.draw();
+    } catch (e) {
+      console.warn('[drawBeams] Error drawing beam:', e.message);
+    }
   });
 }
 
