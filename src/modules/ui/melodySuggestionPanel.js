@@ -335,7 +335,8 @@ export function updateSuggestions({
     recentNotes = [],
     nextChord = null,
     anticipationFactor = 0,
-    sectionIntent = null
+    sectionIntent = null,
+    actualBassNotes = null // Array of actual bass pitches currently playing
 }) {
     showLoadingState();
 
@@ -345,6 +346,9 @@ export function updateSuggestions({
     }
     if (sectionIntent) {
         console.log(`📍 Section intent: mode=${sectionIntent.mode}, subMode=${sectionIntent.subMode}, newSectionType=${sectionIntent.newSectionType}`);
+    }
+    if (actualBassNotes && actualBassNotes.length > 0) {
+        console.log(`🎸 Actual bass notes: ${actualBassNotes.join(', ')}`);
     }
 
     // Generate suggestions
@@ -359,7 +363,8 @@ export function updateSuggestions({
         recentNotes,
         nextChord,
         anticipationFactor,
-        sectionIntent
+        sectionIntent,
+        actualBassNotes
     });
 
     // Update context display

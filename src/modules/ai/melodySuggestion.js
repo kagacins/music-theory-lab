@@ -1036,14 +1036,57 @@ function scoreBassRelationship(melodyNote, chord, bassNote, styleRules) {
         };
     }
 
-    // 2nds/7ths with bass - dissonant (style-dependent)
-    if (interval === 1 || interval === 2 || interval === 10 || interval === 11) {
-        const penalty = (styleRules.tensionPenalty || 1.0) * -8;
+    // Minor 2nd (semitone) with bass - harsh clash, always penalize strongly
+    // This prevents A natural melody over Ab bass (or similar enharmonic clashes)
+    if (interval === 1) {
+        const basePenalty = -25; // Strong penalty for minor 2nd clash
+        const styleMultiplier = styleRules.tensionPenalty || 1.0;
+        return {
+            score: basePenalty * styleMultiplier,
+            reason: 'Minor 2nd clash with bass - harsh dissonance',
+            interval: 'm2'
+        };
+    }
+
+    // Major 2nd with bass - tense but can work as passing tone
+    if (interval === 2) {
+        const penalty = (styleRules.tensionPenalty || 1.0) * -6;
         return {
             score: penalty,
-            reason: 'Dissonant interval with bass',
-            interval: interval <= 2 ? '2nd' : '7th'
+            reason: 'Major 2nd with bass - tense',
+            interval: 'M2'
         };
+    }
+
+    // 7ths with bass - jazzy/bluesy color, style-dependent
+    // In jazz/blues (low tensionPenalty), these are desirable
+    // In pop/classical (high tensionPenalty), these are avoided
+    if (interval === 10 || interval === 11) {
+        // Low tensionPenalty (< 0.8) = jazz/blues style, give bonus
+        // High tensionPenalty (> 1.0) = pop/classical, give penalty
+        const isJazzyStyle = (styleRules.tensionPenalty || 1.0) < 0.8;
+        const isStrictStyle = (styleRules.tensionPenalty || 1.0) > 1.0;
+
+        if (isJazzyStyle) {
+            return {
+                score: 8, // Bonus for jazzy 7th color
+                reason: interval === 10 ? 'Minor 7th with bass - bluesy' : 'Major 7th with bass - sophisticated',
+                interval: interval === 10 ? 'm7' : 'M7'
+            };
+        } else if (isStrictStyle) {
+            return {
+                score: -10, // Penalty in strict styles
+                reason: '7th with bass - too dissonant for style',
+                interval: interval === 10 ? 'm7' : 'M7'
+            };
+        } else {
+            // Neutral for balanced styles
+            return {
+                score: 0,
+                reason: '7th with bass - acceptable',
+                interval: interval === 10 ? 'm7' : 'M7'
+            };
+        }
     }
 
     // Perfect 4th - context dependent
@@ -1643,6 +1686,7 @@ function applySectionIntentModifiers(baseRules, sectionIntent, currentContour) {
  * @param {Object} options.nextChord - Next chord in progression (for anticipation)
  * @param {number} options.anticipationFactor - 0-1, proximity to chord change (1 = at boundary)
  * @param {Object} options.sectionIntent - Section intent state for context-aware suggestions
+ * @param {Array} options.actualBassNotes - Array of actual bass note pitches currently sounding (e.g., ['Ab2', 'Eb3'])
  * @returns {Object} Suggestions and context
  */
 export function generateMelodySuggestions({
@@ -1657,7 +1701,8 @@ export function generateMelodySuggestions({
     recentNotes = [],
     nextChord = null,
     anticipationFactor = 0,
-    sectionIntent = null
+    sectionIntent = null,
+    actualBassNotes = null // Array of actual bass pitches currently playing
 } = {}) {
     const baseStyleRules = STYLE_RULES[styleId] || STYLE_RULES.any;
 
@@ -1816,11 +1861,33 @@ export function generateMelodySuggestions({
 
             // Phase 4: Bass clef awareness / counterpoint
             // Score based on interval relationship with bass note
-            const bassNote = chord.bassNote || (chord.inversion > 0 ? chord.notes?.[0]?.replace(/\d+$/, '') : null);
-            const bassResult = scoreBassRelationship(noteName, chord, bassNote, styleRules);
+            // Priority: actualBassNotes > chord.bassNote > inversion bass > chord root
+            let effectiveBassNote = null;
+            if (actualBassNotes && actualBassNotes.length > 0) {
+                // Use actual bass notes - strip octave for pitch class comparison
+                // Use the lowest bass note (first one, typically the root of bass voicing)
+                effectiveBassNote = actualBassNotes[0].replace(/\d+$/, '');
+            } else {
+                effectiveBassNote = chord.bassNote || (chord.inversion > 0 ? chord.notes?.[0]?.replace(/\d+$/, '') : null);
+            }
+            const bassResult = scoreBassRelationship(noteName, chord, effectiveBassNote, styleRules);
             if (bassResult) {
                 scores.push(bassResult.score);
                 reasons.push(bassResult.reason);
+            }
+
+            // If we have multiple actual bass notes, check for clashes with all of them
+            // (not just the first one) - this catches additional voices in bass
+            if (actualBassNotes && actualBassNotes.length > 1) {
+                for (let i = 1; i < actualBassNotes.length; i++) {
+                    const additionalBass = actualBassNotes[i].replace(/\d+$/, '');
+                    const additionalBassResult = scoreBassRelationship(noteName, chord, additionalBass, styleRules);
+                    // Only add penalty scores from additional bass notes (avoid double bonuses)
+                    if (additionalBassResult && additionalBassResult.score < 0) {
+                        scores.push(additionalBassResult.score * 0.5); // Half weight for additional bass notes
+                        reasons.push(`Additional bass: ${additionalBassResult.reason}`);
+                    }
+                }
             }
 
             // Phase 5: Phrase position awareness

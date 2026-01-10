@@ -11,6 +11,7 @@
 
 import { ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
 import { detectAllPatterns, PATTERN_CATEGORIES } from './patternDetection.js';
+import { getCachedPatternSignatures } from '../features/progressionTemplates.js';
 
 /**
  * Harmonic function types
@@ -23,166 +24,12 @@ export const HARMONIC_FUNCTIONS = {
 };
 
 /**
- * Common chord progression patterns
+ * Get common progression patterns for pattern detection
+ * Now sourced from PROGRESSION_TEMPLATES via getCachedPatternSignatures()
+ * This provides backward compatibility for any code importing COMMON_PROGRESSIONS
+ * @deprecated Use getCachedPatternSignatures() from progressionTemplates.js instead
  */
-export const COMMON_PROGRESSIONS = {
-    'POP_PROGRESSION': {
-        pattern: ['I', 'V', 'vi', 'IV'],
-        name: 'Pop Axis',
-        description: 'I-V-vi-IV (Pop Axis)',
-        strength: 5
-    },
-    'TWELVE_BAR_BLUES': {
-        pattern: ['I', 'I', 'I', 'I', 'IV', 'IV', 'I', 'I', 'V', 'IV', 'I', 'V'],
-        name: '12-Bar Blues',
-        description: 'Classic blues progression',
-        strength: 5
-    },
-    'TWELVE_BAR_BLUES_7TH': {
-        pattern: ['I7', 'I7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'],
-        name: '12-Bar Blues',
-        description: 'Classic 12-bar blues form with dominant 7ths',
-        strength: 5
-    },
-    'TWELVE_BAR_BLUES_QUICK_CHANGE': {
-        pattern: ['I7', 'IV7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'],
-        name: '12-Bar Blues (Quick Change)',
-        description: 'Blues variation with IV chord in bar 2 for quicker harmonic movement',
-        strength: 5
-    },
-    'TWELVE_BAR_BLUES_MINOR': {
-        pattern: ['i7', 'i7', 'i7', 'i7', 'iv7', 'iv7', 'i7', 'i7', 'V7', 'iv7', 'i7', 'V7'],
-        name: '12-Bar Blues (Minor)',
-        description: 'Minor blues with moodier, more introspective feel',
-        strength: 5
-    },
-    'TWO_FIVE_ONE': {
-        pattern: ['ii', 'V', 'I'],
-        name: 'ii-V-I',
-        description: 'Jazz turnaround',
-        strength: 5
-    },
-    'JAZZ_TURNAROUND': {
-        pattern: ['ii7', 'V7', 'Imaj7'],
-        name: 'Jazz Turnaround',
-        description: 'ii7-V7-Imaj7 (Jazz Turnaround)',
-        strength: 5
-    },
-    'ONE_FOUR_FIVE': {
-        pattern: ['I', 'IV', 'V'],
-        name: 'I-IV-V',
-        description: 'Classic rock progression',
-        strength: 5
-    },
-    'ONE_SIX_FOUR_FIVE': {
-        pattern: ['I', 'vi', 'IV', 'V'],
-        name: 'I-vi-IV-V',
-        description: '50s progression (doo-wop)',
-        strength: 4
-    },
-    'ONE_SIX_TWO_FIVE': {
-        pattern: ['I', 'vi', 'ii', 'V'],
-        name: 'I-vi-ii-V',
-        description: 'Circle of fifths descent',
-        strength: 4
-    },
-    'ANDALUSIAN_CADENCE': {
-        pattern: ['i', 'bVII', 'bVI', 'V'],
-        name: 'Andalusian Cadence',
-        description: 'Descending minor progression',
-        strength: 4
-    },
-    'ROYAL_ROAD': {
-        pattern: ['IV', 'V', 'iii', 'vi'],
-        name: 'Royal Road',
-        description: 'Japanese pop progression',
-        strength: 4
-    },
-    'SENSITIVE_PROGRESSION': {
-        pattern: ['vi', 'IV', 'I', 'V'],
-        name: 'vi-IV-I-V',
-        description: 'Sensitive/emotional variation starting on minor chord',
-        strength: 4
-    },
-    'MIXOLYDIAN_ROCK': {
-        pattern: ['I', 'bVII', 'IV', 'I'],
-        name: 'I-bVII-IV',
-        description: 'Mixolydian rock progression with modal flavor',
-        strength: 4
-    },
-    'POWER_BALLAD': {
-        pattern: ['I', 'V', 'vi', 'iii', 'IV', 'I', 'IV', 'V'],
-        name: 'Power Ballad',
-        description: 'Extended progression for dramatic rock ballads',
-        strength: 3
-    },
-    'MINOR_BASIC': {
-        pattern: ['i', 'iv', 'V', 'i'],
-        name: 'i-iv-V-i',
-        description: 'Basic minor key progression',
-        strength: 4
-    },
-    'CIRCLE_OF_FIFTHS': {
-        pattern: ['I', 'IV', 'vii°', 'iii', 'vi', 'ii', 'V', 'I'],
-        name: 'Circle of Fifths',
-        description: 'Complete circle of fifths progression',
-        strength: 3
-    },
-    'WALTZ_BASIC': {
-        pattern: ['I', 'V', 'I'],
-        name: 'I-V-I Waltz',
-        description: 'Classic waltz progression',
-        strength: 3
-    },
-    'FOLK_WALTZ': {
-        pattern: ['I', 'IV', 'I', 'V', 'I'],
-        name: 'I-IV-I-V-I',
-        description: 'Extended waltz progression',
-        strength: 3
-    },
-    'IRISH_JIG': {
-        pattern: ['I', 'IV', 'I', 'V'],
-        name: 'Irish Jig',
-        description: 'Traditional Irish jig in 6/8 time',
-        strength: 3
-    },
-    'JAZZ_CIRCLE': {
-        pattern: ['Imaj7', 'vi7', 'ii7', 'V7'],
-        name: 'I-vi-ii-V',
-        description: 'Jazz circle progression with 7ths',
-        strength: 4
-    },
-    'RHYTHM_CHANGES': {
-        pattern: ['Imaj7', 'vi7', 'ii7', 'V7', 'Imaj7', 'vi7', 'ii7', 'V7'],
-        name: 'Rhythm Changes (A)',
-        description: 'Based on "I Got Rhythm". Foundation for hundreds of jazz tunes',
-        strength: 5
-    },
-    'JAZZ_TURNAROUND_EXTENDED': {
-        pattern: ['ii7', 'V7', 'Imaj7', 'Imaj7'],
-        name: 'ii-V-I Extended',
-        description: 'Extended jazz turnaround with held I chord',
-        strength: 4
-    },
-    'MINOR_JAZZ_TURNAROUND': {
-        pattern: ['ii°7', 'V7', 'i7'],
-        name: 'ii°-V-i',
-        description: 'Minor jazz turnaround',
-        strength: 4
-    },
-    'CLASSIC_TURNAROUND': {
-        pattern: ['I', 'IV', 'V', 'I'],
-        name: 'I-IV-V-I',
-        description: 'Classic turnaround with return to I',
-        strength: 4
-    },
-    'PROG_ROCK_7_4': {
-        pattern: ['i', 'bVII', 'IV', 'i'],
-        name: 'Prog Rock 7/4',
-        description: 'Progressive rock in 7/4 time',
-        strength: 3
-    }
-};
+export const COMMON_PROGRESSIONS = getCachedPatternSignatures();
 
 /**
  * HarmonyAnalyzer Class

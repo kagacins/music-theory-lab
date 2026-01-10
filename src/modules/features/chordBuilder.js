@@ -3833,6 +3833,7 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
             : getBuilderChordType();
         const inversion = getBuilderInversion();
         const trainerState = getTrainerState();
+
         const result = getInvertedChordNotes(
             rootNote,
             chordType,
@@ -3842,6 +3843,7 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
             getEnharmonicPreference(),
             getNotationPreference()
         );
+
         newChordData = {
             name: result.name,
             simpleName: result.simpleName,
@@ -3917,8 +3919,9 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
     newChordData.lhOctaveShift = lhOctaveShift;
 
     // Add to trainer state using window function
+    // Always append at end (don't use position-based insertion from selection)
     if (window.addToProgressionData) {
-        window.addToProgressionData(newChordData);
+        window.addToProgressionData(newChordData, { appendToEnd: true });
     } else {
         // Fallback: manually add to progression
         const trainerState = getTrainerState();
@@ -4093,6 +4096,8 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
     }
 
     // Add to trainer state using window function
+    // This function is used by the Unified Recommendations Modal which NEEDS position-based insertion
+    // Do NOT add appendToEnd here - only addChordToProgression (Chord Lab) should append to end
     if (window.addToProgressionData) {
         window.addToProgressionData(newChordData, { skipRender: options.skipRender });
 

@@ -163,28 +163,11 @@ export function resolveEnharmonic(noteWithOctave, key, enharmonicPreference = nu
     if (enharmonicPreference === 'sharp') {
         noteNoOctave = SHARP_NOTES[noteIndex];
     } else { // 'flat'
-        // In flat mode, we need to decide whether to show a sharp or a flat.
-        // The rule is: if the note is part of the key's major scale, use the key's natural spelling.
-        // Otherwise, prefer the flat name.
-        const keyRootName = ENHARMONIC_MAP[key] || key;
-        const keyRootIndex = ALL_NOTES.indexOf(keyRootName);
-
-        if (keyRootIndex !== -1) {
-            const scaleNoteIndices = MAJOR_SCALE_STEPS.map(step => (keyRootIndex + step) % 12);
-
-            // If the note's sharp name is in the scale, use the sharp name.
-            // This handles cases like G in Ab major.
-            if (scaleNoteIndices.includes(noteIndex)) {
-                 noteNoOctave = SHARP_NOTES[noteIndex];
-            } else {
-                // Otherwise, it's a chromatic note, prefer the flat name.
-                // This handles cases like the minor 3rd of Ab (Cb).
-                noteNoOctave = FLAT_NOTES[noteIndex];
-            }
-        } else {
-            // Fallback for keys not in our map (shouldn't happen with builder)
-            noteNoOctave = FLAT_NOTES[noteIndex];
-        }
+        // In flat mode, we should use FLAT_NOTES for consistency.
+        // The key signature determines the spelling, and flat keys use flat spellings.
+        // For example, in F major, Bb is spelled as Bb (not A#), even though pitch class 10
+        // is in the F major scale.
+        noteNoOctave = FLAT_NOTES[noteIndex];
     }
 
     return noteNoOctave + octave;
@@ -218,10 +201,12 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
     if (enharmonicPreference === null) {
         enharmonicPreference = key ? getEnharmonicPreferenceForKey(key) : 'flat';
     }
+
     const chordDef = CHORD_DEFINITIONS[chordType];
     if (!chordDef) { return { baseNotes: [], specificNotes: [] }; }
 
     const rootMidi = noteToMidi(`${rootNoteName}${octave}`);
+
     // Validate rootMidi - if it's NaN or invalid, return empty notes
     if (isNaN(rootMidi) || rootMidi === null || rootMidi === undefined) {
         console.warn(`Invalid root note for chord: ${rootNoteName}${octave}`);
@@ -400,21 +385,21 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
             console.warn(`No note to shift for inversion ${i} of chord ${rootNote} ${chordType}`);
             break;
         }
-        
+
         const shiftedMidi = noteToMidi(noteToShift) + 12;
         // Validate shiftedMidi before converting
         if (isNaN(shiftedMidi) || shiftedMidi === null || shiftedMidi === undefined) {
             console.warn(`Invalid MIDI value for shifted note: ${noteToShift} -> ${shiftedMidi}`);
             break;
         }
-        
+
         // Convert the new MIDI value back to a note name. Tone.js handles the octave correctly.
         const rawShiftedNote = Tone.Midi(shiftedMidi).toNote();
         if (!rawShiftedNote || typeof rawShiftedNote !== 'string') {
             console.warn(`Invalid note from MIDI ${shiftedMidi}: ${rawShiftedNote}`);
             break;
         }
-        
+
         // Now, resolve its enharmonic spelling based on the key and user preference.
         const resolvedNote = resolveEnharmonic(rawShiftedNote, key, enharmonicPreference);
         if (resolvedNote && typeof resolvedNote === 'string') {

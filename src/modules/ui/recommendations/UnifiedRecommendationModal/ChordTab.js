@@ -5267,16 +5267,21 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
         }
     }
 
+    // Spell the root note correctly for the current key to avoid enharmonic issues
+    // e.g., Bb minor in key of F should be Bb, Db, F - not A#, C#, E#
+    const key = getCurrentKey() || 'C';
+    const spelledRoot = spellNoteInKey(rec.root, key);
+
     if (modalState.callbacks.onAddChord) {
-        modalState.callbacks.onAddChord(rec.type, rec.root, rec.inversion, duration);
+        modalState.callbacks.onAddChord(rec.type, spelledRoot, rec.inversion, duration);
     } else if (window.addSpecificChordToProgression) {
         // First select the root
-        const rootIndex = ALL_NOTES.indexOf(rec.root);
+        const rootIndex = ALL_NOTES.indexOf(spelledRoot);
         if (rootIndex !== -1 && window.selectBuilderRootNote) {
             window.selectBuilderRootNote(rootIndex, false);
         }
         // Pass skipRender option for batch operations
-        window.addSpecificChordToProgression(rec.type, rec.inversion, !options.skipRender, rec.root, duration, { skipRender: options.skipRender });
+        window.addSpecificChordToProgression(rec.type, rec.inversion, !options.skipRender, spelledRoot, duration, { skipRender: options.skipRender });
     }
 
     // Calculate the index of the newly added chord

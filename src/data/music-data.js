@@ -25,27 +25,6 @@ const ROMAN_MAP_BASE = {
     'v': { index: 4, quality: 'Minor' },    // Minor dominant (modal)
 };
 
-const COMMON_PROGRESSIONS = {
-    'I-IV-V-I (Basic)': ['I', 'IV', 'V', 'I'],
-    'I-vi-IV-V (Doo-wop/50s)': ['I', 'vi', 'IV', 'V'],
-    'ii-V-I (Jazz Turnaround)': ['ii', 'V', 'I'],
-    'I-V-vi-IV (Pop Progression)': ['I', 'V', 'vi', 'IV'],
-    'vi-IV-I-V (A variation)': ['vi', 'IV', 'I', 'V'],
-    'I-IV-V (Blues/Folk)': ['I', 'IV', 'V'],
-    'I-IV-I-V-I': ['I', 'IV', 'I', 'V', 'I'],
-    'i-iv-V-i (Minor)': ['i', 'iv', 'V', 'i'],
-    'i-iv-V (Minor Basic)': ['i', 'iv', 'V'],
-    // Extended progression templates
-    '12-Bar Blues (I)': ['I', 'I', 'I', 'I', 'IV', 'IV', 'I', 'I', 'V', 'IV', 'I', 'I'],
-    '12-Bar Blues (i)': ['i', 'i', 'i', 'i', 'iv', 'iv', 'i', 'i', 'V', 'iv', 'i', 'i'],
-    'I-vi-ii-V (Jazz)': ['I', 'vi', 'ii', 'V'],
-    'I-iii-vi-ii-V-I (Circle Progression)': ['I', 'iii', 'vi', 'ii', 'V', 'I'],
-    'vi-IV-I-V (Minor Pop)': ['vi', 'IV', 'I', 'V'],
-    'I-bVII-IV-I (Rock)': ['I', 'bVII', 'IV', 'I'],
-    'I-vi-IV-V-I (Classic)': ['I', 'vi', 'IV', 'V', 'I'],
-    'ii-vi-IV-V (Alternative)': ['ii', 'vi', 'IV', 'V'],
-};
-
 const CHORD_DEFINITIONS = {
     'Major': { intervals: [0, 4, 7], symbol: '', description: 'The foundation triad: Root, Major 3rd, Perfect 5th. All other chords are built from or compared to this. Sounds bright and happy.' },
     'Minor': { intervals: [0, 3, 7], symbol: 'm', description: 'Lowers the 3rd tone of the major triad by a half step (Root, Minor 3rd, Perfect 5th). Creates a sadder, darker sound.' },
@@ -788,7 +767,6 @@ export {
     FLAT_NOTES,
     MAJOR_SCALE_STEPS,
     ROMAN_MAP_BASE,
-    COMMON_PROGRESSIONS,
     CHORD_DEFINITIONS,
     INVERSION_NAMES,
     INTERVAL_DEFINITIONS,

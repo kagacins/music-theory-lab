@@ -1783,6 +1783,30 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
         }
     }
 
+    // Get actual bass notes for the current position
+    // This prevents melody notes from clashing with what's actually playing in the bass
+    let actualBassNotes = null;
+    const compositionState = getCompositionState();
+    if (compositionState && selectedInfo && selectedInfo.measureIndex !== undefined) {
+        const measure = compositionState.measures[selectedInfo.measureIndex];
+        if (measure?.notation?.bass?.voices?.[0]?.notes) {
+            const bassNotes = measure.notation.bass.voices[0].notes;
+            // Find the bass note(s) at or before the current position
+            // For simplicity, get all non-rest pitches from the measure's bass
+            actualBassNotes = [];
+            for (const note of bassNotes) {
+                if (!note.isRest && note.pitches && note.pitches.length > 0) {
+                    actualBassNotes.push(...note.pitches);
+                }
+            }
+            // Remove duplicates
+            actualBassNotes = [...new Set(actualBassNotes)];
+            if (actualBassNotes.length === 0) {
+                actualBassNotes = null;
+            }
+        }
+    }
+
     // Get section context for melody suggestions
     const intent = getSectionIntent();
     const effectiveContext = getEffectiveSectionContext();
@@ -1809,7 +1833,8 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
             mood: modalState.mood, // Use global mood
             octave: modalState.melodyOctave,
             range: 2,
-            sectionIntent: sectionIntent // Pass section context for section-aware melody suggestions
+            sectionIntent: sectionIntent, // Pass section context for section-aware melody suggestions
+            actualBassNotes: actualBassNotes // Pass actual bass notes to prevent clashes
         });
 
         modalState.currentMelodySuggestions = result.suggestions || [];

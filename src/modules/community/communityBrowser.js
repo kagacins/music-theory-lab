@@ -2391,6 +2391,14 @@ export async function loadCommunitySubmission(submissionId) {
             window.syncProgressionToMelodyTab();
         }
 
+        // Update voice leading diagram after a short delay
+        // (refreshNotationFromProgression is debounced, so we need to wait for it to complete)
+        setTimeout(() => {
+            if (window.voiceLeadingDiagram && window.voiceLeadingDiagram.update) {
+                window.voiceLeadingDiagram.update();
+            }
+        }, 300);
+
         // Close the FAB submenus without closing the entire FAB
         if (window.closeFabSubmenus) {
             window.closeFabSubmenus();

@@ -2288,7 +2288,8 @@ export function addToProgressionData(chordData, options = {}) {
     }
 
     // Phase 2.1: Check for position-based insertion
-    const insertAfterIndex = getInsertAfterIndex();
+    // If appendToEnd option is set, skip position-based insertion and always add at end
+    const insertAfterIndex = options.appendToEnd ? null : getInsertAfterIndex();
     const usePositionBasedInsert = insertAfterIndex !== null &&
                                    insertAfterIndex >= 0 &&
                                    insertAfterIndex < trainerState.progressionData.length;
@@ -2876,6 +2877,11 @@ export function unhighlightAllChordCards() {
 export function expandChordCard(index) {
     expandedChords.add(index);
 
+    // Hide any floating tooltips that might be visible
+    document.querySelectorAll("[id^='inversion-tooltip-']").forEach(el => {
+        el.style.display = 'none';
+    });
+
     // Dispatch event for tutorial tracking
     dispatchBuilderEvent('chordCardExpanded', { chordIndex: index });
 
@@ -2930,6 +2936,11 @@ export function expandChordCard(index) {
  */
 export function collapseChordCard(index) {
     expandedChords.delete(index);
+
+    // Hide any floating tooltips that might be visible
+    document.querySelectorAll("[id^='inversion-tooltip-']").forEach(el => {
+        el.style.display = 'none';
+    });
 
     // Find wrappers in both containers
     const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);

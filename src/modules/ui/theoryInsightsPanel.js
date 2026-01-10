@@ -15,6 +15,8 @@ import {
     MODAL_PATTERNS,
     BORROWED_CHORDS
 } from '../analysis/patternDetection.js';
+import { HarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
+import { spellNoteInKey } from '../utils/noteUtils.js';
 
 // Note: getAllBorrowedChords and MODAL_INTERCHANGE_CHORDS exist in comprehensiveChordRecommendations.js
 // but are not exported. We use local implementations for borrowed chord suggestions.
@@ -869,6 +871,85 @@ export class TheoryInsightsPanel {
 
         // Run pattern detection
         const patterns = detectAllPatterns(progressionData, key);
+
+        // Detect named progressions from PROGRESSION_TEMPLATES using HarmonyAnalyzer
+        // This will identify patterns like "Pop Axis", "12-Bar Blues", "Andalusian Cadence", etc.
+        const harmonyAnalyzer = new HarmonyAnalyzer();
+        const progressionPatterns = harmonyAnalyzer.detectCommonPatterns(progressionData, key);
+
+        // Consolidate pattern detections:
+        // 1. Merge identical patterns (same chords, same position) into one entry with combined names
+        // 2. Remove shorter patterns that are prefixes of longer ones at the same position
+        const patternMap = new Map(); // key: "pattern_startPos" -> merged pattern data
+
+        // First pass: group identical patterns and merge their names
+        for (const p of progressionPatterns) {
+            const patternKey = `${(p.pattern || []).join('-')}_${p.matches?.[0] ?? 0}`;
+
+            if (patternMap.has(patternKey)) {
+                // Merge: add this pattern's name to the existing entry
+                const existing = patternMap.get(patternKey);
+                // Extract just the descriptive name (e.g., "Power Ballad" from "I-V-vi-iii-IV-I-IV-V (Power Ballad)")
+                const existingShortName = existing.name.match(/\(([^)]+)\)$/)?.[1] || existing.name;
+                const newShortName = p.name.match(/\(([^)]+)\)$/)?.[1] || p.name;
+
+                // Only add if it's a different name
+                if (existingShortName !== newShortName) {
+                    if (!existing.altNames) {
+                        existing.altNames = [newShortName];
+                    } else if (!existing.altNames.includes(newShortName)) {
+                        existing.altNames.push(newShortName);
+                    }
+                }
+            } else {
+                patternMap.set(patternKey, { ...p });
+            }
+        }
+
+        // Convert map to array and sort by length (longest first)
+        const sortedByLength = Array.from(patternMap.values())
+            .sort((a, b) => (b.pattern?.length || 0) - (a.pattern?.length || 0));
+
+        // Second pass: filter out patterns that are prefixes of longer patterns
+        const filteredPatterns = sortedByLength.filter((p, idx) => {
+            const pStart = p.matches?.[0] ?? 0;
+            const pPattern = p.pattern || [];
+
+            // Check if this pattern is a prefix of any longer pattern at the same start position
+            for (let i = 0; i < idx; i++) {
+                const longer = sortedByLength[i];
+                const longerStart = longer.matches?.[0] ?? 0;
+                const longerPattern = longer.pattern || [];
+
+                // Same start position and this pattern is a prefix of the longer one
+                if (pStart === longerStart && longerPattern.length > pPattern.length) {
+                    const isPrefix = pPattern.every((chord, ci) => chord === longerPattern[ci]);
+                    if (isPrefix) {
+                        return false; // Skip this shorter pattern
+                    }
+                }
+            }
+            return true;
+        });
+
+        // Transform progression patterns to include 'positions' array for rendering
+        // The renderer expects 'positions' to show "at m.X-Y" location indicator
+        patterns.progressions = filteredPatterns.map(p => {
+            // Calculate positions from first match and pattern length
+            const patternLength = p.pattern?.length || 0;
+            const firstMatch = p.matches?.[0] ?? 0;
+            const positions = patternLength > 0
+                ? Array.from({ length: patternLength }, (_, i) => firstMatch + i)
+                : [];
+
+            return {
+                ...p,
+                type: p.id,  // Use id as type for lesson mapping
+                positions,
+                isProgression: true  // Flag to skip Learn link in renderer
+            };
+        });
+
         const topPatterns = getTopPatterns(patterns, 5);
 
         // Get borrowed chord opportunities
@@ -1469,7 +1550,30 @@ export class TheoryInsightsPanel {
             const lessonId = this.getLessonForPattern(pattern);
 
             // Use fullName if available (cadences), otherwise name, otherwise type
-            const displayName = pattern.fullName || pattern.name || pattern.type;
+            let displayName = pattern.fullName || pattern.name || pattern.type;
+
+            // If there are alternate names (same pattern with different names), show them combined
+            // e.g., "Power Ballad (& Pachelbel Canon)"
+            if (pattern.altNames && pattern.altNames.length > 0) {
+                // Extract the short name from the main display name
+                const mainShortName = displayName.match(/\(([^)]+)\)$/)?.[1] || displayName;
+                const altNamesStr = pattern.altNames.join(', ');
+                // Rebuild display name with combined names
+                const chordPart = displayName.replace(/\s*\([^)]+\)$/, ''); // Remove existing parenthetical
+                displayName = `${chordPart} (${mainShortName} & ${altNamesStr})`;
+            }
+
+            // Format positions as a range (e.g., "m.1-8") instead of listing each one
+            let positionText = '';
+            if (pattern.positions && pattern.positions.length > 0) {
+                const start = pattern.positions[0] + 1;  // 1-indexed for display
+                const end = pattern.positions[pattern.positions.length - 1] + 1;
+                positionText = start === end ? `at m.${start}` : `at m.${start}-${end}`;
+            }
+
+            // Only show Learn link for non-progression patterns (cadences, modes, etc.)
+            // Progressions don't have detailed educational content yet
+            const showLearnLink = !pattern.isProgression;
 
             html += `
                 <div class="flex items-start gap-2 text-sm bg-white/30 rounded px-2 py-1.5">
@@ -1477,8 +1581,8 @@ export class TheoryInsightsPanel {
                     <div class="flex-1">
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-medium" style="color: ${color}">${displayName}</span>
-                            ${pattern.positions ? `<span class="text-gray-400 text-xs">at m.${pattern.positions.map(p => p + 1).join('-')}</span>` : ''}
-                            <button class="learn-more-btn text-xs text-blue-600 hover:text-blue-800 hover:underline" data-concept-type="${pattern.type}" data-concept-title="${displayName}">Learn →</button>
+                            ${positionText ? `<span class="text-gray-400 text-xs">${positionText}</span>` : ''}
+                            ${showLearnLink ? `<button class="learn-more-btn text-xs text-blue-600 hover:text-blue-800 hover:underline" data-concept-type="${pattern.type}" data-concept-title="${displayName}">Learn →</button>` : ''}
                         </div>
                         ${pattern.description ? `<div class="text-xs text-gray-500">${pattern.description}</div>` : ''}
                     </div>
@@ -1893,22 +1997,23 @@ export class TheoryInsightsPanel {
         };
         const properType = typeMap[type] || type;
 
-        // Get the selected chord index
-        const selectedIndex = window.getSelectedChordIndex?.() ?? -1;
-        const insertIndex = selectedIndex >= 0 ? selectedIndex + 1 : null;
+        // Spell the root correctly for the current key to avoid enharmonic issues
+        // e.g., Bb in key of F should stay Bb, not become A#
+        const key = window.getCurrentKey?.() || 'C';
+        const spelledRoot = spellNoteInKey(root, key);
 
         // Build chord notes for playback
-        const notes = this.buildChordNotes(root, type);
+        const notes = this.buildChordNotes(spelledRoot, type);
 
         // Build chord name
         const typeSuffix = properType === 'Minor' ? 'm' :
                           properType === 'Diminished' ? 'dim' :
                           properType === 'Augmented' ? 'aug' : '';
-        const name = `${root}${typeSuffix}`;
+        const name = `${spelledRoot}${typeSuffix}`;
 
         // Build chord data for insertion with complete information
         const chordData = {
-            root: root,
+            root: spelledRoot,
             type: properType,
             inversion: 0,
             duration: 4,
@@ -1917,18 +2022,22 @@ export class TheoryInsightsPanel {
             name: name
         };
 
-        // Use insertChordCardAt if we have a specific position
-        if (insertIndex !== null && window.insertChordCardAt) {
+        // Always add to the end of the progression
+        // Get progression length to insert at the end
+        const progression = window.getProgressionData?.() || [];
+        const insertIndex = progression.length;
+
+        if (window.insertChordCardAt) {
             const success = window.insertChordCardAt(insertIndex, chordData, 4);
             if (success) {
-                console.log(`[TheoryInsights] Inserted ${root} ${properType} (${numeral}) at index ${insertIndex}`);
+                console.log(`[TheoryInsights] Added ${spelledRoot} ${properType} (${numeral}) at end (index ${insertIndex})`);
                 return;
             }
         }
 
-        // Fallback to addSpecificChordToProgression (adds at end)
+        // Fallback to addSpecificChordToProgression (also adds at end)
         if (window.addSpecificChordToProgression) {
-            window.addSpecificChordToProgression(properType, 0, true, root);
+            window.addSpecificChordToProgression(properType, 0, true, spelledRoot);
         } else {
             console.warn('[TheoryInsights] No method available to add chord');
         }

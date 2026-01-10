@@ -12,11 +12,39 @@
  * - Apply alternative with one click
  */
 
-import { getChordNotes, getLHNotes } from '../utils/noteUtils.js';
+import { getChordNotes, getLHNotes, spellNoteInKey } from '../utils/noteUtils.js';
 import { getProgressionData, getCurrentKey, setProgressionData } from '../state/trainerState.js';
-import { CHORD_DEFINITIONS } from '../../data/music-data.js';
+import { CHORD_DEFINITIONS, ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
 import { getChordFunction, getTransition } from '../../data/theoryExplanations/chordFunctions.js';
 import { getPiano } from '../audio/audioEngine.js';
+
+/**
+ * Get pitch class (0-11) for a note name, handling enharmonic equivalents
+ * @param {string} noteName - Note name like "C", "Bb", "A#"
+ * @returns {number} Pitch class 0-11, or -1 if not found
+ */
+function getPitchClass(noteName) {
+    if (!noteName) return -1;
+    // Remove any octave number if present
+    const noteOnly = noteName.replace(/\d+$/, '');
+    let idx = ALL_NOTES.indexOf(noteOnly);
+    if (idx === -1 && ENHARMONIC_MAP[noteOnly]) {
+        idx = ALL_NOTES.indexOf(ENHARMONIC_MAP[noteOnly]);
+    }
+    return idx;
+}
+
+/**
+ * Check if two note names are enharmonically equal (same pitch class)
+ * @param {string} note1 - First note name
+ * @param {string} note2 - Second note name
+ * @returns {boolean} True if same pitch class
+ */
+function areEnharmonicallyEqual(note1, note2) {
+    const pc1 = getPitchClass(note1);
+    const pc2 = getPitchClass(note2);
+    return pc1 !== -1 && pc2 !== -1 && pc1 === pc2;
+}
 
 // ===========================================
 // STATE
@@ -213,13 +241,20 @@ function getChordAlternatives(chordIndex, progression, key) {
         }
     }
 
-    // Remove duplicates and the current chord
+    // Remove duplicates and the current chord (using enharmonic-aware comparison)
     const seen = new Set();
     return alternatives.filter(alt => {
-        const key = `${alt.numeral}-${alt.root}-${alt.type}`;
-        if (seen.has(key)) return false;
-        if (alt.root === currentChord.root && alt.type === currentChord.type) return false;
-        seen.add(key);
+        // Check for duplicates by pitch class + type
+        const pitchClass = getPitchClass(alt.root);
+        const dedupeKey = `${pitchClass}-${alt.type}`;
+        if (seen.has(dedupeKey)) return false;
+
+        // Filter out alternatives that match the current chord (enharmonically)
+        if (areEnharmonicallyEqual(alt.root, currentChord.root) && alt.type === currentChord.type) {
+            return false;
+        }
+
+        seen.add(dedupeKey);
         return true;
     }).slice(0, 4); // Limit to 4 alternatives
 }
@@ -556,14 +591,19 @@ function applyAlternativeChord(index, alternative) {
 
     // Create new chord based on alternative
     const key = getCurrentKey ? getCurrentKey() : 'C';
+
+    // Spell the root correctly for the current key to avoid enharmonic issues
+    // e.g., Bb in key of F should stay Bb, not become A#
+    const spelledRoot = spellNoteInKey(alternative.root, key);
+
     const newChord = {
         ...currentChord,
-        root: alternative.root,
+        root: spelledRoot,
         type: alternative.type,
         roman: alternative.numeral,
-        simpleName: getChordDisplayName(alternative.root, alternative.type),
+        simpleName: getChordDisplayName(spelledRoot, alternative.type),
         inversion: 0, // Reset inversion for new chord
-        notes: getChordNotes(alternative.root, alternative.type, key)?.specificNotes || []
+        notes: getChordNotes(spelledRoot, alternative.type, key)?.specificNotes || []
     };
 
     // Update progression

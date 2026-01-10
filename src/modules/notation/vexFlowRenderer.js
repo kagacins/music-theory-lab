@@ -153,6 +153,7 @@ export const KEY_SIGNATURES = {
   'Bbm': ['Bb', 'Eb', 'Ab', 'Db', 'Gb'],
   'Ebm': ['Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'],
   'Abm': ['Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb', 'Fb'],
+  'Cbm': ['Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb', 'Fb'],  // Same as Cb major (7 flats)
 };
 
 /**

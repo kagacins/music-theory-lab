@@ -13,7 +13,7 @@ import { switchTab, refreshAllTabs, initTabHistory } from '../modules/ui/tabs.js
 import { enterApp, enterAppToTab, showStartHereModal } from './appSetup.js';
 import { initAllSectionDragDrop } from '../modules/ui/sectionDragDrop.js';
 import { initAllSectionSidebars, triggerSectionSidebarUpdate } from '../modules/ui/sectionSidebar.js';
-import { showModal, hideModal, showModalHTML, showAboutModal, hideAboutModal } from '../modules/ui/modals.js';
+import { showModal, hideModal, showModalHTML, showAboutModal, hideAboutModal, showConfirmModal } from '../modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from '../modules/ui/keyboard.js';
 import { updateKeySignatureDisplay } from '../modules/ui/header.js';
 import { toggleSidebar, toggleSettingsGroup, restoreSettingsGroupStates, toggleHeaderDisplays, restoreHeaderDisplaysState } from '../modules/ui/sidebar.js';
@@ -2032,7 +2032,7 @@ export function setupWindowExports() {
     /**
      * Apply bass pattern to ALL chords
      */
-    window.applyBassPatternToAll = function() {
+    window.applyBassPatternToAll = async function() {
         const compositionState = window.getCompositionState ? window.getCompositionState() : null;
         if (!compositionState) {
             window.toast?.error('Composition state not available');
@@ -2054,10 +2054,12 @@ export function setupWindowExports() {
         const bassOctave = octaveSelect?.value === 'auto' ? null : parseInt(octaveSelect?.value || '2');
         const bassFollowsInversion = inversionToggle?.checked || false;
 
-        const confirmed = confirm(
-            `Apply "${bassPattern}" bass pattern to all ${chordCount} chords?\n\n` +
-            'This will overwrite any existing bass notes.'
-        );
+        const confirmed = await showConfirmModal({
+            title: 'Apply Bass Pattern to All',
+            message: `Apply "<strong>${bassPattern}</strong>" bass pattern to all ${chordCount} chords?<br><br>This will overwrite any existing bass notes.`,
+            confirmText: 'Apply to All',
+            cancelText: 'Cancel'
+        });
         if (!confirmed) return;
 
         // Update settings

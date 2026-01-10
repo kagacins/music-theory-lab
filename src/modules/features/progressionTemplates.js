@@ -163,7 +163,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-rhythm-changes': {
         id: 'jazz-rhythm-changes',
-        name: 'Rhythm Changes (A)',
+        name: 'Imaj7-vi7-ii7-V7-Imaj7-vi7-ii7-V7 (Rhythm Changes A)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.ADVANCED,
         progressions: ['Imaj7', 'vi7', 'ii7', 'V7', 'Imaj7', 'vi7', 'ii7', 'V7'],
@@ -329,11 +329,11 @@ export const PROGRESSION_TEMPLATES = {
 
     'rock-power-ballad': {
         id: 'rock-power-ballad',
-        name: 'I-V-vi-iii-IV (Power Ballad)',
+        name: 'I-V-vi-iii-IV-I-IV-V (Power Ballad)',
         category: TEMPLATE_CATEGORIES.ROCK,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'V', 'vi', 'iii', 'IV', 'I', 'IV', 'V'],
-        description: 'Extended progression for dramatic rock ballads.',
+        description: 'Extended 8-chord progression for dramatic rock ballads.',
         tags: ['rock', 'ballad', 'dramatic', 'intermediate'],
         examples: ['Common in 80s rock ballads'],
         arrangement: {
@@ -475,7 +475,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'folk-waltz-3-4': {
         id: 'folk-waltz-3-4',
-        name: 'I-IV-I-V Waltz (3/4)',
+        name: 'I-IV-I-V-I Waltz (3/4)',
         category: TEMPLATE_CATEGORIES.CLASSICAL,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'IV', 'I', 'V', 'I'],
@@ -495,7 +495,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-waltz-3-4': {
         id: 'jazz-waltz-3-4',
-        name: 'Jazz Waltz (3/4)',
+        name: 'Imaj7-vi7-ii7-V7 Jazz Waltz (3/4)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.ADVANCED,
         progressions: ['Imaj7', 'vi7', 'ii7', 'V7'],
@@ -515,7 +515,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'irish-jig-6-8': {
         id: 'irish-jig-6-8',
-        name: 'Irish Jig (6/8)',
+        name: 'I-IV-I-V Irish Jig (6/8)',
         category: TEMPLATE_CATEGORIES.ROCK,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'IV', 'I', 'V'],
@@ -535,7 +535,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'take-five-5-4': {
         id: 'take-five-5-4',
-        name: 'Take Five Style (5/4)',
+        name: 'ii7-V7-Imaj7-Imaj7 Take Five (5/4)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.ADVANCED,
         progressions: ['ii7', 'V7', 'Imaj7', 'Imaj7'],
@@ -555,7 +555,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'progressive-7-4': {
         id: 'progressive-7-4',
-        name: 'Progressive Rock (7/4)',
+        name: 'i-bVII-IV-i Progressive Rock (7/4)',
         category: TEMPLATE_CATEGORIES.ROCK,
         difficulty: DIFFICULTY_LEVELS.ADVANCED,
         progressions: ['i', 'bVII', 'IV', 'i'],
@@ -618,11 +618,11 @@ export const PROGRESSION_TEMPLATES = {
 
     'pop-80s-power': {
         id: 'pop-80s-power',
-        name: '80s Power Ballad',
+        name: 'I-V-vi-IV-I-V-IV (80s Power Ballad)',
         category: TEMPLATE_CATEGORIES.POP,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'V', 'vi', 'IV', 'I', 'V', 'IV'],
-        description: 'Extended 80s-style progression with repeated resolution.',
+        description: 'Extended 7-chord 80s-style progression with repeated resolution.',
         tags: ['80s', 'power-ballad', 'anthemic', 'retro'],
         examples: ['"Total Eclipse of the Heart" - Bonnie Tyler', '"Alone" - Heart'],
         arrangement: {
@@ -701,7 +701,7 @@ export const PROGRESSION_TEMPLATES = {
     // ============================================================================
     'jazz-autumn-leaves': {
         id: 'jazz-autumn-leaves',
-        name: 'Autumn Leaves Changes',
+        name: 'ii7-V7-Imaj7-IVmaj7-vii°7-III7-vi7 (Autumn Leaves)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['ii7', 'V7', 'Imaj7', 'IVmaj7', 'vii°7', 'III7', 'vi7'],
@@ -721,7 +721,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-coltrane-changes': {
         id: 'jazz-coltrane-changes',
-        name: 'Coltrane Changes',
+        name: 'Imaj7-bIII7-bVImaj7-VII7-bIImaj7-bV7 (Coltrane Changes)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.ADVANCED,
         progressions: ['Imaj7', 'bIII7', 'bVImaj7', 'VII7', 'bIImaj7', 'bV7'],
@@ -781,7 +781,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-bird-blues': {
         id: 'jazz-bird-blues',
-        name: 'Bird Blues (Bebop)',
+        name: 'I7-bVII7-VI7-bVI7-V7-bV7-IV7-#IVdim7-I7-VI7-ii7-V7 (Bird Blues)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.ADVANCED,
         progressions: ['I7', 'bVII7', 'VI7', 'bVI7', 'V7', 'bV7', 'IV7', '#IVdim7', 'I7', 'VI7', 'ii7', 'V7'],
@@ -801,7 +801,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-modal-so-what': {
         id: 'jazz-modal-so-what',
-        name: 'So What Changes',
+        name: 'i7-i7-i7-i7-bii7-bii7-i7-i7 (So What)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['i7', 'i7', 'i7', 'i7', 'bii7', 'bii7', 'i7', 'i7'],
@@ -821,7 +821,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-lady-bird': {
         id: 'jazz-lady-bird',
-        name: 'Lady Bird Turnaround',
+        name: 'Imaj7-bIIImaj7-bVImaj7-bIImaj7 (Lady Bird)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['Imaj7', 'bIIImaj7', 'bVImaj7', 'bIImaj7'],
@@ -841,7 +841,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-bossa-nova': {
         id: 'jazz-bossa-nova',
-        name: 'Bossa Nova Progression',
+        name: 'Imaj7-vii°7-II7-ii7-bII7-Imaj7-bVImaj7-V7 (Bossa Nova)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['Imaj7', 'vii°7', 'II7', 'ii7', 'bII7', 'Imaj7', 'bVImaj7', 'V7'],
@@ -861,7 +861,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'jazz-rhythm-bridge': {
         id: 'jazz-rhythm-bridge',
-        name: 'Rhythm Changes Bridge',
+        name: 'III7-III7-VI7-VI7-II7-II7-V7-V7 (Rhythm Changes Bridge)',
         category: TEMPLATE_CATEGORIES.JAZZ,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['III7', 'III7', 'VI7', 'VI7', 'II7', 'II7', 'V7', 'V7'],
@@ -884,7 +884,7 @@ export const PROGRESSION_TEMPLATES = {
     // ============================================================================
     'blues-jazz': {
         id: 'blues-jazz',
-        name: 'Jazz Blues',
+        name: 'I7-IV7-I7-vi7-ii7-V7-I7-VI7-ii7-V7-I7-V7 (Jazz Blues)',
         category: TEMPLATE_CATEGORIES.BLUES,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I7', 'IV7', 'I7', 'vi7', 'ii7', 'V7', 'I7', 'VI7', 'ii7', 'V7', 'I7', 'V7'],
@@ -904,7 +904,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'blues-stormy-monday': {
         id: 'blues-stormy-monday',
-        name: 'Stormy Monday Blues',
+        name: 'I9-IV9-I9-I9-IV9-#IVdim7-I9-VI7-ii9-V9-I9-II9 (Stormy Monday)',
         category: TEMPLATE_CATEGORIES.BLUES,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I9', 'IV9', 'I9', 'I9', 'IV9', '#IVdim7', 'I9', 'VI7', 'ii9', 'V9', 'I9', 'II9'],
@@ -1090,7 +1090,7 @@ export const PROGRESSION_TEMPLATES = {
     // ============================================================================
     'classical-romanesca': {
         id: 'classical-romanesca',
-        name: 'Romanesca',
+        name: 'I-V-vi-III-IV-I-IV-V (Romanesca)',
         category: TEMPLATE_CATEGORIES.CLASSICAL,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'V', 'vi', 'III', 'IV', 'I', 'IV', 'V'],
@@ -1110,7 +1110,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'classical-lament': {
         id: 'classical-lament',
-        name: 'Lament Bass',
+        name: 'i-vii°-III-VII-iv-i-V-i (Lament Bass)',
         category: TEMPLATE_CATEGORIES.CLASSICAL,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['i', 'vii°', 'III', 'VII', 'iv', 'i', 'V', 'i'],
@@ -1130,7 +1130,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'classical-deceptive': {
         id: 'classical-deceptive',
-        name: 'Deceptive Expansion',
+        name: 'I-IV-V-vi-IV-V-I (Deceptive Expansion)',
         category: TEMPLATE_CATEGORIES.CLASSICAL,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'IV', 'V', 'vi', 'IV', 'V', 'I'],
@@ -1150,7 +1150,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'classical-baroque-sequence': {
         id: 'classical-baroque-sequence',
-        name: 'Baroque Sequence',
+        name: 'I-IV-vii°-iii-vi-ii-V-I (Baroque Sequence)',
         category: TEMPLATE_CATEGORIES.CLASSICAL,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'IV', 'vii°', 'iii', 'vi', 'ii', 'V', 'I'],
@@ -1170,7 +1170,7 @@ export const PROGRESSION_TEMPLATES = {
 
     'classical-pachelbel': {
         id: 'classical-pachelbel',
-        name: 'Pachelbel Canon',
+        name: 'I-V-vi-iii-IV-I-IV-V (Pachelbel Canon)',
         category: TEMPLATE_CATEGORIES.CLASSICAL,
         difficulty: DIFFICULTY_LEVELS.INTERMEDIATE,
         progressions: ['I', 'V', 'vi', 'iii', 'IV', 'I', 'IV', 'V'],
@@ -1638,4 +1638,48 @@ export function getTemplateGroups() {
     }
 
     return groups;
+}
+
+/**
+ * Get pattern signatures for pattern detection in HarmonyAnalyzer
+ * Returns a simplified format optimized for pattern matching
+ * @returns {Object} Map of pattern ID to { pattern, name, description, strength }
+ */
+export function getPatternSignatures() {
+    const signatures = {};
+
+    for (const [id, template] of Object.entries(PROGRESSION_TEMPLATES)) {
+        // Calculate strength based on difficulty and common usage
+        let strength = 4; // Default
+        if (template.difficulty?.level === 1) strength = 5; // Beginner = most common
+        if (template.difficulty?.level === 3) strength = 3; // Advanced = less common
+
+        // Boost strength for certain well-known progressions
+        if (template.tags?.includes('common') || template.tags?.includes('classic')) {
+            strength = 5;
+        }
+
+        signatures[id.toUpperCase().replace(/-/g, '_')] = {
+            pattern: template.progressions,
+            name: template.name,
+            description: template.description,
+            strength
+        };
+    }
+
+    return signatures;
+}
+
+// Cache the pattern signatures for performance
+let _cachedPatternSignatures = null;
+
+/**
+ * Get cached pattern signatures (builds cache on first call)
+ * @returns {Object} Map of pattern ID to { pattern, name, description, strength }
+ */
+export function getCachedPatternSignatures() {
+    if (!_cachedPatternSignatures) {
+        _cachedPatternSignatures = getPatternSignatures();
+    }
+    return _cachedPatternSignatures;
 }
