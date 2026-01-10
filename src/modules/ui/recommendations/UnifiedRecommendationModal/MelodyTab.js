@@ -103,6 +103,8 @@ function renderMelodyTab(container) {
         // Single chord selection from Progression picker - sync to melody state
         modalState.melodySelectedChordStart = modalState.selectedProgressionIndex;
         modalState.melodySelectedChordEnd = -1;
+        // Auto-switch to section mode when any chord is selected (including N.C.)
+        modalState.melodyPositionMode = 'section';
     }
 
     // Clear cached phrases if selection changed - forces regeneration
@@ -1648,8 +1650,6 @@ function applyPhrase(phrase) {
                 if (notationComposer) {
                     notationComposer.render();
                 }
-
-                console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalPhraseBeats.toFixed(1)} beats)`);
 
                 // Visual feedback
                 const cards = document.querySelectorAll('.phrase-card');

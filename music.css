@@ -2223,6 +2223,27 @@ select:focus {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+/* Dropdown options - slightly larger for better readability when expanded */
+select option {
+    font-size: 13px;
+    padding: 6px 8px;
+}
+
+/* Specific styling for chord editor dropdowns */
+.chord-bracket-editor select option,
+.detailed-card select option {
+    font-size: 13px;
+    padding: 6px 8px;
+}
+
+/* Scale filter dropdown options */
+#scale-filter-dropdown option {
+    font-size: 13px;
+    padding: 6px 8px;
+    color: #374151;
+    background: white;
+}
+
 /* Input Fields */
 input[type="checkbox"] {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);

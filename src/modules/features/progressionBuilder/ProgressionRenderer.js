@@ -6035,11 +6035,11 @@ export function createDetailedCardHTML(chord, index, key) {
         const isInScale = scaleNotes.includes(noteWithoutOctave);
 
         return `
-            <label class="flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px] ${isInScale ? 'font-semibold' : ''}">
+            <label class="flex items-center gap-0.5 cursor-pointer text-gray-700 text-[11px] ${isInScale ? 'font-semibold' : ''}">
                 <input type="checkbox" value="${note}" ${isChecked ? 'checked' : ''}
-                    class="note-checkbox w-2.5 h-2.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
+                    class="note-checkbox w-3 h-3 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
                 <span class="${isInScale ? 'text-green-700' : ''}">${note}</span>
-                ${isInScale ? '<span class="text-[8px] text-green-600">●</span>' : ''}
+                ${isInScale ? '<span class="text-[9px] text-green-600">●</span>' : ''}
             </label>
         `;
     }).join('');
@@ -6053,7 +6053,7 @@ export function createDetailedCardHTML(chord, index, key) {
         const isActive = inv === currentInversion;
         const label = inv === 0 ? 'R' : inv.toString();
         inversionButtons.push(`
-            <button class="inversion-btn w-8 px-0.5 py-0.5 text-[9px] font-semibold rounded transition-colors ${
+            <button class="inversion-btn w-8 px-0.5 py-0.5 text-[10px] font-semibold rounded transition-colors ${
                 isActive ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }" data-inversion="${inv}">${label}</button>
         `);
@@ -6065,33 +6065,33 @@ export function createDetailedCardHTML(chord, index, key) {
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2 py-1.5 drag-handle cursor-grab active:cursor-grabbing flex justify-between items-center">
                 <div class="flex items-center gap-2 flex-wrap">
                     ${isInterval ? `
-                        <span class="text-sm font-bold">${chord.root}</span>
-                        <span class="text-xs opacity-80">${intervalSymbol}</span>
+                        <span class="text-base font-bold">${chord.root}</span>
+                        <span class="text-sm opacity-80">${intervalSymbol}</span>
                     ` : `
-                        <span class="text-sm font-bold">${chordSymbol}</span>
+                        <span class="text-base font-bold">${chordSymbol}</span>
                     `}
-                    <span class="text-xs opacity-90">${roman}</span>
-                    ${functionLabel ? `<span class="text-[9px] opacity-70">${functionLabel}</span>` : ''}
-                    <span class="text-[9px] opacity-70">#${index + 1}</span>
+                    <span class="text-sm opacity-90">${roman}</span>
+                    ${functionLabel ? `<span class="text-xs opacity-70">${functionLabel}</span>` : ''}
+                    <span class="text-xs opacity-70">#${index + 1}</span>
                 </div>
                 <div class="flex gap-0.5">
                     <button class="play-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Play (hold)">
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
                         </svg>
                     </button>
                     <button class="suggestions-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Suggest">
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
                         </svg>
                     </button>
                     <button class="collapse-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Collapse">
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                         </svg>
                     </button>
                     <button class="delete-btn p-1 hover:bg-red-500 hover:bg-opacity-90 rounded transition" title="Delete">
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                         </svg>
                     </button>
@@ -6103,14 +6103,14 @@ export function createDetailedCardHTML(chord, index, key) {
                 <!-- Root Note & Chord Type side by side -->
                 <div class="flex gap-1">
                     <div class="flex-1">
-                        <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">Root</label>
-                        <select class="root-select w-full px-1 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Root</label>
+                        <select class="root-select w-full px-1 py-0.5 bg-white border border-gray-300 rounded text-[11px]">
                             ${getRootNoteOptions(chord.root)}
                         </select>
                     </div>
                     <div class="flex-[2]">
-                        <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">Type</label>
-                        <select class="type-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Type</label>
+                        <select class="type-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[11px]">
                             ${getChordTypeOptions(chord.type)}
                         </select>
                     </div>
@@ -6118,12 +6118,12 @@ export function createDetailedCardHTML(chord, index, key) {
 
                 <!-- RH SECTION -->
                 <div class="border-2 border-blue-200 rounded p-1 bg-blue-50">
-                    <div class="text-[10px] font-bold text-blue-700 mb-0.5">RIGHT HAND (Treble)</div>
+                    <div class="text-[11px] font-bold text-blue-700 mb-0.5">RIGHT HAND (Treble)</div>
 
                     <!-- RH Octave Shift -->
                     <div class="mb-0.5">
-                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Octave Shift</label>
-                        <select class="rh-octave-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                        <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">Octave Shift</label>
+                        <select class="rh-octave-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[11px]">
                             <option value="-36" ${rhOctaveShift === -36 ? 'selected' : ''}>-3 octaves (-36)</option>
                             <option value="-24" ${rhOctaveShift === -24 ? 'selected' : ''}>-2 octaves (-24)</option>
                             <option value="-12" ${rhOctaveShift === -12 ? 'selected' : ''}>-1 octave (-12)</option>
@@ -6137,10 +6137,10 @@ export function createDetailedCardHTML(chord, index, key) {
                     <!-- RH Notes/Voicing -->
                     <div class="border border-gray-300 rounded p-1 bg-white mb-0.5">
                         <div class="flex items-center justify-between mb-0.5">
-                            <label class="text-[9px] font-semibold text-indigo-600">Notes <span class="text-green-600">●</span> = in scale</label>
+                            <label class="text-[10px] font-semibold text-indigo-600">Notes <span class="text-green-600">●</span> = in scale</label>
                             <div class="flex gap-0.5">
-                                <button class="notes-all-btn px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded">All</button>
-                                <button class="notes-none-btn px-1.5 py-0.5 text-[9px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded">None</button>
+                                <button class="notes-all-btn px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded">All</button>
+                                <button class="notes-none-btn px-1.5 py-0.5 text-[10px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded">None</button>
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-x-2 gap-y-0.5">
@@ -6150,7 +6150,7 @@ export function createDetailedCardHTML(chord, index, key) {
 
                     <!-- RH Inversion -->
                     <div class="chord-card-inversion-section bg-yellow-50 border border-yellow-300 rounded p-1">
-                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">🎹 Inversion</label>
+                        <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">🎹 Inversion</label>
                         <div class="flex gap-0.5 inversion-btn-group">
                             ${inversionButtons.join('')}
                         </div>
@@ -6159,13 +6159,13 @@ export function createDetailedCardHTML(chord, index, key) {
 
                 <!-- Musical Notation (Permanent) -->
                 <div class="border-t border-gray-200 pt-1.5 mt-1.5">
-                    <div class="text-[10px] font-semibold text-gray-700 mb-1">Musical Notation</div>
+                    <div class="text-[11px] font-semibold text-gray-700 mb-1">Musical Notation</div>
                     <canvas class="chord-notation-canvas mx-auto" style="display: block;"></canvas>
                 </div>
 
                 <!-- Footer Buttons -->
                 <div class="flex gap-1 pt-1 border-t border-gray-200">
-                    <button class="collapse-btn flex-1 px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-[10px] rounded transition">
+                    <button class="collapse-btn flex-1 px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-[11px] rounded transition">
                         Collapse
                     </button>
                 </div>

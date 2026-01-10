@@ -167,11 +167,11 @@ function createEditorHTML(chord, index, key) {
         const noteWithoutOctave = note.replace(/\d+$/, '');
         const isInScale = scaleNotes.includes(noteWithoutOctave);
         return `
-            <label class="flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px] ${isInScale ? 'font-semibold' : ''}">
+            <label class="flex items-center gap-0.5 cursor-pointer text-gray-700 text-[11px] ${isInScale ? 'font-semibold' : ''}">
                 <input type="checkbox" value="${note}" ${isChecked ? 'checked' : ''}
-                    class="note-checkbox w-2.5 h-2.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
+                    class="note-checkbox w-3 h-3 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
                 <span class="${isInScale ? 'text-green-700' : ''}">${note}</span>
-                ${isInScale ? '<span class="text-[8px] text-green-600">●</span>' : ''}
+                ${isInScale ? '<span class="text-[9px] text-green-600">●</span>' : ''}
             </label>
         `;
     }).join('');
@@ -185,36 +185,50 @@ function createEditorHTML(chord, index, key) {
         const isActive = inv === currentInversion;
         const label = inv === 0 ? 'R' : inv.toString();
         inversionButtons.push(`
-            <button class="inversion-btn w-7 px-0.5 py-0.5 text-[9px] font-semibold rounded transition-colors ${
+            <button class="inversion-btn w-7 px-0.5 py-0.5 text-[10px] font-semibold rounded transition-colors ${
                 isActive ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }" data-inversion="${inv}">${label}</button>
         `);
     }
 
-    // Generate octave shift options (matching chord cards style)
+    // Generate octave shift options (matching chord cards style, with 3 octave range)
     const rhOctaveShift = chord.octaveShift || 0;
     const octaveOptions = `
+        <option value="-36" ${rhOctaveShift === -36 ? 'selected' : ''}>-3</option>
         <option value="-24" ${rhOctaveShift === -24 ? 'selected' : ''}>-2</option>
         <option value="-12" ${rhOctaveShift === -12 ? 'selected' : ''}>-1</option>
         <option value="0" ${rhOctaveShift === 0 ? 'selected' : ''}>0</option>
         <option value="12" ${rhOctaveShift === 12 ? 'selected' : ''}>+1</option>
         <option value="24" ${rhOctaveShift === 24 ? 'selected' : ''}>+2</option>
+        <option value="36" ${rhOctaveShift === 36 ? 'selected' : ''}>+3</option>
     `;
 
     return `
-        <div class="chord-bracket-editor bg-white border-2 border-indigo-500 rounded-lg shadow-xl overflow-hidden" style="width: 240px;">
-            <!-- Compact Header -->
+        <div class="chord-bracket-editor bg-white border-2 border-indigo-500 rounded-lg shadow-xl overflow-hidden" style="width: 260px;">
+            <!-- Compact Header with Play/Suggest buttons -->
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-2 py-1.5 flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <span class="text-sm font-bold">${chordSymbol}</span>
-                    <span class="text-xs opacity-80">${roman}</span>
-                    ${functionLabel ? `<span class="text-[9px] opacity-70">${functionLabel}</span>` : ''}
+                    <span class="text-base font-bold">${chordSymbol}</span>
+                    <span class="text-sm opacity-80">${roman}</span>
+                    ${functionLabel ? `<span class="text-xs opacity-70">${functionLabel}</span>` : ''}
                 </div>
-                <button class="close-editor-btn p-0.5 hover:bg-white hover:bg-opacity-20 rounded transition" title="Close">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                    </svg>
-                </button>
+                <div class="flex gap-0.5">
+                    <button class="play-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Play (hold)">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
+                        </svg>
+                    </button>
+                    <button class="suggest-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Suggest">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
+                        </svg>
+                    </button>
+                    <button class="close-editor-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Close">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Controls -->
@@ -222,26 +236,26 @@ function createEditorHTML(chord, index, key) {
                 <!-- Row 1: Root, Type, Beats, Octave -->
                 <div class="flex gap-1">
                     <div class="w-14">
-                        <label class="block text-[9px] font-semibold text-gray-600 mb-0.5">Root</label>
-                        <select class="root-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[10px]">
+                        <label class="block text-[10px] font-semibold text-gray-600 mb-0.5">Root</label>
+                        <select class="root-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[11px]">
                             ${getRootNoteOptions(chord.root)}
                         </select>
                     </div>
                     <div class="flex-1">
-                        <label class="block text-[9px] font-semibold text-gray-600 mb-0.5">Type</label>
-                        <select class="type-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[10px]">
+                        <label class="block text-[10px] font-semibold text-gray-600 mb-0.5">Type</label>
+                        <select class="type-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[11px]">
                             ${getChordTypeOptions(chord.type)}
                         </select>
                     </div>
                     <div class="w-12">
-                        <label class="block text-[9px] font-semibold text-gray-600 mb-0.5">Beats</label>
-                        <select class="duration-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[10px]">
+                        <label class="block text-[10px] font-semibold text-gray-600 mb-0.5">Beats</label>
+                        <select class="duration-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[11px]">
                             ${getDurationOptions(chord.beats || 4)}
                         </select>
                     </div>
-                    <div class="w-11">
-                        <label class="block text-[9px] font-semibold text-gray-600 mb-0.5">Oct</label>
-                        <select class="octave-select w-full px-0.5 py-1 bg-white border border-gray-300 rounded text-[10px]">
+                    <div class="w-12">
+                        <label class="block text-[10px] font-semibold text-gray-600 mb-0.5">Oct</label>
+                        <select class="octave-select w-full px-0.5 py-1 bg-white border border-gray-300 rounded text-[11px]">
                             ${octaveOptions}
                         </select>
                     </div>
@@ -250,10 +264,10 @@ function createEditorHTML(chord, index, key) {
                 <!-- Notes section -->
                 <div class="border border-gray-200 rounded p-1.5 bg-gray-50">
                     <div class="flex items-center justify-between mb-1">
-                        <label class="text-[9px] font-semibold text-gray-600">Notes <span class="text-green-600">●</span> = in scale</label>
+                        <label class="text-[10px] font-semibold text-gray-600">Notes <span class="text-green-600">●</span> = in scale</label>
                         <div class="flex gap-0.5">
-                            <button class="notes-all-btn px-1.5 py-0.5 text-[8px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded">All</button>
-                            <button class="notes-none-btn px-1.5 py-0.5 text-[8px] font-semibold bg-gray-400 hover:bg-gray-500 text-white rounded">None</button>
+                            <button class="notes-all-btn px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded">All</button>
+                            <button class="notes-none-btn px-1.5 py-0.5 text-[9px] font-semibold bg-gray-400 hover:bg-gray-500 text-white rounded">None</button>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-x-2 gap-y-0.5">
@@ -263,26 +277,10 @@ function createEditorHTML(chord, index, key) {
 
                 <!-- Inversion row -->
                 <div class="flex items-center gap-2">
-                    <label class="text-[9px] font-semibold text-gray-600">Inversion:</label>
+                    <label class="text-[10px] font-semibold text-gray-600">Inversion:</label>
                     <div class="flex gap-0.5 inversion-btn-group">
                         ${inversionButtons.join('')}
                     </div>
-                </div>
-
-                <!-- Action buttons -->
-                <div class="flex gap-1.5 pt-1 border-t border-gray-200">
-                    <button class="play-btn flex-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-[10px] font-medium rounded transition flex items-center justify-center gap-1">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
-                        </svg>
-                        Play
-                    </button>
-                    <button class="suggest-btn flex-1 px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-medium rounded transition flex items-center justify-center gap-1">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
-                        </svg>
-                        Suggest
-                    </button>
                 </div>
             </div>
         </div>
