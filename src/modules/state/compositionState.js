@@ -5506,6 +5506,44 @@ export class CompositionState {
     }
 
     // ========================================================================
+    // Title and Composer Methods
+    // ========================================================================
+
+    /**
+     * Get the composition title
+     * @returns {string} The title or empty string
+     */
+    getTitle() {
+        return this.metadata.title || '';
+    }
+
+    /**
+     * Set the composition title
+     * @param {string} title - The title to set
+     */
+    setTitle(title) {
+        this.metadata.title = title || '';
+        this.events.emit('metadataChanged', { field: 'title', value: this.metadata.title });
+    }
+
+    /**
+     * Get the composer name
+     * @returns {string} The composer or empty string
+     */
+    getComposer() {
+        return this.metadata.composer || '';
+    }
+
+    /**
+     * Set the composer name
+     * @param {string} composer - The composer to set
+     */
+    setComposer(composer) {
+        this.metadata.composer = composer || '';
+        this.events.emit('metadataChanged', { field: 'composer', value: this.metadata.composer });
+    }
+
+    // ========================================================================
     // Utility Methods
     // ========================================================================
 

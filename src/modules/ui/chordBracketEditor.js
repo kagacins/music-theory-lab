@@ -318,7 +318,7 @@ export function showChordBracketEditor(chordIndex, region, event) {
     // Create the editor element
     editorElement = document.createElement('div');
     editorElement.id = 'chord-bracket-editor-popup';
-    editorElement.className = 'fixed z-[9999]';
+    editorElement.className = 'fixed z-[100000]';
     editorElement.innerHTML = createEditorHTML(chord, chordIndex, key);
 
     console.log('[ChordBracketEditor] Editor element created, appending to body...');

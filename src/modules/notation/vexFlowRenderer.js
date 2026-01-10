@@ -901,6 +901,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
       const vexGraceNotes = graceNotes.map(gn => {
         const graceKey = noteToVexKey(gn.pitch);
         const graceDuration = DURATION_MAP[gn.duration] || '8';
+        // GraceNote renders at 0.66 scale by default in VexFlow
         const graceNote = new VF.GraceNote({
           keys: [graceKey],
           duration: graceDuration,
@@ -909,8 +910,8 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
         return graceNote;
       });
 
-      // Create a GraceNoteGroup and attach to the main note
-      const graceGroup = new VF.GraceNoteGroup(vexGraceNotes);
+      // Create a GraceNoteGroup with slur (beamNotes adds slur by default)
+      const graceGroup = new VF.GraceNoteGroup(vexGraceNotes, true); // true = show slur
       staveNote.addModifier(graceGroup, 0);
     } catch (error) {
       console.warn('[VexFlowRenderer] Error adding grace notes:', error.message);
@@ -1152,6 +1153,7 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
       const vexGraceNotes = graceNotes.map(gn => {
         const graceKey = noteToVexKey(gn.pitch);
         const graceDuration = DURATION_MAP[gn.duration] || '8';
+        // GraceNote renders at 0.66 scale by default in VexFlow
         const graceNote = new VF.GraceNote({
           keys: [graceKey],
           duration: graceDuration,
@@ -1160,8 +1162,8 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
         return graceNote;
       });
 
-      // Create a GraceNoteGroup and attach to the chord
-      const graceGroup = new VF.GraceNoteGroup(vexGraceNotes);
+      // Create a GraceNoteGroup with slur (true = show slur)
+      const graceGroup = new VF.GraceNoteGroup(vexGraceNotes, true);
       staveNote.addModifier(graceGroup, 0);
     } catch (error) {
       console.warn('[VexFlowRenderer] Error adding grace notes to chord:', error.message);

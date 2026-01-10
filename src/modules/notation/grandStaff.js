@@ -3034,7 +3034,13 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
 
     // Reserve padding at the end of the measure to prevent notes touching the bar line
     const endPadding = 15;
-    const staveWidth = width - trebleStave.getNoteStartX() + x - endPadding;
+    // Calculate available width for notes: from note start to end of stave, minus padding
+    // Note: getNoteStartX() returns ABSOLUTE position (includes stave's x offset)
+    // So we need: (x + width) - getNoteStartX() - endPadding
+    // This ensures first measure (wider but with clef/key/time) has same note area as other measures
+    const noteEndX = x + width;
+    const noteStartX = trebleStave.getNoteStartX();
+    const staveWidth = noteEndX - noteStartX - endPadding;
 
     // Format all voices together
     const allVoices = [];
@@ -4312,6 +4318,84 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         ctx.restore();
       }
     });
+  }
+
+  // ========================================================================
+  // TITLE AND COMPOSER RENDERING (First page only)
+  // ========================================================================
+  // Render title on left, composer on right, same line at top of first page
+  if (globalMeasureOffset === 0) {
+    const compState = window.getCompositionState?.();
+    const title = compState?.metadata?.title;
+    const composer = compState?.metadata?.composer;
+
+    if (title || composer) {
+      // Get raw canvas context for text rendering
+      let ctx = null;
+      if (context.context2D) {
+        ctx = context.context2D;
+      } else if (context.vexFlowCanvasContext) {
+        ctx = context.vexFlowCanvasContext;
+      } else if (context.canvas && context.canvas.getContext) {
+        ctx = context.canvas.getContext('2d');
+      }
+
+      const centerX = dimensions.totalWidth / 2;
+      const rightMargin = dimensions.totalWidth - 30;
+      const textY = 25; // Vertical position from top
+
+      if (ctx) {
+        ctx.save();
+
+        // Title centered
+        if (title) {
+          ctx.font = 'bold 20px Georgia, Times New Roman, serif';
+          ctx.fillStyle = '#1a1a1a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(title, centerX, textY);
+        }
+
+        // Composer on the right
+        if (composer) {
+          ctx.font = 'italic 14px Georgia, Times New Roman, serif';
+          ctx.fillStyle = '#555555';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(composer, rightMargin, textY);
+        }
+
+        ctx.restore();
+      } else if (context.svg) {
+        // SVG renderer - title centered
+        if (title) {
+          const titleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          titleText.setAttribute('x', centerX);
+          titleText.setAttribute('y', textY);
+          titleText.setAttribute('text-anchor', 'middle');
+          titleText.setAttribute('font-family', 'Georgia, Times New Roman, serif');
+          titleText.setAttribute('font-size', '20px');
+          titleText.setAttribute('font-weight', 'bold');
+          titleText.setAttribute('fill', '#1a1a1a');
+          titleText.textContent = title;
+          context.svg.appendChild(titleText);
+        }
+
+        // SVG renderer - composer on right
+        if (composer) {
+          const composerText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          composerText.setAttribute('x', rightMargin);
+          composerText.setAttribute('y', textY);
+          composerText.setAttribute('text-anchor', 'end');
+          composerText.setAttribute('font-family', 'Georgia, Times New Roman, serif');
+          composerText.setAttribute('font-size', '14px');
+          composerText.setAttribute('font-style', 'italic');
+          composerText.setAttribute('fill', '#555555');
+          composerText.textContent = composer;
+          context.svg.appendChild(composerText);
+        }
+      }
+    }
   }
 
   // Draw measure highlights before rendering measures

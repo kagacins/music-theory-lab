@@ -226,7 +226,7 @@ export class MeasureIsolationEditor {
 
         this.modal = document.createElement('div');
         this.modal.id = 'measure-isolation-modal';
-        this.modal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-4';
+        this.modal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[100000] flex items-center justify-center p-4';
         this.modal.innerHTML = `
             <!-- Scrollbar styles - force native scrollbar visibility -->
             <style>

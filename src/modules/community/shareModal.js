@@ -946,6 +946,16 @@ async function showShareForm(dupData, key, compState, isVariant = false, parentS
         draftBtn.classList.remove('hidden');
     }
 
+    // Pre-fill title from composition metadata (if not empty and not in edit mode)
+    // This helps users by suggesting their composition's title
+    if (!editModeState) {
+        const titleInput = document.getElementById('share-title');
+        const compositionTitle = compState?.metadata?.title || compState?.getTitle?.();
+        if (titleInput && compositionTitle && compositionTitle.trim()) {
+            titleInput.value = compositionTitle.trim();
+        }
+    }
+
     // Pre-fill form with existing data in edit mode
     if (editModeState && editModeState.existingData) {
         const data = editModeState.existingData;

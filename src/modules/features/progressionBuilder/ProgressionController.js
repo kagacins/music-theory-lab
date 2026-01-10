@@ -1158,6 +1158,16 @@ export function updateChordInversion(index, newInversion, shouldUpdateUI = true,
         // Use new helper function that preserves treble notes
         updateChordAndRenderPreservingTrebleNotes(index);
     }
+
+    // Dispatch progressionUpdated event for full-screen chord cards and other listeners
+    window.dispatchEvent(new CustomEvent('progressionUpdated', {
+        detail: {
+            progression: trainerState.progressionData,
+            key: trainerState.currentKey,
+            updatedIndex: index,
+            updateType: 'inversion'
+        }
+    }));
 }
 
 /**

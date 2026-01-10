@@ -49,6 +49,11 @@ function isModalOpen() {
   // Look for visible modal overlays (fixed position, full screen, not hidden)
   const modalOverlays = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
   for (const overlay of modalOverlays) {
+    // Skip the full-screen notation editor - it's not a blocking modal
+    // The full-screen editor should allow all keyboard shortcuts to work normally
+    if (overlay.id === 'fullscreen-notation-modal') {
+      continue;
+    }
     // Check if it looks like a modal (has semi-transparent background)
     const style = window.getComputedStyle(overlay);
     const bg = style.backgroundColor;
@@ -4606,12 +4611,9 @@ export class NoteEditor {
         slash: graceType === 'acciaccatura',  // Acciaccatura has a slash through it
       };
 
-      // Add to existing grace notes or create new array
-      if (!note.graceNotes) {
-        note.graceNotes = [graceNote];
-      } else {
-        note.graceNotes.push(graceNote);
-      }
+      // Replace any existing grace notes (only one grace note per note allowed)
+      // This prevents accumulating multiple grace notes on a single note
+      note.graceNotes = [graceNote];
       changedCount++;
     }
 
@@ -5945,8 +5947,8 @@ export class NoteEditor {
   // ============================================================================
 
   /**
-   * Change accidental on all selected notes (supports per-pitch accidentals in chords)
-   * @param {string} accidental - Accidental ('#', 'b', 'n', or null)
+   * Change accidental on all selected notes by modifying the pitch string
+   * @param {string} accidental - Accidental ('#', 'b', 'n', or null) - 'n' means natural (no accidental)
    */
   changeAccidentalOnSelected(accidental) {
     if (this.selectedNotes.size === 0) return;
@@ -5955,6 +5957,9 @@ export class NoteEditor {
     if (typeof window.saveStateBeforeChange === 'function') {
       window.saveStateBeforeChange();
     }
+
+    // Convert 'n' (natural) to empty string for pitch modification
+    const accidentalChar = accidental === 'n' ? '' : (accidental || '');
 
     let changedCount = 0;
 
@@ -5970,23 +5975,25 @@ export class NoteEditor {
           if (voice && voice.notes[noteIndex]) {
             const note = voice.notes[noteIndex];
             // Only apply to notes, not rests
-            if (!note.isRest) {
-              if (pitchIndex !== null && note.pitches && note.pitches.length > 1) {
-                // Pitch-specific accidental for chord
-                // Initialize accidentals array if needed
-                if (!note.accidentals) {
-                  note.accidentals = new Array(note.pitches.length).fill(null);
+            if (!note.isRest && note.pitches && note.pitches.length > 0) {
+              // Determine which pitches to modify
+              const indicesToModify = (pitchIndex !== null) ? [pitchIndex] :
+                note.pitches.map((_, i) => i);
+
+              // Modify the pitch strings directly
+              for (const idx of indicesToModify) {
+                if (idx < note.pitches.length) {
+                  const oldPitch = note.pitches[idx];
+                  // Parse pitch: e.g., "C#4" -> noteLetter="C", oldAcc="#", octave="4"
+                  const match = oldPitch.match(/^([A-G])([#b]?)(\d+)$/);
+                  if (match) {
+                    const noteLetter = match[1];
+                    const octave = match[3];
+                    // Create new pitch with the specified accidental
+                    note.pitches[idx] = noteLetter + accidentalChar + octave;
+                    changedCount++;
+                  }
                 }
-                // Ensure array is correct length
-                while (note.accidentals.length < note.pitches.length) {
-                  note.accidentals.push(null);
-                }
-                note.accidentals[pitchIndex] = accidental;
-                changedCount++;
-              } else {
-                // Single note or whole chord accidental
-                note.accidental = accidental;
-                changedCount++;
               }
             }
           }

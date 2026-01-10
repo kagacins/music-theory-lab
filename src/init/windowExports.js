@@ -439,6 +439,14 @@ import {
     getMeasureIsolationEditor
 } from '../modules/notation/measureIsolation/index.js';
 
+// Full-Screen Notation Editor
+import {
+    openFullScreenNotation,
+    closeFullScreenNotation,
+    toggleFullScreenNotation,
+    getFullScreenNotationEditor
+} from '../modules/notation/fullScreen/FullScreenNotationEditor.js';
+
 import {
     ENHARMONIC_MAP,
     SHARP_NOTES,
@@ -2388,4 +2396,10 @@ export function setupWindowExports() {
         });
     };
     window.getMeasureIsolationEditor = getMeasureIsolationEditor;
+
+    // Full-Screen Notation Editor
+    window.openFullScreenNotation = openFullScreenNotation;
+    window.closeFullScreenNotation = closeFullScreenNotation;
+    window.toggleFullScreenNotation = toggleFullScreenNotation;
+    window.getFullScreenNotationEditor = getFullScreenNotationEditor;
 }
