@@ -200,6 +200,7 @@ export class NotationToolbar {
     this.selectionGraceNote = null;  // null = none, 'acciaccatura'/'appoggiatura' = all same, 'mixed' = multiple
 
     // Contextual button validation flags
+    this.canBeamSelected = false;       // 2+ consecutive beamable notes in same measure
     this.canBreakBeamsBetween = false;  // Exactly 2 notes in same beam group
     this.canTie = false;                // 2+ notes with at least one common pitch
     this.canSlur = false;               // 2+ notes selected
@@ -818,6 +819,8 @@ export class NotationToolbar {
           <div class="toolbar-group tier2-group group-rhythm beam-group">
             <span class="group-label">Beam</span>
             <div class="toolbar-group-content">
+              <button class="toolbar-btn beam-btn beam-selected-btn" data-beam="beam" title="Beam selected consecutive notes together">⟨⟩</button>
+              <span class="toolbar-divider">|</span>
               <button class="toolbar-btn beam-btn" data-beam="start" title="Force start of new beam group here">[</button>
               <button class="toolbar-btn beam-btn" data-beam="end" title="Force end of beam group here">]</button>
               <button class="toolbar-btn beam-btn" data-beam="breakBetween" title="Break all beams between 2 selected notes (select exactly 2 notes in same beam group)">⊥</button>
@@ -2990,6 +2993,7 @@ export class NotationToolbar {
       this.selectionDynamic = null;
 
       // Reset all contextual validation flags
+      this.canBeamSelected = false;
       this.canBreakBeamsBetween = false;
       this.canTie = false;
       this.canSlur = false;
@@ -3128,9 +3132,15 @@ export class NotationToolbar {
       end: beamStates.end.size === 1 && [...beamStates.end][0] === true,
       unbeam: beamStates.unbeam.size === 1 && [...beamStates.unbeam][0] === true
     };
-    // Check if "Break Beams Between" should be enabled (exactly 2 notes in same beam group)
+    // Check if beam-related actions should be enabled
     const notationComposer = window.getNotationComposer?.();
     const noteEditor = notationComposer?.noteEditor;
+
+    // Check if "Beam Selected" should be enabled (2+ consecutive beamable notes in same measure)
+    const beamResult = noteEditor?.canBeamSelected?.();
+    this.canBeamSelected = beamResult?.valid || false;
+
+    // Check if "Break Beams Between" should be enabled (exactly 2 notes in same beam group)
     const breakResult = noteEditor?.canBreakBeamsBetween?.();
     this.canBreakBeamsBetween = breakResult?.valid || false;
     this.selectionHasLyric = lyricStates.size === 1 && [...lyricStates][0] === 'has-lyric';
@@ -3667,7 +3677,10 @@ export class NotationToolbar {
       let isActive = false;
       let isDisabled = false;
 
-      if (beamType === 'start' && this.selectionBeam?.start) {
+      if (beamType === 'beam') {
+        // "Beam Selected" is only enabled when 2+ consecutive beamable notes are selected
+        isDisabled = !this.canBeamSelected;
+      } else if (beamType === 'start' && this.selectionBeam?.start) {
         isActive = true;
       } else if (beamType === 'end' && this.selectionBeam?.end) {
         isActive = true;

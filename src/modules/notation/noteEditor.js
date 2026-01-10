@@ -9531,8 +9531,178 @@ export class NoteEditor {
   }
 
   /**
+   * Check if selected notes can be beamed together
+   * Returns { valid: true } if beaming is possible, { valid: false, reason: '...' } otherwise
+   *
+   * Valid for beaming when:
+   * - 2+ notes selected
+   * - All notes are beamable (8th, 16th, 32nd notes - not quarter or longer)
+   * - All notes are in the same measure
+   * - All notes are in the same voice (same staff, same voice index)
+   * - Notes are consecutive (no gaps in note indices)
+   * - No rests between selected notes
+   *
+   * @returns {Object} { valid: boolean, reason?: string, notes?: Array }
+   */
+  canBeamSelected() {
+    if (this.selectedNotes.size < 2) {
+      return { valid: false, reason: 'Need at least 2 notes to beam' };
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) {
+      return { valid: false, reason: 'Composition state not available' };
+    }
+
+    // Parse all selected note IDs and gather info
+    const noteInfos = [];
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      noteInfos.push({ noteId, measureIndex, staff, voiceIndex, noteIndex });
+    }
+
+    // Check all notes are in the same measure
+    const measures = new Set(noteInfos.map(n => n.measureIndex));
+    if (measures.size > 1) {
+      return { valid: false, reason: 'Cannot beam across measures' };
+    }
+
+    // Check all notes are on the same staff
+    const staffs = new Set(noteInfos.map(n => n.staff));
+    if (staffs.size > 1) {
+      return { valid: false, reason: 'Cannot beam across staves' };
+    }
+
+    // Check all notes are in the same voice
+    const voices = new Set(noteInfos.map(n => n.voiceIndex));
+    if (voices.size > 1) {
+      return { valid: false, reason: 'Cannot beam across voices' };
+    }
+
+    const measureIndex = noteInfos[0].measureIndex;
+    const staff = noteInfos[0].staff;
+    const voiceIndex = noteInfos[0].voiceIndex;
+
+    // Get the voice
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) {
+      return { valid: false, reason: 'Measure not found' };
+    }
+
+    const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+    const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+    if (!voice?.notes) {
+      return { valid: false, reason: 'Voice not found' };
+    }
+
+    // Sort note infos by note index
+    noteInfos.sort((a, b) => a.noteIndex - b.noteIndex);
+
+    // Check notes are consecutive (no gaps)
+    const indices = noteInfos.map(n => n.noteIndex);
+    for (let i = 1; i < indices.length; i++) {
+      if (indices[i] !== indices[i - 1] + 1) {
+        return { valid: false, reason: 'Selected notes must be consecutive' };
+      }
+    }
+
+    // Helper to check if a note is beamable
+    const isBeamable = (note) => {
+      if (!note || note.isRest) return false;
+      const dur = note.duration || '';
+      // Beamable: 8n, 16n, 32n, 64n (and dotted variants like 8nd)
+      // Also handle tuplet durations: 8t, 8q, 8x, 16t, etc.
+      return ['8', '16', '32', '64'].some(d => dur.includes(d));
+    };
+
+    // Check all notes are beamable and not rests
+    const startIdx = indices[0];
+    const endIdx = indices[indices.length - 1];
+
+    for (let i = startIdx; i <= endIdx; i++) {
+      const note = voice.notes[i];
+      if (!note) {
+        return { valid: false, reason: 'Note not found at index ' + i };
+      }
+      if (note.isRest) {
+        return { valid: false, reason: 'Cannot beam rests' };
+      }
+      if (!isBeamable(note)) {
+        return { valid: false, reason: 'All notes must be beamable (8th notes or shorter)' };
+      }
+    }
+
+    // All checks passed
+    return {
+      valid: true,
+      measureIndex,
+      staff,
+      voiceIndex,
+      startNoteIndex: startIdx,
+      endNoteIndex: endIdx,
+      voice
+    };
+  }
+
+  /**
+   * Beam the selected notes together as a single beam group
+   * Sets beam.start on first note and beam.end on last note,
+   * clearing any conflicting beam settings on notes between.
+   */
+  beamSelectedNotes() {
+    const canBeam = this.canBeamSelected();
+    if (!canBeam.valid) {
+      console.log(`[beamSelectedNotes] Cannot beam: ${canBeam.reason}`);
+      return false;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const { voice, startNoteIndex, endNoteIndex } = canBeam;
+
+    // Set beam.start on first note
+    const firstNote = voice.notes[startNoteIndex];
+    if (!firstNote.beam) firstNote.beam = { start: false, end: false, unbeam: false };
+    firstNote.beam.start = true;
+    firstNote.beam.end = false;
+    firstNote.beam.unbeam = false;
+
+    // Set beam.end on last note
+    const lastNote = voice.notes[endNoteIndex];
+    if (!lastNote.beam) lastNote.beam = { start: false, end: false, unbeam: false };
+    lastNote.beam.end = true;
+    // If first and last are different notes, don't set start on last
+    if (startNoteIndex !== endNoteIndex) {
+      lastNote.beam.start = false;
+    }
+    lastNote.beam.unbeam = false;
+
+    // Clear conflicting beam settings on notes in between
+    for (let i = startNoteIndex + 1; i < endNoteIndex; i++) {
+      const note = voice.notes[i];
+      if (note && note.beam) {
+        // Clear all beam overrides - let them flow naturally within the group
+        note.beam.start = false;
+        note.beam.end = false;
+        note.beam.unbeam = false;
+      }
+    }
+
+    console.log(`[beamSelectedNotes] Beamed notes ${startNoteIndex} to ${endNoteIndex}`);
+
+    // Re-render
+    this.composerIntegration.render(true);
+    this.composerIntegration.updateToolbarSelectionState();
+
+    return true;
+  }
+
+  /**
    * Apply beam control to selected notes
-   * @param {string} beamAction - 'start', 'end', 'unbeam', 'breakBetween', or 'clear'
+   * @param {string} beamAction - 'beam', 'start', 'end', 'unbeam', 'breakBetween', or 'clear'
    *
    * Beam property format: { start: boolean, end: boolean, unbeam: boolean }
    * - start: true = force start of a new beam group here
@@ -9540,6 +9710,7 @@ export class NoteEditor {
    * - unbeam: true = this note gets individual flags, not beamed at all
    *
    * Actions:
+   * - 'beam': Beam consecutive selected notes together (uses beamSelectedNotes())
    * - 'start': Toggle forcing a new beam to start at this note
    * - 'end': Toggle forcing the beam to end at this note
    * - 'unbeam': Toggle removing this note from beaming entirely (gets flags)
@@ -9549,6 +9720,12 @@ export class NoteEditor {
   applyBeamToSelected(beamAction) {
     if (this.selectedNotes.size === 0) {
       console.log('[applyBeamToSelected] No notes selected');
+      return;
+    }
+
+    // Special handling for 'beam' action - delegate to beamSelectedNotes()
+    if (beamAction === 'beam') {
+      this.beamSelectedNotes();
       return;
     }
 

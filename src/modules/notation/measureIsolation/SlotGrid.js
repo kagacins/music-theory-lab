@@ -1334,8 +1334,21 @@ export class SlotGrid {
                     }
 
                     // For quarter rests (>=48 slots = 1 beat), prefer starting on beat boundaries
-                    if (option.slots >= 48 && !beatInfo.isDownbeat && !beatInfo.isHalfBeat) {
-                        continue;
+                    // In simple meter: check isDownbeat or isHalfBeat
+                    // In compound meter: check isDownbeat or isQuarterBeat (eighth note positions)
+                    if (option.slots >= 48) {
+                        if (beatInfo.isCompound) {
+                            // Compound meter (6/8, etc.): quarter rests align with dotted quarter beats
+                            // or eighth note positions within the felt beat
+                            if (!beatInfo.isDownbeat && !beatInfo.isQuarterBeat) {
+                                continue;
+                            }
+                        } else {
+                            // Simple meter: quarter rests align with beats or half-beats
+                            if (!beatInfo.isDownbeat && !beatInfo.isHalfBeat) {
+                                continue;
+                            }
+                        }
                     }
 
                     bestOption = option;
