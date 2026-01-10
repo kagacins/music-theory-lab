@@ -5008,7 +5008,9 @@ export function toggleSimplifiedCardNotation(wrapper, index) {
     const musicNoteIcon = toggleBtn?.querySelector('.music-note-icon');
     const abcText = toggleBtn?.querySelector('.abc-text');
 
-    if (!card || !chordInfoView || !notationView || !canvas || !toggleBtn) return;
+    if (!card || !chordInfoView || !notationView || !canvas || !toggleBtn) {
+        return;
+    }
 
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
@@ -6059,49 +6061,41 @@ export function createDetailedCardHTML(chord, index, key) {
 
     return `
         <div class="detailed-card bg-white border-2 border-blue-500 rounded-lg overflow-hidden shadow-lg">
-            <!-- Header - drag handle for reordering -->
-            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 drag-handle cursor-grab active:cursor-grabbing">
-                <div class="flex justify-between items-start">
-                    <div class="flex-1">
-                        ${isInterval ? `
-                            <div class="text-sm font-bold">${chord.root}</div>
-                            <div class="text-[10px]" style="color: rgba(255,255,255,0.8);">${intervalSymbol}</div>
-                        ` : `
-                            <div class="text-sm font-bold">${chordSymbol}</div>
-                        `}
-                        <div class="text-xs" style="color: rgba(255,255,255,0.9);">${roman}</div>
-                        ${functionLabel ? `<div class="text-[9px] text-blue-200">${functionLabel}</div>` : ''}
-                        <div class="text-[9px] text-blue-200">Pos: ${index + 1}</div>
-                    </div>
-                    <div class="flex gap-0.5">
-                        <button class="collapse-btn p-0.5 text-white hover:bg-white hover:bg-opacity-20 rounded transition" title="Collapse">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                            </svg>
-                        </button>
-                        <button class="delete-btn p-0.5 text-white hover:bg-red-500 hover:bg-opacity-90 rounded transition" title="Delete">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                            </svg>
-                        </button>
-                    </div>
+            <!-- Compact Header - single row with all info, drag handle for reordering -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2 py-1.5 drag-handle cursor-grab active:cursor-grabbing flex justify-between items-center">
+                <div class="flex items-center gap-2 flex-wrap">
+                    ${isInterval ? `
+                        <span class="text-sm font-bold">${chord.root}</span>
+                        <span class="text-xs opacity-80">${intervalSymbol}</span>
+                    ` : `
+                        <span class="text-sm font-bold">${chordSymbol}</span>
+                    `}
+                    <span class="text-xs opacity-90">${roman}</span>
+                    ${functionLabel ? `<span class="text-[9px] opacity-70">${functionLabel}</span>` : ''}
+                    <span class="text-[9px] opacity-70">#${index + 1}</span>
                 </div>
-            </div>
-
-            <!-- Top Control Buttons -->
-            <div class="bg-gray-50 border-b border-gray-200 p-1 flex gap-0.5">
-                <button class="play-btn px-1.5 py-0.5 bg-green-600 hover:bg-green-700 text-white text-[9px] font-medium rounded transition flex items-center justify-center gap-0.5 whitespace-nowrap">
-                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
-                    </svg>
-                    Play
-                </button>
-                <button class="suggestions-btn px-1.5 py-0.5 bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-medium rounded transition flex items-center justify-center gap-0.5 whitespace-nowrap" title="Open Suggestions">
-                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
-                    </svg>
-                    Suggest
-                </button>
+                <div class="flex gap-0.5">
+                    <button class="play-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Play (hold)">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
+                        </svg>
+                    </button>
+                    <button class="suggestions-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Suggest">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
+                        </svg>
+                    </button>
+                    <button class="collapse-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Collapse">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    <button class="delete-btn p-1 hover:bg-red-500 hover:bg-opacity-90 rounded transition" title="Delete">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Controls -->
@@ -6888,6 +6882,19 @@ export function attachCardEventListeners(wrapper, index) {
         });
     }
 
+    // === DETAILED CARD TOOLTIP CLEANUP ===
+    // When on an expanded/detailed card, hide tooltip when mouse leaves the card
+    const detailedCard = wrapper.querySelector('.detailed-card');
+    if (detailedCard) {
+        const chordTooltipForDetailed = document.querySelector(`.chord-tooltip[data-chord-index="${index}"]`);
+        if (chordTooltipForDetailed) {
+            // Add mouseleave handler to hide tooltip when leaving expanded card
+            wrapper.addEventListener('mouseleave', () => {
+                chordTooltipForDetailed.classList.add('hidden');
+            });
+        }
+    }
+
     // === SIMPLIFIED CARD INTERACTIVE TOOLTIP ===
     const simplifiedCard = wrapper.querySelector('.simplified-card');
     // Tooltip is now on body, find it by data-chord-index
@@ -6978,8 +6985,17 @@ export function attachCardEventListeners(wrapper, index) {
         const hideTooltip = () => {
             chordTooltip.classList.add('hidden');
             isTooltipPinned = false;
+
+            // Check if notation view is currently showing - if so, don't rebuild the card
+            // This prevents the notation view from being reset when mouse leaves card area
+            const notationView = cardWrapper.querySelector('.notation-view');
+            const isNotationShowing = notationView && !notationView.classList.contains('hidden');
+
             // Update the card UI after tooltip closes to show any inversion changes
-            updateSingleCard(index);
+            // But skip if notation view is showing to preserve it
+            if (!isNotationShowing) {
+                updateSingleCard(index);
+            }
             updateTensionCurveIfVisible();
 
             // Sync notation ONLY if inversion was actually changed

@@ -159,6 +159,9 @@ import {
 // Import mySubmissions module (registers window functions on import)
 import '../modules/community/mySubmissions.js';
 
+// Import chordBracketEditor (registers window.showChordBracketEditor on import)
+import '../modules/ui/chordBracketEditor.js';
+
 import {
     initAdminFab
 } from '../modules/admin/adminFab.js';

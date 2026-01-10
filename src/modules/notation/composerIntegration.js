@@ -2938,6 +2938,7 @@ export class NotationComposer {
    * Handle click on a chord bracket label
    * Selects the corresponding bass block for editing (Phase 2 enhancement)
    * Shift+Click replaces bass notes with foundational chord (original behavior)
+   * Double-click opens compact chord editor popup
    * @param {Object} region - Chord bracket region data
    * @param {MouseEvent} event - The click event (to check for modifier keys)
    */
@@ -2946,6 +2947,15 @@ export class NotationComposer {
 
     if (!this.compositionState) {
       console.warn('[ComposerIntegration] Cannot handle bracket click - missing compositionState');
+      return;
+    }
+
+    // Double-click = Open compact chord editor popup
+    if (event && event.detail === 2) {
+      console.log('[ComposerIntegration] Double-click on chord bracket:', chordIndex);
+      if (window.showChordBracketEditor) {
+        window.showChordBracketEditor(chordIndex, region, event);
+      }
       return;
     }
 
