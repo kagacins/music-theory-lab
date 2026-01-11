@@ -29,6 +29,11 @@ function isModalOpen() {
   // Look for visible modal overlays (fixed position, full screen, not hidden)
   const modalOverlays = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
   for (const overlay of modalOverlays) {
+    // Skip the fullscreen notation editor - it should allow all keyboard shortcuts
+    // The fullscreen editor is for notation editing, not a blocking modal
+    if (overlay.id === 'fullscreen-notation-modal') {
+      continue;
+    }
     // Check if it looks like a modal (has semi-transparent background)
     const style = window.getComputedStyle(overlay);
     const bg = style.backgroundColor;
@@ -38,6 +43,131 @@ function isModalOpen() {
     }
   }
   return false;
+}
+
+/**
+ * Get the key signature accidentals for a given key
+ * @param {string} key - Key signature (e.g., 'C', 'G', 'F', 'Bb')
+ * @returns {Object} { sharps: Set of note letters, flats: Set of note letters }
+ */
+function getKeySignatureAccidentals(key) {
+  const sharps = new Set();
+  const flats = new Set();
+
+  // Map of keys to which notes are sharped
+  const sharpKeys = {
+    'G': ['F'], 'D': ['F', 'C'], 'A': ['F', 'C', 'G'],
+    'E': ['F', 'C', 'G', 'D'], 'B': ['F', 'C', 'G', 'D', 'A'],
+    'F#': ['F', 'C', 'G', 'D', 'A', 'E'], 'C#': ['F', 'C', 'G', 'D', 'A', 'E', 'B'],
+    // Minor keys with sharps
+    'Em': ['F'], 'Bm': ['F', 'C'], 'F#m': ['F', 'C', 'G'],
+    'C#m': ['F', 'C', 'G', 'D'], 'G#m': ['F', 'C', 'G', 'D', 'A'],
+    'D#m': ['F', 'C', 'G', 'D', 'A', 'E'], 'A#m': ['F', 'C', 'G', 'D', 'A', 'E', 'B']
+  };
+
+  // Map of keys to which notes are flatted
+  const flatKeys = {
+    'F': ['B'], 'Bb': ['B', 'E'], 'Eb': ['B', 'E', 'A'],
+    'Ab': ['B', 'E', 'A', 'D'], 'Db': ['B', 'E', 'A', 'D', 'G'],
+    'Gb': ['B', 'E', 'A', 'D', 'G', 'C'], 'Cb': ['B', 'E', 'A', 'D', 'G', 'C', 'F'],
+    // Minor keys with flats
+    'Dm': ['B'], 'Gm': ['B', 'E'], 'Cm': ['B', 'E', 'A'],
+    'Fm': ['B', 'E', 'A', 'D'], 'Bbm': ['B', 'E', 'A', 'D', 'G'],
+    'Ebm': ['B', 'E', 'A', 'D', 'G', 'C'], 'Abm': ['B', 'E', 'A', 'D', 'G', 'C', 'F']
+  };
+
+  // Normalize key - handle " Major", " Minor", " minor" suffixes
+  let normalizedKey = key;
+  if (key) {
+    normalizedKey = key.replace(' Major', '').replace(' Minor', 'm').replace(' minor', 'm').trim();
+  }
+
+  if (sharpKeys[normalizedKey]) {
+    sharpKeys[normalizedKey].forEach(n => sharps.add(n));
+  }
+  if (flatKeys[normalizedKey]) {
+    flatKeys[normalizedKey].forEach(n => flats.add(n));
+  }
+
+  return { sharps, flats };
+}
+
+/**
+ * Get the effective accidental for a note in a given key
+ * This considers both the explicit accidental on the note AND the key signature
+ *
+ * @param {Object} note - Note object with pitch/pitches and optional accidental
+ * @param {string} key - Key signature (e.g., 'C', 'G', 'F', 'Bb')
+ * @returns {string} Effective accidental: '#', 'b', 'n', or 'none' (matching ACCIDENTALS ids)
+ */
+function getEffectiveAccidental(note, key) {
+  // If note has an explicit accidental property, that's always the displayed one
+  if (note.accidental && note.accidental !== 'none') {
+    return note.accidental;
+  }
+
+  // IMPORTANT: If there's a selectedPitch, only analyze that pitch (for chords)
+  // Otherwise analyze all pitches
+  let pitches;
+  if (note.selectedPitch) {
+    pitches = [note.selectedPitch];
+  } else {
+    pitches = note.pitches || (note.pitch ? [note.pitch] : []);
+  }
+  if (pitches.length === 0) return 'none';
+
+  // Get key signature accidentals
+  const keyAccidentals = getKeySignatureAccidentals(key);
+
+  // Check each pitch to determine effective accidental
+  for (const pitch of pitches) {
+    if (!pitch || typeof pitch !== 'string') continue;
+
+    // Parse pitch: e.g., "F#4" -> noteLetter="F", accInPitch="#", octave="4"
+    const match = pitch.match(/^([A-G])([#b]?)(\d+)$/i);
+    if (!match) continue;
+
+    const noteLetter = match[1].toUpperCase();
+    const accInPitch = match[2]; // '#', 'b', or '' (empty)
+
+    // Check what the key signature expects for this note
+    const keySigExpectsSharp = keyAccidentals.sharps.has(noteLetter);
+    const keySigExpectsFlat = keyAccidentals.flats.has(noteLetter);
+
+    if (keySigExpectsSharp) {
+      if (accInPitch === '#') {
+        // Pitch has sharp, matches key sig - show sharp (from key sig)
+        return '#';
+      } else if (accInPitch === '') {
+        // Pitch has NO accidental but key sig expects sharp - this is a natural override
+        return 'n';
+      } else if (accInPitch === 'b') {
+        // Pitch has flat, key sig expects sharp - show flat (explicit override)
+        return 'b';
+      }
+    } else if (keySigExpectsFlat) {
+      if (accInPitch === 'b') {
+        // Pitch has flat, matches key sig - show flat (from key sig)
+        return 'b';
+      } else if (accInPitch === '') {
+        // Pitch has NO accidental but key sig expects flat - this is a natural override
+        return 'n';
+      } else if (accInPitch === '#') {
+        // Pitch has sharp, key sig expects flat - show sharp (explicit override)
+        return '#';
+      }
+    } else {
+      // Note letter has no key sig accidental
+      if (accInPitch === '#') {
+        return '#';
+      } else if (accInPitch === 'b') {
+        return 'b';
+      }
+      // No accidental in pitch, no key sig - none
+    }
+  }
+
+  return 'none';
 }
 
 // ============================================================================
@@ -2755,8 +2885,17 @@ export class NotationToolbar {
    * @param {string} accidental - Accidental ID or null to clear
    */
   setAccidental(accidental) {
-    // Toggle if clicking the same accidental
-    if (this.currentAccidental === accidental) {
+    // Special case: If there's a selection with an accidental from key signature
+    // and user clicks that same accidental, add a natural to cancel the key sig
+    // selectionAccidental uses '#', 'b' format (matching ACCIDENTALS ids)
+    if (this.selectedNotesCount > 0 &&
+        this.selectionAccidentalFromKeySig &&
+        this.selectionAccidental === accidental) {
+      // User clicked the same accidental that's showing from key signature
+      // Set to natural ('n') to cancel the key signature effect
+      this.currentAccidental = 'n';
+    } else if (this.currentAccidental === accidental) {
+      // Normal toggle behavior: clicking same accidental clears it
       this.currentAccidental = null;
     } else {
       this.currentAccidental = accidental;
@@ -2839,9 +2978,13 @@ export class NotationToolbar {
 
   /**
    * Update accidental button states
+   * NOTE: Only updates buttons when NO notes are selected.
+   * When notes are selected, updateAccidentalButtonsForSelection() handles button state.
    */
   updateAccidentalButtons() {
     if (!this.container) return;
+    // Skip if there are selected notes - let updateAccidentalButtonsForSelection handle it
+    if (this.selectedNotesCount > 0) return;
     this.container.querySelectorAll('.accidental-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.accidental === this.currentAccidental);
     });
@@ -2981,6 +3124,7 @@ export class NotationToolbar {
       this.selectionDotted = null;
       this.selectionIsRest = null;
       this.selectionAccidental = null;
+      this.selectionAccidentalFromKeySig = false;
       this.selectionTied = null;
       this.selectionTuplet = null;
       this.selectionPedal = null;
@@ -3070,7 +3214,19 @@ export class NotationToolbar {
       // Use centralized checkIsDotted - handles all formats consistently
       dottedStates.add(checkIsDotted(note));
       restStates.add(note.isRest || note.type === 'rest' || false);
-      accidentals.add(note.accidental || 'none');
+      // Use effective accidental which considers key signature
+      const currentKey = window.getCurrentKey?.() || 'C';
+      const effectiveAcc = getEffectiveAccidental(note, currentKey);
+      accidentals.add(effectiveAcc);
+      // Track whether the accidental comes from key signature (note has no explicit accidental)
+      // This is used to determine if clicking the same accidental should add a natural
+      // Only true when: no explicit .accidental property AND effective is '#' or 'b' (not 'n')
+      // 'n' means it's an explicit natural override, not from key sig
+      const hasExplicitAccidental = note.accidental && note.accidental !== 'none';
+      if (!hasExplicitAccidental && (effectiveAcc === '#' || effectiveAcc === 'b')) {
+        // Accidental comes from key signature (pitch matches what key sig expects)
+        accidentals._fromKeySig = true;
+      }
       tiedStates.add(note.tied || note.isTied || false);
       tupletTypes.add(note.tuplet?.type || 'none');
 
@@ -3122,6 +3278,8 @@ export class NotationToolbar {
     this.selectionDotted = dottedStates.size === 1 ? [...dottedStates][0] : 'mixed';
     this.selectionIsRest = restStates.size === 1 ? [...restStates][0] : 'mixed';
     this.selectionAccidental = accidentals.size === 1 ? ([...accidentals][0] === 'none' ? null : [...accidentals][0]) : 'mixed';
+    // Track if the accidental comes from key signature (for toggle-to-natural behavior)
+    this.selectionAccidentalFromKeySig = accidentals._fromKeySig || false;
     this.selectionTied = tiedStates.size === 1 ? [...tiedStates][0] : 'mixed';
     this.selectionTuplet = tupletTypes.size === 1 ? ([...tupletTypes][0] === 'none' ? null : [...tupletTypes][0]) : 'mixed';
 

@@ -16,7 +16,7 @@
 import { EventEmitter } from '../utils/eventEmitter.js';
 import { generateBassVoicing, generateBuildingBlockBass, splitBlockBassIntoMeasures } from '../integration/bassAutoFill.js';
 import { getChordNotes } from '../utils/noteUtils.js';
-import { BuildingBlockSequence, BuildingBlock, Unit, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
+import { BuildingBlockSequence, BuildingBlock, Unit, durationToUnits, unitsToDuration, unitsToTiedDurations, UNITS_PER_BEAT } from './buildingBlock.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { SONG_STRUCTURE_TEMPLATES, getTemplate } from '../../data/songStructureTemplates.js';
 import {
@@ -1731,7 +1731,7 @@ export class CompositionState {
                     pitches: note.pitches ? [...note.pitches] : [], // CRITICAL: Copy array to avoid shared reference with building block
                     duration: note.duration,
                     beat: note.beat,
-                    dotted: note.duration?.includes('.') || false,
+                    dotted: note.dotted || note.duration?.includes('.') || false,
                     isTied: note.isTied, // True if this note is tied FROM the previous note
                     tied: note.tied, // True if this note ties TO the next note
                     isRest: note.isRest,
@@ -1855,7 +1855,6 @@ export class CompositionState {
 
 
                 const pitchesToSave = note.pitches || (note.pitch ? [note.pitch] : []);
-                console.log('[syncMeasuresToBuildingBlocks] Collecting note from measure', measureIndex, '- chordIndex:', noteChordIndex, 'pitches:', JSON.stringify(pitchesToSave), 'note.pitch:', note.pitch);
                 chordNotes.get(noteChordIndex).push({
                     pitches: pitchesToSave,
                     duration: note.duration || '4n',
@@ -2661,7 +2660,7 @@ export class CompositionState {
                 const unitInMeasure = currentUnit % unitsPerMeasure;
                 const unitsAvailableInMeasure = unitsPerMeasure - unitInMeasure;
                 const unitsToPlace = Math.min(remainingUnits, unitsAvailableInMeasure);
-                const isLastPart = remainingUnits <= unitsAvailableInMeasure;
+                const isLastMeasurePart = remainingUnits <= unitsAvailableInMeasure;
 
                 // Ensure measure exists
                 while (this.measures.length <= measureIndex) {
@@ -2669,60 +2668,83 @@ export class CompositionState {
                 }
 
                 const measure = this.measures[measureIndex];
-                const duration = unitsToDuration(unitsToPlace);
-                const beat = unitInMeasure / UNITS_PER_BEAT;
 
                 // Ensure the voice array exists in this measure
                 while (measure.notation.treble.voices.length <= voiceIndex) {
                     measure.notation.treble.voices.push({ notes: [] });
                 }
 
-                // Create note for this measure
-                // For tied flag:
-                // - If not last part, always true (ties to next part of same split note)
-                // - If last part, preserve note.tied from block (may tie to a different note)
-                const tiedValue = !isLastPart
-                    ? (!note.isRest)  // Always tie to next part if not last
-                    : (note.tied || false);  // Preserve block's tied flag for last part
+                // Decompose unitsToPlace into tied standard durations
+                // This handles non-standard durations like 120 units (2.5 beats)
+                // which become half note (96) + eighth note (24)
+                const decomposedDurations = unitsToTiedDurations(unitsToPlace);
 
-                const measureNote = {
-                    type: note.isRest ? 'rest' : 'note',
-                    pitches: note.pitches,
-                    pitch: note.pitches[0] || null, // Legacy single pitch
-                    duration: duration,
-                    beat: beat,
-                    dotted: duration.includes('.'),
-                    isTied: !isFirstPart, // True if this is a continuation FROM the previous note
-                    tied: tiedValue,
-                    isRest: note.isRest,
-                    voiceIndex: voiceIndex, // Include 0-based voice index for rendering
-                    // Musical attributes - only on first part
-                    dynamic: isFirstPart ? note.dynamic : null,
-                    velocity: note.velocity,
-                    articulation: isFirstPart ? note.articulation : null,
-                    fermata: isLastPart ? note.fermata : null,
-                    ornament: isFirstPart ? note.ornament : null,
-                    graceNotes: isFirstPart ? note.graceNotes : null,
-                    tremolo: note.tremolo,
-                    accidental: isFirstPart ? note.accidental : null,
-                    accidentals: isFirstPart ? note.accidentals : null,  // Per-pitch accidentals for chords
-                    slur: note.slur,
-                    glissando: isLastPart ? note.glissando : null,
-                    arpeggio: isFirstPart ? note.arpeggio : null,
-                    tuplet: note.tuplet,
-                    tupletType: note.tupletType,
-                    tupletGroupId: note.tupletGroupId,
-                    fingering: isFirstPart ? note.fingering : null,
-                    pedal: isFirstPart ? note.pedal : null,
-                    text: isFirstPart ? note.text : null,
-                    breath: isLastPart ? note.breath : null,
-                    voice: voiceNumber,
-                    stemDirection: note.stemDirection,
-                    lyric: isFirstPart ? note.lyric : null,
-                };
+                let localBeat = unitInMeasure / UNITS_PER_BEAT;
 
-                // MULTI-VOICE: Write to the correct voice
-                measure.notation.treble.voices[voiceIndex].notes.push(measureNote);
+                for (let partIdx = 0; partIdx < decomposedDurations.length; partIdx++) {
+                    const durPart = decomposedDurations[partIdx];
+                    const isFirstDurPart = partIdx === 0;
+                    const isLastDurPart = partIdx === decomposedDurations.length - 1;
+
+                    // Determine tie flags:
+                    // - isTied (incoming tie): true if NOT first part of entire note
+                    // - tied (outgoing tie): true if NOT last part (more parts to come)
+                    const isTiedValue = !isFirstPart || !isFirstDurPart;
+
+                    // For outgoing tie: tie to next part unless this is the very last part
+                    const hasMoreDurParts = !isLastDurPart;
+                    const hasMoreMeasureParts = !isLastMeasurePart;
+                    const tiedValue = hasMoreDurParts || hasMoreMeasureParts
+                        ? (!note.isRest)  // Tie to next part
+                        : (note.tied || false);  // Preserve original tied flag
+
+                    // Determine if this is the VERY last part of the entire note
+                    const isVeryLastPart = isLastMeasurePart && isLastDurPart;
+                    // And if this is the VERY first part
+                    const isVeryFirstPart = isFirstPart && isFirstDurPart;
+
+                    const measureNote = {
+                        type: note.isRest ? 'rest' : 'note',
+                        pitches: note.pitches,
+                        pitch: note.pitches[0] || null, // Legacy single pitch
+                        duration: durPart.duration,
+                        beat: localBeat,
+                        dotted: durPart.dotted,
+                        isTied: isTiedValue, // True if this is a continuation FROM the previous note
+                        tied: tiedValue,
+                        isRest: note.isRest,
+                        voiceIndex: voiceIndex, // Include 0-based voice index for rendering
+                        // Musical attributes - only on first part of the entire note
+                        dynamic: isVeryFirstPart ? note.dynamic : null,
+                        velocity: note.velocity,
+                        articulation: isVeryFirstPart ? note.articulation : null,
+                        fermata: isVeryLastPart ? note.fermata : null,
+                        ornament: isVeryFirstPart ? note.ornament : null,
+                        graceNotes: isVeryFirstPart ? note.graceNotes : null,
+                        tremolo: note.tremolo,
+                        accidental: isVeryFirstPart ? note.accidental : null,
+                        accidentals: isVeryFirstPart ? note.accidentals : null,  // Per-pitch accidentals for chords
+                        slur: note.slur,
+                        glissando: isVeryLastPart ? note.glissando : null,
+                        arpeggio: isVeryFirstPart ? note.arpeggio : null,
+                        tuplet: note.tuplet,
+                        tupletType: note.tupletType,
+                        tupletGroupId: note.tupletGroupId,
+                        fingering: isVeryFirstPart ? note.fingering : null,
+                        pedal: isVeryFirstPart ? note.pedal : null,
+                        text: isVeryFirstPart ? note.text : null,
+                        breath: isVeryLastPart ? note.breath : null,
+                        voice: voiceNumber,
+                        stemDirection: note.stemDirection,
+                        lyric: isVeryFirstPart ? note.lyric : null,
+                    };
+
+                    // MULTI-VOICE: Write to the correct voice
+                    measure.notation.treble.voices[voiceIndex].notes.push(measureNote);
+
+                    // Advance local beat position within this measure
+                    localBeat += durPart.units / UNITS_PER_BEAT;
+                }
 
                 currentUnit += unitsToPlace;
                 remainingUnits -= unitsToPlace;

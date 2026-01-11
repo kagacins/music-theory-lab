@@ -159,6 +159,36 @@
 - Optimal rest filling for empty slots
 - V2 rest handling: invisible when no content, cue rests when V2 has content
 
+#### Full-Screen Mode
+**Location:** `src/modules/notation/fullScreen/`
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `FullScreenNotationEditor.js` | 3,375 | Full-screen notation editing mode with zoom, sidebar tools, chord cards panel |
+
+**Key Features:**
+- Full-screen modal overlay with larger notation display
+- Collapsible left sidebar with complete notation toolbar (duration, articulations, dynamics, ornaments, tuplets, beams, slurs, grace notes, pedal, etc.)
+- Zoom controls (−/+, fit-width, Ctrl+wheel) with zoom-aware click coordinate handling
+- Bottom panel showing chord progression cards (scroll view or section view)
+- Title/composer editing in header
+- Configurable measures per system
+- Persists settings to localStorage (zoom, sidebar state, measures per system)
+
+**Key Exports:**
+- `getFullScreenNotationEditor()` - Get singleton instance
+- `openFullScreenNotation()` - Open full-screen mode
+- `closeFullScreenNotation()` - Close full-screen mode
+- `toggleFullScreenNotation()` - Toggle full-screen mode
+
+**When to Read:**
+- Full-screen notation mode issues
+- Sidebar tool button handlers (mirrors notationToolbar.js)
+- Zoom coordinate compensation for clicks
+- Chord progression bottom panel
+
+---
+
 #### Layout & Pagination
 | File | Lines | Purpose |
 |------|-------|---------|

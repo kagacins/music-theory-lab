@@ -3087,6 +3087,8 @@ export class NotationComposer {
       // Note ID format: measureIndex-staff-voiceIndex-noteIndex[-pitchIndex]
       const voiceIndex = parseInt(parts[2]) || 0;
       const noteIndex = parseInt(parts[3]) || parseInt(parts[2]); // Fallback for legacy 3-part IDs
+      // Extract pitchIndex if present (5th part, index 4)
+      const pitchIndex = parts.length > 4 ? parseInt(parts[4]) : null;
 
       // Track which voices are selected
       selectedVoices.add(voiceIndex);
@@ -3096,12 +3098,18 @@ export class NotationComposer {
         // Use the correct voice index from the note ID
         const note = measure.notation[staff]?.voices[voiceIndex]?.notes[noteIndex];
         if (note) {
+          // Include selectedPitch if a specific pitch was clicked in a chord
+          const selectedPitch = (pitchIndex !== null && note.pitches && note.pitches[pitchIndex])
+            ? note.pitches[pitchIndex]
+            : null;
           selectedNoteObjects.push({
             ...note,
             measureIndex,
             staff,
             voiceIndex,
             noteIndex,
+            pitchIndex,
+            selectedPitch,
           });
         }
       }

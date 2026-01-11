@@ -294,16 +294,11 @@ function createEditorHTML(chord, index, key) {
  * @param {MouseEvent} event - The double-click event
  */
 export function showChordBracketEditor(chordIndex, region, event) {
-    console.log('[ChordBracketEditor] showChordBracketEditor called with:', { chordIndex, region, event });
-
     // Hide any existing editor
     hideChordBracketEditor();
 
     const progression = getProgressionData();
     const key = getCurrentKey() || 'C';
-
-    console.log('[ChordBracketEditor] progression:', progression);
-    console.log('[ChordBracketEditor] key:', key);
 
     if (!progression || chordIndex < 0 || chordIndex >= progression.length) {
         console.warn('[ChordBracketEditor] Invalid chord index:', chordIndex);
@@ -313,15 +308,12 @@ export function showChordBracketEditor(chordIndex, region, event) {
     const chord = progression[chordIndex];
     currentEditorIndex = chordIndex;
 
-    console.log('[ChordBracketEditor] Chord data:', chord);
-
     // Create the editor element
     editorElement = document.createElement('div');
     editorElement.id = 'chord-bracket-editor-popup';
     editorElement.className = 'fixed z-[100000]';
     editorElement.innerHTML = createEditorHTML(chord, chordIndex, key);
 
-    console.log('[ChordBracketEditor] Editor element created, appending to body...');
     document.body.appendChild(editorElement);
 
     // Position the editor near the click
@@ -350,19 +342,13 @@ export function showChordBracketEditor(chordIndex, region, event) {
     editorElement.style.left = `${left}px`;
     editorElement.style.top = `${top}px`;
 
-    console.log('[ChordBracketEditor] Editor positioned at:', { left, top });
-
     // Attach event listeners
-    console.log('[ChordBracketEditor] Attaching event listeners...');
     attachEditorEventListeners(editorElement, chordIndex, key);
 
     // Close on click outside
     setTimeout(() => {
         document.addEventListener('mousedown', handleOutsideClick);
-        console.log('[ChordBracketEditor] Outside click handler attached');
     }, 100);
-
-    console.log('[ChordBracketEditor] showChordBracketEditor complete');
 }
 
 /**
@@ -391,8 +377,6 @@ function handleOutsideClick(event) {
  * Uses ProgressionController functions for consistency with chord cards and built-in audio feedback
  */
 function attachEditorEventListeners(editor, chordIndex, key) {
-    console.log('[ChordBracketEditor] attachEditorEventListeners called with:', { editor, chordIndex, key });
-
     const closeBtn = editor.querySelector('.close-editor-btn');
     const rootSelect = editor.querySelector('.root-select');
     const typeSelect = editor.querySelector('.type-select');
@@ -405,24 +389,9 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     const playBtn = editor.querySelector('.play-btn');
     const suggestBtn = editor.querySelector('.suggest-btn');
 
-    console.log('[ChordBracketEditor] Found elements:', {
-        closeBtn: !!closeBtn,
-        rootSelect: !!rootSelect,
-        typeSelect: !!typeSelect,
-        durationSelect: !!durationSelect,
-        octaveSelect: !!octaveSelect,
-        inversionBtns: inversionBtns.length,
-        noteCheckboxes: noteCheckboxes.length,
-        notesAllBtn: !!notesAllBtn,
-        notesNoneBtn: !!notesNoneBtn,
-        playBtn: !!playBtn,
-        suggestBtn: !!suggestBtn
-    });
-
     // Close button
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
-            console.log('[ChordBracketEditor] Close button clicked');
             hideChordBracketEditor();
         });
     }
@@ -430,7 +399,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Root select - uses updateChordRoot from ProgressionController (has audio feedback)
     if (rootSelect) {
         rootSelect.addEventListener('change', () => {
-            console.log('[ChordBracketEditor] Root select changed to:', rootSelect.value);
             if (window.updateChordRoot) {
                 window.updateChordRoot(chordIndex, rootSelect.value);
                 refreshEditorContent(chordIndex, key);
@@ -441,7 +409,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Type select - uses updateChordType from ProgressionController (has audio feedback)
     if (typeSelect) {
         typeSelect.addEventListener('change', () => {
-            console.log('[ChordBracketEditor] Type select changed to:', typeSelect.value);
             if (window.updateChordType) {
                 window.updateChordType(chordIndex, typeSelect.value);
                 refreshEditorContent(chordIndex, key);
@@ -452,9 +419,9 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Duration select - uses updateChordDuration (may not have audio, so we add it)
     if (durationSelect) {
         durationSelect.addEventListener('change', () => {
-            console.log('[ChordBracketEditor] Duration select changed to:', durationSelect.value);
             if (window.updateChordDuration) {
-                window.updateChordDuration(chordIndex, parseFloat(durationSelect.value));
+                // Pass null for sourceElement since we're providing beats directly as 3rd param
+                window.updateChordDuration(chordIndex, null, parseFloat(durationSelect.value));
             } else {
                 // Fallback to our updateChordProperty
                 updateChordProperty(chordIndex, 'beats', parseFloat(durationSelect.value), key);
@@ -467,7 +434,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Octave select - uses updateRHOctaveShift from ProgressionController (has audio feedback)
     if (octaveSelect) {
         octaveSelect.addEventListener('change', () => {
-            console.log('[ChordBracketEditor] Octave select changed to:', octaveSelect.value);
             if (window.updateRHOctaveShift) {
                 window.updateRHOctaveShift(chordIndex, parseInt(octaveSelect.value, 10));
                 refreshEditorContent(chordIndex, key);
@@ -476,7 +442,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     }
 
     // Inversion buttons - click-and-hold to play (matching chord cards)
-    console.log('[ChordBracketEditor] Attaching click-and-hold handlers to', inversionBtns.length, 'inversion buttons');
     inversionBtns.forEach((btn, idx) => {
         let wasPressed = false;
 
@@ -486,7 +451,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
             e.preventDefault();
             wasPressed = true;
             const inversion = parseInt(btn.getAttribute('data-inversion'), 10);
-            console.log('[ChordBracketEditor] Inversion mousedown:', inversion);
 
             // Update inversion WITHOUT syncing notation (to prevent flash)
             if (window.updateChordInversion) {
@@ -556,7 +520,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Note checkboxes - toggle individual notes with audio feedback
     noteCheckboxes.forEach((checkbox, idx) => {
         checkbox.addEventListener('change', () => {
-            console.log('[ChordBracketEditor] Note checkbox', idx, 'changed, checked:', checkbox.checked);
             const note = checkbox.value;
             // Use toggleProgressionNote which syncs properly
             if (window.toggleProgressionNote) {
@@ -570,7 +533,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Notes All button - with audio feedback
     if (notesAllBtn) {
         notesAllBtn.addEventListener('click', () => {
-            console.log('[ChordBracketEditor] Notes All button clicked');
             // Use compositionState to set all notes (matching chord cards)
             if (window.getCompositionState) {
                 const compositionState = window.getCompositionState();
@@ -592,7 +554,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Notes None button
     if (notesNoneBtn) {
         notesNoneBtn.addEventListener('click', () => {
-            console.log('[ChordBracketEditor] Notes None button clicked');
             // Get chord notes and set all as omitted
             if (window.getCompositionState) {
                 const compositionState = window.getCompositionState();
@@ -615,7 +576,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Play button - press and hold
     if (playBtn) {
         playBtn.addEventListener('mousedown', () => {
-            console.log('[ChordBracketEditor] Play button mousedown');
             if (window.startProgressionChord) {
                 window.startProgressionChord(chordIndex);
             }
@@ -635,7 +595,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     // Suggest button
     if (suggestBtn) {
         suggestBtn.addEventListener('click', () => {
-            console.log('[ChordBracketEditor] Suggest button clicked');
             hideChordBracketEditor();
             if (window.showUnifiedRecommendationModal) {
                 window.showUnifiedRecommendationModal({
@@ -647,8 +606,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
             }
         });
     }
-
-    console.log('[ChordBracketEditor] All event listeners attached successfully');
 }
 
 /**
@@ -669,11 +626,8 @@ function playChordOnce(chordIndex) {
  * Update chord beats/duration (fallback if window.updateChordDuration is not available)
  */
 function updateChordProperty(chordIndex, property, value, key) {
-    console.log(`[ChordBracketEditor] updateChordProperty: index=${chordIndex}, property=${property}, value=${value}`);
-
     // This is now only used for beats as a fallback
     if (property !== 'beats') {
-        console.warn('[ChordBracketEditor] updateChordProperty should only be used for beats now');
         return;
     }
 
@@ -722,30 +676,24 @@ function refreshEditorContent(chordIndex, key) {
  * Refresh all UI components after chord changes
  */
 function refreshAllUI(chordIndex) {
-    console.log('[ChordBracketEditor] refreshAllUI called for index:', chordIndex);
-
     // Update the chord card in progression display (updates all three card locations)
     if (window.updateSingleCard) {
-        console.log('[ChordBracketEditor] Calling updateSingleCard');
         window.updateSingleCard(chordIndex);
     }
 
     // Also call full re-render to ensure all displays are synced
     if (window.renderProgressionDisplay) {
-        console.log('[ChordBracketEditor] Calling renderProgressionDisplay');
         window.renderProgressionDisplay('progression-visualization', true);
         window.renderProgressionDisplay('melody-progression-visualization', true);
     }
 
     // Sync to melody composer (propagates chord data to compositionState)
     if (window.syncProgressionToMelodyComposer) {
-        console.log('[ChordBracketEditor] Calling syncProgressionToMelodyComposer');
         window.syncProgressionToMelodyComposer();
     }
 
     // Refresh VexFlow notation display
     if (window.refreshNotationFromProgression) {
-        console.log('[ChordBracketEditor] Calling refreshNotationFromProgression');
         window.refreshNotationFromProgression();
     }
 

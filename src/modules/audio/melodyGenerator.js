@@ -2808,6 +2808,8 @@ function startMeasurePlayback(canvas, measureIndex) {
         const tempo = interactiveMelody.tempo || 120;
         const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
 
+        const currentKey = getCurrentKey() || 'C';
+
         bassNoteData.forEach(bassNote => {
             const noteBeat = bassNote.beat || 0;
             const delay = noteBeat * beatDuration; // Calculate delay based on beat position
@@ -2815,19 +2817,62 @@ function startMeasurePlayback(canvas, measureIndex) {
             // Pass tupletType (string) OR tuplet (object) - function handles both formats
             const noteDuration = bassNote.duration ? getDurationInSeconds(bassNote.duration, tempo, bassNote.tupletType || bassNote.tuplet, bassNote.dotted) : beatDuration;
 
+            // Handle both single notes (pitch) and chords (pitches)
+            const notesToPlay = bassNote.pitches || (bassNote.pitch ? [bassNote.pitch] : []);
+            if (notesToPlay.length === 0) return;
+
             // Schedule the bass note to play at its proper beat timing
             const timeoutId = setTimeout(() => {
-                piano.triggerAttackRelease(bassNote.pitch, noteDuration, Tone.now());
+                // Handle ornaments if present - expand into multiple notes (same as treble clef)
+                if (bassNote.ornament && notesToPlay.length > 0) {
+                    // For chords with ornaments, apply ornament to the top (melody) note only
+                    const topPitch = notesToPlay[notesToPlay.length - 1];
+                    const sustainPitches = notesToPlay.slice(0, -1);
+
+                    // Expand ornament into note sequence
+                    const expandedNotes = expandOrnament(topPitch, bassNote.ornament, noteDuration, currentKey, tempo);
+
+                    // Play sustained lower notes (if any) for full duration
+                    sustainPitches.forEach(pitch => {
+                        piano.triggerAttackRelease(pitch, noteDuration, Tone.now());
+                    });
+
+                    // Play expanded ornament notes on top pitch
+                    expandedNotes.forEach((ornamentNote, ornamentIndex) => {
+                        const ornamentDelay = ornamentNote.offset * 1000;
+                        setTimeout(() => {
+                            // Release previous ornament note before playing next
+                            if (ornamentIndex > 0) {
+                                const prevNote = expandedNotes[ornamentIndex - 1];
+                                piano.triggerRelease(prevNote.pitch, Tone.now());
+                            }
+                            piano.triggerAttack(ornamentNote.pitch, Tone.now());
+                            state.activeMelodyNotes.push(ornamentNote.pitch);
+
+                            const keyEl = document.getElementById(getNoteKeyId(ornamentNote.pitch));
+                            if (keyEl) {
+                                keyEl.classList.add('active-progression');
+                            }
+                        }, ornamentDelay);
+                    });
+                } else {
+                    // No ornament - play normally
+                    notesToPlay.forEach(pitch => {
+                        piano.triggerAttackRelease(pitch, noteDuration, Tone.now());
+                    });
+                }
 
                 // Add to activeNotes for highlighting (use actual beat value)
-                const noteId = `${measureIndex}-${noteBeat}-${bassNote.pitch}`;
-                activeNotes.add(noteId);
+                notesToPlay.forEach(pitch => {
+                    const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                    activeNotes.add(noteId);
 
-                // Visual feedback on piano keyboard
-                const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
-                if (keyEl) {
-                    keyEl.classList.add('active-progression');
-                }
+                    // Visual feedback on piano keyboard
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) {
+                        keyEl.classList.add('active-progression');
+                    }
+                });
 
                 // Re-render to show red bass note highlighting
                 requestAnimationFrame(() => {
@@ -2838,11 +2883,14 @@ function startMeasurePlayback(canvas, measureIndex) {
 
                 // Remove from activeNotes after note duration
                 setTimeout(() => {
-                    activeNotes.delete(noteId);
-                    const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
-                    if (keyEl) {
-                        keyEl.classList.remove('active-progression');
-                    }
+                    notesToPlay.forEach(pitch => {
+                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                        activeNotes.delete(noteId);
+                        const keyEl = document.getElementById(getNoteKeyId(pitch));
+                        if (keyEl) {
+                            keyEl.classList.remove('active-progression');
+                        }
+                    });
 
                     // Re-render to clear red highlighting
                     requestAnimationFrame(() => {
@@ -4439,17 +4487,44 @@ export async function playAllMelody(options = {}) {
                     chordTotalDuration = totalDuration;
                 }
 
-                // Play the bass note(s) with the exact calculated duration
-                // Use triggerAttack + scheduled triggerRelease for precise duration control
-                // (triggerAttackRelease has natural decay that continues past the release time)
-                notesToPlay.forEach(pitch => {
-                    piano.triggerAttack(pitch, bassTime);
-                });
-                // Schedule explicit release at exact end time
-                const bassReleaseTime = bassTime + totalDuration;
-                notesToPlay.forEach(pitch => {
-                    piano.triggerRelease(pitch, bassReleaseTime);
-                });
+                // Handle ornaments if present - expand into multiple notes (same as treble clef)
+                const ornament = bassNote.ornament;
+                const currentKey = getCurrentKey() || 'C';
+
+                if (ornament && notesToPlay.length > 0) {
+                    // For chords with ornaments, apply ornament to the top (melody) note only
+                    // Other notes in the chord sustain normally
+                    const topPitch = notesToPlay[notesToPlay.length - 1]; // Top note gets ornament
+                    const sustainPitches = notesToPlay.slice(0, -1); // Lower notes sustain
+
+                    // Expand ornament into note sequence
+                    const expandedNotes = expandOrnament(topPitch, ornament, totalDuration, currentKey, tempo);
+
+                    // Play sustained lower notes (if any) for full duration
+                    sustainPitches.forEach(pitch => {
+                        piano.triggerAttackRelease(pitch, totalDuration, bassTime);
+                    });
+
+                    // Play expanded ornament notes on top pitch
+                    expandedNotes.forEach(ornamentNote => {
+                        const ornamentTime = bassTime + ornamentNote.offset;
+                        if (ornamentTime >= 0) {
+                            piano.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
+                        }
+                    });
+                } else {
+                    // No ornament - play all pitches normally
+                    // Use triggerAttack + scheduled triggerRelease for precise duration control
+                    // (triggerAttackRelease has natural decay that continues past the release time)
+                    notesToPlay.forEach(pitch => {
+                        piano.triggerAttack(pitch, bassTime);
+                    });
+                    // Schedule explicit release at exact end time
+                    const bassReleaseTime = bassTime + totalDuration;
+                    notesToPlay.forEach(pitch => {
+                        piano.triggerRelease(pitch, bassReleaseTime);
+                    });
+                }
 
                 // Add to activeNotes when bass note starts (each pitch in the chord)
                 Tone.Draw.schedule(() => {

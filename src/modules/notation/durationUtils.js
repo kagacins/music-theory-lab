@@ -187,6 +187,76 @@ export function beatsToDuration(beats) {
 }
 
 /**
+ * All standard note durations in beats (sorted descending for greedy decomposition)
+ * Includes both base and dotted durations
+ */
+const ALL_STANDARD_DURATIONS = [
+  { beats: 6,     duration: '1n', dotted: true },   // dotted whole
+  { beats: 4,     duration: '1n', dotted: false },  // whole
+  { beats: 3,     duration: '2n', dotted: true },   // dotted half
+  { beats: 2,     duration: '2n', dotted: false },  // half
+  { beats: 1.5,   duration: '4n', dotted: true },   // dotted quarter
+  { beats: 1,     duration: '4n', dotted: false },  // quarter
+  { beats: 0.75,  duration: '8n', dotted: true },   // dotted eighth
+  { beats: 0.5,   duration: '8n', dotted: false },  // eighth
+  { beats: 0.375, duration: '16n', dotted: true },  // dotted sixteenth
+  { beats: 0.25,  duration: '16n', dotted: false }, // sixteenth
+  { beats: 0.1875, duration: '32n', dotted: true }, // dotted thirty-second
+  { beats: 0.125, duration: '32n', dotted: false }, // thirty-second
+];
+
+/**
+ * Decompose a beat duration into one or more tied notes
+ * Uses a greedy algorithm to find the smallest number of notes that sum to the target beats
+ *
+ * @param {number} targetBeats - Total beats to decompose
+ * @returns {Array<{duration: string, dotted: boolean, beats: number}>} Array of note parts
+ *
+ * @example
+ * beatsToTiedNotes(1.25) // [{duration: '4n', dotted: false, beats: 1}, {duration: '16n', dotted: false, beats: 0.25}]
+ * beatsToTiedNotes(2.5)  // [{duration: '2n', dotted: false, beats: 2}, {duration: '8n', dotted: false, beats: 0.5}]
+ * beatsToTiedNotes(1.5)  // [{duration: '4n', dotted: true, beats: 1.5}] - single dotted note
+ */
+export function beatsToTiedNotes(targetBeats) {
+  const eps = 0.001;
+  const result = [];
+  let remaining = targetBeats;
+
+  // First check if it's an exact match for a single note
+  const exactMatch = beatsToDuration(targetBeats);
+  const exactBeats = durationToBeats(exactMatch.duration, exactMatch.dotted);
+  if (Math.abs(exactBeats - targetBeats) < eps) {
+    return [{ ...exactMatch, beats: exactBeats }];
+  }
+
+  // Greedy decomposition: pick largest fitting note repeatedly
+  while (remaining > eps) {
+    let found = false;
+
+    for (const std of ALL_STANDARD_DURATIONS) {
+      if (std.beats <= remaining + eps) {
+        result.push({
+          duration: std.duration,
+          dotted: std.dotted,
+          beats: std.beats,
+        });
+        remaining -= std.beats;
+        found = true;
+        break;
+      }
+    }
+
+    // Safety: if no standard duration fits (shouldn't happen), break
+    if (!found) {
+      console.warn('[beatsToTiedNotes] Could not decompose remaining:', remaining);
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Convert beats to duration STRING (for backwards compatibility)
  * Returns duration WITH dot suffix if dotted (e.g., '2n.')
  *

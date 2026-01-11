@@ -22,14 +22,10 @@
 import { getCompositionState } from '../../state/compositionState.js';
 import { getGlobalState } from '../../state/globalState.js';
 
-// Debug log to verify new code is loaded
-console.log('[FullScreenNotationEditor] v2.1 with Title/Composer support loaded');
-
 // Force clear any existing singleton on module reload (for HMR)
 if (typeof window !== 'undefined') {
     const existingModal = document.getElementById('fullscreen-notation-modal');
     if (existingModal) {
-        console.log('[FullScreenNotationEditor] Removing stale modal for fresh creation');
         existingModal.remove();
     }
 }
@@ -336,8 +332,32 @@ export class FullScreenNotationEditor {
                             </button>
                         </div>
 
-                        <!-- PINNED Duration Section (sticky at top) -->
-                        <div class="flex-shrink-0 p-3 pb-0 bg-gray-50">
+                        <!-- PINNED Section (sticky at top) -->
+                        <div class="flex-shrink-0 p-3 pb-0 bg-gray-50 space-y-2">
+                        <!-- Jump to Section (compact, inline) -->
+                        <div class="flex items-center gap-2 p-2 bg-gradient-to-r from-indigo-50 to-slate-50 rounded-lg border border-indigo-200">
+                            <label class="text-xs text-indigo-600 font-medium whitespace-nowrap">Jump to:</label>
+                            <select id="fs-section-jump" class="flex-1 p-1.5 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-xs shadow-sm" title="Quickly navigate to a section">
+                                <option value="">-- Select --</option>
+                                <option value="fs-section-accidentals">Accidentals</option>
+                                <option value="fs-section-articulations">Articulations</option>
+                                <option value="fs-section-dynamics">Dynamics</option>
+                                <option value="fs-section-ornaments">Ornaments</option>
+                                <option value="fs-section-tuplets">Tuplets</option>
+                                <option value="fs-section-beams">Beams</option>
+                                <option value="fs-section-slurs">Slurs & Ties</option>
+                                <option value="fs-section-hairpins">Hairpins</option>
+                                <option value="fs-section-grace">Grace Notes</option>
+                                <option value="fs-section-repeat">Repeat Signs</option>
+                                <option value="fs-section-endings">Endings</option>
+                                <option value="fs-section-chord">Chord Labels</option>
+                                <option value="fs-section-lyrics">Lyrics</option>
+                                <option value="fs-section-pedal">Pedal</option>
+                                <option value="fs-section-voicing">Voicing</option>
+                                <option value="fs-section-actions">Quick Actions</option>
+                            </select>
+                        </div>
+                        <!-- Duration Section -->
                         <div class="sidebar-section bg-indigo-50 rounded-lg border border-indigo-200 shadow-md">
                             <div class="flex items-center justify-between p-2 border-b border-indigo-200">
                                 <span class="font-semibold text-indigo-800 text-sm">Duration</span>
@@ -346,18 +366,18 @@ export class FullScreenNotationEditor {
                                     pinned
                                 </span>
                             </div>
-                            <div class="p-2 space-y-2">
+                            <div class="p-2 space-y-1.5">
                                 <div class="grid grid-cols-3 gap-1">
-                                    <button class="fs-duration-btn p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm" data-duration="1n" title="Whole note (4 beats)">𝅝</button>
-                                    <button class="fs-duration-btn p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm" data-duration="2n" title="Half note (2 beats)">𝅗𝅥</button>
-                                    <button class="fs-duration-btn p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm" data-duration="4n" title="Quarter note (1 beat)">♩</button>
-                                    <button class="fs-duration-btn p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm" data-duration="8n" title="Eighth note (1/2 beat)">♪</button>
-                                    <button class="fs-duration-btn p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm" data-duration="16n" title="16th note (1/4 beat)">𝅘𝅥𝅯</button>
-                                    <button class="fs-duration-btn p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm" data-duration="32n" title="32nd note (1/8 beat)">𝅘𝅥𝅰</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="1n" title="Whole note (4 beats)">𝅝</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="2n" title="Half note (2 beats)">𝅗𝅥</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="4n" title="Quarter note (1 beat)">♩</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="8n" title="Eighth note (1/2 beat)">♪</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="16n" title="16th note (1/4 beat)">𝅘𝅥𝅯</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="32n" title="32nd note (1/8 beat)">𝅘𝅥𝅰</button>
                                 </div>
-                                <div class="flex gap-2">
-                                    <button class="fs-dot-btn flex-1 p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-sm shadow-sm" title="Dotted note (+50% duration)">• Dot</button>
-                                    <button class="fs-rest-btn flex-1 p-2 rounded bg-white border border-gray-300 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-sm shadow-sm" title="Rest mode">𝄽 Rest</button>
+                                <div class="flex gap-1">
+                                    <button class="fs-dot-btn flex-1 px-2 py-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Dotted note (+50% duration)">• Dot</button>
+                                    <button class="fs-rest-btn flex-1 px-2 py-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Rest mode">𝄽 Rest</button>
                                 </div>
                                 <!-- Current duration indicator -->
                                 <div id="fs-duration-indicator" class="text-center text-xs text-indigo-600 font-medium py-1 bg-indigo-100 rounded">
@@ -371,216 +391,346 @@ export class FullScreenNotationEditor {
                     <div class="flex-1 min-h-0 overflow-y-auto p-3 pt-3">
                         <div id="fullscreen-sidebar-content" class="space-y-3">
                             <!-- Accidentals Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-purple-100 rounded-lg hover:bg-purple-200 transition-colors"
+                            <div id="fs-section-accidentals" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-purple-800 text-sm">Accidentals</span>
-                                    <svg class="chevron w-4 h-4 text-purple-600 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Accidentals</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2">
-                                    <div class="flex gap-2">
-                                        <button class="fs-accidental-btn flex-1 p-2 rounded bg-white border border-gray-300 hover:bg-purple-50 hover:border-purple-400 transition-colors text-lg" data-accidental="#" title="Sharp">♯</button>
-                                        <button class="fs-accidental-btn flex-1 p-2 rounded bg-white border border-gray-300 hover:bg-purple-50 hover:border-purple-400 transition-colors text-lg" data-accidental="b" title="Flat">♭</button>
-                                        <button class="fs-accidental-btn flex-1 p-2 rounded bg-white border border-gray-300 hover:bg-purple-50 hover:border-purple-400 transition-colors text-lg" data-accidental="n" title="Natural">♮</button>
+                                    <div class="flex gap-1">
+                                        <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="#" title="Sharp - Raise pitch by half step. Click again to toggle off.">♯</button>
+                                        <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="b" title="Flat - Lower pitch by half step. Click again to toggle off.">♭</button>
+                                        <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="n" title="Natural - Cancel any sharp or flat. Click again to toggle off.">♮</button>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Articulations Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-emerald-100 rounded-lg hover:bg-emerald-200 transition-colors"
+                            <div id="fs-section-articulations" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-emerald-800 text-sm">Articulations</span>
-                                    <svg class="chevron w-4 h-4 text-emerald-600 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Articulations</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="grid grid-cols-2 gap-2">
-                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-gray-300 hover:bg-emerald-50 hover:border-emerald-400 transition-colors text-sm" data-articulation="staccato" title="Staccato">. Staccato</button>
-                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-gray-300 hover:bg-emerald-50 hover:border-emerald-400 transition-colors text-sm" data-articulation="accent" title="Accent">> Accent</button>
-                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-gray-300 hover:bg-emerald-50 hover:border-emerald-400 transition-colors text-sm" data-articulation="tenuto" title="Tenuto">— Tenuto</button>
-                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-gray-300 hover:bg-emerald-50 hover:border-emerald-400 transition-colors text-sm" data-articulation="marcato" title="Marcato">^ Marcato</button>
+                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="staccato" title="Staccato - Short, detached notes. Play for half duration.">. Staccato</button>
+                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="accent" title="Accent - Emphasize note with stronger attack.">> Accent</button>
+                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="tenuto" title="Tenuto - Hold note for full duration, slight emphasis.">— Tenuto</button>
+                                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="marcato" title="Marcato - Strong accent, even more emphasis than accent.">^ Marcato</button>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Dynamics Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-orange-100 rounded-lg hover:bg-orange-200 transition-colors"
+                            <div id="fs-section-dynamics" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-orange-800 text-sm">Dynamics</span>
-                                    <svg class="chevron w-4 h-4 text-orange-600 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Dynamics</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="grid grid-cols-4 gap-1">
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="pp" title="Pianissimo">pp</button>
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="p" title="Piano">p</button>
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="mp" title="Mezzo-piano">mp</button>
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="mf" title="Mezzo-forte">mf</button>
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="f" title="Forte">f</button>
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="ff" title="Fortissimo">ff</button>
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="sfz" title="Sforzando">sfz</button>
-                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-gray-300 hover:bg-orange-50 hover:border-orange-400 transition-colors text-xs font-serif italic" data-dynamic="fp" title="Forte-piano">fp</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="pp" title="Pianissimo - Very soft">pp</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="p" title="Piano - Soft">p</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="mp" title="Mezzo-piano - Moderately soft">mp</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="mf" title="Mezzo-forte - Moderately loud">mf</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="f" title="Forte - Loud">f</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="ff" title="Fortissimo - Very loud">ff</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="sfz" title="Sforzando - Sudden strong accent">sfz</button>
+                                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="fp" title="Forte-piano - Loud then immediately soft">fp</button>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Ornaments Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-pink-100 rounded-lg hover:bg-pink-200 transition-colors"
+                            <div id="fs-section-ornaments" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-pink-800 text-sm">Ornaments</span>
-                                    <svg class="chevron w-4 h-4 text-pink-600 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Ornaments</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="grid grid-cols-2 gap-1 mb-2">
-                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-gray-300 hover:bg-pink-50 hover:border-pink-400 transition-colors text-sm" data-ornament="trill" title="Trill">tr Trill</button>
-                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-gray-300 hover:bg-pink-50 hover:border-pink-400 transition-colors text-sm" data-ornament="mordent" title="Mordent">𝆰 Mordent</button>
-                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-gray-300 hover:bg-pink-50 hover:border-pink-400 transition-colors text-sm" data-ornament="turn" title="Turn">𝆗 Turn</button>
-                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-gray-300 hover:bg-pink-50 hover:border-pink-400 transition-colors text-sm" data-ornament="invertedMordent" title="Inverted Mordent">𝆱 Inv.Mord</button>
+                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="trill" title="Trill - Rapid alternation between note and upper neighbor">tr Trill</button>
+                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="mordent" title="Mordent - Quick alternation: note → upper note → note">𝆰 Mordent</button>
+                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="turn" title="Turn - Four-note figure: upper → note → lower → note">𝆗 Turn</button>
+                                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="invertedMordent" title="Inverted Mordent - Quick alternation: note → lower note → note">𝆱 Inv.Mord</button>
                                     </div>
-                                    <button class="fs-ornament-remove-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-red-50 hover:border-red-400 transition-colors text-xs" title="Remove ornament from selected notes">Remove Ornament</button>
+                                    <button class="fs-ornament-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove ornament from selected note(s)">Remove Ornament</button>
                                 </div>
                             </div>
 
                             <!-- Tuplets Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-teal-100 rounded-lg hover:bg-teal-200 transition-colors"
+                            <div id="fs-section-tuplets" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-teal-800 text-sm">Tuplets</span>
-                                    <svg class="chevron w-4 h-4 text-teal-600 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Tuplets</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="grid grid-cols-3 gap-1 mb-2">
-                                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-gray-300 hover:bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium" data-tuplet="triplet" title="Create triplet (select 3 notes)">3 Trip</button>
-                                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-gray-300 hover:bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium" data-tuplet="quintuplet" title="Create quintuplet (select 5 notes)">5 Quint</button>
-                                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-gray-300 hover:bg-teal-50 hover:border-teal-400 transition-colors text-xs font-medium" data-tuplet="sextuplet" title="Create sextuplet (select 6 notes)">6 Sext</button>
+                                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-medium shadow-sm" data-tuplet="triplet" title="Triplet - 3 notes in the time of 2. Select exactly 3 consecutive notes.">3 Trip</button>
+                                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-medium shadow-sm" data-tuplet="quintuplet" title="Quintuplet - 5 notes in the time of 4. Select exactly 5 consecutive notes.">5 Quint</button>
+                                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-medium shadow-sm" data-tuplet="sextuplet" title="Sextuplet - 6 notes in the time of 4. Select exactly 6 consecutive notes.">6 Sext</button>
                                     </div>
-                                    <button class="fs-tuplet-remove-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-red-50 hover:border-red-400 transition-colors text-xs" title="Remove tuplet from selected notes">Remove Tuplet</button>
+                                    <button class="fs-tuplet-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove tuplet grouping from selected note(s)">Remove Tuplet</button>
                                 </div>
                             </div>
 
                             <!-- Beams Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-cyan-100 rounded-lg hover:bg-cyan-200 transition-colors"
+                            <div id="fs-section-beams" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-cyan-800 text-sm">Beams</span>
-                                    <svg class="chevron w-4 h-4 text-cyan-600 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Beams</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="space-y-2">
-                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-cyan-50 hover:border-cyan-400 transition-colors text-xs" data-beam="beam" title="Beam selected notes together">Beam Selected</button>
-                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-cyan-50 hover:border-cyan-400 transition-colors text-xs" data-beam="break" title="Break beam between selected notes">Break Beam Between</button>
-                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-cyan-50 hover:border-cyan-400 transition-colors text-xs" data-beam="unbeam" title="Remove beaming from selected notes">Unbeam Selected</button>
+                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="beam" title="Beam selected consecutive notes together (select 2+ beamable notes in same measure)">⟨⟩ Beam Selected</button>
+                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="breakBetween" title="Break all beams between 2 selected notes (select exactly 2 notes in same beam group)">⊥ Break Between</button>
+                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="unbeam" title="Remove this note from beaming entirely">⊘ Unbeam Note</button>
+                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="clear" title="Clear manual beam settings on selected notes">✕ Clear Beam Settings</button>
+                                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" data-action="clearMeasureBeams" title="Clear ALL beam settings in selected measure (click measure to select)">⌧ Clear Measure Beams</button>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Slurs & Ties Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-violet-100 rounded-lg hover:bg-violet-200 transition-colors"
+                            <div id="fs-section-slurs" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-violet-800 text-sm">Slurs & Ties</span>
-                                    <svg class="chevron w-4 h-4 text-violet-600 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Slurs & Ties</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="space-y-2">
-                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-violet-50 hover:border-violet-400 transition-colors text-xs" data-slur="tie" title="Tie selected notes (T)">⁀ Tie Notes</button>
-                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-violet-50 hover:border-violet-400 transition-colors text-xs" data-slur="slur" title="Create slur over selected notes">⌒ Add Slur</button>
-                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-violet-50 hover:border-violet-400 transition-colors text-xs" data-slur="remove-slur" title="Remove slur from selected notes">Remove Slur</button>
+                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="tie" title="Tie Notes (T) - Connect two notes of same pitch, combining their durations">⁀ Tie Notes</button>
+                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="slur" title="Add Slur - Phrase marking over notes (legato playing, connect smoothly)">⌒ Add Slur</button>
+                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" data-slur="remove-slur" title="Remove slur/tie from selected notes">Remove Slur</button>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Hairpins Section (Crescendo/Decrescendo) -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-rose-100 rounded-lg hover:bg-rose-200 transition-colors"
+                            <div id="fs-section-hairpins" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-rose-800 text-sm">Hairpins</span>
-                                    <svg class="chevron w-4 h-4 text-rose-600 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Hairpins</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="space-y-2">
-                                        <button class="fs-hairpin-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-rose-50 hover:border-rose-400 transition-colors text-xs" data-hairpin="crescendo" title="Crescendo (select 2+ notes)">< Crescendo</button>
-                                        <button class="fs-hairpin-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-rose-50 hover:border-rose-400 transition-colors text-xs" data-hairpin="decrescendo" title="Decrescendo (select 2+ notes)">> Decrescendo</button>
-                                        <button class="fs-hairpin-remove-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-red-50 hover:border-red-400 transition-colors text-xs" title="Remove hairpin from selected notes">Remove Hairpin</button>
+                                        <button class="fs-hairpin-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-hairpin="crescendo" title="Crescendo - Gradually get louder. Select 2+ consecutive notes.">< Crescendo</button>
+                                        <button class="fs-hairpin-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-hairpin="decrescendo" title="Decrescendo - Gradually get softer. Select 2+ consecutive notes.">> Decrescendo</button>
+                                        <button class="fs-hairpin-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove hairpin from selected note(s)">Remove Hairpin</button>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Grace Notes Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-amber-100 rounded-lg hover:bg-amber-200 transition-colors"
+                            <div id="fs-section-grace" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-amber-800 text-sm">Grace Notes</span>
-                                    <svg class="chevron w-4 h-4 text-amber-600 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Grace Notes</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="space-y-2">
                                         <div class="grid grid-cols-2 gap-2">
-                                            <button class="fs-grace-btn p-2 rounded bg-white border border-gray-300 hover:bg-amber-50 hover:border-amber-400 transition-colors text-xs" data-grace="acciaccatura" title="Acciaccatura (slashed)">♯ Acciaccatura</button>
-                                            <button class="fs-grace-btn p-2 rounded bg-white border border-gray-300 hover:bg-amber-50 hover:border-amber-400 transition-colors text-xs" data-grace="appoggiatura" title="Appoggiatura (not slashed)">♪ Appoggiatura</button>
+                                            <button class="fs-grace-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-grace="acciaccatura" title="Acciaccatura - Quick crushed note (slashed stem). Played very fast before main note.">♯ Acciaccatura</button>
+                                            <button class="fs-grace-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-grace="appoggiatura" title="Appoggiatura - Leaning note (no slash). Takes time from main note.">♪ Appoggiatura</button>
                                         </div>
                                         <div class="flex items-center justify-between gap-2">
-                                            <span class="text-xs text-gray-600">Adjust Pitch:</span>
+                                            <span class="text-xs text-slate-600">Adjust Pitch:</span>
                                             <div class="flex gap-1">
-                                                <button class="fs-grace-transpose-btn p-2 rounded bg-white border border-gray-300 hover:bg-amber-50 hover:border-amber-400 transition-colors text-sm font-bold" data-grace-transpose="-1" title="Move grace note down one semitone">−</button>
-                                                <button class="fs-grace-transpose-btn p-2 rounded bg-white border border-gray-300 hover:bg-amber-50 hover:border-amber-400 transition-colors text-sm font-bold" data-grace-transpose="1" title="Move grace note up one semitone">+</button>
+                                                <button class="fs-grace-transpose-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm font-bold shadow-sm" data-grace-transpose="-1" title="Lower grace note pitch by one semitone">−</button>
+                                                <button class="fs-grace-transpose-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm font-bold shadow-sm" data-grace-transpose="1" title="Raise grace note pitch by one semitone">+</button>
                                             </div>
                                         </div>
-                                        <button class="fs-grace-remove-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-red-50 hover:border-red-400 transition-colors text-xs" title="Remove grace note from selected notes">Remove Grace</button>
+                                        <button class="fs-grace-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove grace note from selected notes">Remove Grace</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Repeat Signs Section -->
+                            <div id="fs-section-repeat" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Repeat Signs</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2 hidden">
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <button class="fs-repeat-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-repeat="repeatStart" title="Repeat Start - Begin repeat section">|:</button>
+                                        <button class="fs-repeat-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-repeat="repeatEnd" title="Repeat End - End repeat section">:|</button>
+                                        <button class="fs-repeat-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-repeat="repeatBoth" title="Repeat Both - End and start new repeat">:|:</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Endings (Volta Brackets) Section -->
+                            <div id="fs-section-endings" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Endings</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2 hidden">
+                                    <div class="space-y-2">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="1" title="1st Ending - Play on first pass">1.</button>
+                                            <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="2" title="2nd Ending - Play on second pass">2.</button>
+                                        </div>
+                                        <button class="fs-volta-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove ending bracket from selected measure">Remove Ending</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Chord Labels Section -->
+                            <div id="fs-section-chord" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Chord Labels</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2 hidden">
+                                    <div class="space-y-2">
+                                        <input type="text" class="fs-chord-input w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm shadow-sm" placeholder="e.g., Cmaj7, Dm, G7" title="Enter chord symbol">
+                                        <button class="fs-chord-apply-btn w-full p-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors text-sm shadow-sm" title="Apply chord symbol to selected note">✓ Apply Chord</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Lyrics Section -->
+                            <div id="fs-section-lyrics" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Lyrics</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2 hidden">
+                                    <div class="space-y-2">
+                                        <input type="text" class="fs-lyric-input w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm shadow-sm" placeholder="Lyric syllable" title="Enter lyric text">
+                                        <select class="fs-lyric-syllabic w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm shadow-sm" title="Syllable position in word">
+                                            <option value="single">Single word</option>
+                                            <option value="begin">Begin─ (start of word)</option>
+                                            <option value="middle">─Mid─ (middle)</option>
+                                            <option value="end">─End (end of word)</option>
+                                        </select>
+                                        <button class="fs-lyric-apply-btn w-full p-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors text-sm shadow-sm" title="Apply lyric to selected note">✓ Apply Lyric</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pedal Section -->
+                            <div id="fs-section-pedal" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Pedal</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2 hidden">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="down" title="Pedal Down (Ped.) - Depress sustain pedal">Ped</button>
+                                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="up" title="Pedal Up (*) - Release sustain pedal">*</button>
+                                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="change" title="Pedal Change - Quick release and re-depress">⟳</button>
+                                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="half" title="Half Pedal - Partial pedal for lighter sustain">½</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Voicing Section -->
+                            <div id="fs-section-voicing" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Voicing</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2">
+                                    <div class="space-y-3">
+                                        <!-- Voice Toggle -->
+                                        <div>
+                                            <label class="block text-xs text-slate-600 mb-1">Active Voice (V to toggle)</label>
+                                            <div class="flex gap-2">
+                                                <button class="fs-voice-btn flex-1 p-2 rounded bg-indigo-100 border border-indigo-500 text-indigo-700 font-medium transition-colors text-sm shadow-sm" data-voice="1" title="Voice 1 - Upper voice (melody)">V1</button>
+                                                <button class="fs-voice-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-voice="2" title="Voice 2 - Lower voice (harmony)">V2</button>
+                                            </div>
+                                        </div>
+                                        <!-- V2 Rest Display Mode -->
+                                        <div>
+                                            <label class="block text-xs text-slate-600 mb-1">Voice 2 Rests</label>
+                                            <div class="flex gap-2">
+                                                <button class="fs-rest-display-btn flex-1 p-2 rounded bg-indigo-100 border border-indigo-500 transition-colors text-xs shadow-sm" data-rest-mode="clean" title="Clean mode - hide redundant Voice 2 rests">Clean</button>
+                                                <button class="fs-rest-display-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-rest-mode="explicit" title="Show all Voice 2 rests explicitly">Show All</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Quick Actions Section -->
-                            <div class="sidebar-section">
-                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                            <div id="fs-section-actions" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
                                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
-                                    <span class="font-medium text-gray-800 text-sm">Quick Actions</span>
-                                    <svg class="chevron w-4 h-4 text-gray-600 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="font-medium text-slate-700 text-sm">Quick Actions</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </div>
                                 <div class="sidebar-section-content p-2">
                                     <div class="space-y-2">
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm flex items-center justify-center gap-2" data-action="undo" title="Undo (Ctrl+Z)">
+                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="undo" title="Undo (Ctrl+Z)">
                                             <span>↩</span> Undo
                                         </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm flex items-center justify-center gap-2" data-action="redo" title="Redo (Ctrl+Y)">
+                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="redo" title="Redo (Ctrl+Y)">
                                             <span>↪</span> Redo
                                         </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm flex items-center justify-center gap-2" data-action="delete" title="Delete selected">
+                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="delete" title="Delete selected">
                                             <span>🗑</span> Delete
                                         </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm flex items-center justify-center gap-2" data-action="copy" title="Copy selected (Ctrl+C)">
+                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="copy" title="Copy selected (Ctrl+C)">
                                             <span>📋</span> Copy
                                         </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm flex items-center justify-center gap-2" data-action="paste" title="Paste (Ctrl+V)">
+                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="paste" title="Paste (Ctrl+V)">
                                             <span>📄</span> Paste
                                         </button>
                                         <div class="flex gap-2">
-                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors text-xs flex items-center justify-center gap-1" data-action="octave-up" title="Octave up (Shift+↑)">
+                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="octave-up" title="Octave up (Shift+↑)">
                                                 <span>↑</span> 8va
                                             </button>
-                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-colors text-xs flex items-center justify-center gap-1" data-action="octave-down" title="Octave down (Shift+↓)">
+                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="octave-down" title="Octave down (Shift+↓)">
                                                 <span>↓</span> 8vb
                                             </button>
                                         </div>
@@ -589,12 +739,12 @@ export class FullScreenNotationEditor {
                             </div>
 
                             <!-- Selection Info -->
-                            <div id="fs-selection-info" class="text-xs text-gray-500 p-2 text-center border-t border-gray-200 mt-2 hidden">
+                            <div id="fs-selection-info" class="text-xs text-slate-500 p-2 text-center border-t border-slate-200 mt-2 hidden">
                                 <span id="fs-selection-count">No selection</span>
                             </div>
 
                             <!-- Info Note -->
-                            <div class="text-xs text-gray-400 italic p-2 text-center border-t border-gray-200 mt-2">
+                            <div class="text-xs text-slate-400 italic p-2 text-center border-t border-slate-200 mt-2">
                                 Keyboard shortcuts work in full-screen mode
                             </div>
                         </div>
@@ -892,8 +1042,9 @@ export class FullScreenNotationEditor {
             return composer?.noteEditor;
         };
 
-        // Duration buttons
-        sidebar.querySelectorAll('.fs-duration-btn').forEach(btn => {
+        // Duration buttons - NOTE: These are in the PINNED header section, not in sidebar-content
+        // So we search the entire modal for them
+        this.modal.querySelectorAll('.fs-duration-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const duration = e.currentTarget.dataset.duration;
                 if (duration && window.setNotationDuration) {
@@ -903,10 +1054,18 @@ export class FullScreenNotationEditor {
             });
         });
 
-        // Dot button
-        const dotBtn = sidebar.querySelector('.fs-dot-btn');
+        // Dot button - also in pinned header
+        // Use toolbar's toggleDotted to apply to selected notes (not just input mode)
+        const dotBtn = this.modal.querySelector('.fs-dot-btn');
         dotBtn?.addEventListener('click', () => {
-            if (window.setNotationDotted) {
+            const composer = window.getNotationComposer?.();
+            const toolbar = composer?.toolbar;
+            if (toolbar?.toggleDotted) {
+                toolbar.toggleDotted();
+                // Update our button to match toolbar state
+                this._updateDotButton(toolbar.isDotted);
+            } else if (window.setNotationDotted) {
+                // Fallback to old behavior
                 const state = window.getNotationState?.();
                 const newDotted = !state?.isDotted;
                 window.setNotationDotted(newDotted);
@@ -914,8 +1073,8 @@ export class FullScreenNotationEditor {
             }
         });
 
-        // Rest button
-        const restBtn = sidebar.querySelector('.fs-rest-btn');
+        // Rest button - also in pinned header
+        const restBtn = this.modal.querySelector('.fs-rest-btn');
         restBtn?.addEventListener('click', () => {
             if (window.setNotationRestMode) {
                 const state = window.getNotationState?.();
@@ -925,6 +1084,29 @@ export class FullScreenNotationEditor {
             }
         });
 
+        // Voice select dropdown
+        const voiceSelect = sidebar.querySelector('.fs-voice-select');
+        voiceSelect?.addEventListener('change', (e) => {
+            const voice = parseInt(e.target.value, 10);
+            const toolbar = getToolbar();
+            if (toolbar && voice) {
+                toolbar.setVoice(voice);
+                this._updateVoiceSelect(voice);
+            }
+        });
+
+        // V2 Rest display mode buttons
+        sidebar.querySelectorAll('.fs-rest-display-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const mode = e.currentTarget.dataset.restMode;
+                const toolbar = getToolbar();
+                if (mode && toolbar) {
+                    toolbar.setRestDisplayMode(mode);
+                    this._updateRestDisplayButtons(mode);
+                }
+            });
+        });
+
         // Accidental buttons - let toolbar.setAccidental() handle toggling
         sidebar.querySelectorAll('.fs-accidental-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -932,7 +1114,12 @@ export class FullScreenNotationEditor {
                 const toolbar = getToolbar();
                 if (accidental && toolbar) {
                     toolbar.setAccidental(accidental);
-                    this._updateActiveAccidentalButton(toolbar.currentAccidental);
+                    // Only update button state immediately when NO notes are selected
+                    // When notes ARE selected, _syncSidebarWithToolbar() will handle the update
+                    // after the note is modified and selection state is recalculated
+                    if (toolbar.selectedNotesCount === 0) {
+                        this._updateActiveAccidentalButton(toolbar.currentAccidental);
+                    }
                 }
             });
         });
@@ -1006,9 +1193,14 @@ export class FullScreenNotationEditor {
         sidebar.querySelectorAll('.fs-beam-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const beamAction = e.currentTarget.dataset.beam;
+                const action = e.currentTarget.dataset.action;
                 const toolbar = getToolbar();
-                if (beamAction && toolbar) {
-                    toolbar.onBeamApply?.(beamAction);
+                if (toolbar) {
+                    if (action === 'clearMeasureBeams') {
+                        toolbar.onClearMeasureBeams?.();
+                    } else if (beamAction) {
+                        toolbar.onBeamApply?.(beamAction);
+                    }
                 }
             });
         });
@@ -1113,6 +1305,141 @@ export class FullScreenNotationEditor {
                 }
             });
         });
+
+        // Voice toggle buttons (V1/V2)
+        sidebar.querySelectorAll('.fs-voice-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const voice = parseInt(e.currentTarget.dataset.voice);
+                const toolbar = getToolbar();
+                if (toolbar && !isNaN(voice)) {
+                    toolbar.setVoice?.(voice);
+                    this._updateVoiceButtons(voice);
+                }
+            });
+        });
+
+        // Rest display mode buttons (Clean vs Show All)
+        sidebar.querySelectorAll('.fs-rest-display-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const mode = e.currentTarget.dataset.restMode;
+                const toolbar = getToolbar();
+                if (toolbar && mode) {
+                    toolbar.setV2RestDisplayMode?.(mode);
+                    this._updateRestDisplayButtons(mode);
+                }
+            });
+        });
+
+        // Repeat sign buttons
+        sidebar.querySelectorAll('.fs-repeat-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const repeatType = e.currentTarget.dataset.repeat;
+                const toolbar = getToolbar();
+                if (toolbar && repeatType) {
+                    toolbar.onRepeatSignApply?.(repeatType);
+                }
+            });
+        });
+
+        // Volta/Ending buttons
+        sidebar.querySelectorAll('.fs-volta-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const voltaNum = e.currentTarget.dataset.volta;
+                const toolbar = getToolbar();
+                if (toolbar && voltaNum) {
+                    toolbar.onVoltaApply?.(parseInt(voltaNum));
+                }
+            });
+        });
+
+        // Volta remove button
+        const voltaRemoveBtn = sidebar.querySelector('.fs-volta-remove-btn');
+        voltaRemoveBtn?.addEventListener('click', () => {
+            const toolbar = getToolbar();
+            toolbar?.onVoltaRemove?.();
+        });
+
+        // Chord label apply button
+        const chordApplyBtn = sidebar.querySelector('.fs-chord-apply-btn');
+        chordApplyBtn?.addEventListener('click', () => {
+            const input = sidebar.querySelector('.fs-chord-input');
+            const chordText = input?.value?.trim();
+            const toolbar = getToolbar();
+            if (toolbar && chordText) {
+                toolbar.onChordLabelApply?.(chordText);
+                input.value = ''; // Clear input after applying
+            }
+        });
+
+        // Lyric apply button
+        const lyricApplyBtn = sidebar.querySelector('.fs-lyric-apply-btn');
+        lyricApplyBtn?.addEventListener('click', () => {
+            const input = sidebar.querySelector('.fs-lyric-input');
+            const syllabicSelect = sidebar.querySelector('.fs-lyric-syllabic');
+            const lyricText = input?.value?.trim();
+            const syllabic = syllabicSelect?.value || 'single';
+            const toolbar = getToolbar();
+            if (toolbar && lyricText) {
+                toolbar.onLyricApply?.(lyricText, syllabic);
+                input.value = ''; // Clear input after applying
+            }
+        });
+
+        // Pedal buttons
+        sidebar.querySelectorAll('.fs-pedal-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const pedalType = e.currentTarget.dataset.pedal;
+                const toolbar = getToolbar();
+                if (toolbar && pedalType) {
+                    toolbar.onPedalApply?.(pedalType);
+                }
+            });
+        });
+
+        // Quick Section Selector (jump to section)
+        // Note: The dropdown is in the pinned header area, not inside #fullscreen-sidebar-content,
+        // so we search from this.modal instead of sidebar
+        const sectionJump = this.modal.querySelector('#fs-section-jump');
+        sectionJump?.addEventListener('change', (e) => {
+            const sectionId = e.target.value;
+            if (!sectionId) return;
+
+            // The sections are inside #fullscreen-sidebar-content
+            const section = sidebar.querySelector(`#${sectionId}`);
+            if (section) {
+                // Scroll section into view
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                // Open the section if it's collapsed
+                const content = section.querySelector('.sidebar-section-content');
+                const chevron = section.querySelector('.chevron');
+                if (content && content.classList.contains('hidden')) {
+                    content.classList.remove('hidden');
+                    chevron?.classList.add('rotate-180');
+                }
+
+                // Reset dropdown after navigation
+                setTimeout(() => { e.target.value = ''; }, 300);
+            }
+        });
+    }
+
+    /**
+     * Update voice toggle buttons to reflect active voice
+     */
+    _updateVoiceButtons(activeVoice) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        sidebar.querySelectorAll('.fs-voice-btn').forEach(btn => {
+            const isActive = parseInt(btn.dataset.voice) === activeVoice;
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-500', isActive);
+            btn.classList.toggle('text-indigo-700', isActive);
+            btn.classList.toggle('font-medium', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+        });
     }
 
     /**
@@ -1166,54 +1493,142 @@ export class FullScreenNotationEditor {
     _syncSidebarWithToolbar(toolbar) {
         if (!toolbar || !this.modal) return;
 
+        const hasSelection = toolbar.selectedNotesCount > 0;
+
         // Update duration buttons
-        if (toolbar.selectionDuration && toolbar.selectionDuration !== 'mixed') {
-            this._updateActiveDurationButton(toolbar.selectionDuration);
-        } else if (!toolbar.selectionDuration) {
+        // When notes are selected, show their duration; otherwise show input mode duration
+        if (hasSelection) {
+            // Always update duration when there's a selection, even if 'mixed'
+            // For 'mixed', we could show no highlight, but let's show the first selected note's duration
+            const durationToShow = toolbar.selectionDuration === 'mixed'
+                ? toolbar.currentDuration  // Fallback to current input duration for mixed
+                : toolbar.selectionDuration;
+            this._updateActiveDurationButton(durationToShow);
+        } else {
             this._updateActiveDurationButton(toolbar.currentDuration);
         }
 
         // Update dot button
-        if (toolbar.selectionDotted !== null && toolbar.selectionDotted !== 'mixed') {
-            this._updateDotButton(toolbar.selectionDotted);
-        } else if (toolbar.selectionDotted === null) {
+        if (hasSelection) {
+            if (toolbar.selectionDotted !== 'mixed') {
+                this._updateDotButton(toolbar.selectionDotted === true);
+            }
+        } else {
             this._updateDotButton(toolbar.isDotted);
         }
 
         // Update rest button
-        if (toolbar.selectionIsRest !== null && toolbar.selectionIsRest !== 'mixed') {
-            this._updateRestButton(toolbar.selectionIsRest);
-        } else if (toolbar.selectionIsRest === null) {
+        if (hasSelection) {
+            if (toolbar.selectionIsRest !== 'mixed') {
+                this._updateRestButton(toolbar.selectionIsRest === true);
+            }
+        } else {
             this._updateRestButton(toolbar.isRestMode);
         }
 
         // Update accidental buttons
-        if (toolbar.selectionAccidental && toolbar.selectionAccidental !== 'mixed') {
-            this._updateActiveAccidentalButton(toolbar.selectionAccidental);
-        } else if (!toolbar.selectionAccidental) {
+        // When notes are selected, show their accidental state (or null if no accidental)
+        if (hasSelection) {
+            if (toolbar.selectionAccidental !== 'mixed') {
+                this._updateActiveAccidentalButton(toolbar.selectionAccidental);
+            }
+        } else {
             this._updateActiveAccidentalButton(toolbar.currentAccidental);
         }
 
         // Update articulation buttons
-        if (toolbar.selectionArticulation && toolbar.selectionArticulation !== 'mixed') {
-            this._updateActiveArticulationButton(toolbar.selectionArticulation);
-        } else if (!toolbar.selectionArticulation) {
+        if (hasSelection) {
+            if (toolbar.selectionArticulation !== 'mixed') {
+                this._updateActiveArticulationButton(toolbar.selectionArticulation);
+            }
+        } else {
             this._updateActiveArticulationButton(toolbar.currentArticulation);
         }
 
         // Update dynamic buttons
-        if (toolbar.selectionDynamic && toolbar.selectionDynamic !== 'mixed') {
-            this._updateActiveDynamicButton(toolbar.selectionDynamic);
-        } else if (!toolbar.selectionDynamic) {
+        if (hasSelection) {
+            if (toolbar.selectionDynamic !== 'mixed') {
+                this._updateActiveDynamicButton(toolbar.selectionDynamic);
+            }
+        } else {
             this._updateActiveDynamicButton(toolbar.currentDynamic);
         }
 
         // Update ornament buttons
-        if (toolbar.selectionOrnament && toolbar.selectionOrnament !== 'mixed') {
-            this._updateActiveOrnamentButton(toolbar.selectionOrnament);
+        if (hasSelection) {
+            if (toolbar.selectionOrnament !== 'mixed') {
+                this._updateActiveOrnamentButton(toolbar.selectionOrnament);
+            }
         } else {
             this._updateActiveOrnamentButton(null);
         }
+
+        // Update tuplet buttons (reflect selection state)
+        if (hasSelection) {
+            if (toolbar.selectionTuplet !== 'mixed') {
+                this._updateActiveTupletButton(toolbar.selectionTuplet);
+            }
+        } else {
+            this._updateActiveTupletButton(null);
+        }
+
+        // Update pedal buttons (reflect selection state)
+        if (hasSelection) {
+            if (toolbar.selectionPedal !== 'mixed') {
+                this._updatePedalButtons(toolbar.selectionPedal);
+            }
+        } else {
+            this._updatePedalButtons(null);
+        }
+
+        // Update slur button state
+        this._updateSlurButton(hasSelection && toolbar.selectionHasSlur);
+
+        // Update hairpin buttons
+        if (hasSelection) {
+            if (toolbar.selectionHasHairpin !== 'mixed') {
+                this._updateHairpinButtons(toolbar.selectionHasHairpin);
+            }
+        } else {
+            this._updateHairpinButtons(null);
+        }
+
+        // Update grace note buttons
+        if (hasSelection) {
+            if (toolbar.selectionGraceNote !== 'mixed') {
+                this._updateGraceNoteButtons(toolbar.selectionGraceNote);
+            }
+        } else {
+            this._updateGraceNoteButtons(null);
+        }
+
+        // Update beam buttons
+        if (hasSelection && toolbar.selectionBeam) {
+            this._updateBeamButtons(toolbar.selectionBeam);
+        } else {
+            this._updateBeamButtons({ start: false, end: false, unbeam: false });
+        }
+
+        // Update tie button
+        if (hasSelection) {
+            if (toolbar.selectionTied !== 'mixed') {
+                this._updateTieButton(toolbar.selectionTied === true);
+            }
+        } else {
+            this._updateTieButton(false);
+        }
+
+        // Update volta buttons (based on measure selection)
+        this._updateVoltaButtons(toolbar.selectionMeasureIndices);
+
+        // Update repeat buttons (based on measure selection)
+        this._updateRepeatButtons(toolbar.selectionMeasureIndices);
+
+        // Update lyric buttons
+        this._updateLyricButtons(toolbar.selectionHasLyric);
+
+        // Update chord buttons (placeholder for future)
+        this._updateChordButtons();
 
         // Update selection info
         this._updateSelectionInfo(toolbar.selectedNotesCount);
@@ -1233,20 +1648,21 @@ export class FullScreenNotationEditor {
     }
 
     /**
-     * Update active state of duration buttons in sidebar
+     * Update active state of duration buttons in sidebar (pinned header)
      */
     _updateActiveDurationButton(activeDuration) {
-        const sidebar = this.modal.querySelector('#fullscreen-sidebar-content');
-        if (!sidebar) return;
+        if (!this.modal) return;
 
-        sidebar.querySelectorAll('.fs-duration-btn').forEach(btn => {
+        // Duration buttons are in the PINNED header, not sidebar-content
+        const buttons = this.modal.querySelectorAll('.fs-duration-btn');
+        buttons.forEach(btn => {
             const isActive = btn.dataset.duration === activeDuration;
             btn.classList.toggle('bg-indigo-200', isActive);
             btn.classList.toggle('border-indigo-500', isActive);
             btn.classList.toggle('ring-2', isActive);
             btn.classList.toggle('ring-indigo-400', isActive);
             btn.classList.toggle('bg-white', !isActive);
-            btn.classList.toggle('border-gray-300', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
         });
 
         // Update the duration indicator text
@@ -1278,48 +1694,73 @@ export class FullScreenNotationEditor {
             btn.classList.toggle('bg-purple-100', isActive);
             btn.classList.toggle('border-purple-400', isActive);
             btn.classList.toggle('bg-white', !isActive);
-            btn.classList.toggle('border-gray-300', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
         });
     }
 
     /**
-     * Update dot button state
+     * Update dot button state (in pinned header)
      */
     _updateDotButton(isDotted) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
-        if (!sidebar) return;
+        if (!this.modal) return;
 
-        const dotBtn = sidebar.querySelector('.fs-dot-btn');
+        // Dot button is in the PINNED header, not sidebar-content
+        const dotBtn = this.modal.querySelector('.fs-dot-btn');
         if (dotBtn) {
             dotBtn.classList.toggle('bg-indigo-200', isDotted);
             dotBtn.classList.toggle('border-indigo-500', isDotted);
             dotBtn.classList.toggle('ring-2', isDotted);
             dotBtn.classList.toggle('ring-indigo-400', isDotted);
             dotBtn.classList.toggle('bg-white', !isDotted);
-            dotBtn.classList.toggle('border-gray-300', !isDotted);
+            dotBtn.classList.toggle('border-slate-200', !isDotted);
         }
-
-        // Also update the duration indicator to show dotted state
-        const currentDuration = window.getNotationState?.()?.duration;
-        if (currentDuration) {
-            this._updateActiveDurationButton(currentDuration);
-        }
+        // Note: Duration indicator update is handled by _updateActiveDurationButton
+        // Don't call it here as it would override selection-based duration display
     }
 
     /**
-     * Update rest button state
+     * Update rest button state (in pinned header)
      */
     _updateRestButton(isRest) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
-        if (!sidebar) return;
+        if (!this.modal) return;
 
-        const restBtn = sidebar.querySelector('.fs-rest-btn');
+        // Rest button is in the PINNED header, not sidebar-content
+        const restBtn = this.modal.querySelector('.fs-rest-btn');
         if (restBtn) {
             restBtn.classList.toggle('bg-indigo-100', isRest);
             restBtn.classList.toggle('border-indigo-400', isRest);
             restBtn.classList.toggle('bg-white', !isRest);
-            restBtn.classList.toggle('border-gray-300', !isRest);
+            restBtn.classList.toggle('border-slate-200', !isRest);
         }
+    }
+
+    /**
+     * Update voice select dropdown to reflect current voice
+     */
+    _updateVoiceSelect(voice) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        const voiceSelect = sidebar.querySelector('.fs-voice-select');
+        if (voiceSelect) {
+            voiceSelect.value = String(voice);
+        }
+    }
+
+    /**
+     * Update rest display mode buttons (Clean vs Show All)
+     */
+    _updateRestDisplayButtons(mode) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        sidebar.querySelectorAll('.fs-rest-display-btn').forEach(btn => {
+            const isActive = btn.dataset.restMode === mode;
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-400', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+        });
     }
 
     /**
@@ -1334,7 +1775,7 @@ export class FullScreenNotationEditor {
             btn.classList.toggle('bg-emerald-100', isActive);
             btn.classList.toggle('border-emerald-400', isActive);
             btn.classList.toggle('bg-white', !isActive);
-            btn.classList.toggle('border-gray-300', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
         });
     }
 
@@ -1350,7 +1791,7 @@ export class FullScreenNotationEditor {
             btn.classList.toggle('bg-orange-100', isActive);
             btn.classList.toggle('border-orange-400', isActive);
             btn.classList.toggle('bg-white', !isActive);
-            btn.classList.toggle('border-gray-300', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
         });
     }
 
@@ -1366,8 +1807,257 @@ export class FullScreenNotationEditor {
             btn.classList.toggle('bg-pink-100', isActive);
             btn.classList.toggle('border-pink-400', isActive);
             btn.classList.toggle('bg-white', !isActive);
-            btn.classList.toggle('border-gray-300', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
         });
+    }
+
+    /**
+     * Update pedal buttons to reflect the selected note's pedal state
+     * Mirrors notationToolbar.updatePedalButtonsForSelection()
+     */
+    _updatePedalButtons(selectionPedal) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        sidebar.querySelectorAll('.fs-pedal-btn').forEach(btn => {
+            const pedalType = btn.dataset.pedal;
+            const isActive = selectionPedal === pedalType;
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-500', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+        });
+    }
+
+    /**
+     * Update active state of tuplet buttons in sidebar
+     * @param {string|null} activeTuplet - 'triplet', 'quintuplet', 'sextuplet', or null
+     */
+    _updateActiveTupletButton(activeTuplet) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        sidebar.querySelectorAll('.fs-tuplet-btn').forEach(btn => {
+            const isActive = btn.dataset.tuplet === activeTuplet;
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-500', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+        });
+    }
+
+    /**
+     * Update slur button to reflect if selected notes have a slur
+     * @param {boolean} hasSlur - Whether selected notes have a slur
+     */
+    _updateSlurButton(hasSlur) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        // Update the slur button (not tie, that's separate)
+        const slurBtn = sidebar.querySelector('.fs-slur-btn[data-slur="slur"]');
+        if (slurBtn) {
+            slurBtn.classList.toggle('bg-indigo-100', hasSlur);
+            slurBtn.classList.toggle('border-indigo-500', hasSlur);
+            slurBtn.classList.toggle('bg-white', !hasSlur);
+            slurBtn.classList.toggle('border-slate-200', !hasSlur);
+        }
+    }
+
+    /**
+     * Update hairpin buttons to reflect selected notes' hairpin state
+     * @param {string|null} hairpinType - 'crescendo', 'decrescendo', or null
+     */
+    _updateHairpinButtons(hairpinType) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        sidebar.querySelectorAll('.fs-hairpin-btn').forEach(btn => {
+            const isActive = btn.dataset.hairpin === hairpinType;
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-500', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+        });
+    }
+
+    /**
+     * Update grace note buttons to reflect selected notes' grace note state
+     * @param {string|null} graceType - 'acciaccatura', 'appoggiatura', or null
+     */
+    _updateGraceNoteButtons(graceType) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        sidebar.querySelectorAll('.fs-grace-btn').forEach(btn => {
+            const isActive = btn.dataset.grace === graceType;
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-500', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+        });
+    }
+
+    /**
+     * Update beam buttons to reflect selected notes' beam state
+     * @param {Object} beamState - Object with start, end, unbeam properties
+     */
+    _updateBeamButtons(beamState) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        // Beam buttons show active if the selected notes have specific beam settings
+        // For now, we'll just show if there's any beam start/end on selected notes
+        const hasBeamStart = beamState?.start || false;
+        const hasBeamEnd = beamState?.end || false;
+        const hasUnbeam = beamState?.unbeam || false;
+
+        // Update the beam button (selection has notes that start a beam)
+        const beamBtn = sidebar.querySelector('.fs-beam-btn[data-beam="beam"]');
+        if (beamBtn) {
+            beamBtn.classList.toggle('bg-indigo-100', hasBeamStart);
+            beamBtn.classList.toggle('border-indigo-500', hasBeamStart);
+            beamBtn.classList.toggle('bg-white', !hasBeamStart);
+            beamBtn.classList.toggle('border-slate-200', !hasBeamStart);
+        }
+
+        // Update unbeam button
+        const unbeamBtn = sidebar.querySelector('.fs-beam-btn[data-beam="unbeam"]');
+        if (unbeamBtn) {
+            unbeamBtn.classList.toggle('bg-indigo-100', hasUnbeam);
+            unbeamBtn.classList.toggle('border-indigo-500', hasUnbeam);
+            unbeamBtn.classList.toggle('bg-white', !hasUnbeam);
+            unbeamBtn.classList.toggle('border-slate-200', !hasUnbeam);
+        }
+    }
+
+    /**
+     * Update tie button to reflect if selected notes are tied
+     * @param {boolean} isTied - Whether selected notes have a tie
+     */
+    _updateTieButton(isTied) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        const tieBtn = sidebar.querySelector('.fs-slur-btn[data-slur="tie"]');
+        if (tieBtn) {
+            tieBtn.classList.toggle('bg-indigo-100', isTied);
+            tieBtn.classList.toggle('border-indigo-500', isTied);
+            tieBtn.classList.toggle('bg-white', !isTied);
+            tieBtn.classList.toggle('border-slate-200', !isTied);
+        }
+    }
+
+    /**
+     * Update volta buttons to show which volta applies to selected measure(s)
+     * Mirrors notationToolbar.updateVoltaButtonsForSelection()
+     */
+    _updateVoltaButtons(selectionMeasureIndices) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        // Get composition state to check volta brackets
+        const compositionState = window.getCompositionState?.();
+
+        // Find which volta numbers apply to the selected measure(s)
+        const activeVoltaNumbers = new Set();
+
+        if (compositionState && selectionMeasureIndices && selectionMeasureIndices.size > 0) {
+            for (const measureIndex of selectionMeasureIndices) {
+                const volta = compositionState.getVoltaForMeasure?.(measureIndex);
+                if (volta) {
+                    activeVoltaNumbers.add(String(volta.number));
+                }
+            }
+        }
+
+        // Update button states
+        sidebar.querySelectorAll('.fs-volta-btn').forEach(btn => {
+            const voltaId = btn.dataset.volta;
+            const isActive = activeVoltaNumbers.has(voltaId);
+
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-500', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+
+            // Update title based on state
+            if (isActive) {
+                btn.title = `Remove ${voltaId === '1' ? '1st' : '2nd'} ending from this measure`;
+            } else {
+                btn.title = `Add ${voltaId === '1' ? '1st' : '2nd'} ending to selected measure`;
+            }
+        });
+    }
+
+    /**
+     * Update repeat sign buttons to show which repeat applies to selected measure(s)
+     * Mirrors notationToolbar.updateRepeatButtonsForSelection()
+     */
+    _updateRepeatButtons(selectionMeasureIndices) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        // Get composition state to check repeat signs
+        const compositionState = window.getCompositionState?.();
+
+        // Find which repeat types apply to the selected measure(s)
+        const activeRepeatTypes = new Set();
+
+        if (compositionState && selectionMeasureIndices && selectionMeasureIndices.size > 0) {
+            for (const measureIndex of selectionMeasureIndices) {
+                const repeat = compositionState.getRepeatSignForMeasure?.(measureIndex);
+                if (repeat) {
+                    activeRepeatTypes.add(repeat.type);
+                }
+            }
+        }
+
+        // Update button states
+        sidebar.querySelectorAll('.fs-repeat-btn').forEach(btn => {
+            const repeatType = btn.dataset.repeat;
+            const isActive = activeRepeatTypes.has(repeatType);
+
+            btn.classList.toggle('bg-indigo-100', isActive);
+            btn.classList.toggle('border-indigo-500', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+
+            // Update title based on state
+            const labels = {
+                'repeatStart': 'Repeat Start |:',
+                'repeatEnd': 'Repeat End :|',
+                'repeatBoth': 'Repeat Both :|:'
+            };
+            if (isActive) {
+                btn.title = `Remove ${labels[repeatType] || repeatType} from this measure`;
+            } else {
+                btn.title = `Add ${labels[repeatType] || repeatType} to selected measure`;
+            }
+        });
+    }
+
+    /**
+     * Update lyric button/indicator to show if selected note has a lyric
+     * Mirrors notationToolbar.updateLyricButtonsForSelection()
+     */
+    _updateLyricButtons(selectionHasLyric) {
+        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        const applyBtn = sidebar.querySelector('.fs-lyric-apply-btn');
+        if (applyBtn) {
+            applyBtn.classList.toggle('bg-indigo-700', selectionHasLyric);
+            applyBtn.classList.toggle('bg-indigo-600', !selectionHasLyric);
+        }
+    }
+
+    /**
+     * Update chord label button state
+     */
+    _updateChordButtons(/* future: selectionHasChord */) {
+        // Currently the chord apply button doesn't have a toggle state
+        // This can be extended in the future to show if selected note has a chord label
     }
 
     /**
@@ -1400,10 +2090,16 @@ export class FullScreenNotationEditor {
         this._updateActiveDurationButton(toolbar.currentDuration);
         this._updateDotButton(toolbar.isDotted);
         this._updateRestButton(toolbar.isRestMode);
+        this._updateVoiceButtons(toolbar.voiceNumber || 1);
+        this._updateRestDisplayButtons(toolbar.restDisplayMode || 'clean');
         this._updateActiveAccidentalButton(toolbar.currentAccidental);
         this._updateActiveArticulationButton(toolbar.currentArticulation);
         this._updateActiveDynamicButton(toolbar.currentDynamic);
         this._updateActiveOrnamentButton(null);
+        this._updatePedalButtons(toolbar.selectionPedal);
+        this._updateVoltaButtons(toolbar.selectionMeasureIndices);
+        this._updateRepeatButtons(toolbar.selectionMeasureIndices);
+        this._updateLyricButtons(toolbar.selectionHasLyric);
         this._updateSelectionInfo(toolbar.selectedNotesCount || 0);
         // Initialize contextual button states
         this._updateContextualButtonStates(toolbar);
@@ -1462,9 +2158,13 @@ export class FullScreenNotationEditor {
         // Beam selected: 2+ consecutive beamable notes in same measure
         setButtonState('.fs-beam-btn[data-beam="beam"]', toolbar.canBeamSelected);
         // Break beams between: exactly 2 notes in same beam group
-        setButtonState('.fs-beam-btn[data-beam="break"]', toolbar.canBreakBeamsBetween);
+        setButtonState('.fs-beam-btn[data-beam="breakBetween"]', toolbar.canBreakBeamsBetween);
         // Unbeam selected: 1+ notes
         setButtonState('.fs-beam-btn[data-beam="unbeam"]', has1);
+        // Clear manual beam settings: 1+ notes
+        setButtonState('.fs-beam-btn[data-beam="clear"]', has1);
+        // Clear measure beams: always enabled (user can select a measure)
+        setButtonState('.fs-beam-btn[data-action="clearMeasureBeams"]', true);
 
         // --- Remove buttons (require notes with that feature) ---
         setButtonState('.fs-slur-btn[data-slur="remove-slur"]', toolbar.notesInSlur);
@@ -1483,6 +2183,19 @@ export class FullScreenNotationEditor {
         setButtonState('.fs-action-btn[data-action="octave-up"]', has1);
         setButtonState('.fs-action-btn[data-action="octave-down"]', has1);
         setButtonState('.fs-action-btn[data-action="delete"]', has1);
+
+        // --- Pedal buttons (require 1+ notes) ---
+        setButtonState('.fs-pedal-btn', has1);
+
+        // --- Repeat/Volta buttons (require measure selection) ---
+        const hasMeasure = toolbar.hasMeasureSelection;
+        setButtonState('.fs-repeat-btn', hasMeasure);
+        setButtonState('.fs-volta-btn', hasMeasure);
+        setButtonState('.fs-volta-remove-btn', hasMeasure);
+
+        // --- Lyric/Chord buttons (require 1+ notes) ---
+        setButtonState('.fs-lyric-apply-btn', has1);
+        setButtonState('.fs-chord-apply-btn', has1);
     }
 
     // ========================================================================
@@ -2510,8 +3223,16 @@ export class FullScreenNotationEditor {
 
         // Get the NotationComposer and trigger re-render with new measures per line
         const notationComposer = window.getNotationComposer?.();
-        if (notationComposer && notationComposer.callbacks?.onMeasuresPerLineChange) {
-            notationComposer.callbacks.onMeasuresPerLineChange(this.measuresPerSystem);
+        if (notationComposer?.toolbar?.onMeasuresPerLineChange) {
+            // Use the toolbar's callback which handles config update + re-render
+            notationComposer.toolbar.onMeasuresPerLineChange(this.measuresPerSystem);
+        } else if (notationComposer) {
+            // Direct approach: update config and re-render
+            notationComposer.config.measuresPerLine = this.measuresPerSystem;
+            if (notationComposer.layoutManager?.setConfig) {
+                notationComposer.layoutManager.setConfig({ measuresPerLine: this.measuresPerSystem });
+            }
+            notationComposer.render?.();
         } else {
             // Fallback: trigger a general notation refresh
             if (typeof window.refreshNotationFromProgression === 'function') {

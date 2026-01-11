@@ -292,13 +292,27 @@ export function noteToMidi(noteStr) {
   }
   if (pitchClass === -1) pitchClass = 0;
 
-  if (accidental === '#') pitchClass += 1;
-  else if (accidental === 'b') pitchClass -= 1;
+  // Track octave adjustment for edge cases like Cb (should go down an octave)
+  // and B# (should go up an octave)
+  let octaveAdjust = 0;
 
-  // Normalize pitch class
-  pitchClass = ((pitchClass % 12) + 12) % 12;
+  if (accidental === '#') {
+    pitchClass += 1;
+    // B# wraps to C of the next octave
+    if (pitchClass >= 12) {
+      pitchClass -= 12;
+      octaveAdjust = 1;
+    }
+  } else if (accidental === 'b') {
+    pitchClass -= 1;
+    // Cb wraps to B of the previous octave
+    if (pitchClass < 0) {
+      pitchClass += 12;
+      octaveAdjust = -1;
+    }
+  }
 
-  return (octave + 1) * 12 + pitchClass;
+  return (octave + 1 + octaveAdjust) * 12 + pitchClass;
 }
 
 /**

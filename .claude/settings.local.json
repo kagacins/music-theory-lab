@@ -70,7 +70,9 @@
       "Bash(while read hash msg)",
       "Bash(do git show \"$hash\":index.html)",
       "Bash(find:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(timeout 10 npm run build:*)",
+      "Bash(timeout 60 npm run build:*)"
     ],
     "deny": [],
     "ask": []

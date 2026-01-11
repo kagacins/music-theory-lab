@@ -97,6 +97,71 @@ export function unitsToDuration(units) {
 }
 
 /**
+ * Standard durations sorted by size (largest first) for greedy decomposition
+ * Excludes triplet/tuplet values - only standard note values
+ */
+const STANDARD_DURATION_UNITS = [
+    { units: 192, duration: '1n', dotted: false },   // Whole note (4 beats)
+    { units: 144, duration: '2n', dotted: true },    // Dotted half (3 beats)
+    { units: 96,  duration: '2n', dotted: false },   // Half note (2 beats)
+    { units: 72,  duration: '4n', dotted: true },    // Dotted quarter (1.5 beats)
+    { units: 48,  duration: '4n', dotted: false },   // Quarter note (1 beat)
+    { units: 36,  duration: '8n', dotted: true },    // Dotted eighth (0.75 beats)
+    { units: 24,  duration: '8n', dotted: false },   // Eighth note (0.5 beats)
+    { units: 18,  duration: '16n', dotted: true },   // Dotted 16th (0.375 beats)
+    { units: 12,  duration: '16n', dotted: false },  // 16th note (0.25 beats)
+    { units: 6,   duration: '32n', dotted: false },  // 32nd note (0.125 beats)
+];
+
+/**
+ * Decompose a unit value into a sequence of tied standard durations
+ * This handles non-standard durations like 120 units (2.5 beats) by
+ * returning [{ duration: '2n', units: 96 }, { duration: '8n', units: 24 }]
+ *
+ * @param {number} units - Total units to decompose
+ * @returns {Array<{duration: string, dotted: boolean, units: number}>} Array of duration components
+ */
+export function unitsToTiedDurations(units) {
+    const result = [];
+    let remaining = units;
+
+    // Check for exact match first
+    if (UNITS_TO_DURATION[units]) {
+        const duration = UNITS_TO_DURATION[units];
+        const dotted = duration.includes('.');
+        return [{ duration, dotted, units }];
+    }
+
+    // Greedy decomposition: pick largest fitting note repeatedly
+    while (remaining > 0) {
+        let found = false;
+
+        for (const std of STANDARD_DURATION_UNITS) {
+            if (std.units <= remaining) {
+                result.push({
+                    duration: std.duration,
+                    dotted: std.dotted,
+                    units: std.units
+                });
+                remaining -= std.units;
+                found = true;
+                break;
+            }
+        }
+
+        // Safety: if we can't find anything (shouldn't happen with 6-unit minimum)
+        if (!found) {
+            // Remaining is smaller than smallest standard note (6 units)
+            // This can happen with rounding errors - just drop it
+            console.warn(`[unitsToTiedDurations] Unable to decompose remaining ${remaining} units`);
+            break;
+        }
+    }
+
+    return result;
+}
+
+/**
  * Convert duration string to units
  * @param {string} duration - Duration string like '4n', '8n', etc.
  * @returns {number} Number of units
@@ -954,76 +1019,108 @@ export class BuildingBlockSequence {
                 while (remainingUnits > 0) {
                     const unitsAvailableInMeasure = unitsPerMeasure - measureUnitOffset;
                     const unitsToPlace = Math.min(remainingUnits, unitsAvailableInMeasure);
-                    const isLastPart = remainingUnits <= unitsAvailableInMeasure;
+                    const isLastMeasurePart = remainingUnits <= unitsAvailableInMeasure;
 
-                    // Create the note/rest for this measure
-                    // Most attributes only apply to the first part of a tied note
-                    const measureNote = {
-                        // Core properties
-                        pitches: note.pitches,
-                        duration: unitsToDuration(unitsToPlace),
-                        beat: measureUnitOffset / UNITS_PER_BEAT,
-                        isRest: note.isRest,
-                        isTied: !isFirstPart, // True if this is a continuation FROM the previous note
-                        tied: !isLastPart && !note.isRest, // True if this note ties TO the next part (for rendering)
-                        chordIndex: block.chordIndex,
-                        blockId: block.id,
+                    // Decompose unitsToPlace into tied standard durations
+                    // This handles non-standard durations like 120 units (2.5 beats)
+                    // which become half note (96) + eighth note (24)
+                    const decomposedDurations = unitsToTiedDurations(unitsToPlace);
 
-                        // Dynamics - only on first part
-                        dynamic: isFirstPart ? note.dynamic : null,
-                        velocity: note.velocity, // Velocity applies to all parts for playback
+                    let localBeat = measureUnitOffset / UNITS_PER_BEAT;
 
-                        // Articulations - only on first part (except fermata on last)
-                        articulation: isFirstPart ? note.articulation : null,
-                        fermata: isLastPart ? note.fermata : null,
+                    for (let partIdx = 0; partIdx < decomposedDurations.length; partIdx++) {
+                        const durPart = decomposedDurations[partIdx];
+                        const isFirstDurPart = partIdx === 0;
+                        const isLastDurPart = partIdx === decomposedDurations.length - 1;
 
-                        // Ornaments - only on first part
-                        ornament: isFirstPart ? note.ornament : null,
-                        graceNotes: isFirstPart ? note.graceNotes : null,
-                        tremolo: note.tremolo, // Tremolo continues through tied notes
+                        // Determine tie flags:
+                        // - isTied (incoming tie): true if NOT first part of entire note
+                        // - tied (outgoing tie): true if NOT last part (more parts to come)
+                        const isTiedValue = !isFirstPart || !isFirstDurPart;
 
-                        // Accidentals - only on first part
-                        accidental: isFirstPart ? note.accidental : null,
+                        // For outgoing tie: tie to next part unless this is the very last part
+                        const hasMoreDurParts = !isLastDurPart;
+                        const hasMoreMeasureParts = !isLastMeasurePart;
+                        const tiedValue = (hasMoreDurParts || hasMoreMeasureParts) && !note.isRest;
 
-                        // Phrasing - slur start on first, end on last
-                        slur: this._computeSlurForPart(note.slur, isFirstPart, isLastPart),
-                        glissando: isLastPart ? note.glissando : null, // Glissando from end of note
-                        arpeggio: isFirstPart ? note.arpeggio : null,
+                        // Determine if this is the VERY last part of the entire note
+                        const isVeryLastPart = isLastMeasurePart && isLastDurPart;
+                        // And if this is the VERY first part
+                        const isVeryFirstPart = isFirstPart && isFirstDurPart;
 
-                        // Tuplets - all parts need tuplet info for rendering
-                        tuplet: note.tuplet,
-                        tupletType: note.tupletType,
-                        tupletGroupId: note.tupletGroupId,
+                        // Create the note/rest for this measure
+                        // Most attributes only apply to the first part of a tied note
+                        const measureNote = {
+                            // Core properties
+                            pitches: note.pitches,
+                            duration: durPart.duration,
+                            dotted: durPart.dotted,  // CRITICAL: Include dotted flag from decomposition
+                            beat: localBeat,
+                            isRest: note.isRest,
+                            isTied: isTiedValue, // True if this is a continuation FROM the previous note
+                            tied: tiedValue, // True if this note ties TO the next part (for rendering)
+                            chordIndex: block.chordIndex,
+                            blockId: block.id,
 
-                        // Technique - only on first part
-                        fingering: isFirstPart ? note.fingering : null,
-                        tablature: isFirstPart ? note.tablature : null,
-                        harmonic: note.harmonic, // Harmonic affects playback of all parts
-                        octaveShift: note.octaveShift, // Octave shift affects all parts
+                            // Dynamics - only on first part
+                            dynamic: isVeryFirstPart ? note.dynamic : null,
+                            velocity: note.velocity, // Velocity applies to all parts for playback
 
-                        // Piano pedals - on first part
-                        pedal: isFirstPart ? note.pedal : null,
-                        softPedal: isFirstPart ? note.softPedal : null,
-                        sostenutoPedal: isFirstPart ? note.sostenutoPedal : null,
+                            // Articulations - only on first part (except fermata on last)
+                            articulation: isVeryFirstPart ? note.articulation : null,
+                            fermata: isVeryLastPart ? note.fermata : null,
 
-                        // Text - only on first part
-                        text: isFirstPart ? note.text : null,
-                        tempo: isFirstPart ? note.tempo : null,
-                        rehearsalMark: isFirstPart ? note.rehearsalMark : null,
+                            // Ornaments - only on first part
+                            ornament: isVeryFirstPart ? note.ornament : null,
+                            graceNotes: isVeryFirstPart ? note.graceNotes : null,
+                            tremolo: note.tremolo, // Tremolo continues through tied notes
 
-                        // Breath - only after last part
-                        breath: isLastPart ? note.breath : null,
+                            // Accidentals - only on first part
+                            accidental: isVeryFirstPart ? note.accidental : null,
 
-                        // Voice & Stem
-                        voice: note.voice,
-                        stemDirection: note.stemDirection,
-                        beam: this._computeBeamForPart(note.beam, isFirstPart, isLastPart),
+                            // Phrasing - slur start on first, end on last
+                            slur: this._computeSlurForPart(note.slur, isVeryFirstPart, isVeryLastPart),
+                            glissando: isVeryLastPart ? note.glissando : null, // Glissando from end of note
+                            arpeggio: isVeryFirstPart ? note.arpeggio : null,
 
-                        // Lyric - only on first part
-                        lyric: isFirstPart ? note.lyric : null,
-                    };
+                            // Tuplets - all parts need tuplet info for rendering
+                            tuplet: note.tuplet,
+                            tupletType: note.tupletType,
+                            tupletGroupId: note.tupletGroupId,
 
-                    currentMeasure.bassNotes.push(measureNote);
+                            // Technique - only on first part
+                            fingering: isVeryFirstPart ? note.fingering : null,
+                            tablature: isVeryFirstPart ? note.tablature : null,
+                            harmonic: note.harmonic, // Harmonic affects playback of all parts
+                            octaveShift: note.octaveShift, // Octave shift affects all parts
+
+                            // Piano pedals - on first part
+                            pedal: isVeryFirstPart ? note.pedal : null,
+                            softPedal: isVeryFirstPart ? note.softPedal : null,
+                            sostenutoPedal: isVeryFirstPart ? note.sostenutoPedal : null,
+
+                            // Text - only on first part
+                            text: isVeryFirstPart ? note.text : null,
+                            tempo: isVeryFirstPart ? note.tempo : null,
+                            rehearsalMark: isVeryFirstPart ? note.rehearsalMark : null,
+
+                            // Breath - only after last part
+                            breath: isVeryLastPart ? note.breath : null,
+
+                            // Voice & Stem
+                            voice: note.voice,
+                            stemDirection: note.stemDirection,
+                            beam: this._computeBeamForPart(note.beam, isVeryFirstPart, isVeryLastPart),
+
+                            // Lyric - only on first part
+                            lyric: isVeryFirstPart ? note.lyric : null,
+                        };
+
+                        currentMeasure.bassNotes.push(measureNote);
+
+                        // Advance local beat position within this measure
+                        localBeat += durPart.units / UNITS_PER_BEAT;
+                    }
 
                     measureUnitOffset += unitsToPlace;
                     remainingUnits -= unitsToPlace;

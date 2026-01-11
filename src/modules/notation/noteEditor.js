@@ -18,6 +18,7 @@ import {
   getBaseDuration,
   beatsToDuration,
   beatsToDurationString,
+  beatsToTiedNotes,
   durationToBeats,
   getNoteDurationInBeats,
   createNote,
@@ -3821,12 +3822,18 @@ export class NoteEditor {
     let newBeats = this.durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
 
-    // If reducing duration, just apply directly
-    if (newBeats <= currentBeats) {
+    // Check if there are downstream notes that would be affected
+    const hasDownstreamNotes = voice.notes.some(n => (n.beat || 0) > noteBeat);
+
+    // If duration is unchanged or there are no downstream notes, just apply directly
+    if (Math.abs(newBeats - currentBeats) < 0.001 || !hasDownstreamNotes) {
+      console.log('[DURATION-SHIFT] No downstream notes or same duration, applying directly');
       this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-treble-${noteIndex}`]);
       return;
     }
 
+    // ALWAYS use extract→rebuild when duration changes with downstream notes
+    // This ensures downstream notes are properly repositioned and split if needed
     console.log('[DURATION-SHIFT] Using extract→rebuild algorithm');
     console.log('[DURATION-SHIFT] Changing note at measure', measureIndex, 'beat', noteBeat, 'from', currentBeats, 'to', newBeats, 'beats');
 
@@ -3884,12 +3891,17 @@ export class NoteEditor {
     let newBeats = this.durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
 
-    // If reducing duration, just apply directly
-    if (newBeats <= currentBeats) {
+    // Check if there are downstream notes that would be affected
+    const hasDownstreamNotes = voice.notes.some(n => (n.beat || 0) > noteBeat);
+
+    // If duration is unchanged or there are no downstream notes, just apply directly
+    if (Math.abs(newBeats - currentBeats) < 0.001 || !hasDownstreamNotes) {
+      console.log('[DURATION-SHIFT-BASS] No downstream notes or same duration, applying directly');
       this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-bass-${voiceIndex}-${noteIndex}`]);
       return;
     }
 
+    // ALWAYS use extract→rebuild when duration changes with downstream notes
     console.log('[DURATION-SHIFT-BASS] Using extract→rebuild algorithm');
     console.log('[DURATION-SHIFT-BASS] Changing note at measure', measureIndex, 'beat', noteBeat, 'from', currentBeats, 'to', newBeats, 'beats');
 
@@ -5948,7 +5960,7 @@ export class NoteEditor {
 
   /**
    * Change accidental on all selected notes by modifying the pitch string
-   * @param {string} accidental - Accidental ('#', 'b', 'n', or null) - 'n' means natural (no accidental)
+   * @param {string} accidental - Accidental ('#', 'b', 'n', or null) - 'n' means natural (no accidental), null means use key signature
    */
   changeAccidentalOnSelected(accidental) {
     if (this.selectedNotes.size === 0) return;
@@ -5958,20 +5970,21 @@ export class NoteEditor {
       window.saveStateBeforeChange();
     }
 
-    // Convert 'n' (natural) to empty string for pitch modification
-    const accidentalChar = accidental === 'n' ? '' : (accidental || '');
+    // Get current key for restoring key signature accidentals
+    const currentKey = window.getCurrentKey?.() || 'C';
 
     let changedCount = 0;
 
     for (const noteId of this.selectedNotes) {
-      const [measureIndex, staff, noteIndex, pitchIndex] = this.parseNoteId(noteId);
+      const [measureIndex, staff, voiceIndex, noteIndex, pitchIndex] = this.parseNoteId(noteId);
 
       // Update compositionState directly
       if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
         if (compositionState && compositionState.measures[measureIndex]) {
           const measure = compositionState.measures[measureIndex];
-          const voice = this.getVoice(measure, staff);
+          const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+          const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
           if (voice && voice.notes[noteIndex]) {
             const note = voice.notes[noteIndex];
             // Only apply to notes, not rests
@@ -5989,8 +6002,21 @@ export class NoteEditor {
                   if (match) {
                     const noteLetter = match[1];
                     const octave = match[3];
-                    // Create new pitch with the specified accidental
-                    note.pitches[idx] = noteLetter + accidentalChar + octave;
+
+                    let newPitch;
+                    if (accidental === null) {
+                      // null = use key signature (restore key sig accidental)
+                      const basePitch = noteLetter + octave;
+                      newPitch = applyKeySignatureToPitch(basePitch, currentKey);
+                    } else if (accidental === 'n') {
+                      // 'n' = explicit natural (no accidental, override key sig)
+                      newPitch = noteLetter + octave;
+                    } else {
+                      // '#' or 'b' = explicit accidental
+                      newPitch = noteLetter + accidental + octave;
+                    }
+
+                    note.pitches[idx] = newPitch;
                     changedCount++;
                   }
                 }
@@ -6023,6 +6049,8 @@ export class NoteEditor {
 
       // Force a complete re-render from scratch
       this.composerIntegration.render(true);
+      // Update toolbar to reflect the new accidental state
+      this.composerIntegration.updateToolbarSelectionState();
       // Also refresh the overlay after a brief delay to ensure noteRegions are updated
       setTimeout(() => {
         this.renderOverlay();
@@ -8502,65 +8530,87 @@ export class NoteEditor {
         // Calculate how much fits in this measure
         const beatsAvailable = beatsPerMeasure - currentBeat;
         const beatsToPlace = Math.min(remainingBeats, beatsAvailable);
-        const isLastPart = remainingBeats <= beatsAvailable;
+        const isLastPartOfLogical = remainingBeats <= beatsAvailable;
 
-        // Create the measure note using centralized duration utilities
-        // beatsToDuration returns CANONICAL format: { duration: '2n', dotted: true }
-        const { duration: noteDuration, dotted: noteDotted } = beatsToDuration(beatsToPlace);
+        // CRITICAL: Decompose beatsToPlace into valid note durations
+        // This handles fractional beats like 2.5 = half note + eighth note tied
+        const noteParts = beatsToTiedNotes(beatsToPlace);
 
-        // Calculate tied flag properly:
-        // - If NOT the last part: always true (ties to next part of same split note)
-        // - If IS the last part: use logicalNote.tiedForward (preserves user's tie to another note)
-        const tiedValue = !isLastPart ? true : (logicalNote.tiedForward || false);
+        console.log('[rebuildNotesAfterShift] Decomposed', beatsToPlace, 'beats into', noteParts.length, 'parts:', noteParts);
 
-        const measureNote = {
-          type: logicalNote.attributes.isRest ? 'rest' : 'note',
-          pitches: logicalNote.pitches,
-          duration: noteDuration,  // WITHOUT dot suffix (canonical format)
-          dotted: noteDotted,      // Separate boolean (canonical format)
-          beat: currentBeat,
-          // Tie flags
-          isTied: !isFirstPart,   // Tied FROM previous if not first part
-          tied: tiedValue,        // Ties TO next if not last part, OR preserves user's forward tie
-          // Other properties
-          isRest: logicalNote.attributes.isRest || false,
-        };
+        // Create measure notes for each part of the decomposition
+        for (let partIdx = 0; partIdx < noteParts.length; partIdx++) {
+          const part = noteParts[partIdx];
+          const isFirstPartOfDecomposition = partIdx === 0;
+          const isLastPartOfDecomposition = partIdx === noteParts.length - 1;
 
-        // Add attributes only on first part
-        if (isFirstPart) {
-          if (logicalNote.attributes.articulation) {
-            measureNote.articulation = logicalNote.attributes.articulation;
+          // Calculate tied flags:
+          // - isTied (tied FROM previous): true if not first part of logical OR not first part of decomposition
+          // - tied (ties TO next): true if not last part of decomposition, OR not last part of logical, OR has forward tie
+          const shouldTieFromPrevious = !isFirstPart || !isFirstPartOfDecomposition;
+          const shouldTieToNext = !isLastPartOfDecomposition ||
+                                   !isLastPartOfLogical ||
+                                   (isLastPartOfLogical && logicalNote.tiedForward);
+
+          const measureNote = {
+            type: logicalNote.attributes.isRest ? 'rest' : 'note',
+            pitches: logicalNote.pitches,
+            duration: part.duration,  // WITHOUT dot suffix (canonical format)
+            dotted: part.dotted,      // Separate boolean (canonical format)
+            beat: currentBeat,
+            // Tie flags
+            isTied: shouldTieFromPrevious,
+            tied: shouldTieToNext,
+            // Other properties
+            isRest: logicalNote.attributes.isRest || false,
+          };
+
+          // Add attributes only on very first part of the logical note
+          if (isFirstPart && isFirstPartOfDecomposition) {
+            if (logicalNote.attributes.articulation) {
+              measureNote.articulation = logicalNote.attributes.articulation;
+            }
+            if (logicalNote.attributes.accidental) {
+              measureNote.accidental = logicalNote.attributes.accidental;
+            }
+            if (logicalNote.attributes.dynamic) {
+              measureNote.dynamic = logicalNote.attributes.dynamic;
+            }
+            if (logicalNote.attributes.velocity !== undefined) {
+              measureNote.velocity = logicalNote.attributes.velocity;
+            }
           }
-          if (logicalNote.attributes.accidental) {
-            measureNote.accidental = logicalNote.attributes.accidental;
-          }
-          if (logicalNote.attributes.dynamic) {
-            measureNote.dynamic = logicalNote.attributes.dynamic;
-          }
-          if (logicalNote.attributes.velocity !== undefined) {
-            measureNote.velocity = logicalNote.attributes.velocity;
+
+          console.log('[rebuildNotesAfterShift] Created note:', {
+            measure: currentMeasure,
+            beat: currentBeat,
+            duration: measureNote.duration,
+            dotted: measureNote.dotted,
+            tied: measureNote.tied,
+            isTied: measureNote.isTied,
+            partIdx,
+            isFirstPartOfDecomposition,
+            isLastPartOfDecomposition
+          });
+
+          // Add to voice and sort
+          voice.notes.push(measureNote);
+          voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+          // Advance beat position within measure
+          currentBeat += part.beats;
+
+          // After first part of decomposition, subsequent parts are tied from previous
+          if (isFirstPartOfDecomposition) {
+            isFirstPart = false;
           }
         }
 
-        console.log('[rebuildNotesAfterShift] Created note:', {
-          measure: currentMeasure,
-          beat: currentBeat,
-          duration: measureNote.duration,
-          tied: measureNote.tied,
-          isTied: measureNote.isTied
-        });
-
-        // Add to voice and sort
-        voice.notes.push(measureNote);
-        voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
-
-        // Advance position
-        currentBeat += beatsToPlace;
+        // Update remaining beats
         remainingBeats -= beatsToPlace;
-        isFirstPart = false;
 
         // Move to next measure if current is full
-        if (currentBeat >= beatsPerMeasure) {
+        if (currentBeat >= beatsPerMeasure - 0.001) {
           currentMeasure++;
           currentBeat = 0;
         }
