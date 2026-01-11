@@ -74,6 +74,7 @@ import {
     createDetailedCardHTML,
     attachCardEventListeners,
     createSimplifiedCardStructure,
+    createChordCardWrapper,
     highlightTensionPoint,
     highlightTensionPointForSelection,
     unhighlightAllTensionPoints,
@@ -420,6 +421,7 @@ if (typeof window !== 'undefined') {
     window.createDetailedCardHTML = createDetailedCardHTML;
     window.attachCardEventListeners = attachCardEventListeners;
     window.createSimplifiedCardStructure = createSimplifiedCardStructure;
+    window.createChordCardWrapper = createChordCardWrapper;
     window.refreshChordNotationCanvas = refreshChordNotationCanvas;
     window.renderChordNotation = renderChordNotation;
     window.calculateCanvasDimensions = calculateCanvasDimensions;

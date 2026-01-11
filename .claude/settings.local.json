@@ -72,7 +72,8 @@
       "Bash(find:*)",
       "Bash(npm run:*)",
       "Bash(timeout 10 npm run build:*)",
-      "Bash(timeout 60 npm run build:*)"
+      "Bash(timeout 60 npm run build:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

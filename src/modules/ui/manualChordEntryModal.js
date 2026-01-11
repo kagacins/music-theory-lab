@@ -49,7 +49,7 @@ export function closeManualChordEntryModal() {
  */
 function createModal() {
     const modalHTML = `
-        <div id="manual-chord-entry-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) window.closeManualChordEntryModal()">
+        <div id="manual-chord-entry-modal" class="hidden fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-4" onclick="if(event.target === this) window.closeManualChordEntryModal()">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden" onclick="event.stopPropagation()">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4 flex items-center justify-between">

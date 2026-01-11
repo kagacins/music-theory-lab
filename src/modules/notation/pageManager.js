@@ -9,7 +9,7 @@ export class PageManager {
   constructor(container, options = {}) {
     this.container = container;
     this.pages = []; // Array of page objects
-    this.currentViewMode = options.viewMode || PAGE_CONFIG.viewModes.SINGLE;
+    this.currentViewMode = options.viewMode || PAGE_CONFIG.defaultViewMode || PAGE_CONFIG.viewModes.CONTINUOUS;
     this.currentPage = 0; // For single page view
     this.pageLayoutManager = null; // Reference to PageLayoutManager
     this.onPageChange = options.onPageChange || null; // Callback when page changes

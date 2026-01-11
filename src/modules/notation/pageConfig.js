@@ -5,9 +5,9 @@
 
 // Mutable configuration object that can be updated at runtime
 const _pageConfig = {
-  // Standard page dimensions (8.5" x 11" at 96 DPI)
+  // Standard page dimensions (8.5" x 11" at 96 DPI, extended height for 4 systems)
   width: 816,
-  height: 1056,
+  height: 1400,  // Taller to fit 4 grand staff systems comfortably
 
   // Page margins
   margin: {
@@ -17,9 +17,9 @@ const _pageConfig = {
     right: 50,
   },
 
-  // Layout settings
-  measuresPerPage: 8,    // Default: 2 systems of 4 measures each
-  systemsPerPage: 2,     // Number of grand staff systems per page
+  // Layout settings - Standard sheet music: 4 measures/row, 4 rows/page = 16 measures
+  measuresPerPage: 16,   // Default: 4 systems of 4 measures each
+  systemsPerPage: 4,     // Number of grand staff systems per page (standard sheet music)
   measuresPerSystem: 4,  // Measures per system (can be changed via toolbar)
 
   // Pagination presets
@@ -27,6 +27,11 @@ const _pageConfig = {
     '8_MEASURES': {
       measuresPerPage: 8,
       systemsPerPage: 2,
+      measuresPerSystem: 4,
+    },
+    '12_MEASURES': {
+      measuresPerPage: 12,
+      systemsPerPage: 3,
       measuresPerSystem: 4,
     },
     '16_MEASURES': {

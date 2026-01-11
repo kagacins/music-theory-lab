@@ -83,7 +83,7 @@ export function hideTemplateBrowser() {
 function createTemplateModal() {
     const modal = document.createElement('div');
     modal.id = 'template-browser-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4';
 
     modal.innerHTML = `
         <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">

@@ -1538,6 +1538,135 @@ export class VoiceLeadingDiagram {
     }
 
     /**
+     * Render just the SVG diagram to an arbitrary container element.
+     * This allows reusing the voice leading visualization in other parts of the UI
+     * (e.g., full-screen mode) without the full panel chrome.
+     *
+     * @param {HTMLElement} container - The container to render into
+     * @param {Object} options - Optional settings
+     * @param {string} options.matchingMode - 'smooth' or 'voices' (defaults to instance setting)
+     * @param {boolean} options.showNewDropped - Show new/dropped voices (defaults to instance setting)
+     */
+    renderToContainer(container, options = {}) {
+        if (!container) return;
+
+        // Apply options temporarily
+        const originalMode = this.matchingMode;
+        const originalShowNewDropped = this.showNewDropped;
+        const originalShowWarningsOnly = this.showWarningsOnly;
+
+        if (options.matchingMode) {
+            this.matchingMode = options.matchingMode;
+        }
+        if (options.showNewDropped !== undefined) {
+            this.showNewDropped = options.showNewDropped;
+        }
+        if (options.showWarningsOnly !== undefined) {
+            this.showWarningsOnly = options.showWarningsOnly;
+        }
+
+        // Ensure we have analysis data
+        this.analyze();
+
+        // If no analysis data, show empty state
+        if (!this.analysisData) {
+            container.innerHTML = `
+                <div class="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+                    Add at least 2 chords to see voice leading analysis
+                </div>
+            `;
+            // Restore settings
+            this.matchingMode = originalMode;
+            this.showNewDropped = originalShowNewDropped;
+            this.showWarningsOnly = originalShowWarningsOnly;
+            return;
+        }
+
+        const { chords, transitions } = this.analysisData;
+
+        // Calculate diagram dimensions
+        const numChords = chords.length;
+        const containerWidth = container.clientWidth || 600;
+        const width = Math.max(400, Math.min(containerWidth - 20, numChords * DIAGRAM.chordSpacing + 40));
+
+        // Find global MIDI range for pitch-based Y positioning
+        const allMidi = chords.flatMap(c => c.midi);
+        const midiMin = Math.min(...allMidi);
+        const midiMax = Math.max(...allMidi);
+        const midiRange = Math.max(12, midiMax - midiMin);
+
+        // Store for use in getNoteYByPitch
+        this._midiMin = midiMin;
+        this._midiMax = midiMax;
+        this._midiRange = midiRange;
+
+        const height = Math.max(DIAGRAM.minHeight, DIAGRAM.topPadding + 150 + DIAGRAM.bottomPadding);
+
+        // Create SVG
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', width);
+        svg.setAttribute('height', height);
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.style.display = 'block';
+        svg.style.margin = '0 auto';
+
+        // Draw voice leading lines first (behind notes)
+        transitions.forEach(transition => {
+            const fromX = this.getChordX(transition.fromIndex, numChords, width);
+            const toX = this.getChordX(transition.toIndex, numChords, width);
+
+            transition.motions.forEach((motion, voiceIdx) => {
+                // Skip new/dropped if filter is off
+                if (!this.showNewDropped && (motion.type === 'new' || motion.type === 'dropped')) {
+                    return;
+                }
+
+                // Skip non-warning arcs in warnings-only mode
+                // EXCEPT for identical chord transitions - always show common tone lines for those
+                if (this.showWarningsOnly && (!motion.warnings || motion.warnings.length === 0)) {
+                    if (!transition.isIdentical) {
+                        return;
+                    }
+                }
+
+                // Use pitch-based Y positioning
+                const fromY = motion.fromMidi !== null
+                    ? this.getNoteYByPitch(motion.fromMidi, height)
+                    : this.getNoteYByPitch(motion.toMidi, height);
+                const toY = motion.toMidi !== null
+                    ? this.getNoteYByPitch(motion.toMidi, height)
+                    : this.getNoteYByPitch(motion.fromMidi, height);
+
+                const path = this.createVoiceLine(
+                    fromX + DIAGRAM.noteRadius,
+                    fromY,
+                    toX - DIAGRAM.noteRadius,
+                    toY,
+                    motion,
+                    voiceIdx
+                );
+                svg.appendChild(path);
+            });
+        });
+
+        // Draw chords
+        chords.forEach((chord, i) => {
+            const x = this.getChordX(i, numChords, width);
+            const chordGroup = this.createChordVisual(chord, x, height);
+            svg.appendChild(chordGroup);
+        });
+
+        // Clear and append
+        container.innerHTML = '';
+        container.appendChild(svg);
+
+        // Restore settings
+        this.matchingMode = originalMode;
+        this.showNewDropped = originalShowNewDropped;
+        this.showWarningsOnly = originalShowWarningsOnly;
+    }
+
+    /**
      * Get X position for a chord
      */
     getChordX(index, totalChords, width) {

@@ -147,7 +147,7 @@ export class NotationComposer {
       showChordSymbols: options.showChordSymbols !== false,
       enableHarmonicColoring: options.enableHarmonicColoring !== false,
       enableMelodySuggestions: options.enableMelodySuggestions !== false,
-      viewMode: options.viewMode || PAGE_CONFIG.viewModes.SINGLE, // NEW: Default to single page
+      viewMode: options.viewMode || PAGE_CONFIG.defaultViewMode, // Use PAGE_CONFIG default (continuous)
       enablePagination: options.enablePagination !== false, // NEW: Enable pagination by default
     };
 
@@ -263,7 +263,7 @@ export class NotationComposer {
           // Re-layout pages if pagination is enabled
           if (this.pageLayoutManager) {
             const measures = this.measureManager.measures || [];
-            this.pageLayoutManager.layoutPages(measures.length);
+            this.pageLayoutManager.calculatePageLayout(measures.length);
           }
           this.render();
         },
@@ -1730,6 +1730,9 @@ export class NotationComposer {
       }
     }
 
+    // Update PageManager layout to apply view mode (continuous/single/two-page)
+    this.pageManager.updateLayout();
+
     // Return combined rendered system
     return {
       measures: allRenderedMeasures,
@@ -1750,19 +1753,8 @@ export class NotationComposer {
     // Calculate page layout
     this.pageLayoutManager.calculatePageLayout(measures.length);
 
-    // Get current page index
-    let currentPageIndex = this.pageManager.getCurrentPage();
-
     // Ensure we have enough page canvases
     const totalPages = this.pageLayoutManager.getTotalPages();
-
-    // CRITICAL: If current page is beyond the total pages (e.g., measures were removed),
-    // navigate back to the last valid page
-    if (currentPageIndex >= totalPages) {
-      const newPageIndex = Math.max(0, totalPages - 1);
-      this.pageManager.goToPage(newPageIndex);
-      currentPageIndex = newPageIndex;
-    }
 
     while (this.pageManager.pages.length < totalPages) {
       this.pageManager.addPage();
@@ -1776,8 +1768,25 @@ export class NotationComposer {
       }
     }
 
-    // Update PageManager layout to show only current page
+    // Update PageManager layout (will show all pages if in continuous mode)
     this.pageManager.updateLayout();
+
+    // CONTINUOUS MODE: Render ALL pages when in continuous view mode (for fullscreen scroll)
+    if (this.pageManager.currentViewMode === 'continuous' && totalPages > 1) {
+      return this._renderAllPagesForContinuousMode(measures, key, timeSig, overrideOptions, totalPages);
+    }
+
+    // SINGLE/TWO-PAGE MODE: Render only the current page
+    // Get current page index
+    let currentPageIndex = this.pageManager.getCurrentPage();
+
+    // CRITICAL: If current page is beyond the total pages (e.g., measures were removed),
+    // navigate back to the last valid page
+    if (currentPageIndex >= totalPages) {
+      const newPageIndex = Math.max(0, totalPages - 1);
+      this.pageManager.goToPage(newPageIndex);
+      currentPageIndex = newPageIndex;
+    }
 
     // Get current page data
     const currentPage = this.pageLayoutManager.getCurrentPage();
@@ -1978,6 +1987,131 @@ export class NotationComposer {
     }
 
     // Return combined rendered system
+    return {
+      measures: allRenderedMeasures,
+      noteRegions: allNoteRegions,
+      chordBracketRegions: allChordBracketRegions,
+    };
+  }
+
+  /**
+   * Render ALL pages for continuous scroll mode (used in fullscreen)
+   * This loops through all pages and renders them, unlike renderWithPagination
+   * which only renders the current page for single-page view navigation.
+   */
+  _renderAllPagesForContinuousMode(measures, key, timeSig, overrideOptions, totalPages) {
+    const allRenderedMeasures = [];
+    const allNoteRegions = [];
+    const allChordBracketRegions = [];
+
+    // Get settings
+    const compositionState = getCompositionState();
+    const settings = compositionState ? compositionState.getSettings() : {};
+    const hasOverrides = overrideOptions.selectedMeasureIndexOverride !== undefined;
+
+    // Clear all pages first
+    this.pageManager.clearAllPages();
+
+    // Render each page
+    for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+      // Get page layout info from the pages array
+      const pageLayout = this.pageLayoutManager.pages[pageIndex];
+      if (!pageLayout) continue;
+
+      const startMeasure = pageLayout.startMeasure;
+      const endMeasure = pageLayout.endMeasure;
+      const pageMeasures = measures.slice(startMeasure, endMeasure + 1);
+
+      // Get page canvas
+      const page = this.pageManager.getPage(pageIndex);
+      if (!page) continue;
+
+      // Convert global indices to page-local indices for highlighting
+      let localSelectedIndex = -1;
+      let localActiveIndex = -1;
+
+      if (hasOverrides) {
+        const overrideSelected = overrideOptions.selectedMeasureIndexOverride;
+        const overrideActive = overrideOptions.activeMeasureIndexOverride;
+        if (overrideSelected >= startMeasure && overrideSelected <= endMeasure) {
+          localSelectedIndex = overrideSelected - startMeasure;
+        }
+        if (overrideActive >= startMeasure && overrideActive <= endMeasure) {
+          localActiveIndex = overrideActive - startMeasure;
+        }
+      } else {
+        if (this.selectedMeasureIndex >= startMeasure && this.selectedMeasureIndex <= endMeasure) {
+          localSelectedIndex = this.selectedMeasureIndex - startMeasure;
+        }
+        if (this.activeMeasureIndex >= startMeasure && this.activeMeasureIndex <= endMeasure) {
+          localActiveIndex = this.activeMeasureIndex - startMeasure;
+        }
+      }
+
+      // Convert active notes to page-local indices
+      const pageLocalActiveNotes = new Set();
+      const sourceNotes = hasOverrides ? (overrideOptions.activeNotesOverride || new Set()) : this.activeNotes;
+      for (const noteId of sourceNotes) {
+        const parts = noteId.split('-');
+        if (parts.length >= 3) {
+          const globalMeasureIndex = parseInt(parts[0], 10);
+          if (!isNaN(globalMeasureIndex) && globalMeasureIndex >= startMeasure && globalMeasureIndex <= endMeasure) {
+            const localMeasureIndex = globalMeasureIndex - startMeasure;
+            const pageLocalNoteId = `${localMeasureIndex}-${parts.slice(1).join('-')}`;
+            pageLocalActiveNotes.add(pageLocalNoteId);
+          }
+        }
+      }
+
+      // Render the page using the same function as renderWithPagination
+      const renderResult = renderGrandStaffSystem(page.canvas, pageMeasures, {
+        key,
+        timeSig,
+        selectedMeasureIndex: localSelectedIndex,
+        activeMeasureIndex: localActiveIndex,
+        activeNotes: pageLocalActiveNotes,
+        showChordSpans: settings.showChordSpans,
+        chordSegments: compositionState?.getChordSegments() || [],
+        chordSpanStartOffset: startMeasure,
+        pageIndex: pageIndex,
+        startMeasureOffset: startMeasure,
+        measuresPerSystem: this.config.measuresPerSystem || 4,
+      });
+
+      // Accumulate results with global measure indices
+      if (renderResult) {
+        // Adjust measure indices to be global
+        const adjustedMeasures = (renderResult.measures || []).map((m, i) => ({
+          ...m,
+          globalIndex: startMeasure + i,
+        }));
+        allRenderedMeasures.push(...adjustedMeasures);
+
+        // Adjust note regions to have global measure indices
+        const adjustedRegions = (renderResult.noteRegions || []).map(region => ({
+          ...region,
+          measureIndex: region.measureIndex + startMeasure,
+          pageIndex: pageIndex,
+        }));
+        allNoteRegions.push(...adjustedRegions);
+
+        // Accumulate chord bracket regions with page index
+        if (renderResult.chordBracketRegions) {
+          const adjustedBrackets = renderResult.chordBracketRegions.map(region => ({
+            ...region,
+            pageIndex: pageIndex,
+          }));
+          allChordBracketRegions.push(...adjustedBrackets);
+        }
+      }
+    }
+
+    // Re-attach event listeners
+    if (this.noteEditor) {
+      this.noteEditor.attachPageEventListeners();
+    }
+    this.attachPageCanvasEvents();
+
     return {
       measures: allRenderedMeasures,
       noteRegions: allNoteRegions,
@@ -3217,7 +3351,7 @@ export class NotationComposer {
       // Re-layout pages if pagination is enabled
       if (this.pageLayoutManager) {
         const measures = this.measureManager.measures || [];
-        this.pageLayoutManager.layoutPages(measures.length);
+        this.pageLayoutManager.calculatePageLayout(measures.length);
       }
     }
 

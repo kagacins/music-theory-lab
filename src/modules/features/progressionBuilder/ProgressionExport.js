@@ -925,7 +925,7 @@ export function showRhythmPatternModal() {
 
     const modal = document.createElement('div');
     modal.id = 'rhythm-pattern-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4';
 
     // Get current time signature from compositionState (reuse variable from above)
     const timeSignature = compositionState?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
@@ -1037,7 +1037,7 @@ export function showRhythmPatternModal() {
         </div>
 
         <!-- Custom Pattern Manager Modal (hidden by default) -->
-        <div id="rhythm-custom-manager" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60]">
+        <div id="rhythm-custom-manager" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[10001]">
             <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col">
                 <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
                     <h3 class="text-base font-bold text-white">Custom Patterns</h3>

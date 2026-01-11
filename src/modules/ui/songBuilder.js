@@ -2364,7 +2364,7 @@ function getRelativeMajor(minorRoot) {
  */
 function showAddSectionModal(container, onStructureChange) {
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+    modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]';
     modal.innerHTML = `
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 m-4">
             <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Add Section</h3>

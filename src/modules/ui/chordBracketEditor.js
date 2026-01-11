@@ -701,6 +701,11 @@ function refreshAllUI(chordIndex) {
     if (window.updateKeyboardLabels) {
         window.updateKeyboardLabels();
     }
+
+    // Refresh fullscreen chord panel if open (chord data actually changed)
+    if (window.refreshFullscreenChordPanel) {
+        window.refreshFullscreenChordPanel();
+    }
 }
 
 // Export to window for use from composerIntegration

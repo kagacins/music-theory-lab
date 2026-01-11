@@ -1550,6 +1550,7 @@ function highlightPatternChordsByPositions(positions) {
 /**
  * Update a single card without re-rendering everything
  * Updates cards in all containers with matching data-chord-index
+ * Skips fullscreen cards (marked with data-fs-card) - they handle their own refresh
  * @param {number} index - Chord index
  */
 export function updateSingleCard(index) {
@@ -1560,12 +1561,16 @@ export function updateSingleCard(index) {
     if (!chord) return;
 
     // Update cards in all containers (Progression Builder, Melody Composer, Builder)
-    const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    // Skip fullscreen cards - they use their own refresh mechanism
+    const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]:not([data-fs-card])`);
     if (wrappers.length === 0) return;
 
     wrappers.forEach(wrapper => {
         updateSingleCardWrapper(wrapper, chord, index, key);
     });
+
+    // Note: Fullscreen panel refresh is NOT called here automatically
+    // It's called explicitly by chordBracketEditor when chord data actually changes
 }
 
 /**
@@ -5396,7 +5401,7 @@ function renderFlatCardsScroll(gridContainer, progressionData, key, options = {}
  * Create chord card wrapper (main entry point for card creation)
  * Creates either simplified or detailed card based on expandedChords state
  */
-function createChordCardWrapper(chord, index, key) {
+export function createChordCardWrapper(chord, index, key) {
     const wrapper = document.createElement('div');
     // Use class for grid layout - Add no-animation class to prevent all transitions/animations
     const isExpanded = isChordExpanded(index);

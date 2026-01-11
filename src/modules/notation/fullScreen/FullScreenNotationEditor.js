@@ -21,6 +21,7 @@
 
 import { getCompositionState } from '../../state/compositionState.js';
 import { getGlobalState } from '../../state/globalState.js';
+import { FullScreenBottomPanel } from './FullScreenBottomPanel.js';
 
 // Force clear any existing singleton on module reload (for HMR)
 if (typeof window !== 'undefined') {
@@ -77,9 +78,15 @@ export class FullScreenNotationEditor {
         this._boundKeyHandler = this._handleKeyDown.bind(this);
         this._boundWheelHandler = this._handleWheel.bind(this);
         this._boundProgressionUpdateHandler = this._onProgressionUpdate.bind(this);
+        this._boundResizeHandler = () => {
+            if (this.modal) this.modal.style.height = `${this._getVisibleViewportHeight()}px`;
+        };
 
         // Original PageManager method reference (for patching)
         this._originalGetPageFromEvent = null;
+
+        // Tabbed bottom panel module
+        this.bottomPanel = null;
 
         // Create modal on instantiation
         this._createModal();
@@ -102,8 +109,15 @@ export class FullScreenNotationEditor {
         // Update header info
         this._updateHeaderInfo(settings);
 
+        // IMPORTANT: Patch PageManager FIRST to set continuous mode
+        // This must happen BEFORE capturing elements so pages are visible
+        this._patchPageManagerForZoom();
+
         // Move notation canvases into full-screen container
         this._captureNotationElements();
+
+        // Force all pages visible after capture (belt and suspenders)
+        this._forceAllPagesVisible();
 
         // Apply current zoom
         this._applyZoom();
@@ -111,20 +125,18 @@ export class FullScreenNotationEditor {
         // Apply sidebar state
         this._applySidebarState();
 
-        // Apply bottom panel state
-        this._applyBottomPanelState();
-
-        // Render chord progression in bottom panel
-        this._renderChordProgression();
-
-        // Patch PageManager for zoom-aware coordinates
-        this._patchPageManagerForZoom();
+        // Initialize tabbed bottom panel
+        this.bottomPanel = new FullScreenBottomPanel(this.modal, this);
+        this.bottomPanel.init();
 
         // Set up selection change listener for sidebar sync
         this._setupSelectionListener();
 
         // Initialize sidebar from current toolbar state
         this._initializeSidebarFromToolbar();
+
+        // Update modal height to current viewport (in case window resized while closed)
+        this.modal.style.height = `${this._getVisibleViewportHeight()}px`;
 
         // Show modal
         this.modal.classList.remove('hidden');
@@ -133,13 +145,14 @@ export class FullScreenNotationEditor {
         // Add event listeners
         document.addEventListener('keydown', this._boundKeyHandler);
         this.modal.addEventListener('wheel', this._boundWheelHandler, { passive: false });
+        window.addEventListener('resize', this._boundResizeHandler);
 
         // Listen for progression updates to re-render chord cards
         window.addEventListener('progressionUpdated', this._boundProgressionUpdateHandler);
         window.addEventListener('chordsChanged', this._boundProgressionUpdateHandler);
 
-        // Focus the modal for keyboard events
-        this.modal.focus();
+        // Focus the modal for keyboard events (preventScroll to avoid page jump)
+        this.modal.focus({ preventScroll: true });
     }
 
     /**
@@ -151,6 +164,7 @@ export class FullScreenNotationEditor {
         // Remove event listeners
         document.removeEventListener('keydown', this._boundKeyHandler);
         this.modal.removeEventListener('wheel', this._boundWheelHandler);
+        window.removeEventListener('resize', this._boundResizeHandler);
 
         // Remove progression update listeners
         window.removeEventListener('progressionUpdated', this._boundProgressionUpdateHandler);
@@ -158,6 +172,9 @@ export class FullScreenNotationEditor {
 
         // Remove selection change listener
         this._removeSelectionListener();
+
+        // Close any open bottom panel to prevent them staying open on next open
+        this.bottomPanel?.closeActivePanel();
 
         // Restore PageManager to original state
         this._restorePageManager();
@@ -197,7 +214,7 @@ export class FullScreenNotationEditor {
 
         this.modal = document.createElement('div');
         this.modal.id = 'fullscreen-notation-modal';
-        this.modal.className = 'fixed inset-0 bg-black/60 hidden z-[99999] flex flex-col';
+        this.modal.className = 'fixed inset-0 bg-black/60 hidden z-[9990] flex flex-col';
         this.modal.tabIndex = -1; // Make focusable for keyboard events
 
         this.modal.innerHTML = `
@@ -768,7 +785,7 @@ export class FullScreenNotationEditor {
                     </div>
 
                     <!-- Playback FAB (Fixed position in bottom-right of canvas container) -->
-                    <div id="fullscreen-playback-fab" class="fixed bottom-6 right-6 z-50">
+                    <div id="fullscreen-playback-fab" class="absolute right-6 z-50" style="bottom: 27px;">
                         <div class="flex flex-col items-center gap-3">
                             <!-- Stop Button (above play) -->
                             <button id="fs-fab-stop-btn"
@@ -824,50 +841,10 @@ export class FullScreenNotationEditor {
                     </div>
                 </div><!-- Close canvas container -->
 
-                <!-- Bottom Chord Progression Panel -->
+                <!-- Tabbed Bottom Panel - Content rendered by FullScreenBottomPanel.js -->
                 <div id="fullscreen-bottom-panel"
-                     class="flex-shrink-0 border-t border-gray-300 bg-gray-50 transition-all duration-300 ease-in-out">
-
-                    <!-- Panel Header/Handle -->
-                    <div id="bottom-panel-header"
-                         class="h-8 bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-between px-3 cursor-pointer select-none">
-                        <div class="flex items-center gap-3">
-                            <span class="text-white text-sm font-semibold" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Chord Progression</span>
-                            <!-- View Mode Toggle (Scroll/Section) -->
-                            <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
-                                <button class="fs-view-mode-btn px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1 ${this.fullscreenViewMode === 'scroll' ? 'bg-white shadow text-indigo-600' : 'text-white/80 hover:text-white hover:bg-white/10'}" data-mode="scroll" title="Scroll View" style="${this.fullscreenViewMode === 'scroll' ? '-webkit-text-fill-color: #4f46e5;' : '-webkit-text-fill-color: inherit;'}">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                                    </svg>
-                                    Scroll
-                                </button>
-                                <button class="fs-view-mode-btn px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1 ${this.fullscreenViewMode === 'section' ? 'bg-white shadow text-indigo-600' : 'text-white/80 hover:text-white hover:bg-white/10'}" data-mode="section" title="Section View" style="${this.fullscreenViewMode === 'section' ? '-webkit-text-fill-color: #4f46e5;' : '-webkit-text-fill-color: inherit;'}">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                                    </svg>
-                                    Section
-                                </button>
-                            </div>
-                        </div>
-                        <!-- Collapse/Expand Chevron -->
-                        <svg class="bottom-panel-chevron w-5 h-5 text-white transform transition-transform ${this.bottomPanelOpen ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </div>
-
-                    <!-- Panel Content -->
-                    <div id="bottom-panel-content" class="${this.bottomPanelOpen ? 'h-[140px]' : 'h-0'} overflow-hidden transition-all duration-300 ease-in-out">
-                        <!-- Section Picker (shown in section mode) -->
-                        <div id="fs-section-picker" class="hidden px-2 py-1 bg-gray-100 border-b border-gray-200"></div>
-
-                        <!-- Cards Container -->
-                        <div id="fs-chord-cards-container"
-                             class="flex items-center gap-2 px-3 py-2 overflow-x-auto h-full"
-                             style="scroll-behavior: smooth;">
-                            <!-- Chord cards rendered here -->
-                            <div class="text-gray-400 text-sm italic">Loading chord progression...</div>
-                        </div>
-                    </div>
+                     class="flex-shrink-0 border-t border-gray-300 bg-gray-100 transition-all duration-300 ease-in-out">
+                    <!-- Tab bar and content rendered by FullScreenBottomPanel.init() -->
                 </div><!-- Close bottom panel -->
                 </div><!-- Close right area (canvas + bottom panel) -->
             </div><!-- Close main content area -->
@@ -2205,6 +2182,7 @@ export class FullScreenNotationEditor {
     /**
      * Patch PageManager.getPageFromEvent to account for zoom level
      * This ensures clicks/double-clicks work correctly at any zoom level
+     * Also forces CONTINUOUS view mode for fullscreen multi-page display
      */
     _patchPageManagerForZoom() {
         // Get the NotationComposer's PageManager
@@ -2216,6 +2194,14 @@ export class FullScreenNotationEditor {
 
         const pageManager = composer.pageManager;
         const self = this;
+
+        // Store original view mode and force CONTINUOUS for fullscreen
+        // This ensures all pages are visible when scrolling
+        this._originalViewMode = pageManager.currentViewMode;
+        pageManager.currentViewMode = 'continuous';
+
+        // Force all pages visible immediately
+        this._forceAllPagesVisible();
 
         // Store original method
         if (!this._originalGetPageFromEvent) {
@@ -2262,14 +2248,32 @@ export class FullScreenNotationEditor {
      * Restore PageManager to its original state
      */
     _restorePageManager() {
-        if (!this._originalGetPageFromEvent) return;
-
         const composer = window.getNotationComposer?.();
         if (!composer || !composer.pageManager) return;
 
-        // Restore original method
-        composer.pageManager.getPageFromEvent = this._originalGetPageFromEvent;
-        this._originalGetPageFromEvent = null;
+        // Restore original view mode
+        if (this._originalViewMode) {
+            composer.pageManager.currentViewMode = this._originalViewMode;
+            composer.pageManager.updateLayout(); // Apply the restored view mode
+            this._originalViewMode = null;
+        }
+
+        // Restore original getPageFromEvent method
+        if (this._originalGetPageFromEvent) {
+            composer.pageManager.getPageFromEvent = this._originalGetPageFromEvent;
+            this._originalGetPageFromEvent = null;
+        }
+    }
+
+    /**
+     * Force all notation pages to be visible (display: block)
+     * Call this after any re-render to ensure multi-page display works in fullscreen
+     */
+    _forceAllPagesVisible() {
+        const pageCanvases = document.querySelectorAll('.notation-page');
+        pageCanvases.forEach(canvas => {
+            canvas.style.display = 'block';
+        });
     }
 
     // ========================================================================
@@ -2299,9 +2303,13 @@ export class FullScreenNotationEditor {
         // Pages have class "notation-page" and id like "notation-page-0"
         const pageCanvases = this.originalPagesContainer.querySelectorAll('.notation-page');
         pageCanvases.forEach(canvas => {
-            // Store original parent reference
+            // Store original parent reference and display state
             canvas._originalParent = canvas.parentElement;
             canvas._originalNextSibling = canvas.nextSibling;
+            canvas._originalDisplay = canvas.style.display;
+
+            // Force all pages visible in fullscreen (continuous scroll mode)
+            canvas.style.display = 'block';
 
             // Move to fullscreen container
             fullscreenPages.appendChild(canvas);
@@ -3143,7 +3151,7 @@ export class FullScreenNotationEditor {
     _onProgressionUpdate() {
         // Re-render chord progression in bottom panel
         if (this.isOpen) {
-            this._renderChordProgression();
+            this.bottomPanel?.refresh();
         }
     }
 
@@ -3306,6 +3314,13 @@ export class FullScreenNotationEditor {
     // ========================================================================
 
     /**
+     * Get the visible viewport height.
+     */
+    _getVisibleViewportHeight() {
+        return window.visualViewport?.height || document.documentElement.clientHeight || window.innerHeight;
+    }
+
+    /**
      * Load value from localStorage
      */
     _loadFromStorage(key, defaultValue) {
@@ -3385,3 +3400,17 @@ export function closeFullScreenNotation() {
 export function toggleFullScreenNotation() {
     getFullScreenNotationEditor().toggle();
 }
+
+/**
+ * Refresh the fullscreen chord panel if it's open
+ * Called by updateSingleCard after bracket editor changes
+ */
+export function refreshFullscreenChordPanel() {
+    const editor = _instance;
+    if (editor && editor.isOpen && editor.bottomPanel) {
+        editor.bottomPanel.refresh();
+    }
+}
+
+// Expose to window for updateSingleCard to call
+window.refreshFullscreenChordPanel = refreshFullscreenChordPanel;
