@@ -739,8 +739,9 @@ export function updateKeyboardLabels() {
             return; // Invalid state
         }
         rootNoteName = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[currentBuilderRootIndex];
-    } else if (currentTab === 'scales') {
+    } else if (currentTab === 'scales' || currentTab === 'scaleexplorer-new') {
         // Get scale root index from window or state module
+        // scaleexplorer-new uses the same scaleRootIndex as the classic Scale Explorer
         const scaleRootIndex = window.scaleRootIndex !== undefined ? window.scaleRootIndex :
             (window.getScaleRootIndex ? window.getScaleRootIndex() : 0);
         if (!SHARP_NOTES || !FLAT_NOTES || scaleRootIndex < 0 || scaleRootIndex >= (enharmonicPreference === 'sharp' ? SHARP_NOTES.length : FLAT_NOTES.length)) {

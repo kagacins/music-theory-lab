@@ -226,14 +226,53 @@ function actuallyLaunchLetItBeVerseTutorial() {
         },
         // ========== GO TO COMPOSITION STUDIO TO SET KEY ==========
         {
-            instruction: '🎹 First, let\'s set the key. Click the "Composition Studio" tab.',
-            spotlight: '#header-tab-btn-melody',
-            targetElement: '#header-tab-btn-melody',
-            callout: 'We\'ll set the key to C Major so our chords show Roman numerals correctly.',
+            instruction: '🎹 First, let\'s set the key. Click "Classic" in the Composition Studio dropdown menu.',
+            spotlight: '#header-tab-btn-melody-classic',
+            targetElement: '#header-tab-btn-melody-classic',
+            callout: 'We\'ll use the Classic Composition Studio which has the full notation editor.',
             isActionStep: true,
             validation: { type: 'tab_selected', value: 'melody' },
-            successMessage: 'Welcome to the Composition Studio!',
-            quickAdvance: true
+            successMessage: 'Welcome to the Classic Composition Studio!',
+            quickAdvance: true,
+            onEnter: () => {
+                // Show the popup FIRST before spotlight tries to find the element
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.remove('invisible', 'opacity-0');
+                        popup.classList.add('visible', 'opacity-100');
+                        popup.style.pointerEvents = 'auto';
+                    }
+                }
+                // Add pulsing effect to the Classic button
+                setTimeout(() => {
+                    const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                    if (classicBtn) {
+                        classicBtn.classList.add('animate-pulse');
+                        classicBtn.style.boxShadow = '0 0 15px 5px rgba(147, 51, 234, 0.6)';
+                        classicBtn.style.backgroundColor = 'rgba(147, 51, 234, 0.2)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                // Remove pulsing effect
+                const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                if (classicBtn) {
+                    classicBtn.classList.remove('animate-pulse');
+                    classicBtn.style.boxShadow = '';
+                    classicBtn.style.backgroundColor = '';
+                }
+                // Hide the popup
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.add('invisible', 'opacity-0');
+                        popup.classList.remove('visible', 'opacity-100');
+                    }
+                }
+            }
         },
         {
             instruction: 'Click the "Key" button to open the Circle of Fifths.',
@@ -259,14 +298,53 @@ function actuallyLaunchLetItBeVerseTutorial() {
         },
         // ========== NAVIGATE TO CHORD LAB ==========
         {
-            instruction: '🎵 Now let\'s go to the Chord Lab to build our chords. Click the "Chord Lab" tab.',
-            spotlight: '#header-tab-btn-builder',
-            targetElement: '#header-tab-btn-builder',
-            callout: 'The Chord Lab is where you create and explore individual chords.',
+            instruction: '🎵 Now let\'s go to the Chord Lab. Click "Classic" in the Chord Lab dropdown.',
+            spotlight: '#header-tab-btn-builder-classic',
+            targetElement: '#header-tab-btn-builder-classic',
+            callout: 'We\'ll use the Classic Chord Lab to build individual chords.',
             isActionStep: true,
             validation: { type: 'tab_selected', value: 'builder' },
-            successMessage: 'Welcome to the Chord Lab!',
-            quickAdvance: true
+            successMessage: 'Welcome to the Classic Chord Lab!',
+            quickAdvance: true,
+            onEnter: () => {
+                // Show the popup FIRST before spotlight tries to find the element
+                const tabContainer = document.querySelector('#header-tab-btn-builder')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.chord-lab-popup');
+                    if (popup) {
+                        popup.classList.remove('invisible', 'opacity-0');
+                        popup.classList.add('visible', 'opacity-100');
+                        popup.style.pointerEvents = 'auto';
+                    }
+                }
+                // Add pulsing effect to the Classic button
+                setTimeout(() => {
+                    const classicBtn = document.getElementById('header-tab-btn-builder-classic');
+                    if (classicBtn) {
+                        classicBtn.classList.add('animate-pulse');
+                        classicBtn.style.boxShadow = '0 0 15px 5px rgba(249, 115, 22, 0.6)';
+                        classicBtn.style.backgroundColor = 'rgba(249, 115, 22, 0.2)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                // Remove pulsing effect
+                const classicBtn = document.getElementById('header-tab-btn-builder-classic');
+                if (classicBtn) {
+                    classicBtn.classList.remove('animate-pulse');
+                    classicBtn.style.boxShadow = '';
+                    classicBtn.style.backgroundColor = '';
+                }
+                // Hide the popup
+                const tabContainer = document.querySelector('#header-tab-btn-builder')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.chord-lab-popup');
+                    if (popup) {
+                        popup.classList.add('invisible', 'opacity-0');
+                        popup.classList.remove('visible', 'opacity-100');
+                    }
+                }
+            }
         },
         // ========== CHORD 1: C Major ==========
         {
@@ -378,13 +456,52 @@ function actuallyLaunchLetItBeVerseTutorial() {
         },
         // ========== SWITCH TO COMPOSITION STUDIO ==========
         {
-            instruction: 'Great! Now click "Composition Studio" to edit our chords.',
-            spotlight: '#header-tab-btn-melody',
-            targetElement: '#header-tab-btn-melody',
+            instruction: 'Great! Click "Classic" in the Composition Studio dropdown to edit our chords.',
+            spotlight: '#header-tab-btn-melody-classic',
+            targetElement: '#header-tab-btn-melody-classic',
             callout: 'Time to add the inversion and set up our verse!',
             validation: { type: 'tab_selected', value: 'melody' },
-            successMessage: 'Welcome to the Composition Studio!',
-            quickAdvance: true
+            successMessage: 'Welcome to the Classic Composition Studio!',
+            quickAdvance: true,
+            onEnter: () => {
+                // Show the popup FIRST before spotlight tries to find the element
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.remove('invisible', 'opacity-0');
+                        popup.classList.add('visible', 'opacity-100');
+                        popup.style.pointerEvents = 'auto';
+                    }
+                }
+                // Add pulsing effect to the Classic button
+                setTimeout(() => {
+                    const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                    if (classicBtn) {
+                        classicBtn.classList.add('animate-pulse');
+                        classicBtn.style.boxShadow = '0 0 15px 5px rgba(147, 51, 234, 0.6)';
+                        classicBtn.style.backgroundColor = 'rgba(147, 51, 234, 0.2)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                // Remove pulsing effect
+                const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                if (classicBtn) {
+                    classicBtn.classList.remove('animate-pulse');
+                    classicBtn.style.boxShadow = '';
+                    classicBtn.style.backgroundColor = '';
+                }
+                // Hide the popup
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.add('invisible', 'opacity-0');
+                        popup.classList.remove('visible', 'opacity-100');
+                    }
+                }
+            }
         },
         // ========== EDIT G INVERSION ==========
         {
@@ -891,14 +1008,53 @@ function actuallyLaunchLetItBeChorusTutorial() {
         },
         // ========== GO TO COMPOSITION STUDIO TO SET KEY ==========
         {
-            instruction: '🎹 First, let\'s set the key. Click the "Composition Studio" tab.',
-            spotlight: '#header-tab-btn-melody',
-            targetElement: '#header-tab-btn-melody',
-            callout: 'We\'ll set the key in the Composition Studio so our chords show Roman numerals correctly.',
+            instruction: '🎹 First, let\'s set the key. Click "Classic" in the Composition Studio dropdown menu.',
+            spotlight: '#header-tab-btn-melody-classic',
+            targetElement: '#header-tab-btn-melody-classic',
+            callout: 'We\'ll use the Classic Composition Studio which has the full notation editor.',
             isActionStep: true,
             validation: { type: 'tab_selected', value: 'melody' },
-            successMessage: 'Welcome to the Composition Studio!',
-            quickAdvance: true
+            successMessage: 'Welcome to the Classic Composition Studio!',
+            quickAdvance: true,
+            onEnter: () => {
+                // Show the popup FIRST before spotlight tries to find the element
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.remove('invisible', 'opacity-0');
+                        popup.classList.add('visible', 'opacity-100');
+                        popup.style.pointerEvents = 'auto';
+                    }
+                }
+                // Add pulsing effect to the Classic button
+                setTimeout(() => {
+                    const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                    if (classicBtn) {
+                        classicBtn.classList.add('animate-pulse');
+                        classicBtn.style.boxShadow = '0 0 15px 5px rgba(147, 51, 234, 0.6)';
+                        classicBtn.style.backgroundColor = 'rgba(147, 51, 234, 0.2)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                // Remove pulsing effect
+                const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                if (classicBtn) {
+                    classicBtn.classList.remove('animate-pulse');
+                    classicBtn.style.boxShadow = '';
+                    classicBtn.style.backgroundColor = '';
+                }
+                // Hide the popup
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.add('invisible', 'opacity-0');
+                        popup.classList.remove('visible', 'opacity-100');
+                    }
+                }
+            }
         },
         {
             instruction: 'Click the "Key" button (next to "Chord Progression") to open the Circle of Fifths.',
@@ -924,14 +1080,53 @@ function actuallyLaunchLetItBeChorusTutorial() {
         },
         // ========== NAVIGATE TO CHORD LAB ==========
         {
-            instruction: '🎵 Now let\'s go to the Chord Lab to build our chords. Click the "Chord Lab" tab.',
-            spotlight: '#header-tab-btn-builder',
-            targetElement: '#header-tab-btn-builder',
-            callout: 'The Chord Lab is where you create and explore individual chords before adding them to your progression.',
+            instruction: '🎵 Now let\'s go to the Chord Lab. Click "Classic" in the Chord Lab dropdown.',
+            spotlight: '#header-tab-btn-builder-classic',
+            targetElement: '#header-tab-btn-builder-classic',
+            callout: 'We\'ll use the Classic Chord Lab to build individual chords.',
             isActionStep: true,
             validation: { type: 'tab_selected', value: 'builder' },
-            successMessage: 'Welcome to the Chord Lab!',
-            quickAdvance: true
+            successMessage: 'Welcome to the Classic Chord Lab!',
+            quickAdvance: true,
+            onEnter: () => {
+                // Show the popup FIRST before spotlight tries to find the element
+                const tabContainer = document.querySelector('#header-tab-btn-builder')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.chord-lab-popup');
+                    if (popup) {
+                        popup.classList.remove('invisible', 'opacity-0');
+                        popup.classList.add('visible', 'opacity-100');
+                        popup.style.pointerEvents = 'auto';
+                    }
+                }
+                // Add pulsing effect to the Classic button
+                setTimeout(() => {
+                    const classicBtn = document.getElementById('header-tab-btn-builder-classic');
+                    if (classicBtn) {
+                        classicBtn.classList.add('animate-pulse');
+                        classicBtn.style.boxShadow = '0 0 15px 5px rgba(249, 115, 22, 0.6)';
+                        classicBtn.style.backgroundColor = 'rgba(249, 115, 22, 0.2)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                // Remove pulsing effect
+                const classicBtn = document.getElementById('header-tab-btn-builder-classic');
+                if (classicBtn) {
+                    classicBtn.classList.remove('animate-pulse');
+                    classicBtn.style.boxShadow = '';
+                    classicBtn.style.backgroundColor = '';
+                }
+                // Hide the popup
+                const tabContainer = document.querySelector('#header-tab-btn-builder')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.chord-lab-popup');
+                    if (popup) {
+                        popup.classList.add('invisible', 'opacity-0');
+                        popup.classList.remove('visible', 'opacity-100');
+                    }
+                }
+            }
         },
         // ========== CHORD LAB: Add Am (first chord of chorus) ==========
         {
@@ -1019,13 +1214,52 @@ function actuallyLaunchLetItBeChorusTutorial() {
         },
         // ========== SWITCH TO COMPOSITION STUDIO ==========
         {
-            instruction: 'Great! Now click on the "Composition Studio" tab to see our progression and fix those mistakes.',
-            spotlight: '#header-tab-btn-melody',
-            targetElement: '#header-tab-btn-melody',
-            callout: 'The Composition Studio is where you arrange, edit, and perfect your chord progressions.',
+            instruction: 'Great! Click "Classic" in the Composition Studio dropdown to fix those mistakes.',
+            spotlight: '#header-tab-btn-melody-classic',
+            targetElement: '#header-tab-btn-melody-classic',
+            callout: 'The Classic Composition Studio is where you arrange, edit, and perfect your chord progressions.',
             validation: { type: 'tab_selected', value: 'melody' },
-            successMessage: 'Welcome to the Composition Studio!',
-            quickAdvance: true
+            successMessage: 'Welcome to the Classic Composition Studio!',
+            quickAdvance: true,
+            onEnter: () => {
+                // Show the popup FIRST before spotlight tries to find the element
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.remove('invisible', 'opacity-0');
+                        popup.classList.add('visible', 'opacity-100');
+                        popup.style.pointerEvents = 'auto';
+                    }
+                }
+                // Add pulsing effect to the Classic button
+                setTimeout(() => {
+                    const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                    if (classicBtn) {
+                        classicBtn.classList.add('animate-pulse');
+                        classicBtn.style.boxShadow = '0 0 15px 5px rgba(147, 51, 234, 0.6)';
+                        classicBtn.style.backgroundColor = 'rgba(147, 51, 234, 0.2)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                // Remove pulsing effect
+                const classicBtn = document.getElementById('header-tab-btn-melody-classic');
+                if (classicBtn) {
+                    classicBtn.classList.remove('animate-pulse');
+                    classicBtn.style.boxShadow = '';
+                    classicBtn.style.backgroundColor = '';
+                }
+                // Hide the popup
+                const tabContainer = document.querySelector('#header-tab-btn-melody')?.closest('.relative.group');
+                if (tabContainer) {
+                    const popup = tabContainer.querySelector('.composition-studio-popup');
+                    if (popup) {
+                        popup.classList.add('invisible', 'opacity-0');
+                        popup.classList.remove('visible', 'opacity-100');
+                    }
+                }
+            }
         },
         // ========== COMPOSITION STUDIO: Summary + Drag/Drop combined ==========
         {

@@ -4184,6 +4184,10 @@ export function captureProgressionState() {
         if (compositionState.hairpins) {
             state.hairpins = [...compositionState.hairpins];
         }
+        // Capture volta brackets
+        if (compositionState.voltaBrackets) {
+            state.voltaBrackets = JSON.parse(JSON.stringify(compositionState.voltaBrackets));
+        }
     }
 
     return state;
@@ -4269,6 +4273,10 @@ function restoreProgressionState(state) {
         }
         if (state.hairpins) {
             compositionState.hairpins = [...state.hairpins];
+        }
+        // Restore volta brackets
+        if (state.voltaBrackets) {
+            compositionState.voltaBrackets = JSON.parse(JSON.stringify(state.voltaBrackets));
         }
         compositionState.events.emit('loaded', { measures: compositionState.measures });
     }

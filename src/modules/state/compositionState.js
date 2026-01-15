@@ -5118,8 +5118,6 @@ export class CompositionState {
         let currentBeatInMeasure = 0; // Track which beat we're at in the current measure
 
         progressionData.forEach((chordData, chordIndex) => {
-            console.log(`[syncWithProgressionData] Processing chord ${chordIndex}:`, chordData.root, chordData.type);
-            console.log(`[syncWithProgressionData] chordData.omittedNotes:`, chordData.omittedNotes);
             const chordBeats = chordData.beats !== undefined ? chordData.beats : 4;
             let remainingBeats = chordBeats;
             let isFirstSegmentOfChord = true;
@@ -5163,7 +5161,6 @@ export class CompositionState {
                         voicing: chordData.voicing || "close",
                         name: chordData.name || chordData.simpleName
                     };
-                    console.log(`[syncWithProgressionData] Creating measure ${currentMeasureIndex}, chord.omittedNotes:`, chordObj.omittedNotes);
                     this.addMeasure({ chord: chordObj });
                 }
 
@@ -5242,7 +5239,6 @@ export class CompositionState {
         // This preserves user-edited bass when chords are inserted/removed/reordered
         const existingBlockData = this.bassBlockSequence.blocks.map((block, idx) => {
             const notes = block.getNotes ? block.getNotes() : [];
-            console.log(`[syncWithProgressionData] Backup block ${idx}: root=${block.chord?.root}, type=${block.chord?.type}, userEdited=${block.userEdited}`);
             return {
                 originalIndex: idx, // Track original position for better matching
                 pitches: notes.length > 0 ? notes[0].pitches : null,
@@ -5252,7 +5248,6 @@ export class CompositionState {
                 units: block.units ? block.units.map(u => u.clone()) : [], // Full unit backup for user-edited blocks
             };
         });
-        console.log(`[syncWithProgressionData] Existing blocks: ${existingBlockData.length}, new progression: ${progressionData.length}`);
 
         // Detect if this is a completely new progression (different chord count or different roots)
         // In that case, we need to reinitialize the bass blocks from scratch
@@ -5262,10 +5257,8 @@ export class CompositionState {
             return block && block.chord && chord.root !== block.chord.root;
         });
         const needsReinitialize = this.bassBlockSequence.blocks.length === 0 || blockCountDiffers || rootsDiffer;
-        console.log(`[syncWithProgressionData] needsReinitialize=${needsReinitialize} (blocks.length=0: ${this.bassBlockSequence.blocks.length === 0}, blockCountDiffers: ${blockCountDiffers}, rootsDiffer: ${rootsDiffer})`);
 
         if (needsReinitialize) {
-            console.log(`[syncWithProgressionData] REINITIALIZING bass blocks - looking for userEdited blocks to preserve...`);
             // Clear existing blocks and reinitialize from progression
             this.bassBlockSequence.blocks = [];
             this.initializeBassBlockSequence(progressionData);
@@ -5282,11 +5275,9 @@ export class CompositionState {
                 const matchingBackup = existingBlockData.find(
                     backup => backup.chordRoot === chord.root && backup.userEdited
                 );
-                console.log(`[syncWithProgressionData] Chord ${i} (${chord.root}): looking for userEdited backup, found: ${matchingBackup ? 'YES' : 'NO'}`);
 
                 if (matchingBackup && matchingBackup.userEdited) {
                     // Restore the user-edited bass block
-                    console.log(`[syncWithProgressionData] Restoring user-edited bass for chord ${i} (${chord.root})`);
                     block.userEdited = true;
                     // Restore the full units if available
                     if (matchingBackup.units && matchingBackup.units.length > 0) {
@@ -5344,7 +5335,6 @@ export class CompositionState {
                     // CRITICAL: If user has manually edited this bass block, do NOT regenerate notes
                     // Only update the chord metadata, but preserve the user's bass edits
                     if (block.userEdited && chordPropsChanged) {
-                        console.log(`[syncWithProgressionData] Chord ${i} changed but bass is user-edited - preserving bass notes`);
                         // Update chord metadata only, preserve bass notes
                         block.chord = {
                             ...block.chord,
@@ -5411,7 +5401,6 @@ export class CompositionState {
         // This overrides the block-based rendering for chords with user edits
         // ================================================================
         if (this.bassDataByChordId && this.bassDataByChordId.size > 0) {
-            console.log('[syncWithProgressionData] Restoring bass from chord IDs');
             this.restoreBassFromChordIds();
         }
 

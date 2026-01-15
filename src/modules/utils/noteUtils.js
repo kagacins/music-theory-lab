@@ -150,8 +150,9 @@ export function resolveEnharmonic(noteWithOctave, key, enharmonicPreference = nu
     if (enharmonicPreference === null) {
         enharmonicPreference = key ? getEnharmonicPreferenceForKey(key) : 'flat';
     }
-    let noteNoOctave = noteWithOctave.slice(0, -1);
-    const octave = noteWithOctave.slice(-1);
+    const originalNoteNoOctave = noteWithOctave.slice(0, -1);
+    let noteNoOctave = originalNoteNoOctave;
+    let octaveNum = parseInt(noteWithOctave.slice(-1), 10);
 
     let noteIndex = ALL_NOTES.indexOf(noteNoOctave);
     if (noteIndex === -1) {
@@ -170,7 +171,16 @@ export function resolveEnharmonic(noteWithOctave, key, enharmonicPreference = nu
         noteNoOctave = FLAT_NOTES[noteIndex];
     }
 
-    return noteNoOctave + octave;
+    // Handle octave adjustments for enharmonics that cross octave boundaries
+    // Cb/B boundary: Cb4 = B3, so when spelling B as Cb, add 1 to octave
+    // B#/C boundary: B#3 = C4, so when spelling C as B#, subtract 1 from octave
+    if (noteNoOctave === 'Cb' && originalNoteNoOctave !== 'Cb') {
+        octaveNum += 1;
+    } else if (noteNoOctave === 'B#' && originalNoteNoOctave !== 'B#') {
+        octaveNum -= 1;
+    }
+
+    return noteNoOctave + octaveNum;
 }
 
 /**
@@ -180,11 +190,22 @@ export function resolveEnharmonic(noteWithOctave, key, enharmonicPreference = nu
  */
 export function getNoteKeyId(note) {
     let noteName = note.slice(0, -1);
-    const octave = note.slice(-1);
-    if (noteName.includes('b')) {
+    let octaveNum = parseInt(note.slice(-1), 10);
+
+    // Handle Cb/B# octave boundaries when converting to keyboard key
+    // Cb5 (the enharmonic display) → B4 (the physical key)
+    // B#3 (the enharmonic display) → C4 (the physical key)
+    if (noteName === 'Cb') {
+        noteName = 'B';
+        octaveNum -= 1;  // Cb5 → B4
+    } else if (noteName === 'B#') {
+        noteName = 'C';
+        octaveNum += 1;  // B#3 → C4
+    } else if (noteName.includes('b')) {
         noteName = ENHARMONIC_MAP[noteName] || noteName;
     }
-    return `key-${noteName.replace('#', 's')}${octave}`;
+
+    return `key-${noteName.replace('#', 's')}${octaveNum}`;
 }
 
 /**

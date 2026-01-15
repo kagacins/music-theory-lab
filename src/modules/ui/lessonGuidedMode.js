@@ -143,6 +143,57 @@ let stepIndicator = null;
 let spotlightOverlay = null;
 
 // ===========================================
+// NEW TAB BUTTON SAFEGUARDS
+// ===========================================
+
+/**
+ * Disable "New" mode tab buttons during tutorials to prevent users from
+ * accidentally clicking the wrong button and getting stuck.
+ * The Classic buttons remain enabled for the tutorial flow.
+ */
+function disableNewTabButtons() {
+    // Disable the main tab buttons that default to New mode
+    const newButtons = [
+        '#header-tab-btn-melody',  // Defaults to studio-new
+        '#header-tab-btn-builder'  // Defaults to chordlab-new
+    ];
+
+    newButtons.forEach(selector => {
+        const btn = document.querySelector(selector);
+        if (btn) {
+            btn.dataset.tutorialDisabled = 'true';
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        }
+    });
+
+    // Also disable the "New" options in the dropdown menus
+    const newDropdownBtns = document.querySelectorAll('[onclick*="studio-new"], [onclick*="chordlab-new"]');
+    newDropdownBtns.forEach(btn => {
+        btn.dataset.tutorialDisabled = 'true';
+        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none';
+    });
+
+    console.log('[GuidedMode] Disabled New tab buttons for tutorial');
+}
+
+/**
+ * Re-enable "New" mode tab buttons after the tutorial ends
+ */
+function enableNewTabButtons() {
+    // Re-enable all buttons we disabled
+    const disabledBtns = document.querySelectorAll('[data-tutorial-disabled="true"]');
+    disabledBtns.forEach(btn => {
+        btn.removeAttribute('data-tutorial-disabled');
+        btn.style.opacity = '';
+        btn.style.pointerEvents = '';
+    });
+
+    console.log('[GuidedMode] Re-enabled New tab buttons');
+}
+
+// ===========================================
 // GUIDED MODE LIFECYCLE
 // ===========================================
 
@@ -177,6 +228,10 @@ export function startGuidedMode(config) {
 
     // Switch to target tab first (so we can save its state)
     switchTab(targetTab);
+
+    // Disable New tab buttons for tutorials to prevent users from getting stuck
+    // (users must use Classic mode buttons during tutorials)
+    disableNewTabButtons();
 
     // Save the current tab state before modifying it
     setTimeout(() => {
@@ -362,6 +417,7 @@ function createFloatingBanner() {
     floatingBanner.style.cssText = `
         background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
         box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+        pointer-events: auto;
     `;
 
     const { lessonTitle, lessonId, steps, stepIndex, targetTab } = guidedModeState;
@@ -572,6 +628,9 @@ function returnToLesson() {
 
     // Re-enable chord card tooltips (they may have been disabled during site tutorial)
     document.body.classList.remove('progression-tooltips-disabled');
+
+    // Re-enable New tab buttons (they were disabled during tutorial)
+    enableNewTabButtons();
 
     // Clean up any expanded chord cards and open tooltips
     // First, collapse all chord cards using the proper function

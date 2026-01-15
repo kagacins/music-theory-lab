@@ -3115,6 +3115,125 @@ export class NotationToolbar {
   }
 
   /**
+   * Validate that a note with tied=true actually has a valid tie to the next note
+   * A tie is only valid if the next note has matching pitch(es)
+   * @param {Object} note - Note object to validate
+   * @returns {boolean} - True if tie is valid (next note has matching pitch)
+   */
+  _validateTieToNextNote(note) {
+    if (!note.tied) return false;
+
+    // Get composition state to find the next note
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return false;
+
+    const measureIndex = note.measureIndex;
+    const staff = note.staff || 'treble';
+    const voiceIndex = note.voiceIndex ?? 0;
+    const noteBeat = note.beat ?? 0;
+
+    if (measureIndex === undefined) return false;
+
+    // Get current measure
+    const measure = compositionState.getMeasure(measureIndex);
+    if (!measure) return false;
+
+    const voiceNotes = measure.notation?.[staff]?.voices?.[voiceIndex]?.notes || [];
+
+    // Find this note's index in the voice
+    const noteIndex = voiceNotes.findIndex(n =>
+      Math.abs((n.beat ?? 0) - noteBeat) < 0.001
+    );
+
+    if (noteIndex === -1) return false;
+
+    // Get the next note (could be in same measure or next measure)
+    let nextNote = null;
+    if (noteIndex + 1 < voiceNotes.length) {
+      nextNote = voiceNotes[noteIndex + 1];
+    } else {
+      // Check first note of next measure
+      const nextMeasure = compositionState.getMeasure(measureIndex + 1);
+      const nextVoiceNotes = nextMeasure?.notation?.[staff]?.voices?.[voiceIndex]?.notes || [];
+      if (nextVoiceNotes.length > 0) {
+        nextNote = nextVoiceNotes[0];
+      }
+    }
+
+    if (!nextNote) return false;
+
+    // Check if pitches match (using same logic as grandStaff.js)
+    return this._pitchesMatch(note, nextNote);
+  }
+
+  /**
+   * Check if two notes have matching pitches (for valid ties)
+   * A tie should only connect notes of the SAME pitch
+   * @param {Object} note1 - First note
+   * @param {Object} note2 - Second note
+   * @returns {boolean} - True if pitches match
+   */
+  _pitchesMatch(note1, note2) {
+    if (!note1 || !note2) return false;
+
+    // Get pitches from various possible properties
+    const getPitch = (note) => {
+      if (note.pitch) return note.pitch;
+      if (note.pitches && note.pitches.length > 0) return note.pitches[0];
+      if (note.keys && note.keys.length > 0) return note.keys[0];
+      return null;
+    };
+
+    const pitch1 = getPitch(note1);
+    const pitch2 = getPitch(note2);
+
+    if (!pitch1 || !pitch2) return false;
+
+    // Normalize pitches for comparison (strip octave, uppercase)
+    const normalize = (pitch) => {
+      if (!pitch) return null;
+      // Handle VexFlow format (e.g., "c/4" -> "C4")
+      const p = String(pitch).replace('/', '').toUpperCase();
+      return p;
+    };
+
+    const norm1 = normalize(pitch1);
+    const norm2 = normalize(pitch2);
+
+    if (!norm1 || !norm2) return false;
+
+    // Direct match
+    if (norm1 === norm2) return true;
+
+    // Handle enharmonic equivalents (e.g., C#4 = Db4)
+    const enharmonicMap = {
+      'C#': 'DB', 'DB': 'C#',
+      'D#': 'EB', 'EB': 'D#',
+      'F#': 'GB', 'GB': 'F#',
+      'G#': 'AB', 'AB': 'G#',
+      'A#': 'BB', 'BB': 'A#'
+    };
+
+    // Extract note name and octave
+    const parseNote = (n) => {
+      const match = n.match(/^([A-G][#B]?)(\d+)?$/i);
+      if (!match) return { name: n, octave: '' };
+      return { name: match[1].toUpperCase(), octave: match[2] || '' };
+    };
+
+    const parsed1 = parseNote(norm1);
+    const parsed2 = parseNote(norm2);
+
+    // Check if enharmonic equivalent
+    const enh1 = enharmonicMap[parsed1.name];
+    if (enh1 && enh1 === parsed2.name && parsed1.octave === parsed2.octave) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Update toolbar based on selected notes (contextual editing)
    * @param {Array} selectedNotes - Array of selected note objects
    */
@@ -3231,7 +3350,17 @@ export class NotationToolbar {
         // Accidental comes from key signature (pitch matches what key sig expects)
         accidentals._fromKeySig = true;
       }
-      tiedStates.add(note.tied || note.isTied || false);
+      // Track tie state - but validate that tie is actually valid (matching pitches)
+      // A note with note.tied=true that doesn't match the next note's pitch is NOT a valid tie
+      let isActuallyTied = false;
+      if (note.isTied) {
+        // This note is the TARGET of a tie from a previous note - always valid
+        isActuallyTied = true;
+      } else if (note.tied) {
+        // This note claims to tie TO the next note - validate the next note has matching pitch
+        isActuallyTied = this._validateTieToNextNote(note);
+      }
+      tiedStates.add(isActuallyTied);
       tupletTypes.add(note.tuplet?.type || 'none');
 
       // Track pedal state
@@ -3253,7 +3382,34 @@ export class NotationToolbar {
       dynamicStates.add(note.dynamic || 'none');
 
       // Track slur state (check if note is part of any slur)
-      slurStates.add(note.slurStart || note.slurEnd || note.inSlur ? 'has-slur' : 'none');
+      // First check note properties, then check compositionState.slurs array
+      let noteInSlur = note.slurStart || note.slurEnd || note.inSlur;
+
+      // If not found via note properties, check the slurs array in compositionState
+      if (!noteInSlur && note.measureIndex !== undefined) {
+        const compositionState = window.getCompositionState?.();
+        const slurs = compositionState?.slurs || [];
+        const noteClef = note.staff || 'treble';
+        const noteBeat = note.beat ?? 0;
+        const noteMeasure = note.measureIndex;
+
+        for (const slur of slurs) {
+          // Check if this slur is for the same clef
+          if (slur.clef !== noteClef) continue;
+
+          // Check if note is within slur range (inclusive of start and end)
+          const startPos = slur.startMeasure * 1000 + (slur.startBeat || 0);
+          const endPos = slur.endMeasure * 1000 + (slur.endBeat || 0);
+          const notePos = noteMeasure * 1000 + noteBeat;
+
+          if (notePos >= startPos && notePos <= endPos) {
+            noteInSlur = true;
+            break;
+          }
+        }
+      }
+
+      slurStates.add(noteInSlur ? 'has-slur' : 'none');
 
       // Track hairpin state (check if note is part of any hairpin)
       if (note.hairpin) {
@@ -3463,6 +3619,12 @@ export class NotationToolbar {
     const notationComposer = window.getNotationComposer?.();
     this.selectedMeasureIndex = notationComposer?.selectedMeasureIndex ?? -1;
     this.hasMeasureSelection = this.selectedMeasureIndex >= 0;
+
+    // If no notes selected but a measure is selected, use that for selectionMeasureIndices
+    // This enables volta buttons to work when clicking on measures (not just notes)
+    if (this.selectionMeasureIndices.size === 0 && this.hasMeasureSelection) {
+      this.selectionMeasureIndices = new Set([this.selectedMeasureIndex]);
+    }
   }
 
   /**

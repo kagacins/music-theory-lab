@@ -174,8 +174,8 @@
 
 /* ============================================================================
    STUDIO-NEW FULL-WIDTH HEADER MODE
-   When Composition Studio (New) is active, header expands to full width
-   and becomes fixed at top
+   When Composition Studio (New) or Chord Lab (New) is active, header expands
+   to full width while keeping the original styling
    ============================================================================ */
 
 .studio-new-header-wrapper {
@@ -183,15 +183,29 @@
     top: 0;
     left: 0;
     right: 0;
+    width: 100vw !important;
     z-index: 101; /* Above tab-studio-new which is z-[100] */
     padding: 0.5rem;
     margin: 0 !important;
     max-width: none !important;
+    background: #f9fafb; /* bg-gray-50 to match main app background */
+    pointer-events: auto;
+    box-sizing: border-box;
 }
 
 .studio-new-header-wrapper #main-header {
-    border-radius: 0;
+    /* Override the fixed positioning from music.css */
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    /* Make header fill the wrapper width */
+    width: 100% !important;
+    max-width: none !important;
+    /* Keep styling */
+    border-radius: 0.5rem;
     margin: 0;
+    pointer-events: auto;
 }
 
 /* Adjust tab-studio-new to account for header when header is visible */
@@ -200,11 +214,14 @@ body[data-active-tab="studio-new"] #tab-studio-new {
     height: calc(100vh - 64px) !important;
 }
 
-/* Ensure pointer-events work on the header wrapper in studio-new mode */
-.studio-new-header-wrapper {
-    pointer-events: auto;
+/* Adjust tab-chordlab-new similarly */
+body[data-active-tab="chordlab-new"] #tab-chordlab-new {
+    top: 64px !important;
+    height: calc(100vh - 64px) !important;
 }
 
-.studio-new-header-wrapper #main-header {
-    pointer-events: auto;
+/* Adjust tab-scaleexplorer-new similarly */
+body[data-active-tab="scaleexplorer-new"] #tab-scaleexplorer-new {
+    top: 64px !important;
+    height: calc(100vh - 64px) !important;
 }

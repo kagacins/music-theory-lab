@@ -288,6 +288,80 @@ if (chord.notes && chord.notes.length > 0) {
 
 ---
 
+## CRITICAL: Enharmonic Octave Boundary - Cb/B# Note Handling
+
+**When converting notes between enharmonic spellings, Cb and B# cross octave boundaries and require octave adjustment.**
+
+### The Problem
+
+In standard music notation, octaves start at C. This means:
+- **Cb4 = B3** (Cb is in the "next" octave from B)
+- **B#3 = C4** (B# is in the "previous" octave from C)
+
+If you convert B4 to Cb without adjusting the octave, you get Cb4 which will play/sound as B3 - an octave lower than intended!
+
+### FLAT_NOTES Array Issue
+
+The `FLAT_NOTES` array in `music-data.js` has `"Cb"` at index 11:
+```javascript
+const FLAT_NOTES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "Cb"];
+```
+
+When using flat enharmonic preference, B notes get converted to Cb. Without octave correction, this causes B notes to play an octave lower.
+
+### The Solution: resolveEnharmonic() handles this
+
+The `resolveEnharmonic()` function in `noteUtils.js` automatically handles octave adjustment:
+```javascript
+// When B4 → Cb, octave is incremented: Cb5 (which equals B4 in pitch)
+// When C4 → B#, octave is decremented: B#3 (which equals C4 in pitch)
+```
+
+### When Writing New Code
+
+**ALWAYS use `resolveEnharmonic()` for enharmonic conversion** - do NOT manually convert using FLAT_NOTES/SHARP_NOTES arrays without handling octave boundaries:
+
+```javascript
+// WRONG - Manual conversion loses octave correctness
+const noteNoOctave = FLAT_NOTES[noteIndex];  // B → Cb (but octave is wrong!)
+return noteNoOctave + octave;  // Cb4 instead of Cb5
+
+// CORRECT - Use resolveEnharmonic which handles octave boundaries
+import { resolveEnharmonic } from './noteUtils.js';
+return resolveEnharmonic(note, key, enharmonicPreference);
+```
+
+### Related Functions That Handle This
+
+- `resolveEnharmonic()` - Handles Cb/B# octave adjustment for AUDIO playback
+- `getNoteKeyId()` - Handles Cb/B# octave adjustment for KEYBOARD highlighting
+- `getChordNotes()` - Has built-in Cb/B# octave correction
+- `getInvertedChordNotes()` - Has built-in Cb/B# octave correction
+
+### Two-Way Conversion: Audio vs Visual
+
+The Cb/B# boundary requires handling in TWO directions:
+
+1. **Audio playback** (`resolveEnharmonic`): When B4 is spelled as Cb, increment octave → Cb5 (sounds like B4)
+2. **Keyboard highlighting** (`getNoteKeyId`): When Cb5 needs to highlight a key, decrement octave → key-B4
+
+```javascript
+// Audio: B4 → Cb5 (so Tone.js plays the right pitch)
+resolveEnharmonic('B4', null, 'flat')  // Returns 'Cb5'
+
+// Visual: Cb5 → key-B4 (so the correct keyboard key lights up)
+getNoteKeyId('Cb5')  // Returns 'key-B4'
+```
+
+### Edge Cases to Watch For
+
+1. **Scale playback** - B notes in scales with flat preference need both audio AND visual handling
+2. **Chord note calculation** - When building chords in keys like Gb major
+3. **Transposition** - When moving notes across the B/C boundary
+4. **Display vs playback** - The note name "Cb5" displays as Cb, sounds like B4, and highlights key B4
+
+---
+
 ## Key Patterns
 
 ### Chord Data Structure

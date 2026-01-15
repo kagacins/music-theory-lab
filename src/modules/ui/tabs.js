@@ -101,6 +101,47 @@ export function switchTab(tabId, options = {}) {
         }
     }
 
+    // Restore keyboard when switching AWAY from scaleexplorer-new
+    // The new Scale Explorer captures the keyboard element, so we need to restore it for other tabs
+    if (previousTab === 'scaleexplorer-new' && tabId !== 'scaleexplorer-new') {
+        if (window.getFullScreenScaleExplorer) {
+            const editor = window.getFullScreenScaleExplorer();
+            if (editor && editor._restoreKeyboard) {
+                editor._restoreKeyboard();
+            }
+        }
+    }
+
+    // Restore notation PageManager when switching AWAY from studio-new
+    // The new Composition Studio captures the notation canvas, so we need to restore it for Classic mode
+    if (previousTab === 'studio-new' && tabId !== 'studio-new') {
+        if (window.getFullScreenNotationEditor) {
+            const editor = window.getFullScreenNotationEditor();
+            if (editor && editor.isTabMode) {
+                // Restore the PageManager container to the classic notation-pages-container
+                const composer = window.getNotationComposer?.();
+                const classicContainer = document.getElementById('notation-pages-container');
+                if (composer?.pageManager && classicContainer) {
+                    // Move existing page canvases to the correct container
+                    const fullscreenContainer = document.getElementById('fullscreen-pages-container');
+                    if (fullscreenContainer) {
+                        const pages = Array.from(fullscreenContainer.querySelectorAll('.notation-page'));
+                        pages.forEach(page => classicContainer.appendChild(page));
+                    }
+                    // Reset the PageManager container
+                    composer.pageManager.setContainer(classicContainer);
+                    // Force a re-render to update the display
+                    setTimeout(() => {
+                        composer.render(true);
+                    }, 50);
+                }
+                // Mark tab mode as closed (but don't call closeTabMode which would switch tabs again)
+                editor.isTabMode = false;
+                editor.tabContent = null;
+            }
+        }
+    }
+
     // Push to browser history if requested and tab is changing
     if (pushHistory && previousTab !== tabId) {
         // First, update the current state with the lesson if we're leaving the learn tab
@@ -143,23 +184,23 @@ export function switchTab(tabId, options = {}) {
         }
     }
 
-    // Hide keyboard section for studio-new and chordlab-new (full-screen experiences with their own keyboards)
+    // Hide keyboard section for full-screen experiences with their own keyboards
     const keyboardSection = document.getElementById('keyboard-section');
     if (keyboardSection) {
-        if (tabId === 'studio-new' || tabId === 'chordlab-new') {
+        if (tabId === 'studio-new' || tabId === 'chordlab-new' || tabId === 'scaleexplorer-new') {
             keyboardSection.classList.add('hidden');
         } else {
             keyboardSection.classList.remove('hidden');
         }
     }
 
-    // Adjust header for studio-new (full-width, simplified)
+    // Adjust header for full-screen tabs (full-width, simplified)
     const mainHeader = document.getElementById('main-header');
     const headerWrapper = mainHeader?.parentElement; // The max-w-7xl wrapper
     const headerDisplayPanels = document.getElementById('header-display-panels');
 
     if (mainHeader && headerWrapper) {
-        if (tabId === 'studio-new' || tabId === 'chordlab-new') {
+        if (tabId === 'studio-new' || tabId === 'chordlab-new' || tabId === 'scaleexplorer-new') {
             // Show header but in full-width mode for full-screen tabs
             mainHeader.classList.remove('hidden');
             // Make wrapper full-width and add fixed positioning
@@ -193,7 +234,7 @@ export function switchTab(tabId, options = {}) {
         fabMelodyQuickBtns.classList.toggle('hidden', tabId !== 'melody');
     }
 
-    const tabs = ['builder', 'melody', 'scales', 'learn', 'studio-new', 'chordlab-new'];
+    const tabs = ['builder', 'melody', 'scales', 'learn', 'studio-new', 'chordlab-new', 'scaleexplorer-new'];
     // Also hide the old trainer tab content
     const trainerTab = document.getElementById('tab-trainer');
     if (trainerTab) trainerTab.classList.add('hidden');
@@ -204,8 +245,14 @@ export function switchTab(tabId, options = {}) {
         chordlabNewTab.classList.toggle('hidden', tabId !== 'chordlab-new');
     }
 
+    // Also hide the scaleexplorer-new tab container when not active (it has fixed positioning)
+    const scaleexplorerNewTab = document.getElementById('tab-scaleexplorer-new');
+    if (scaleexplorerNewTab) {
+        scaleexplorerNewTab.classList.toggle('hidden', tabId !== 'scaleexplorer-new');
+    }
+
     tabs.forEach(id => {
-        document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tabId);
+        document.getElementById(`tab-${id}`)?.classList.toggle('hidden', id !== tabId);
 
         // Set button colors based on tab type - matching keyboard highlighting colors
         let activeColor, inactiveHover;
@@ -227,12 +274,15 @@ export function switchTab(tabId, options = {}) {
         } else if (id === 'chordlab-new') {
             activeColor = 'bg-amber-500'; // Amber for Chord Lab (New), matching classic Chord Lab
             inactiveHover = 'hover:bg-gray-700';
+        } else if (id === 'scaleexplorer-new') {
+            activeColor = 'bg-lime-500'; // Lime for Scale Explorer (New), matching classic Scale Explorer
+            inactiveHover = 'hover:bg-gray-700';
         }
-        
+
         // Update sidebar button (if it exists)
         const sidebarBtn = document.getElementById(`sidebar-btn-${id}`);
         if (sidebarBtn) {
-            sidebarBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'hover:bg-gray-700');
+            sidebarBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-lime-500', 'bg-violet-600', 'bg-indigo-500', 'hover:bg-gray-700');
             if (id === tabId) {
                 sidebarBtn.classList.add(activeColor);
             } else {
@@ -244,10 +294,11 @@ export function switchTab(tabId, options = {}) {
         const headerBtn = document.getElementById(`header-tab-btn-${id}`);
         if (headerBtn) {
             // Remove old styling classes
-            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'bg-amber-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
+            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-lime-500', 'bg-violet-600', 'bg-indigo-500', 'bg-amber-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
             // Special case: melody button should be active for both 'melody' and 'studio-new' tabs
             // Special case: builder button should be active for both 'builder' and 'chordlab-new' tabs
-            const isActive = (id === tabId) || (id === 'melody' && tabId === 'studio-new') || (id === 'builder' && tabId === 'chordlab-new');
+            // Special case: scales button should be active for both 'scales' and 'scaleexplorer-new' tabs
+            const isActive = (id === tabId) || (id === 'melody' && tabId === 'studio-new') || (id === 'builder' && tabId === 'chordlab-new') || (id === 'scales' && tabId === 'scaleexplorer-new');
             if (isActive) {
                 // Add active class for new pill styling (CSS handles the gradient)
                 headerBtn.classList.add('active');
@@ -467,6 +518,11 @@ export function switchTab(tabId, options = {}) {
         if (window.initChordLabNewTab) {
             window.initChordLabNewTab();
         }
+    } else if (tabId === 'scaleexplorer-new') {
+        // Initialize Scale Explorer (New) - the new full-screen scale explorer experience as a tab
+        if (window.initScaleExplorerNewTab) {
+            window.initScaleExplorerNewTab();
+        }
     }
 
     // Update the tab subtitle to show current tab name
@@ -478,7 +534,8 @@ export function switchTab(tabId, options = {}) {
             'scales': 'Scale Explorer',
             'learn': 'Theory Academy',
             'studio-new': 'Composition Studio (New)',
-            'chordlab-new': 'Chord Lab (New)'
+            'chordlab-new': 'Chord Lab (New)',
+            'scaleexplorer-new': 'Scale Explorer (New)'
         };
         const tabColors = {
             'builder': 'text-amber-600',
@@ -486,7 +543,8 @@ export function switchTab(tabId, options = {}) {
             'scales': 'text-lime-600',
             'learn': 'text-blue-600',
             'studio-new': 'text-indigo-600',
-            'chordlab-new': 'text-amber-600'
+            'chordlab-new': 'text-amber-600',
+            'scaleexplorer-new': 'text-lime-600'
         };
         // Remove all color classes and add the new one
         tabSubtitle.className = 'text-[10px] font-semibold leading-tight ' + (tabColors[tabId] || 'text-gray-600');

@@ -223,7 +223,6 @@ export class FullScreenNotationEditor {
     openInTabMode() {
         // If already in tab mode, don't re-initialize (prevents destroying canvases)
         if (this.isTabMode) {
-            console.log('[FullScreenNotationEditor] Already in tab mode, skipping re-init');
             return;
         }
 
@@ -234,7 +233,6 @@ export class FullScreenNotationEditor {
 
         const tabContainer = document.getElementById('studio-new-container');
         if (!tabContainer) {
-            console.error('[FullScreenNotationEditor] studio-new-container not found');
             return;
         }
 
@@ -301,8 +299,6 @@ export class FullScreenNotationEditor {
         if (typeof window.refreshNotationFromProgression === 'function') {
             window.refreshNotationFromProgression();
         }
-
-        console.log('[FullScreenNotationEditor] Opened in tab mode');
     }
 
     /**
@@ -353,8 +349,6 @@ export class FullScreenNotationEditor {
         if (window.switchTab) {
             window.switchTab('melody');
         }
-
-        console.log('[FullScreenNotationEditor] Closed tab mode');
     }
 
     /**
@@ -427,8 +421,20 @@ export class FullScreenNotationEditor {
                         </div>
                     </div>
 
-                    <!-- Right: Zoom Controls -->
+                    <!-- Right: Metronome + Zoom Controls -->
                     <div class="flex items-center gap-2">
+                        <!-- Metronome Toggle -->
+                        <button id="fullscreen-metronome-toggle"
+                                class="flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors ${this._isMetronomeEnabled() ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'}"
+                                title="Toggle Metronome (click during playback)">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #ffffff;">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3L6 21h12L12 3z M12 8v8"/>
+                            </svg>
+                            <span class="text-xs font-medium" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                                ${this._isMetronomeEnabled() ? 'On' : 'Off'}
+                            </span>
+                        </button>
+
                         <!-- Zoom Controls -->
                         <div class="flex items-center gap-1 bg-white/20 rounded-lg px-2 py-1">
                             <button id="fullscreen-zoom-out"
@@ -547,6 +553,7 @@ export class FullScreenNotationEditor {
                             <option value="fs-section-slurs">Slurs & Ties</option>
                             <option value="fs-section-hairpins">Hairpins</option>
                             <option value="fs-section-grace">Grace Notes</option>
+                            <option value="fs-section-tempo">Tempo</option>
                             <option value="fs-section-repeat">Repeat Signs</option>
                             <option value="fs-section-endings">Endings</option>
                             <option value="fs-section-chord">Chord Labels</option>
@@ -735,9 +742,8 @@ export class FullScreenNotationEditor {
                 </div>
                 <div class="sidebar-section-content p-2 hidden">
                     <div class="space-y-2">
-                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="tie" title="Tie Notes (T) - Connect two notes of same pitch, combining their durations">⁀ Tie Notes</button>
-                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="slur" title="Add Slur - Phrase marking over notes (legato playing, connect smoothly)">⌒ Add Slur</button>
-                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" data-slur="remove-slur" title="Remove slur/tie from selected notes">Remove Slur</button>
+                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="tie" title="Tie Notes (T) - Connect two notes of same pitch, combining their durations. Click again to remove tie.">⁀ Tie Notes</button>
+                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="slur" title="Slur Notes - Phrase marking over notes (legato playing). Click again to remove slur.">⌒ Slur Notes</button>
                     </div>
                 </div>
             </div>
@@ -787,6 +793,32 @@ export class FullScreenNotationEditor {
                 </div>
             </div>
 
+            <!-- Tempo Markings Section -->
+            <div id="fs-section-tempo" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Tempo</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <select class="fs-tempo-select w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-xs shadow-sm" title="Select tempo marking to add at selected position">
+                            <option value="">-- Select Tempo --</option>
+                            <option value="largo" title="40-60 BPM">Largo (Very slow)</option>
+                            <option value="adagio" title="66-76 BPM">Adagio (Slow)</option>
+                            <option value="andante" title="76-108 BPM">Andante (Walking pace)</option>
+                            <option value="moderato" title="108-120 BPM">Moderato (Moderate)</option>
+                            <option value="allegro" title="120-156 BPM">Allegro (Fast)</option>
+                            <option value="vivace" title="156-176 BPM">Vivace (Lively)</option>
+                            <option value="presto" title="168-200 BPM">Presto (Very fast)</option>
+                        </select>
+                        <p class="text-[10px] text-slate-500 text-center">Select a note position first, then choose tempo</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Repeat Signs Section -->
             <div id="fs-section-repeat" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
@@ -819,6 +851,16 @@ export class FullScreenNotationEditor {
                         <div class="grid grid-cols-2 gap-2">
                             <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="1" title="1st Ending - Play on first pass">1.</button>
                             <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="2" title="2nd Ending - Play on second pass">2.</button>
+                        </div>
+                        <!-- Volta Extend/Shrink Controls - shown when measure is part of a volta -->
+                        <div class="fs-volta-extend-controls hidden">
+                            <div class="text-xs text-slate-500 mb-1">Adjust bracket:</div>
+                            <div class="grid grid-cols-4 gap-1">
+                                <button class="fs-volta-extend-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-direction="left" title="Extend bracket left">◀+</button>
+                                <button class="fs-volta-shrink-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-amber-100 hover:border-amber-500 transition-colors text-xs shadow-sm" data-direction="left" title="Shrink bracket from left">◀−</button>
+                                <button class="fs-volta-shrink-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-amber-100 hover:border-amber-500 transition-colors text-xs shadow-sm" data-direction="right" title="Shrink bracket from right">−▶</button>
+                                <button class="fs-volta-extend-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-direction="right" title="Extend bracket right">+▶</button>
+                            </div>
                         </div>
                         <button class="fs-volta-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove ending bracket from selected measure">Remove Ending</button>
                     </div>
@@ -1213,6 +1255,15 @@ export class FullScreenNotationEditor {
             collapseBtn.addEventListener('click', () => this._toggleSidebarTab());
         }
 
+        // Metronome toggle
+        const metronomeToggle = this.tabContent.querySelector('#fullscreen-metronome-toggle');
+        if (metronomeToggle) {
+            metronomeToggle.addEventListener('click', () => this._toggleMetronome());
+        }
+
+        // Listen for external metronome state changes to update button
+        window.addEventListener('metronome-state-changed', () => this._updateMetronomeButton());
+
         // Zoom controls
         const zoomOut = this.tabContent.querySelector('#fullscreen-zoom-out');
         const zoomIn = this.tabContent.querySelector('#fullscreen-zoom-in');
@@ -1443,8 +1494,20 @@ export class FullScreenNotationEditor {
                     </div>
                 </div>
 
-                <!-- Right: Zoom Controls + Close -->
+                <!-- Right: Metronome + Zoom Controls + Close -->
                 <div class="flex items-center gap-2">
+                    <!-- Metronome Toggle -->
+                    <button id="fullscreen-metronome-toggle"
+                            class="flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors ${this._isMetronomeEnabled() ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'}"
+                            title="Toggle Metronome (click during playback)">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #ffffff;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3L6 21h12L12 3z M12 8v8"/>
+                        </svg>
+                        <span class="text-xs font-medium" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                            ${this._isMetronomeEnabled() ? 'On' : 'Off'}
+                        </span>
+                    </button>
+
                     <!-- Zoom Controls -->
                     <div class="flex items-center gap-1 bg-white/20 rounded-lg px-2 py-1">
                         <button id="fullscreen-zoom-out"
@@ -1541,6 +1604,7 @@ export class FullScreenNotationEditor {
                                 <option value="fs-section-slurs">Slurs & Ties</option>
                                 <option value="fs-section-hairpins">Hairpins</option>
                                 <option value="fs-section-grace">Grace Notes</option>
+                                <option value="fs-section-tempo">Tempo</option>
                                 <option value="fs-section-repeat">Repeat Signs</option>
                                 <option value="fs-section-endings">Endings</option>
                                 <option value="fs-section-chord">Chord Labels</option>
@@ -1716,9 +1780,8 @@ export class FullScreenNotationEditor {
                                 </div>
                                 <div class="sidebar-section-content p-2 hidden">
                                     <div class="space-y-2">
-                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="tie" title="Tie Notes (T) - Connect two notes of same pitch, combining their durations">⁀ Tie Notes</button>
-                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="slur" title="Add Slur - Phrase marking over notes (legato playing, connect smoothly)">⌒ Add Slur</button>
-                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" data-slur="remove-slur" title="Remove slur/tie from selected notes">Remove Slur</button>
+                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="tie" title="Tie Notes (T) - Connect two notes of same pitch, combining their durations. Click again to remove tie.">⁀ Tie Notes</button>
+                                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="slur" title="Slur Notes - Phrase marking over notes (legato playing). Click again to remove slur.">⌒ Slur Notes</button>
                                     </div>
                                 </div>
                             </div>
@@ -1768,6 +1831,32 @@ export class FullScreenNotationEditor {
                                 </div>
                             </div>
 
+                            <!-- Tempo Markings Section -->
+                            <div id="fs-section-tempo" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Tempo</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2 hidden">
+                                    <div class="space-y-2">
+                                        <select class="fs-tempo-select w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-xs shadow-sm" title="Select tempo marking to add at selected position">
+                                            <option value="">-- Select Tempo --</option>
+                                            <option value="largo" title="40-60 BPM">Largo (Very slow)</option>
+                                            <option value="adagio" title="66-76 BPM">Adagio (Slow)</option>
+                                            <option value="andante" title="76-108 BPM">Andante (Walking pace)</option>
+                                            <option value="moderato" title="108-120 BPM">Moderato (Moderate)</option>
+                                            <option value="allegro" title="120-156 BPM">Allegro (Fast)</option>
+                                            <option value="vivace" title="156-176 BPM">Vivace (Lively)</option>
+                                            <option value="presto" title="168-200 BPM">Presto (Very fast)</option>
+                                        </select>
+                                        <p class="text-[10px] text-slate-500 text-center">Select a note position first, then choose tempo</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Repeat Signs Section -->
                             <div id="fs-section-repeat" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
@@ -1800,6 +1889,16 @@ export class FullScreenNotationEditor {
                                         <div class="grid grid-cols-2 gap-2">
                                             <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="1" title="1st Ending - Play on first pass">1.</button>
                                             <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="2" title="2nd Ending - Play on second pass">2.</button>
+                                        </div>
+                                        <!-- Volta Extend/Shrink Controls - shown when measure is part of a volta -->
+                                        <div class="fs-volta-extend-controls hidden">
+                                            <div class="text-xs text-slate-500 mb-1">Adjust bracket:</div>
+                                            <div class="grid grid-cols-4 gap-1">
+                                                <button class="fs-volta-extend-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-direction="left" title="Extend bracket left">◀+</button>
+                                                <button class="fs-volta-shrink-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-amber-100 hover:border-amber-500 transition-colors text-xs shadow-sm" data-direction="left" title="Shrink bracket from left">◀−</button>
+                                                <button class="fs-volta-shrink-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-amber-100 hover:border-amber-500 transition-colors text-xs shadow-sm" data-direction="right" title="Shrink bracket from right">−▶</button>
+                                                <button class="fs-volta-extend-btn p-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-direction="right" title="Extend bracket right">+▶</button>
+                                            </div>
                                         </div>
                                         <button class="fs-volta-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove ending bracket from selected measure">Remove Ending</button>
                                     </div>
@@ -1989,6 +2088,13 @@ export class FullScreenNotationEditor {
         // Sidebar toggle
         const sidebarToggle = this.modal.querySelector('#fullscreen-sidebar-toggle');
         sidebarToggle?.addEventListener('click', () => this._toggleSidebar());
+
+        // Metronome toggle
+        const metronomeToggle = this.modal.querySelector('#fullscreen-metronome-toggle');
+        metronomeToggle?.addEventListener('click', () => this._toggleMetronome());
+
+        // Listen for external metronome state changes to update button
+        window.addEventListener('metronome-state-changed', () => this._updateMetronomeButton());
 
         // Zoom controls
         const zoomOut = this.modal.querySelector('#fullscreen-zoom-out');
@@ -2537,7 +2643,7 @@ export class FullScreenNotationEditor {
             });
         });
 
-        // Slur/Tie buttons
+        // Slur/Tie buttons (both toggle - click again to remove)
         sidebar.querySelectorAll('.fs-slur-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const slurAction = e.currentTarget.dataset.slur;
@@ -2549,9 +2655,6 @@ export class FullScreenNotationEditor {
                             break;
                         case 'slur':
                             toolbar.onSlur?.();
-                            break;
-                        case 'remove-slur':
-                            toolbar.onSlurRemove?.();
                             break;
                     }
                 }
@@ -2662,6 +2765,31 @@ export class FullScreenNotationEditor {
             });
         });
 
+        // Tempo marking select
+        const tempoSelect = sidebar.querySelector('.fs-tempo-select');
+        tempoSelect?.addEventListener('change', (e) => {
+            const tempoId = e.target.value;
+            const toolbar = getToolbar();
+            if (toolbar && tempoId) {
+                // Import TEMPO_MARKINGS from notationToolbar if needed, or define locally
+                const TEMPO_MARKINGS = [
+                    { id: 'largo', label: 'Largo (Very slow)', symbol: 'Largo', bpm: '40-60' },
+                    { id: 'adagio', label: 'Adagio (Slow)', symbol: 'Adagio', bpm: '66-76' },
+                    { id: 'andante', label: 'Andante (Walking pace)', symbol: 'Andante', bpm: '76-108' },
+                    { id: 'moderato', label: 'Moderato (Moderate)', symbol: 'Moderato', bpm: '108-120' },
+                    { id: 'allegro', label: 'Allegro (Fast)', symbol: 'Allegro', bpm: '120-156' },
+                    { id: 'vivace', label: 'Vivace (Lively)', symbol: 'Vivace', bpm: '156-176' },
+                    { id: 'presto', label: 'Presto (Very fast)', symbol: 'Presto', bpm: '168-200' }
+                ];
+                const tempoMarking = TEMPO_MARKINGS.find(t => t.id === tempoId);
+                if (tempoMarking) {
+                    toolbar.onTempoMarkingApply?.(tempoMarking);
+                    // Reset select after applying
+                    e.target.value = '';
+                }
+            }
+        });
+
         // Repeat sign buttons
         sidebar.querySelectorAll('.fs-repeat-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -2679,16 +2807,41 @@ export class FullScreenNotationEditor {
                 const voltaNum = e.currentTarget.dataset.volta;
                 const toolbar = getToolbar();
                 if (toolbar && voltaNum) {
-                    toolbar.onVoltaApply?.(parseInt(voltaNum));
+                    // Use onVoltaBracketApply which is wired up in notationInit.js
+                    toolbar.onVoltaBracketApply?.(voltaNum);
                 }
             });
         });
 
-        // Volta remove button
+        // Volta remove button - apply volta "0" or toggle to remove
         const voltaRemoveBtn = sidebar.querySelector('.fs-volta-remove-btn');
         voltaRemoveBtn?.addEventListener('click', () => {
             const toolbar = getToolbar();
-            toolbar?.onVoltaRemove?.();
+            // Remove volta by applying null/empty - the toggle behavior will remove it
+            // For now, toggle the current volta to remove it
+            toolbar?.onVoltaBracketApply?.('remove');
+        });
+
+        // Volta extend buttons
+        sidebar.querySelectorAll('.fs-volta-extend-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const direction = e.currentTarget.dataset.direction;
+                const toolbar = getToolbar();
+                if (toolbar && direction) {
+                    toolbar.onVoltaExtend?.(direction);
+                }
+            });
+        });
+
+        // Volta shrink buttons
+        sidebar.querySelectorAll('.fs-volta-shrink-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const direction = e.currentTarget.dataset.direction;
+                const toolbar = getToolbar();
+                if (toolbar && direction) {
+                    toolbar.onVoltaShrink?.(direction);
+                }
+            });
         });
 
         // Chord label apply button
@@ -2807,6 +2960,20 @@ export class FullScreenNotationEditor {
                 this._originalUpdateSelectionState = originalUpdateSelection;
             }
         }
+
+        // Listen for measure selection changes (when user clicks on a measure without selecting notes)
+        this._measureSelectedHandler = (e) => {
+            if (!this.isOpen && !this.isTabMode) return;
+            const { measureIndex } = e.detail || {};
+            if (measureIndex >= 0 && composer.toolbar) {
+                // Update toolbar's selectionMeasureIndices to include the selected measure
+                composer.toolbar.selectionMeasureIndices = new Set([measureIndex]);
+                composer.toolbar.hasMeasureSelection = true;
+                composer.toolbar.selectedMeasureIndex = measureIndex;
+                this._syncSidebarWithToolbar(composer.toolbar);
+            }
+        };
+        window.addEventListener('notationMeasureSelected', this._measureSelectedHandler);
     }
 
     /**
@@ -2817,6 +2984,11 @@ export class FullScreenNotationEditor {
         if (composer?.toolbar && this._originalUpdateSelectionState) {
             composer.toolbar.updateSelectionState = this._originalUpdateSelectionState;
             this._originalUpdateSelectionState = null;
+        }
+        // Remove measure selection listener
+        if (this._measureSelectedHandler) {
+            window.removeEventListener('notationMeasureSelected', this._measureSelectedHandler);
+            this._measureSelectedHandler = null;
         }
     }
 
@@ -3361,12 +3533,14 @@ export class FullScreenNotationEditor {
 
         // Find which volta numbers apply to the selected measure(s)
         const activeVoltaNumbers = new Set();
+        let hasVoltaInSelection = false;
 
         if (compositionState && selectionMeasureIndices && selectionMeasureIndices.size > 0) {
             for (const measureIndex of selectionMeasureIndices) {
                 const volta = compositionState.getVoltaForMeasure?.(measureIndex);
                 if (volta) {
                     activeVoltaNumbers.add(String(volta.number));
+                    hasVoltaInSelection = true;
                 }
             }
         }
@@ -3387,6 +3561,11 @@ export class FullScreenNotationEditor {
             } else {
                 btn.title = `Add ${voltaId === '1' ? '1st' : '2nd'} ending to selected measure`;
             }
+        });
+
+        // Show/hide volta extend controls based on whether selection is in a volta
+        sidebar.querySelectorAll('.fs-volta-extend-controls').forEach(ctrl => {
+            ctrl.classList.toggle('hidden', !hasVoltaInSelection);
         });
     }
 
@@ -3542,9 +3721,17 @@ export class FullScreenNotationEditor {
         setButtonState('.fs-ornament-btn', has1);
 
         // --- Buttons requiring 2+ notes selected ---
-        // Slurs, ties
-        setButtonState('.fs-slur-btn[data-slur="tie"]', toolbar.canTie);
-        setButtonState('.fs-slur-btn[data-slur="slur"]', toolbar.canSlur);
+        // Slurs, ties - special handling: don't disable if button is active (showing current state)
+        // This allows users to see that selected notes are tied/slurred even with 1 note selected
+        const tieBtn = sidebar.querySelector('.fs-slur-btn[data-slur="tie"]');
+        const slurBtn = sidebar.querySelector('.fs-slur-btn[data-slur="slur"]');
+        const tieIsActive = tieBtn?.classList.contains('bg-indigo-100');
+        const slurIsActive = slurBtn?.classList.contains('bg-indigo-100');
+
+        // Enable tie button if canTie OR if it's showing active state (so user can untie)
+        setButtonState('.fs-slur-btn[data-slur="tie"]', toolbar.canTie || tieIsActive);
+        // Enable slur button if canSlur OR if it's showing active state (so user can remove slur)
+        setButtonState('.fs-slur-btn[data-slur="slur"]', toolbar.canSlur || slurIsActive);
 
         // Hairpins require 2+ notes
         setButtonState('.fs-hairpin-btn', toolbar.canHairpin);
@@ -3571,7 +3758,6 @@ export class FullScreenNotationEditor {
         setButtonState('.fs-beam-btn[data-action="clearMeasureBeams"]', true);
 
         // --- Remove buttons (require notes with that feature) ---
-        setButtonState('.fs-slur-btn[data-slur="remove-slur"]', toolbar.notesInSlur);
         setButtonState('.fs-tuplet-remove-btn', has1 && toolbar.selectionTuplet);
         setButtonState('.fs-ornament-remove-btn', toolbar.hasOrnaments);
         setButtonState('.fs-hairpin-remove-btn', toolbar.notesInHairpin);
@@ -3591,11 +3777,14 @@ export class FullScreenNotationEditor {
         // --- Pedal buttons (require 1+ notes) ---
         setButtonState('.fs-pedal-btn', has1);
 
-        // --- Repeat/Volta buttons (require measure selection) ---
-        const hasMeasure = toolbar.hasMeasureSelection;
+        // --- Repeat/Volta buttons (require measure selection OR note selection) ---
+        // When notes are selected, we know which measure(s) they're in via selectionMeasureIndices
+        const hasMeasure = toolbar.hasMeasureSelection || (toolbar.selectionMeasureIndices?.size > 0);
         setButtonState('.fs-repeat-btn', hasMeasure);
         setButtonState('.fs-volta-btn', hasMeasure);
         setButtonState('.fs-volta-remove-btn', hasMeasure);
+        setButtonState('.fs-volta-extend-btn', hasMeasure);
+        setButtonState('.fs-volta-shrink-btn', hasMeasure);
 
         // --- Lyric/Chord buttons (require 1+ notes) ---
         setButtonState('.fs-lyric-apply-btn', has1);
@@ -4737,6 +4926,49 @@ export class FullScreenNotationEditor {
         const compState = getCompositionState();
         const ts = compState?.getTimeSignature?.() || { num: 4, denom: 4 };
         return ts.num === num && ts.denom === denom;
+    }
+
+    /**
+     * Check if metronome is currently enabled
+     */
+    _isMetronomeEnabled() {
+        return window.getMetronomeEnabled?.() || false;
+    }
+
+    /**
+     * Toggle metronome on/off
+     */
+    _toggleMetronome() {
+        if (window.toggleMetronome) {
+            window.toggleMetronome();
+            this._updateMetronomeButton();
+        }
+    }
+
+    /**
+     * Update metronome button appearance based on current state
+     */
+    _updateMetronomeButton() {
+        const container = this._getActiveContainer();
+        if (!container) return;
+
+        const btn = container.querySelector('#fullscreen-metronome-toggle');
+        if (!btn) return;
+
+        const enabled = this._isMetronomeEnabled();
+        const label = btn.querySelector('span');
+
+        if (enabled) {
+            btn.classList.remove('bg-white/10', 'hover:bg-white/20');
+            btn.classList.add('bg-white/30');
+        } else {
+            btn.classList.remove('bg-white/30');
+            btn.classList.add('bg-white/10', 'hover:bg-white/20');
+        }
+
+        if (label) {
+            label.textContent = enabled ? 'On' : 'Off';
+        }
     }
 
     /**

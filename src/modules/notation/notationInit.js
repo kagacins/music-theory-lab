@@ -1676,10 +1676,18 @@ export function initEnhancedNotation(options = {}) {
       }
     };
 
-    // Handle slur application
+    // Handle slur application - toggle behavior (add if not in slur, remove if in slur)
     notationComposer.toolbar.onSlur = () => {
-      if (noteEditor.selectedNotes.size >= 2) {
-        noteEditor.applySlurToSelected();
+      // Check if selected notes are already in a slur - toggle off if so
+      // Removal works with 1+ notes, but adding requires 2+ notes
+      if (notationComposer.toolbar.selectionHasSlur) {
+        if (noteEditor.selectedNotes.size >= 1) {
+          noteEditor.removeSlurFromSelected();
+        }
+      } else {
+        if (noteEditor.selectedNotes.size >= 2) {
+          noteEditor.applySlurToSelected();
+        }
       }
     };
 
@@ -1738,6 +1746,16 @@ export function initEnhancedNotation(options = {}) {
     // Handle volta bracket application
     notationComposer.toolbar.onVoltaBracketApply = (voltaNumber) => {
       noteEditor.applyVoltaBracket(voltaNumber);
+    };
+
+    // Handle volta bracket extend
+    notationComposer.toolbar.onVoltaExtend = (direction) => {
+      noteEditor.extendVoltaBracket(direction);
+    };
+
+    // Handle volta bracket shrink
+    notationComposer.toolbar.onVoltaShrink = (direction) => {
+      noteEditor.shrinkVoltaBracket(direction);
     };
 
     // Handle chord symbol application

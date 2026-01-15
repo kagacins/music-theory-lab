@@ -697,16 +697,13 @@ export class NoteEditor {
    * @param {KeyboardEvent} e - Keyboard event
    */
   handleKeyDown(e) {
-    console.log('[NoteEditor] handleKeyDown called, key:', e.key, 'isEnabled:', this.isEnabled);
     if (!this.isEnabled) {
-      console.log('[NoteEditor] handleKeyDown - DISABLED, returning');
       return;
     }
 
     // Don't process composition shortcuts when a modal is open
     // This prevents accidental edits to notation while using modals
     if (isModalOpen()) {
-      console.log('[NoteEditor] handleKeyDown - modal is open, returning');
       return;
     }
 
@@ -714,11 +711,9 @@ export class NoteEditor {
     // Ctrl+Delete/Backspace = shift delete (removes note and shifts others left)
     // Delete/Backspace alone = replace with rest (preserves rhythm)
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      console.log('[NoteEditor] Delete key pressed, selectedNotes.size:', this.selectedNotes.size);
       if (this.selectedNotes.size > 0) {
         e.preventDefault();
         const shiftDelete = e.ctrlKey || e.metaKey;
-        console.log('[NoteEditor] Calling deleteSelectedNotes, shiftDelete:', shiftDelete);
         this.deleteSelectedNotes(shiftDelete);
       }
     }
@@ -4980,21 +4975,38 @@ export class NoteEditor {
   }
 
   /**
-   * Apply a volta bracket at the current selected measure
-   * @param {string} voltaNumber - '1', '2', or other ending number
+   * Apply a volta bracket at the current selected measure(s)
+   * @param {string} voltaNumber - '1', '2', 'remove', or other ending number
    */
   applyVoltaBracket(voltaNumber) {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return;
 
-    // Get the measure index from: 1) selected notes, 2) selected measure, 3) default to 0
-    let measureIndex = 0;
-    if (this.selectedNotes.size > 0) {
-      const firstNoteId = [...this.selectedNotes][0];
-      const [measIdx] = this.parseNoteId(firstNoteId);
-      measureIndex = measIdx;
+    // Get measure indices from multiple sources:
+    // 1. Toolbar's selectionMeasureIndices (from selected notes or measure selection)
+    // 2. Single selected measure from composerIntegration
+    // 3. Default to measure 0
+    let measureIndices = [];
+
+    // Check toolbar for measure selection (works for both notes and measure clicks)
+    const toolbar = this.composerIntegration?.toolbar;
+    if (toolbar?.selectionMeasureIndices?.size > 0) {
+      measureIndices = Array.from(toolbar.selectionMeasureIndices).sort((a, b) => a - b);
+    } else if (this.selectedNotes.size > 0) {
+      // Fallback: get unique measure indices from selected notes
+      const measureSet = new Set();
+      for (const noteId of this.selectedNotes) {
+        const [measIdx] = this.parseNoteId(noteId);
+        measureSet.add(measIdx);
+      }
+      measureIndices = Array.from(measureSet).sort((a, b) => a - b);
     } else if (this.composerIntegration?.selectedMeasure != null) {
-      measureIndex = this.composerIntegration.selectedMeasure;
+      measureIndices = [this.composerIntegration.selectedMeasure];
+    }
+
+    if (measureIndices.length === 0) {
+      console.log('[applyVoltaBracket] No measures selected');
+      return;
     }
 
     // Save state for undo
@@ -5002,18 +5014,142 @@ export class NoteEditor {
       window.saveStateBeforeChange();
     }
 
-    // Toggle volta at this measure
-    const result = compositionState.toggleVoltaAtMeasure(measureIndex, voltaNumber);
-
-    if (result) {
-      console.log(`[applyVoltaBracket] Added volta ${voltaNumber} at measure ${measureIndex}`);
+    // Handle "remove" action - remove volta from all selected measures
+    if (voltaNumber === 'remove') {
+      for (const measureIndex of measureIndices) {
+        const existingVolta = compositionState.getVoltaForMeasure(measureIndex);
+        if (existingVolta) {
+          // Toggle with the same number to remove it
+          compositionState.toggleVoltaAtMeasure(measureIndex, existingVolta.number);
+        }
+      }
+      console.log(`[applyVoltaBracket] Removed volta from measures ${measureIndices.join(', ')}`);
+    } else if (measureIndices.length === 1) {
+      // Single measure - use toggle behavior
+      const result = compositionState.toggleVoltaAtMeasure(measureIndices[0], voltaNumber);
+      if (result) {
+        console.log(`[applyVoltaBracket] Added volta ${voltaNumber} at measure ${measureIndices[0]}`);
+      } else {
+        console.log(`[applyVoltaBracket] Removed volta ${voltaNumber} from measure ${measureIndices[0]}`);
+      }
     } else {
-      console.log(`[applyVoltaBracket] Removed volta ${voltaNumber} from measure ${measureIndex}`);
+      // Multiple measures - create a volta bracket spanning the range
+      const startMeasure = measureIndices[0];
+      const endMeasure = measureIndices[measureIndices.length - 1];
+
+      // First, remove any existing volta brackets in this range
+      for (const measureIndex of measureIndices) {
+        const existingVolta = compositionState.getVoltaForMeasure(measureIndex);
+        if (existingVolta) {
+          compositionState.toggleVoltaAtMeasure(measureIndex, existingVolta.number);
+        }
+      }
+
+      // Now add the new volta bracket spanning the entire range
+      const result = compositionState.addVoltaBracket({
+        startMeasure,
+        endMeasure,
+        number: voltaNumber
+      });
+
+      if (result) {
+        console.log(`[applyVoltaBracket] Added volta ${voltaNumber} spanning measures ${startMeasure}-${endMeasure}`);
+      }
     }
 
     this.composerIntegration.render(true);
     // Update toolbar to reflect the new volta bracket state
     this.composerIntegration.updateToolbarSelectionState();
+  }
+
+  /**
+   * Extend a volta bracket in the specified direction
+   * @param {string} direction - 'left' or 'right'
+   */
+  extendVoltaBracket(direction) {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Get the measure index from the current selection
+    let measureIndex = null;
+
+    // Check toolbar's selection measure indices first
+    if (this.composerIntegration?.toolbar?.selectionMeasureIndices?.size > 0) {
+      measureIndex = [...this.composerIntegration.toolbar.selectionMeasureIndices][0];
+    } else if (this.composerIntegration?.selectedMeasure != null) {
+      measureIndex = this.composerIntegration.selectedMeasure;
+    }
+
+    if (measureIndex === null) {
+      console.log('[extendVoltaBracket] No measure selected');
+      return;
+    }
+
+    // Find the volta at this measure
+    const volta = compositionState.getVoltaForMeasure?.(measureIndex);
+    if (!volta) {
+      console.log('[extendVoltaBracket] No volta at selected measure');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const success = compositionState.extendVoltaBracket(volta.id, direction);
+    if (success) {
+      this.composerIntegration.render(true);
+      // Re-dispatch measure selected event to update sidebar (preserves volta controls visibility)
+      window.dispatchEvent(new CustomEvent('notationMeasureSelected', {
+        detail: { measureIndex }
+      }));
+    }
+  }
+
+  /**
+   * Shrink a volta bracket from the specified direction
+   * @param {string} direction - 'left' or 'right'
+   */
+  shrinkVoltaBracket(direction) {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Get the measure index from the current selection
+    let measureIndex = null;
+
+    // Check toolbar's selection measure indices first
+    if (this.composerIntegration?.toolbar?.selectionMeasureIndices?.size > 0) {
+      measureIndex = [...this.composerIntegration.toolbar.selectionMeasureIndices][0];
+    } else if (this.composerIntegration?.selectedMeasure != null) {
+      measureIndex = this.composerIntegration.selectedMeasure;
+    }
+
+    if (measureIndex === null) {
+      console.log('[shrinkVoltaBracket] No measure selected');
+      return;
+    }
+
+    // Find the volta at this measure
+    const volta = compositionState.getVoltaForMeasure?.(measureIndex);
+    if (!volta) {
+      console.log('[shrinkVoltaBracket] No volta at selected measure');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const success = compositionState.shrinkVoltaBracket(volta.id, direction);
+    if (success) {
+      this.composerIntegration.render(true);
+      // Re-dispatch measure selected event to update sidebar (preserves volta controls visibility)
+      window.dispatchEvent(new CustomEvent('notationMeasureSelected', {
+        detail: { measureIndex }
+      }));
+    }
   }
 
   // ============================================================================
@@ -5083,10 +5219,48 @@ export class NoteEditor {
         continue;
       }
 
-      // Toggle tied state
-      const newTiedState = !note.tied;
-      note.tied = newTiedState;
-      changedCount++;
+      // Check if this note is part of a tie (either as source or target)
+      const hasTiedToNext = note.tied === true;
+      const isTiedFromPrev = note.isTied === true;
+
+      // Determine new state based on current state
+      let newTiedState;
+
+      if (isTiedFromPrev && !hasTiedToNext) {
+        // This note is the TARGET of a tie (has isTied but not tied)
+        // User wants to remove the tie - we need to clear isTied on this note
+        // and clear tied on the PREVIOUS note
+        note.isTied = false;
+        changedCount++;
+
+        // Find and update the previous note that ties to this one
+        let prevNote = null;
+        let prevMeasureIdx = measureIndex;
+        let prevNoteIdx = noteIndex - 1;
+
+        if (prevNoteIdx >= 0) {
+          prevNote = voice.notes[prevNoteIdx];
+        } else {
+          // Check previous measure
+          prevMeasureIdx = measureIndex - 1;
+          if (prevMeasureIdx >= 0) {
+            const prevMeasure = compositionState.measures[prevMeasureIdx];
+            const prevVoice = prevMeasure?.notation[voiceKey]?.voices?.[voiceIndex];
+            if (prevVoice && prevVoice.notes && prevVoice.notes.length > 0) {
+              prevNote = prevVoice.notes[prevVoice.notes.length - 1];
+            }
+          }
+        }
+
+        if (prevNote && prevNote.tied) {
+          prevNote.tied = false;
+        }
+
+        continue; // Don't process further - we handled the untie
+      }
+
+      // Normal toggle: this note either has tied=true (remove it) or no tie (add one)
+      newTiedState = !hasTiedToNext;
 
       // CRITICAL: Also update isTied on the next note to keep tie state consistent
       // This prevents sync from incorrectly merging notes after tie is removed
@@ -5112,19 +5286,32 @@ export class NoteEditor {
         }
       }
 
+      // Check if pitches match before creating a tie
+      const samePitches = nextNote && this.pitchArraysMatch(
+        note.pitches || (note.pitch ? [note.pitch] : []),
+        nextNote.pitches || (nextNote.pitch ? [nextNote.pitch] : [])
+      );
+
+      // Only allow tie creation if pitches match (or if we're removing a tie)
+      if (newTiedState && !samePitches) {
+        // User is trying to create a tie to a note with different pitch - show toast and skip
+        if (window.toast?.warning) {
+          window.toast.warning("Can't tie notes of different pitch - ties combine notes of the same pitch");
+        }
+        continue; // Skip this note - don't set tied=true
+      }
+
+      // Now safe to set the tie
+      note.tied = newTiedState;
+      changedCount++;
+
       // If the next note exists and has the same pitches, update its isTied
-      if (nextNote) {
-        const samePitches = this.pitchArraysMatch(
-          note.pitches || (note.pitch ? [note.pitch] : []),
-          nextNote.pitches || (nextNote.pitch ? [nextNote.pitch] : [])
-        );
-        if (samePitches) {
-          nextNote.isTied = newTiedState;
-          // Mark this next note as having been tied-to, so we don't toggle its tie
-          if (newTiedState) {
-            const nextNoteIdForCheck = `${nextMeasureIdx}-${staff}-${voiceIndex}-${nextNoteIdx}`;
-            tieTiedNotes.add(nextNoteIdForCheck);
-          }
+      if (nextNote && samePitches) {
+        nextNote.isTied = newTiedState;
+        // Mark this next note as having been tied-to, so we don't toggle its tie
+        if (newTiedState) {
+          const nextNoteIdForCheck = `${nextMeasureIdx}-${staff}-${voiceIndex}-${nextNoteIdx}`;
+          tieTiedNotes.add(nextNoteIdForCheck);
         }
       }
     }
@@ -5433,9 +5620,7 @@ export class NoteEditor {
    * Toggle rest mode on all selected notes
    */
   toggleRestOnSelected() {
-    console.log('[NoteEditor] toggleRestOnSelected called, selectedNotes:', Array.from(this.selectedNotes));
     if (this.selectedNotes.size === 0) {
-      console.log('[NoteEditor] toggleRestOnSelected - no notes selected, returning');
       return;
     }
 
@@ -6335,9 +6520,7 @@ export class NoteEditor {
    * @param {string} noteId - Note ID
    */
   selectNote(noteId) {
-    console.log('[NoteEditor] selectNote called with noteId:', noteId);
     this.selectedNotes.add(noteId);
-    console.log('[NoteEditor] selectedNotes after add:', Array.from(this.selectedNotes));
     this.hideSelectionHighlight = false; // Show highlight when selecting
     this.onNoteSelect(Array.from(this.selectedNotes));
     this.renderOverlay();
@@ -6429,8 +6612,6 @@ export class NoteEditor {
    * Clear selection
    */
   clearSelection() {
-    console.log('[NoteEditor] clearSelection called, had:', Array.from(this.selectedNotes));
-    console.trace('[NoteEditor] clearSelection stack trace');
     this.selectedNotes.clear();
     // Also clear auto-generated rest info since those selections are no longer valid
     if (this.autoGeneratedRestInfo) {
@@ -9378,9 +9559,10 @@ export class NoteEditor {
     // Shift octave
     octave += direction;
 
-    // Apply reasonable limits
-    const minOctave = staff === 'bass' ? 1 : 3;
-    const maxOctave = staff === 'bass' ? 4 : 7;
+    // Apply limits that match the ottava bracket system (supports 8va/8vb, 15ma/15mb, 22ma/22mb)
+    // The rendering system can display notes with up to 3-octave displacement brackets
+    const minOctave = staff === 'bass' ? 0 : 1;   // Bass: C0-C8, Treble: C1-C9
+    const maxOctave = staff === 'bass' ? 8 : 9;
     octave = Math.max(minOctave, Math.min(maxOctave, octave));
 
     return `${noteName.toUpperCase()}${accidental}${octave}`;
@@ -10100,6 +10282,8 @@ export class NoteEditor {
 
   /**
    * Show Quick Actions popup near a selected note
+   * Now shows the Editor Selector menu first, which allows choosing between
+   * Note Editor (Quick Actions), Measure Editor, or Chord Editor
    * @param {number} screenX - Screen X coordinate
    * @param {number} screenY - Screen Y coordinate
    */
@@ -10107,11 +10291,16 @@ export class NoteEditor {
     // Check if Quick Actions is enabled
     if (!this._quickActionsEnabled) return;
 
+    if (this.selectedNotes.size === 0) return;
+
+    // Show the Editor Selector menu instead of going directly to Quick Actions
+    this.showEditorSelector(screenX, screenY);
+    return;
+
+    // === LEGACY CODE BELOW (kept for reference) ===
     // Close any existing popup first (but don't let it trigger from the same click)
     this._quickActionsIgnoreNextOutsideClick = true;
     this.hideQuickActionsPopup();
-
-    if (this.selectedNotes.size === 0) return;
 
     // Get the first selected note's info
     const firstNoteId = Array.from(this.selectedNotes)[0];
@@ -11247,11 +11436,335 @@ export class NoteEditor {
     this._quickActionsSelectedPitch = null;
   }
 
+  // ============================================================================
+  // EDITOR SELECTOR MENU
+  // ============================================================================
+
+  /**
+   * Show the Editor Selector menu - an intermediary menu that lets users choose
+   * between Note Editor, Measure Editor, or Chord Editor
+   * @param {number} screenX - Screen X coordinate
+   * @param {number} screenY - Screen Y coordinate
+   */
+  showEditorSelector(screenX, screenY) {
+    // Close any existing popups first
+    this._editorSelectorIgnoreNextOutsideClick = true;
+    this.hideEditorSelector();
+    this.hideQuickActionsPopup();
+
+    if (this.selectedNotes.size === 0) return;
+
+    // Get measure index for the selected note
+    const firstNoteId = Array.from(this.selectedNotes)[0];
+    const [measureIndex] = this.parseNoteId(firstNoteId);
+
+    // Get chord index for this measure
+    const compositionState = window.getCompositionState?.();
+    const chordIndex = this._getChordIndexForMeasure(measureIndex);
+
+    // Create the selector popup
+    const selector = document.createElement('div');
+    selector.id = 'note-editor-selector';
+    selector.className = 'fixed bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden';
+    selector.style.cssText = `
+      font-family: system-ui, -apple-system, sans-serif;
+      z-index: 999999;
+      pointer-events: auto;
+      isolation: isolate;
+    `;
+
+    selector.innerHTML = `
+      <div class="flex flex-col">
+        <!-- Note Editor -->
+        <button id="es-note-editor" class="flex items-center gap-3 px-4 py-3 hover:bg-indigo-50 transition-colors border-b border-gray-100 text-left group">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm group-hover:shadow">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+            </svg>
+          </div>
+          <div>
+            <div class="font-semibold text-gray-800 text-sm">Note Editor</div>
+            <div class="text-xs text-gray-500">Duration, pitch, articulation</div>
+          </div>
+        </button>
+
+        <!-- Measure Editor -->
+        <button id="es-measure-editor" class="flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 transition-colors border-b border-gray-100 text-left group">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm group-hover:shadow">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+            </svg>
+          </div>
+          <div>
+            <div class="font-semibold text-gray-800 text-sm">Measure Editor</div>
+            <div class="text-xs text-gray-500">Detailed note placement</div>
+          </div>
+        </button>
+
+        <!-- Chord Editor -->
+        <button id="es-chord-editor" class="flex items-center gap-3 px-4 py-3 hover:bg-amber-50 transition-colors text-left group ${chordIndex === null ? 'opacity-50 cursor-not-allowed' : ''}">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-sm group-hover:shadow">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+            </svg>
+          </div>
+          <div>
+            <div class="font-semibold text-gray-800 text-sm">Chord Editor</div>
+            <div class="text-xs text-gray-500">${chordIndex !== null ? 'Edit chord properties' : 'No chord at this position'}</div>
+          </div>
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(selector);
+
+    // Position near click, adjust to stay on screen
+    const rect = selector.getBoundingClientRect();
+    let left = screenX + 30;
+    let top = screenY - 15;
+
+    if (left + rect.width > window.innerWidth - 10) {
+      left = screenX - rect.width - 30;
+    }
+    if (top + rect.height > window.innerHeight - 10) {
+      top = window.innerHeight - rect.height - 10;
+    }
+    if (top < 10) top = 10;
+    if (left < 10) left = 10;
+
+    selector.style.left = `${left}px`;
+    selector.style.top = `${top}px`;
+
+    this.editorSelector = selector;
+
+    // Attach event handlers
+    this._attachEditorSelectorHandlers(selector, measureIndex, chordIndex, screenX, screenY);
+  }
+
+  /**
+   * Attach event handlers to the Editor Selector menu
+   * @param {HTMLElement} selector - The selector element
+   * @param {number} measureIndex - The measure index of the selected note
+   * @param {number|null} chordIndex - The chord index for this measure (or null)
+   * @param {number} screenX - Original click X position
+   * @param {number} screenY - Original click Y position
+   * @private
+   */
+  _attachEditorSelectorHandlers(selector, measureIndex, chordIndex, screenX, screenY) {
+    // Note Editor - opens the Quick Actions popup
+    selector.querySelector('#es-note-editor')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hideEditorSelector();
+      // Show the full Quick Actions popup
+      this._showQuickActionsPopupDirect(screenX, screenY);
+    });
+
+    // Measure Editor - opens Measure Isolation Editor
+    selector.querySelector('#es-measure-editor')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hideEditorSelector();
+      if (window.openMeasureIsolationEditor) {
+        // Apply filter offset if in section view
+        const filterOffset = this.composerIntegration?.getMeasureFilterOffset?.() || 0;
+        window.openMeasureIsolationEditor(measureIndex + filterOffset);
+      }
+    });
+
+    // Chord Editor - opens Chord Bracket Editor
+    const chordBtn = selector.querySelector('#es-chord-editor');
+    if (chordBtn && chordIndex !== null) {
+      chordBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.hideEditorSelector();
+        if (window.showChordBracketEditor) {
+          window.showChordBracketEditor(chordIndex, null, e);
+        }
+      });
+    }
+
+    // Click outside to close
+    this._editorSelectorClickOutsideHandler = (e) => {
+      // Ignore the click that opened the selector
+      if (this._editorSelectorIgnoreNextOutsideClick) {
+        return;
+      }
+      if (!selector.contains(e.target)) {
+        this.hideEditorSelector();
+      }
+    };
+    // Use a longer delay and reset the ignore flag after event loop completes
+    setTimeout(() => {
+      this._editorSelectorIgnoreNextOutsideClick = false;
+      document.addEventListener('click', this._editorSelectorClickOutsideHandler);
+    }, 100);
+
+    // Escape to close
+    this._editorSelectorEscapeHandler = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hideEditorSelector();
+      }
+    };
+    document.addEventListener('keydown', this._editorSelectorEscapeHandler);
+  }
+
+  /**
+   * Get the chord index for a given measure
+   * @param {number} measureIndex - The measure index
+   * @returns {number|null} - Chord index or null if no chord
+   * @private
+   */
+  _getChordIndexForMeasure(measureIndex) {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState?.chordSegments) return null;
+
+    // Find which chord segment this measure falls into
+    let measuresSeen = 0;
+    for (let i = 0; i < compositionState.chordSegments.length; i++) {
+      const segment = compositionState.chordSegments[i];
+      const segmentMeasures = segment.measures || 1;
+      if (measureIndex >= measuresSeen && measureIndex < measuresSeen + segmentMeasures) {
+        return i;
+      }
+      measuresSeen += segmentMeasures;
+    }
+    return null;
+  }
+
+  /**
+   * Hide the Editor Selector menu
+   */
+  hideEditorSelector() {
+    if (this.editorSelector) {
+      this.editorSelector.remove();
+      this.editorSelector = null;
+    }
+    if (this._editorSelectorClickOutsideHandler) {
+      document.removeEventListener('click', this._editorSelectorClickOutsideHandler);
+      this._editorSelectorClickOutsideHandler = null;
+    }
+    if (this._editorSelectorEscapeHandler) {
+      document.removeEventListener('keydown', this._editorSelectorEscapeHandler);
+      this._editorSelectorEscapeHandler = null;
+    }
+    // Reset the ignore flag
+    this._editorSelectorIgnoreNextOutsideClick = false;
+  }
+
+  /**
+   * Direct call to show Quick Actions popup (bypasses editor selector)
+   * Used when Note Editor is selected from the editor selector menu
+   * @param {number} screenX - Screen X coordinate
+   * @param {number} screenY - Screen Y coordinate
+   * @private
+   */
+  _showQuickActionsPopupDirect(screenX, screenY) {
+    // This is the original showQuickActionsPopup logic
+    // Close any existing popup first
+    this._quickActionsIgnoreNextOutsideClick = true;
+    this.hideQuickActionsPopup();
+
+    if (this.selectedNotes.size === 0) return;
+
+    // Get the first selected note's info
+    const firstNoteId = Array.from(this.selectedNotes)[0];
+    const [measureIndex, staff, voiceIndex, noteIndex, pitchIndex] = this.parseNoteId(firstNoteId);
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) return;
+
+    const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+    const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+    const note = voice?.notes?.[noteIndex];
+    if (!note) return;
+
+    // Get current note properties
+    const currentDuration = note.duration || '4n';
+    const currentDotted = note.dotted || false;
+    const pitches = note.pitches || [note.pitch];
+    const currentPitch = (pitchIndex !== null && pitchIndex !== undefined && pitches[pitchIndex])
+      ? pitches[pitchIndex]
+      : (pitches[0] || 'C4');
+
+    // Store the selected pitch for interval/triad addition
+    this._quickActionsSelectedPitch = currentPitch;
+
+    // Get current accidental from toolbar
+    const currentAccidental = this.composerIntegration?.toolbar?.currentAccidental || null;
+
+    // Get chord root for this note's position
+    const noteBeat = note.beat || 0;
+    const chordRoot = this._getChordRootForPosition(measureIndex, noteBeat);
+
+    // Create popup element
+    const popup = document.createElement('div');
+    popup.id = 'note-quick-actions-popup';
+    popup.className = 'fixed bg-white rounded-xl shadow-2xl border border-gray-200 p-3';
+    popup.style.cssText = `
+      font-family: system-ui, -apple-system, sans-serif;
+      width: 200px;
+      max-height: 80vh;
+      overflow-y: auto;
+      z-index: 999999;
+      pointer-events: auto;
+      isolation: isolate;
+    `;
+
+    // Build popup content
+    popup.innerHTML = this._buildQuickActionsHTML(currentDuration, currentDotted, currentPitch, currentAccidental, chordRoot);
+
+    // Position popup near the click
+    document.body.appendChild(popup);
+
+    const popupRect = popup.getBoundingClientRect();
+    let left = screenX + 25;
+    let top = screenY - 10;
+
+    if (left + popupRect.width > window.innerWidth - 10) {
+      left = screenX - popupRect.width - 25;
+    }
+    if (top + popupRect.height > window.innerHeight - 10) {
+      top = window.innerHeight - popupRect.height - 10;
+    }
+    if (top < 10) top = 10;
+    if (left < 10) left = 10;
+
+    popup.style.left = `${left}px`;
+    popup.style.top = `${top}px`;
+
+    this.quickActionsPopup = popup;
+
+    // Attach handlers and setup drag
+    this._attachQuickActionsHandlers(popup);
+    this._setupQuickActionsDragging(popup);
+
+    // Update accidental state to reflect actual note state
+    this._updateQuickActionsAccidentalState(popup);
+
+    // Setup click outside handler
+    this._quickActionsClickOutsideHandler = (e) => {
+      if (this._quickActionsIgnoreNextOutsideClick) {
+        return;
+      }
+      if (!popup.contains(e.target)) {
+        this.hideQuickActionsPopup();
+      }
+    };
+    setTimeout(() => {
+      this._quickActionsIgnoreNextOutsideClick = false;
+      document.addEventListener('click', this._quickActionsClickOutsideHandler);
+    }, 100);
+  }
+
   /**
    * Destroy the editor
    */
   destroy() {
     this.hideQuickActionsPopup();
+    this.hideEditorSelector();
     this.detachEventListeners();
     this.clearSelection();
     // Remove global escape handler

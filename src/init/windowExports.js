@@ -457,6 +457,13 @@ import {
     getFullScreenChordLabEditor
 } from '../modules/features/chordLab/FullScreenChordLabEditor.js';
 
+// Full-Screen Scale Explorer
+import {
+    initScaleExplorerNewTab,
+    closeScaleExplorerNewTab,
+    getFullScreenScaleExplorer
+} from '../modules/features/scaleExplorer/FullScreenScaleExplorer.js';
+
 import {
     ENHARMONIC_MAP,
     SHARP_NOTES,
@@ -2441,4 +2448,9 @@ export function setupWindowExports() {
     window.initChordLabNewTab = initChordLabNewTab;
     window.closeChordLabNewTab = closeChordLabNewTab;
     window.getFullScreenChordLabEditor = getFullScreenChordLabEditor;
+
+    // Full-Screen Scale Explorer
+    window.initScaleExplorerNewTab = initScaleExplorerNewTab;
+    window.closeScaleExplorerNewTab = closeScaleExplorerNewTab;
+    window.getFullScreenScaleExplorer = getFullScreenScaleExplorer;
 }

@@ -210,10 +210,6 @@ export function getProgressionData() {
 export function setProgressionData(value) {
     // Silent delegation to compositionState (single source of truth)
     if (window.getCompositionState && Array.isArray(value)) {
-        console.log('[setProgressionData] Received value:');
-        value.forEach((chord, i) => {
-            console.log(`  [${i}] ${chord.root} ${chord.type} omittedNotes:`, chord.omittedNotes);
-        });
         const compositionState = window.getCompositionState();
         if (compositionState) {
             // CRITICAL FIX: Use the CURRENT time signature from compositionState, not hardcoded 4/4
