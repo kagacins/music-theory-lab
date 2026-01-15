@@ -33,10 +33,11 @@ export function showChoiceDialog(options) {
         activeChoiceDialog = null;
     }
 
-    // Create dialog overlay - z-index must be higher than unified modal (99999)
+    // Create dialog overlay - z-index must be higher than unified modal (99999) AND quick action popup (999999)
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
-    overlay.style.zIndex = '100000';
+    overlay.style.zIndex = '2147483647';
+    overlay.style.pointerEvents = 'auto';
     overlay.id = 'choice-dialog-overlay';
 
     // Create dialog container

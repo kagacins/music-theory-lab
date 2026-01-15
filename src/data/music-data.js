@@ -4,6 +4,32 @@ const ALL_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "
 const SHARP_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const FLAT_NOTES =  ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "Cb"];
 
+// --- CHORD ID GENERATION ---
+// Each chord card gets a unique ID for tracking bass edits across reorders/inserts/removes
+let _chordIdCounter = 0;
+
+/**
+ * Generate a unique chord ID
+ * Format: "chord_<timestamp>_<counter>" to ensure uniqueness even across sessions
+ * @returns {string} Unique chord ID
+ */
+function generateChordId() {
+    _chordIdCounter++;
+    return `chord_${Date.now()}_${_chordIdCounter}`;
+}
+
+/**
+ * Ensure a chord has an ID, generating one if missing
+ * @param {Object} chord - Chord object
+ * @returns {Object} The chord with an ID property
+ */
+function ensureChordId(chord) {
+    if (!chord.id) {
+        chord.id = generateChordId();
+    }
+    return chord;
+}
+
 const MAJOR_SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
 
 const ROMAN_MAP_BASE = {
@@ -91,8 +117,8 @@ const INTERVAL_DEFINITIONS = {
 
 const CHORD_GROUPS = [
     { title: 'Triads', types: ['Major', 'Minor', 'Augmented', 'Diminished', 'Sus2', 'Sus4', 'Power Chord'] },
-    { title: 'Sevenths', types: ['Dominant 7th', 'Major 7th', 'Minor 7th', 'Half-Diminished 7th', 'Diminished 7th', 'Minor-Major 7th'] },
     { title: 'Sixths', types: ['Major 6th', 'Minor 6th', '6/9'] },
+    { title: 'Sevenths', types: ['Dominant 7th', 'Major 7th', 'Minor 7th', 'Half-Diminished 7th', 'Diminished 7th', 'Minor-Major 7th'] },
     { title: 'Ninths', types: ['Major 9th', 'Dominant 9th', 'Minor 9th', 'Add9'] },
     { title: 'Extended', types: ['Dominant 11th', 'Minor 11th', 'Dominant 13th', 'Major 7th #11'] },
     { title: 'Altered', types: ['Augmented 7th', '7b5', '7#5', '7b9', '7#9'] },
@@ -782,5 +808,8 @@ export {
     generateDiatonicChords,
     generateScaleDiatonicChords,
     TIME_SIGNATURES,
-    DEFAULT_TIME_SIGNATURE
+    DEFAULT_TIME_SIGNATURE,
+    // Chord ID utilities for bass preservation system
+    generateChordId,
+    ensureChordId
 };

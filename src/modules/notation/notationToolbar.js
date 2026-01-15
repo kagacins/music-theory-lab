@@ -34,6 +34,10 @@ function isModalOpen() {
     if (overlay.id === 'fullscreen-notation-modal') {
       continue;
     }
+    // Skip the Composition Studio (New) tab - it's a tab, not a blocking modal
+    if (overlay.id === 'tab-studio-new') {
+      continue;
+    }
     // Check if it looks like a modal (has semi-transparent background)
     const style = window.getComputedStyle(overlay);
     const bg = style.backgroundColor;

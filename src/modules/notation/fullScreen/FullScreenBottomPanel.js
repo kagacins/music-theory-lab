@@ -17,6 +17,12 @@ import {
     CHORD_DEFINITIONS
 } from '../../../data/music-data.js';
 import { isChordInScale } from '../../features/chordBuilder.js';
+import {
+    detectAllPatterns,
+    getTopPatterns,
+    PATTERN_CATEGORIES
+} from '../../analysis/patternDetection.js';
+import { HarmonyAnalyzer } from '../../analysis/harmonyAnalyzer.js';
 
 // ============================================================================
 // CONSTANTS
@@ -30,21 +36,21 @@ const STORAGE_KEYS = {
 const DOCK_HEIGHT = 44; // Height of the dock bar
 const PANEL_HEIGHTS = {
     'workbench': 240,  // Song Workbench - 3 column layout (taller for better spacing)
-    'chords': 340,  // 75% larger to show full chord cards with section picker bar in section view
-    'quick-add': 195,
-    'auto-bass': 200,
+    'chords': 360,  // 75% larger to show full chord cards with section picker bar in section view
+    'quick-add': 360,  // Combined: quick-add controls + chord progression cards
+    'auto-bass': 360,  // Taller to include chord progression cards
     'voice-leading': 320,  // Increased to accommodate legend, filter controls, and fix suggestions
-    'borrowed': 200,
-    'theory': 220
+    'borrowed': 360,
+    'theory': 380  // Increased to show pattern detection, harmony analysis, and suggestions
 };
 
 const DOCK_BUTTONS = [
     { id: 'workbench', label: 'Workbench', icon: '🧪', color: 'from-violet-500 to-indigo-500' },
     { id: 'chords', label: 'Chord Progression', icon: '🎵', color: 'from-purple-500 to-indigo-500' },
-    { id: 'quick-add', label: 'Quick Add', icon: '➕', color: 'from-green-500 to-emerald-500' },
+    { id: 'quick-add', label: 'Quick Add', icon: '➕', color: 'from-lime-700 to-lime-800' },
     { id: 'auto-bass', label: 'Auto-Bass', icon: '🎸', color: 'from-amber-500 to-orange-500' },
     { id: 'voice-leading', label: 'Voice Leading', icon: '📊', color: 'from-blue-500 to-cyan-500' },
-    { id: 'borrowed', label: 'Borrowed', icon: '🔄', color: 'from-pink-500 to-rose-500' },
+    { id: 'borrowed', label: 'Borrowed Chords', icon: '🔄', color: 'from-slate-600 to-indigo-700' },
     { id: 'theory', label: 'Theory', icon: '💡', color: 'from-yellow-500 to-amber-500' }
 ];
 
@@ -60,6 +66,12 @@ export class FullScreenBottomPanel {
         this.activePanel = null; // null = closed, or panel id
         this.viewMode = this._loadFromStorage(STORAGE_KEYS.VIEW_MODE, 'scroll');
         this.selectedSectionIds = new Set();
+        this._quickAddSelectedSectionIds = new Set();  // Separate tracking for Quick Add panel
+
+        // Borrowed chords panel state
+        this._selectedBorrowedChord = null;  // Currently selected borrowed chord object
+        this._borrowedChordInversion = 0;    // 0 = root, 1 = 1st inv, 2 = 2nd inv
+        this._borrowedPreviewPiano = null;   // Piano sampler for preview
     }
 
     // ========================================================================
@@ -100,6 +112,12 @@ export class FullScreenBottomPanel {
      * to prevent panels from staying open on next open
      */
     closeActivePanel() {
+        // Clean up Quick Add selection listener if it exists
+        if (this._quickAddSelectionHandler) {
+            window.removeEventListener('chordCardSelected', this._quickAddSelectionHandler);
+            this._quickAddSelectionHandler = null;
+        }
+
         this.activePanel = null;
         this._saveToStorage(STORAGE_KEYS.ACTIVE_PANEL, '');
         this._updateUI();
@@ -117,7 +135,7 @@ export class FullScreenBottomPanel {
             left: 0 !important;
             right: 0 !important;
             bottom: 27px !important;
-            z-index: 9995 !important;
+            z-index: 505 !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
@@ -231,6 +249,51 @@ export class FullScreenBottomPanel {
                 this.toggle(btn.dataset.panel);
             });
         });
+
+        // Listen for chord selection changes to update Auto-Bass "Apply to Selected" button
+        document.addEventListener('chordsSelectionChanged', () => {
+            this._updateApplyToSelectedButton();
+        });
+
+        // Listen for section changes to re-render chord panels
+        const compState = getCompositionState();
+        if (compState?.events) {
+            const sectionEvents = [
+                'sectionCreated', 'sectionUpdated', 'sectionDeleted',
+                'sectionDuplicated', 'sectionsReordered', 'sectionsReorderedByIds',
+                'chordAddedToSection', 'chordRemovedFromSection',
+                'sectionChordsReordered', 'sectionsUpdatedAfterDelete',
+                'sectionsUpdatedAfterInsert', 'sectionsUpdatedAfterReorder'
+            ];
+            sectionEvents.forEach(eventName => {
+                compState.events.on(eventName, () => {
+                    // Re-render panels that show chord cards when sections change
+                    if (this.activePanel === 'chords' || this.activePanel === 'quick-add' || this.activePanel === 'auto-bass') {
+                        this._renderPanelContent();
+                    }
+                });
+            });
+        }
+
+        // MutationObserver to watch for data-selected attribute changes on chord cards only
+        this._selectionObserver = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'data-selected') {
+                    // Only react if it's an actual chord card
+                    const target = mutation.target;
+                    if (target.classList.contains('simplified-card') || target.classList.contains('detailed-card')) {
+                        this._updateApplyToSelectedButton();
+                        break;
+                    }
+                }
+            }
+        });
+        // Observe the entire document for attribute changes
+        this._selectionObserver.observe(document.body, {
+            attributes: true,
+            attributeFilter: ['data-selected'],
+            subtree: true
+        });
     }
 
     // ========================================================================
@@ -239,10 +302,9 @@ export class FullScreenBottomPanel {
 
     _renderWorkbenchPanel(container) {
         const compState = getCompositionState();
-        const settings = compState?.getSettings?.() || {};
-        const key = settings.key || 'C';
-        const mode = settings.mode || 'major';
-        const keyDisplay = `${key} ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+        // Key is stored in metadata (e.g., "C", "Gm", "F#", "Bbm")
+        // Just display the key as-is to match Classic studio behavior
+        const key = compState?.metadata?.key || 'C';
 
         container.innerHTML = `
             <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 border-b border-violet-700">
@@ -270,7 +332,7 @@ export class FullScreenBottomPanel {
                     </h4>
                     <button id="fs-workbench-key-btn"
                             class="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all">
-                        <span id="fs-workbench-key-display">${keyDisplay}</span>
+                        <span id="fs-workbench-key-display">${key}</span>
                         <svg class="w-4 h-4 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </button>
                     <p class="text-[10px] text-gray-400 mt-1.5 text-center">Sets the tonal center</p>
@@ -385,11 +447,31 @@ export class FullScreenBottomPanel {
         }
         const key = compState?.getSettings?.()?.key || 'C';
 
-        // Header with view mode toggle
+        // Header with view mode toggle and action buttons
         container.innerHTML = `
             <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 border-b border-purple-700">
                 <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Chord Progression</span>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5">
+                    <!-- Action Buttons -->
+                    <button id="fs-chords-add-section-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Select adjacent chords, then add to a section">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span>+Section</span>
+                    </button>
+                    <button id="fs-chords-clear-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Clear all chords">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>Clear</span>
+                    </button>
+                    <button id="fs-chords-colors-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View color legend">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>Colors</span>
+                    </button>
+                    <!-- View Mode Toggle -->
                     <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
                         <button class="fs-view-mode-btn px-2 py-1 text-xs font-medium rounded-md transition-all ${this.viewMode === 'scroll' ? 'bg-white shadow text-indigo-600' : 'text-white/80 hover:text-white'}"
                                 data-mode="scroll" style="${this.viewMode === 'scroll' ? '-webkit-text-fill-color: #4f46e5;' : ''}">
@@ -410,7 +492,7 @@ export class FullScreenBottomPanel {
             <!-- Section picker bar (visible in section view mode when sections exist) -->
             <div id="fs-section-picker" class="${this.viewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
             <!-- Cards container -->
-            <div id="fs-chord-cards-container" class="flex flex-nowrap items-start gap-1 pl-4 pr-2 mt-2" style="width: 100%; height: calc(100% - ${this.viewMode === 'section' && hasSections ? '120px' : '58px'}); scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overflow-x: auto; overflow-y: hidden; padding-bottom: 24px;">
+            <div id="fs-chord-cards-container" class="flex flex-nowrap items-start gap-1 pl-4 pr-2 mt-2" style="width: 100%; height: calc(100% - ${this.viewMode === 'section' && hasSections ? '120px' : '58px'}); scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overflow-x: auto; overflow-y: visible; padding-bottom: 24px; padding-top: 4px;">
             </div>
             <style>
                 #fs-chord-cards-container::-webkit-scrollbar { height: 10px; }
@@ -418,6 +500,17 @@ export class FullScreenBottomPanel {
                 #fs-chord-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #8b5cf6, #6366f1); border-radius: 5px; }
                 #fs-chord-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #7c3aed, #4f46e5); }
                 #fs-chord-cards-container { scrollbar-width: auto; scrollbar-color: #8b5cf6 #f1f5f9; }
+
+                /* Selection styling - remove double outline, use contained border like Quick Add/Auto Bass */
+                #fs-chord-cards-container .chord-card-wrapper {
+                    outline: none !important;
+                    outline-offset: 0 !important;
+                }
+                #fs-chord-cards-container .simplified-card[data-selected="true"],
+                #fs-chord-cards-container .detailed-card[data-selected="true"] {
+                    border: 3px solid #a855f7 !important;
+                    box-sizing: border-box !important;
+                }
             </style>
         `;
 
@@ -433,6 +526,51 @@ export class FullScreenBottomPanel {
         // Attach close button handler
         container.querySelector('.fs-panel-close-btn')?.addEventListener('click', () => {
             this.closeActivePanel();
+        });
+
+        // Attach +Add Section button handler
+        container.querySelector('#fs-chords-add-section-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Check if any cards are selected (either via main app state or via data-selected attribute)
+            const selectedCards = document.querySelectorAll('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
+            const selectedIndices = window.getSelectedIndicesArray ? window.getSelectedIndicesArray() : [];
+
+            if (selectedCards.length === 0 && selectedIndices.length === 0) {
+                // No selection - show helpful message
+                if (window.toast) {
+                    window.toast.warning('Click on chord cards to select them first, then click +Section');
+                }
+                return;
+            }
+
+            // Use the main app's showAddSectionMenu
+            if (window.showAddSectionMenu) {
+                window.showAddSectionMenu(e, 'fs-chord-cards-container');
+            }
+        });
+
+        // Attach Clear button handler
+        container.querySelector('#fs-chords-clear-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.clearProgression) {
+                window.clearProgression();
+                // Re-render after clear
+                setTimeout(() => this._renderChordsPanel(container), 100);
+            }
+        });
+
+        // Attach Colors button handler
+        container.querySelector('#fs-chords-colors-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Try multiple possible function names for the legend toggle
+            if (typeof window.toggleChordFunctionLegend === 'function') {
+                window.toggleChordFunctionLegend();
+            } else if (typeof window.showChordFunctionLegend === 'function') {
+                window.showChordFunctionLegend();
+            } else if (window.toast) {
+                window.toast.info('Color legend shows chord functions: Tonic (I, vi), Subdominant (IV, ii), Dominant (V, vii°)');
+            }
         });
 
         const cardsContainer = container.querySelector('#fs-chord-cards-container');
@@ -751,6 +889,11 @@ export class FullScreenBottomPanel {
                 </div>
                 <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-600 rounded-xl p-2 hover:shadow-xl transition-all shadow-lg relative" style="min-height: 70px;">
                     ${invText ? `<div class="absolute top-1 left-1.5 text-lg text-red-400 font-bold" style="-webkit-text-fill-color: #f87171;">${invText}</div>` : ''}
+                    <button class="edit-btn absolute top-1 right-1 p-1 bg-amber-500/80 hover:bg-amber-500 text-white rounded transition" title="Edit Chord">
+                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                        </svg>
+                    </button>
                     <div class="text-center pt-1">
                         <div class="text-lg font-bold text-white" style="-webkit-text-fill-color: white;">${chordSymbol}</div>
                         <div class="text-[10px] text-gray-400 mt-0.5">${chord.beats || 4} beats</div>
@@ -758,6 +901,17 @@ export class FullScreenBottomPanel {
                 </div>
             </div>
         `;
+
+        // Edit button click handler
+        const editBtn = wrapper.querySelector('.edit-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.showChordBracketEditor) {
+                    window.showChordBracketEditor(index, null, e);
+                }
+            });
+        }
 
         wrapper.addEventListener('click', (e) => {
             if (e.target.closest('.drag-handle') || e.target.closest('button')) return;
@@ -794,7 +948,8 @@ export class FullScreenBottomPanel {
     }
 
     /**
-     * Initialize Sortable on section containers (for reordering entire sections)
+     * Initialize Sortable on section containers (for reordering entire sections AND receiving cards from sections)
+     * MIRRORS Composition Studio's initializeSimplifiedSortable
      */
     _initializeFSSectionContainerSortable(container) {
         if (typeof Sortable === 'undefined') return;
@@ -804,45 +959,76 @@ export class FullScreenBottomPanel {
         }
 
         container.sortableInstance = new Sortable(container, {
+            group: {
+                name: 'fs-progression-cards',  // Same group as section cards for cross-container drag
+                pull: true,
+                put: true  // Accept cards dragged out of sections
+            },
             animation: 200,
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
             dragClass: 'sortable-drag',
-            handle: '.section-banner',
-            draggable: '.section-unified-container',
-            swapThreshold: 0.3,
+            // Use drag-handle for cards, section-banner for sections
+            handle: '.drag-handle, .section-banner',
+            // Allow dragging both cards and section containers
+            draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',
+            swapThreshold: 0.4,
             sort: true,
+            // Exclude buttons from triggering drag
+            filter: 'button, select, input, .play-btn, .delete-btn, .edit-btn, .expand-btn, .no-drag',
+            preventOnFilter: false,
             onEnd: (evt) => {
-                window.saveStateBeforeChange?.();
+                const draggedItem = evt.item;
 
-                const compState = window.getCompositionState?.();
-                const trainerState = window.getTrainerState?.();
-                if (!compState || !trainerState) return;
+                // Check if we dragged a section container or a chord card
+                if (draggedItem.classList.contains('section-unified-container')) {
+                    // Section container was reordered
+                    window.saveStateBeforeChange?.();
 
-                const allContainers = Array.from(container.querySelectorAll(':scope > .section-unified-container'));
-                const newSectionOrder = allContainers
-                    .map(cont => cont.getAttribute('data-section-id'))
-                    .filter(Boolean);
+                    const compState = window.getCompositionState?.();
+                    const trainerState = window.getTrainerState?.();
+                    if (!compState || !trainerState) return;
 
-                const success = compState.reorderSectionsByIds(
-                    newSectionOrder,
-                    () => trainerState.progressionData,
-                    (newData) => {
-                        if (window.setProgressionData && window.setProgressionRomans) {
-                            const newRomans = newData.map((_, i) => trainerState.progressionRomans[i] || 'I');
-                            window.setProgressionData(newData);
-                            window.setProgressionRomans(newRomans);
+                    const allContainers = Array.from(container.querySelectorAll(':scope > .section-unified-container'));
+                    const newSectionOrder = allContainers
+                        .map(cont => cont.getAttribute('data-section-id'))
+                        .filter(Boolean);
+
+                    const success = compState.reorderSectionsByIds(
+                        newSectionOrder,
+                        () => trainerState.progressionData,
+                        (newData) => {
+                            if (window.setProgressionData && window.setProgressionRomans) {
+                                const newRomans = newData.map((_, i) => trainerState.progressionRomans[i] || 'I');
+                                window.setProgressionData(newData);
+                                window.setProgressionRomans(newRomans);
+                            }
                         }
-                    }
-                );
+                    );
 
-                if (success) {
-                    window.invalidateProgressionDataCache?.();
-                    window.refreshNotationFromProgression?.();
-                    // Refresh both Composition Studio and fullscreen panel
-                    window.renderProgressionDisplay?.('melody-progression-visualization', false);
-                    this._renderChordsPanel(this.container.querySelector('#fs-dock-panel-content'));
+                    if (success) {
+                        window.invalidateProgressionDataCache?.();
+                        window.refreshNotationFromProgression?.();
+                        window.renderProgressionDisplay?.('melody-progression-visualization', false);
+                        this._renderChordsPanel(this.container.querySelector('#fs-dock-panel-content'));
+                    }
+                } else if (draggedItem.classList.contains('chord-card-wrapper')) {
+                    // Chord card was dragged - delegate to the Composition Studio handler
+                    // This handles cards being dropped directly on the main container (ungrouped)
+                    if (evt.from === evt.to) {
+                        // Same container - use handleCardDragWithinSection
+                        window.saveStateBeforeChange?.();
+                        const fromSectionId = evt.from.getAttribute('data-section-id');
+                        this._handleFSCardDrag(evt, fromSectionId);
+                    }
+                    // Cross-container moves are handled by onAdd
                 }
+            },
+            onAdd: (evt) => {
+                // A card was dropped onto the main container from a section
+                window.saveStateBeforeChange?.();
+                const fromSectionId = evt.from.getAttribute('data-section-id');
+                this._handleFSCardDrag(evt, fromSectionId);
             }
         });
     }
@@ -893,6 +1079,7 @@ export class FullScreenBottomPanel {
 
     /**
      * Initialize Sortable for flat cards (no sections)
+     * Uses same group as section cards to allow cross-container drag
      */
     _initializeFSSimplifiedSortable(container) {
         if (typeof Sortable === 'undefined') return;
@@ -902,6 +1089,14 @@ export class FullScreenBottomPanel {
         }
 
         container.sortableInstance = new Sortable(container, {
+            group: {
+                name: 'fs-progression-cards',  // Same group as section cards for cross-container drag
+                pull: true,
+                put: (to, from, dragEl) => {
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
+            },
             animation: 200,
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
@@ -910,35 +1105,44 @@ export class FullScreenBottomPanel {
             filter: 'button, select, input, .no-drag',
             preventOnFilter: false,
             draggable: '.chord-card-wrapper[data-chord-index]',
+            swapThreshold: 0.65,
             delay: 150,
             delayOnTouchOnly: true,
             touchStartThreshold: 5,
             onEnd: (evt) => {
+                if (evt.from === evt.to) {
+                    // Same container reorder
+                    window.saveStateBeforeChange?.();
+
+                    const oldIndex = parseInt(evt.item.getAttribute('data-chord-index'));
+                    const allCards = Array.from(container.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+                    const newIndex = allCards.indexOf(evt.item);
+
+                    if (oldIndex === newIndex) return;
+
+                    const trainerState = window.getTrainerState?.();
+                    if (!trainerState) return;
+
+                    const progressionData = [...trainerState.progressionData];
+                    const progressionRomans = [...trainerState.progressionRomans];
+
+                    const [movedChord] = progressionData.splice(oldIndex, 1);
+                    const [movedRoman] = progressionRomans.splice(oldIndex, 1);
+                    progressionData.splice(newIndex, 0, movedChord);
+                    progressionRomans.splice(newIndex, 0, movedRoman);
+
+                    window.setProgressionData?.(progressionData);
+                    window.setProgressionRomans?.(progressionRomans);
+                    window.invalidateProgressionDataCache?.();
+                    window.refreshNotationFromProgression?.();
+                    window.renderProgressionDisplay?.('melody-progression-visualization', false);
+                    this._renderChordsPanel(this.container.querySelector('#fs-dock-panel-content'));
+                }
+            },
+            onAdd: (evt) => {
+                // Card was added from a section - handle cross-container move
                 window.saveStateBeforeChange?.();
-
-                const oldIndex = parseInt(evt.item.getAttribute('data-chord-index'));
-                const allCards = Array.from(container.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
-                const newIndex = allCards.indexOf(evt.item);
-
-                if (oldIndex === newIndex) return;
-
-                const trainerState = window.getTrainerState?.();
-                if (!trainerState) return;
-
-                const progressionData = [...trainerState.progressionData];
-                const progressionRomans = [...trainerState.progressionRomans];
-
-                const [movedChord] = progressionData.splice(oldIndex, 1);
-                const [movedRoman] = progressionRomans.splice(oldIndex, 1);
-                progressionData.splice(newIndex, 0, movedChord);
-                progressionRomans.splice(newIndex, 0, movedRoman);
-
-                window.setProgressionData?.(progressionData);
-                window.setProgressionRomans?.(progressionRomans);
-                window.invalidateProgressionDataCache?.();
-                window.refreshNotationFromProgression?.();
-                window.renderProgressionDisplay?.('melody-progression-visualization', false);
-                this._renderChordsPanel(this.container.querySelector('#fs-dock-panel-content'));
+                this._handleFSCardDrag(evt, evt.from.getAttribute('data-section-id'));
             }
         });
     }
@@ -1050,115 +1254,713 @@ export class FullScreenBottomPanel {
         const compState = getCompositionState();
         const key = compState?.getSettings?.()?.key || 'C';
 
-        // EXACTLY mirror the Composition Studio quick-add-chord-form layout
+        // Get chord progression data
+        let chords = [];
+        if (typeof compState?.getChords === 'function') {
+            chords = compState.getChords() || [];
+        }
+        if (chords.length === 0) {
+            const progressionData = compState?.exportToProgressionData?.();
+            chords = Array.isArray(progressionData) ? progressionData : [];
+        }
+
+        // Get sections for section view
+        const sections = compState?.buildSectionView?.() || compState?.getSections?.() || [];
+        const hasSections = sections.length > 0;
+
+        // Get selected chord index from MAIN APP's selection (purple/blue ring)
+        // Use window.getSelectedChordIndex() instead of our own _quickAddSelectedIndex
+        const selectedIndex = window.getSelectedChordIndex?.() ?? -1;
+        let selectedChordInfo = null;
+        let sectionInfo = null;
+
+        if (selectedIndex >= 0 && selectedIndex < chords.length) {
+            const chord = chords[selectedIndex];
+            const typeSymbol = CHORD_DEFINITIONS[chord.type]?.symbol || '';
+            const displayRoot = this._spellNoteInKey(chord.root || 'C', key);
+            const chordName = chord.simpleName || (displayRoot + typeSymbol);
+
+            // Get section for this chord
+            sectionInfo = compState?.getSectionForChord?.(selectedIndex);
+
+            selectedChordInfo = {
+                name: chordName,
+                position: selectedIndex + 1,
+                section: sectionInfo
+            };
+        }
+
+        // Build insert indicator text
+        let insertIndicatorText = 'Insert at end';
+        if (selectedChordInfo) {
+            insertIndicatorText = `Insert after ${selectedChordInfo.name} at position ${selectedChordInfo.position}`;
+            if (selectedChordInfo.section) {
+                insertIndicatorText += ` (in ${selectedChordInfo.section.label})`;
+            }
+        }
+
+        // Initialize view mode for quick-add if not set
+        if (!this._quickAddViewMode) {
+            this._quickAddViewMode = 'scroll';
+        }
+
+        // Combined layout: Quick Add controls on top, chord progression below
+        // Using forest/moss green theme (#4d7c0f = lime-700, #3f6212 = lime-800)
         container.innerHTML = `
-            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-500 border-b border-green-600">
-                <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Quick Add Chord</span>
-                <button class="fs-panel-close-btn p-1 rounded-full hover:bg-white/20 transition-colors" title="Close panel">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="p-3">
-                <!-- Scale Filter Row - EXACTLY like Composition Studio (lines 1791-1800 in index.html) -->
-                <div class="mb-3 p-2 bg-purple-50 rounded-lg border border-purple-200">
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <label class="text-xs font-medium text-purple-700">Scale Filter:</label>
-                        <select id="fs-quick-scale" class="flex-1 min-w-[200px] p-1.5 text-sm border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white">
-                            <option value="">All Chords (no filter)</option>
-                            <!-- Options populated by _populateScaleDropdown -->
-                        </select>
-                        <span class="text-xs text-purple-600 italic">Filter chord types by scale compatibility</span>
-                    </div>
+            <div class="flex items-center justify-between px-3 py-2 border-b" style="background: linear-gradient(to right, #4d7c0f, #3f6212); border-color: #365314;">
+                <div class="flex items-center gap-3">
+                    <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Quick Add Chord</span>
+                    <!-- Insert position indicator - in header to avoid line wrapping -->
+                    <span id="fs-quick-insert-indicator" class="text-[11px] text-white/90 font-medium bg-white/20 px-2 py-0.5 rounded" style="-webkit-text-fill-color: rgba(255,255,255,0.9);">
+                        ${insertIndicatorText}
+                    </span>
                 </div>
-                <!-- Main Controls Grid - EXACTLY like Composition Studio (lines 1802-1894 in index.html) -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">Root Note</label>
-                        <select id="fs-quick-root" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                            <option value="0">C</option>
-                            <option value="1">C# / Db</option>
-                            <option value="2">D</option>
-                            <option value="3">D# / Eb</option>
-                            <option value="4">E</option>
-                            <option value="5">F</option>
-                            <option value="6">F# / Gb</option>
-                            <option value="7">G</option>
-                            <option value="8">G# / Ab</option>
-                            <option value="9">A</option>
-                            <option value="10">A# / Bb</option>
-                            <option value="11">B</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type</label>
-                        <select id="fs-quick-type" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                            <!-- Populated by _populateChordTypeDropdown -->
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">Inversion</label>
-                        <select id="fs-quick-inversion" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                            <option value="0">Root Position</option>
-                            <option value="1">1st Inversion</option>
-                            <option value="2">2nd Inversion</option>
-                            <option value="3">3rd Inversion</option>
-                        </select>
-                    </div>
-                    <div class="flex items-end gap-2">
-                        <button id="fs-quick-add-btn" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition">
-                            Add
+                <div class="flex items-center gap-2">
+                    <!-- View mode toggle -->
+                    <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
+                        <button class="fs-qa-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._quickAddViewMode === 'scroll' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
+                                data-mode="scroll" style="${this._quickAddViewMode === 'scroll' ? 'color: #3f6212; -webkit-text-fill-color: #3f6212;' : ''}">
+                            Scroll
+                        </button>
+                        <button class="fs-qa-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._quickAddViewMode === 'section' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
+                                data-mode="section" style="${this._quickAddViewMode === 'section' ? 'color: #3f6212; -webkit-text-fill-color: #3f6212;' : ''}">
+                            Section
                         </button>
                     </div>
-                </div>
-                <!-- N.C. Button Row -->
-                <div class="mt-3 flex justify-end">
-                    <button id="fs-quick-nc-btn" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs font-medium rounded-lg shadow transition flex items-center gap-1.5" title="Add No Chord (N.C.) - reserves time without harmony">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-                        Add No Chord (N.C.)
+                    <button class="fs-panel-close-btn p-1 rounded-full hover:bg-white/20 transition-colors" title="Close panel">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
                     </button>
                 </div>
             </div>
+            <!-- Quick Add Controls - Compact single row -->
+            <div class="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- Scale Filter -->
+                    <select id="fs-quick-scale" class="p-1.5 text-xs border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white min-w-[140px]" title="Scale Filter">
+                        <option value="">All Chords</option>
+                    </select>
+                    <!-- Root Note -->
+                    <select id="fs-quick-root" class="p-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 min-w-[80px]">
+                        <option value="0">C</option>
+                        <option value="1">C# / Db</option>
+                        <option value="2">D</option>
+                        <option value="3">D# / Eb</option>
+                        <option value="4">E</option>
+                        <option value="5">F</option>
+                        <option value="6">F# / Gb</option>
+                        <option value="7">G</option>
+                        <option value="8">G# / Ab</option>
+                        <option value="9">A</option>
+                        <option value="10">A# / Bb</option>
+                        <option value="11">B</option>
+                    </select>
+                    <!-- Chord Type -->
+                    <select id="fs-quick-type" class="p-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 min-w-[120px]">
+                    </select>
+                    <!-- Inversion -->
+                    <select id="fs-quick-inversion" class="p-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 min-w-[100px]">
+                        <option value="0">Root Pos</option>
+                        <option value="1">1st Inv</option>
+                        <option value="2">2nd Inv</option>
+                        <option value="3">3rd Inv</option>
+                    </select>
+                    <!-- Add Button - forest green to match header -->
+                    <button id="fs-quick-add-btn" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1" style="background: #4d7c0f;" onmouseover="this.style.background='#3f6212'" onmouseout="this.style.background='#4d7c0f'">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Add Chord
+                    </button>
+                    <!-- N.C. Button -->
+                    <button id="fs-quick-nc-btn" class="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs font-medium rounded-lg shadow transition flex items-center gap-1" title="Add No Chord (N.C.)">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        Add N.C.
+                    </button>
+                </div>
+            </div>
+            <!-- Section picker bar (visible in section view mode when sections exist) -->
+            <div id="fs-qa-section-picker" class="${this._quickAddViewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
+            <!-- Chord Progression Cards -->
+            <div id="fs-quick-add-cards-container" class="flex flex-nowrap items-start gap-1 px-4 py-2" style="height: calc(100% - ${this._quickAddViewMode === 'section' && hasSections ? '130px' : '97px'}); overflow-x: auto; overflow-y: hidden;">
+            </div>
+            <style>
+                /* Scrollbar styling - forest green theme */
+                #fs-quick-add-cards-container::-webkit-scrollbar { height: 10px; }
+                #fs-quick-add-cards-container::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; margin: 0 8px; }
+                #fs-quick-add-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #4d7c0f, #3f6212); border-radius: 5px; border: 1px solid #365314; }
+                #fs-quick-add-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #3f6212, #365314); }
+                #fs-quick-add-cards-container { scrollbar-width: auto; scrollbar-color: #4d7c0f #e2e8f0; }
+
+                /* CRITICAL FIX: The selection outline is on .chord-card-wrapper, NOT the card itself.
+                   The outline with outlineOffset causes it to extend outside the wrapper bounds.
+                   Remove the outline from wrappers and use a contained border on the card instead. */
+                #fs-quick-add-cards-container .chord-card-wrapper {
+                    outline: none !important;
+                    outline-offset: 0 !important;
+                }
+
+                /* Add selection indicator as a border on the card itself (stays contained) */
+                #fs-quick-add-cards-container .simplified-card[data-selected="true"],
+                #fs-quick-add-cards-container .detailed-card[data-selected="true"] {
+                    border: 3px solid #a855f7 !important;
+                    box-sizing: border-box !important;
+                }
+            </style>
         `;
 
         // Populate dropdowns
         this._populateScaleDropdown(container);
         this._populateChordTypeDropdown(container);
 
-        // Root change handler - update chord types based on scale filter
+        // Attach view mode handlers
+        container.querySelectorAll('.fs-qa-view-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._quickAddViewMode = btn.dataset.mode;
+                this._renderQuickAddPanel(container);
+            });
+        });
+
+        // Render section picker if in section view
+        if (this._quickAddViewMode === 'section' && hasSections) {
+            this._renderQuickAddSectionPicker(container.querySelector('#fs-qa-section-picker'), sections);
+        }
+
+        // Render chord cards
+        const cardsContainer = container.querySelector('#fs-quick-add-cards-container');
+        if (cardsContainer && chords.length > 0) {
+            if (this._quickAddViewMode === 'section' && hasSections) {
+                this._renderQuickAddSectionViewCards(cardsContainer, chords, key, sections, selectedIndex);
+            } else {
+                this._renderQuickAddScrollViewCards(cardsContainer, chords, key, sections, selectedIndex);
+            }
+        } else if (cardsContainer) {
+            cardsContainer.innerHTML = '<div class="text-gray-400 text-sm p-4">No chords yet. Add your first chord above!</div>';
+        }
+
+        // Root change handler
         container.querySelector('#fs-quick-root')?.addEventListener('change', () => {
             this._populateChordTypeDropdown(container);
         });
 
-        // Scale change handler - filter chord types
+        // Scale change handler
         container.querySelector('#fs-quick-scale')?.addEventListener('change', () => {
             this._populateChordTypeDropdown(container);
         });
 
-        // Add button handler
+        // Add button handler - insert after selected or at end
+        // NOTE: Don't pass sectionInfo here - it gets re-computed at click time in the handler
         container.querySelector('#fs-quick-add-btn')?.addEventListener('click', () => {
-            const root = parseInt(container.querySelector('#fs-quick-root').value);
-            const type = container.querySelector('#fs-quick-type').value;
-            const inversion = parseInt(container.querySelector('#fs-quick-inversion').value);
-            const rootName = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][root];
-
-            if (window.addChordToProgressionByParams) {
-                window.addChordToProgressionByParams(type, rootName, inversion, 0, true);
-            }
+            this._handleQuickAddChord(container);
         });
 
         // N.C. button handler
         container.querySelector('#fs-quick-nc-btn')?.addEventListener('click', () => {
-            if (window.addNoChordToProgression) {
-                window.addNoChordToProgression();
-            }
+            this._handleQuickAddNC(container);
         });
 
         // Close button handler
         container.querySelector('.fs-panel-close-btn')?.addEventListener('click', () => {
             this.closeActivePanel();
         });
+
+        // Listen for chord selection changes to update insert indicator
+        // Remove any previous listener first
+        if (this._quickAddSelectionHandler) {
+            window.removeEventListener('chordCardSelected', this._quickAddSelectionHandler);
+        }
+        this._quickAddSelectionHandler = () => {
+            this._updateQuickAddInsertIndicator(container, chords, key);
+        };
+        window.addEventListener('chordCardSelected', this._quickAddSelectionHandler);
+    }
+
+    /**
+     * Update just the insert indicator text when selection changes
+     */
+    _updateQuickAddInsertIndicator(container, chords, key) {
+        const indicator = container.querySelector('#fs-quick-insert-indicator');
+        if (!indicator) return;
+
+        const selectedIndex = window.getSelectedChordIndex?.() ?? -1;
+        let insertIndicatorText = 'Insert at end';
+
+        if (selectedIndex >= 0 && selectedIndex < chords.length) {
+            const chord = chords[selectedIndex];
+            const typeSymbol = CHORD_DEFINITIONS[chord.type]?.symbol || '';
+            const displayRoot = this._spellNoteInKey(chord.root || 'C', key);
+            const chordName = chord.simpleName || (displayRoot + typeSymbol);
+
+            const compState = getCompositionState();
+            const sectionInfo = compState?.getSectionForChord?.(selectedIndex);
+
+            insertIndicatorText = `Insert after ${chordName} at position ${selectedIndex + 1}`;
+            if (sectionInfo) {
+                insertIndicatorText += ` (in ${sectionInfo.label})`;
+            }
+        }
+
+        indicator.textContent = insertIndicatorText;
+    }
+
+    /**
+     * Handle adding a chord in quick-add mode
+     */
+    _handleQuickAddChord(container) {
+        const root = parseInt(container.querySelector('#fs-quick-root').value);
+        const type = container.querySelector('#fs-quick-type').value;
+        const inversion = parseInt(container.querySelector('#fs-quick-inversion').value);
+        const rootName = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][root];
+
+        // Use main app's selected chord index
+        const insertAfterIdx = window.getSelectedChordIndex?.() ?? -1;
+
+        const compState = getCompositionState();
+        if (!compState) return;
+
+        // === DEBUG LOGGING START ===
+        console.log('=== QUICK ADD CHORD DEBUG ===');
+        console.log('1. Selected chord index (insertAfterIdx):', insertAfterIdx);
+        console.log('2. Total chords BEFORE insert:', compState.getChords?.()?.length);
+
+        // Log all sections BEFORE insert
+        const sectionsBefore = compState.getSections?.() || [];
+        console.log('3. Sections BEFORE insert:', JSON.stringify(sectionsBefore.map(s => ({
+            id: s.id,
+            name: s.name,
+            startIndex: s.startIndex,
+            chordCount: s.chordCount,
+            coversChords: `[${s.startIndex} to ${s.startIndex + s.chordCount - 1}]`
+        })), null, 2));
+
+        // Get section info for the selected chord (before insertion)
+        let sectionInfo = null;
+        if (insertAfterIdx >= 0) {
+            sectionInfo = compState.getSectionForChord?.(insertAfterIdx);
+        }
+        console.log('4. Section info for selected chord:', sectionInfo ? JSON.stringify({
+            id: sectionInfo.id,
+            name: sectionInfo.name,
+            startIndex: sectionInfo.startIndex,
+            chordCount: sectionInfo.chordCount
+        }) : 'null (no section)');
+
+        // Build chord data using the app's helper
+        const key = compState.metadata?.key || 'C';
+        let chordData = null;
+        if (window.getInvertedChordNotes) {
+            const result = window.getInvertedChordNotes(
+                rootName,
+                type,
+                inversion,
+                key,
+                0,  // octaveShift
+                window.getKeyBasedEnharmonic?.() || 'sharp',
+                window.getNotationPreference?.() || 'full'
+            );
+            const roman = window.noteToRomanNumeral?.(rootName, key, type) || '';
+
+            // Get default beats based on time signature
+            const ts = compState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const defaultBeats = ts.num * (4 / ts.denom);
+
+            chordData = {
+                name: result?.name || `${rootName} ${type}`,
+                simpleName: result?.simpleName || rootName,
+                notes: result?.specificNotes || [],
+                root: rootName,
+                type: type,
+                inversion: inversion || 0,
+                selectionMode: 'chord',
+                omittedNotes: [],
+                octaveShift: 0,
+                lhType: 'off',
+                lhInversion: 0,
+                lhOctaveShift: 0,
+                lhNotes: [],
+                lhOmittedNotes: [],
+                roman: roman,
+                beats: defaultBeats
+            };
+        }
+
+        if (!chordData) return;
+
+        // Calculate insert position: after selected chord, or at end
+        const insertAtIndex = insertAfterIdx >= 0 ? insertAfterIdx + 1 : compState.getChords?.()?.length || 0;
+        console.log('5. Will insert at index:', insertAtIndex);
+
+        // Use compositionState.insertChord which handles bass blocks and basic section shifting
+        const success = compState.insertChord(insertAtIndex, chordData);
+        console.log('6. insertChord success:', success);
+
+        // Log sections AFTER insertChord (which calls updateSectionsAfterChordInsert internally)
+        const sectionsAfterInsert = compState.getSections?.() || [];
+        console.log('7. Sections AFTER insertChord (before our manual fix):', JSON.stringify(sectionsAfterInsert.map(s => ({
+            id: s.id,
+            name: s.name,
+            startIndex: s.startIndex,
+            chordCount: s.chordCount,
+            coversChords: `[${s.startIndex} to ${s.startIndex + s.chordCount - 1}]`
+        })), null, 2));
+
+        if (success) {
+            // ALWAYS expand the section by 1 when the selected chord was in a section
+            // This ensures the new chord stays in the same section as the selected chord.
+            // We check if the new chord index falls within the section's range AFTER the insert.
+            // If not, we expand the section to include it.
+            if (sectionInfo && sectionInfo.id) {
+                console.log('8. Checking if we need manual section expansion...');
+                console.log('   Looking for section with id:', sectionInfo.id);
+
+                const sections = compState.getSections?.() || [];
+                const section = sections.find(s => s.id === sectionInfo.id);
+                console.log('   Found section:', section ? JSON.stringify({
+                    id: section.id,
+                    name: section.name,
+                    startIndex: section.startIndex,
+                    chordCount: section.chordCount
+                }) : 'NOT FOUND');
+
+                if (section) {
+                    // After insertChord, check if the new chord is actually in the section
+                    const sectionStart = section.startIndex;
+                    const sectionEnd = section.startIndex + section.chordCount - 1;
+                    console.log('   Section range: [', sectionStart, 'to', sectionEnd, ']');
+                    console.log('   insertAtIndex:', insertAtIndex);
+                    console.log('   Is insertAtIndex in range?', insertAtIndex >= sectionStart && insertAtIndex <= sectionEnd);
+
+                    // If the inserted chord index is outside the section range, expand to include it
+                    if (insertAtIndex < sectionStart || insertAtIndex > sectionEnd) {
+                        console.log('   --> EXPANDING section by 1 (chord was outside range)');
+                        // The new chord should be right after the selected chord, so expand to include it
+                        section.chordCount++;
+                    } else {
+                        console.log('   --> No expansion needed (chord already in range)');
+                    }
+                }
+            } else {
+                console.log('8. No section info or no section id - skipping manual expansion');
+            }
+
+            // Log final sections state
+            const sectionsFinal = compState.getSections?.() || [];
+            console.log('9. FINAL Sections state:', JSON.stringify(sectionsFinal.map(s => ({
+                id: s.id,
+                name: s.name,
+                startIndex: s.startIndex,
+                chordCount: s.chordCount,
+                coversChords: `[${s.startIndex} to ${s.startIndex + s.chordCount - 1}]`
+            })), null, 2));
+            console.log('10. Total chords AFTER insert:', compState.getChords?.()?.length);
+            console.log('=== END QUICK ADD CHORD DEBUG ===\n');
+
+            // Sync state first (no visual update yet)
+            if (window.syncProgressionToMelodyComposer) {
+                window.syncProgressionToMelodyComposer();
+            }
+
+            // Batch all visual updates in a single animation frame to reduce jank
+            requestAnimationFrame(() => {
+                // Render notation
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                }
+
+                // Update chord cards display
+                if (window.renderProgressionDisplay) {
+                    window.renderProgressionDisplay('melody-progression-visualization', true);
+                }
+
+                // Select the newly inserted chord
+                if (window.selectChordCard) {
+                    window.selectChordCard(insertAtIndex);
+                }
+
+                // Refresh the quick add panel
+                const panelContent = this.container?.querySelector('#fs-dock-panel-content');
+                if (panelContent) {
+                    this._renderQuickAddPanel(panelContent);
+                }
+            });
+
+            // Play shutter sound (can happen immediately, doesn't affect visuals)
+            if (window.getAudioIsReady?.() && window.getCameraShutter) {
+                const shutter = window.getCameraShutter();
+                if (shutter?.loaded) {
+                    shutter.start();
+                }
+            }
+        } else {
+            // Even if insert failed, refresh panel to show current state
+            const panelContent = this.container?.querySelector('#fs-dock-panel-content');
+            if (panelContent) {
+                this._renderQuickAddPanel(panelContent);
+            }
+        }
+    }
+
+    /**
+     * Handle adding N.C. in quick-add mode
+     */
+    _handleQuickAddNC(container) {
+        // Use main app's selected chord index
+        const insertAfterIdx = window.getSelectedChordIndex?.() ?? -1;
+
+        const compState = getCompositionState();
+        if (!compState) return;
+
+        // Get section info for the selected chord (before insertion)
+        let sectionInfo = null;
+        if (insertAfterIdx >= 0) {
+            sectionInfo = compState.getSectionForChord?.(insertAfterIdx);
+        }
+
+        // Get default beats based on time signature
+        const ts = compState.metadata?.timeSignature || { num: 4, denom: 4 };
+        const defaultBeats = ts.num * (4 / ts.denom);
+
+        // Create N.C. chord data
+        const ncChordData = {
+            name: 'N.C.',
+            simpleName: 'N.C.',
+            notes: [],
+            root: null,
+            type: 'N.C.',
+            inversion: 0,
+            selectionMode: 'chord',
+            omittedNotes: [],
+            octaveShift: 0,
+            lhType: 'off',
+            lhInversion: 0,
+            lhOctaveShift: 0,
+            lhNotes: [],
+            lhOmittedNotes: [],
+            roman: '',
+            beats: defaultBeats,
+            isNoChord: true
+        };
+
+        // Calculate insert position: after selected chord, or at end
+        const insertAtIndex = insertAfterIdx >= 0 ? insertAfterIdx + 1 : compState.getChords?.()?.length || 0;
+
+        // Use compositionState.insertChord which properly handles section index shifting
+        const success = compState.insertChord(insertAtIndex, ncChordData);
+
+        if (success) {
+            // If the selected chord was in a section, expand that section to include the new chord
+            if (sectionInfo && sectionInfo.id) {
+                compState.addChordToSection(insertAtIndex, sectionInfo.id);
+            }
+
+            // Sync state first (no visual update yet)
+            if (window.syncProgressionToMelodyComposer) {
+                window.syncProgressionToMelodyComposer();
+            }
+
+            // Batch all visual updates in a single animation frame to reduce jank
+            requestAnimationFrame(() => {
+                // Render notation
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                }
+
+                // Update chord cards display
+                if (window.renderProgressionDisplay) {
+                    window.renderProgressionDisplay('melody-progression-visualization', true);
+                }
+
+                // Select the newly inserted chord
+                if (window.selectChordCard) {
+                    window.selectChordCard(insertAtIndex);
+                }
+
+                // Refresh the quick add panel
+                const panelContent = this.container?.querySelector('#fs-dock-panel-content');
+                if (panelContent) {
+                    this._renderQuickAddPanel(panelContent);
+                }
+            });
+        } else {
+            // Even if insert failed, refresh panel to show current state
+            const panelContent = this.container?.querySelector('#fs-dock-panel-content');
+            if (panelContent) {
+                this._renderQuickAddPanel(panelContent);
+            }
+        }
+    }
+
+    /**
+     * Render section picker for quick-add panel
+     */
+    _renderQuickAddSectionPicker(container, sections) {
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="flex items-center gap-2 px-3 py-2 bg-gray-100 border-b border-gray-200" style="overflow: visible;">
+                <!-- All button -->
+                <button class="fs-qa-section-all-btn px-2.5 py-1 text-[10px] font-semibold rounded-full transition-all flex-shrink-0 cursor-pointer
+                               ${this._quickAddSelectedSectionIds.size === 0 ? 'bg-lime-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}">
+                    All
+                </button>
+                <!-- Section chips -->
+                <div class="fs-qa-section-chips flex items-center gap-1.5 flex-wrap"></div>
+            </div>
+        `;
+
+        // Populate section chips
+        const chipsContainer = container.querySelector('.fs-qa-section-chips');
+        sections.forEach(section => {
+            const isSelected = this._quickAddSelectedSectionIds.has(section.id);
+            const chip = document.createElement('button');
+            chip.className = `flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 cursor-pointer transition-all`;
+            chip.style.background = isSelected ? section.color : this._hexToRgba(section.color, 0.15);
+            chip.style.border = `1px solid ${section.color}`;
+            chip.style.color = isSelected ? 'white' : section.color;
+            if (isSelected) {
+                chip.style.webkitTextFillColor = 'white';
+            }
+            chip.innerHTML = `
+                <span class="w-2 h-2 rounded-full" style="background: ${isSelected ? 'white' : section.color};"></span>
+                ${section.label} (${section.chordIndices?.length || 0})
+            `;
+            chip.dataset.sectionId = section.id;
+
+            // Click handler
+            chip.addEventListener('click', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    // Toggle this section
+                    if (this._quickAddSelectedSectionIds.has(section.id)) {
+                        this._quickAddSelectedSectionIds.delete(section.id);
+                    } else {
+                        this._quickAddSelectedSectionIds.add(section.id);
+                    }
+                } else {
+                    // Single select
+                    if (this._quickAddSelectedSectionIds.has(section.id) && this._quickAddSelectedSectionIds.size === 1) {
+                        this._quickAddSelectedSectionIds.clear();
+                    } else {
+                        this._quickAddSelectedSectionIds.clear();
+                        this._quickAddSelectedSectionIds.add(section.id);
+                    }
+                }
+                this._renderQuickAddPanel(this.container.querySelector('#fs-dock-panel-content'));
+            });
+
+            chipsContainer.appendChild(chip);
+        });
+
+        // All button handler
+        container.querySelector('.fs-qa-section-all-btn')?.addEventListener('click', () => {
+            this._quickAddSelectedSectionIds.clear();
+            this._renderQuickAddPanel(this.container.querySelector('#fs-dock-panel-content'));
+        });
+    }
+
+    /**
+     * Render cards in scroll view for quick-add panel
+     */
+    _renderQuickAddScrollViewCards(container, chords, key, sections, selectedIndex) {
+        container.innerHTML = '';
+
+        const compState = getCompositionState();
+        const sectionView = compState?.buildSectionView?.() || [];
+
+        if (sectionView.length > 0) {
+            // Render with section containers
+            sectionView.forEach(section => {
+                const sectionContainer = this._createQuickAddSectionContainer(section, chords, key, selectedIndex);
+                if (sectionContainer) {
+                    container.appendChild(sectionContainer);
+                }
+            });
+        } else {
+            // Flat cards
+            chords.forEach((chord, index) => {
+                const wrapper = this._createQuickAddChordCard(chord, index, key, selectedIndex);
+                container.appendChild(wrapper);
+            });
+        }
+    }
+
+    /**
+     * Render cards in section view for quick-add panel
+     * Filters to only show selected sections (or all if none selected)
+     */
+    _renderQuickAddSectionViewCards(container, chords, key, sections, selectedIndex) {
+        container.innerHTML = '';
+
+        const compState = getCompositionState();
+        const sectionView = compState?.buildSectionView?.() || [];
+
+        // If no sections selected, show all
+        const selectedIds = this._quickAddSelectedSectionIds.size > 0
+            ? this._quickAddSelectedSectionIds
+            : new Set(sectionView.map(s => s.id));
+
+        // Filter to only selected sections
+        const filteredSections = sectionView.filter(s => selectedIds.has(s.id));
+
+        if (filteredSections.length > 0) {
+            // Render with section containers (only selected ones)
+            filteredSections.forEach(section => {
+                const sectionContainer = this._createQuickAddSectionContainer(section, chords, key, selectedIndex);
+                if (sectionContainer) {
+                    container.appendChild(sectionContainer);
+                }
+            });
+        } else {
+            // No matching sections - show empty message
+            container.innerHTML = '<div class="text-gray-400 text-sm p-4">No sections selected</div>';
+        }
+    }
+
+    /**
+     * Create section container for quick-add panel
+     */
+    _createQuickAddSectionContainer(section, progressionData, key, selectedIndex) {
+        const container = document.createElement('div');
+        container.className = 'inline-flex flex-col rounded-lg overflow-visible flex-shrink-0';
+        container.style.marginRight = '8px';
+
+        // Section banner
+        const banner = document.createElement('div');
+        banner.className = 'flex items-center gap-2 px-2 py-1 rounded-t-lg';
+        banner.style.backgroundColor = section.color;
+        banner.innerHTML = `<span class="text-white text-xs font-semibold" style="-webkit-text-fill-color: white;">${section.label}</span>`;
+        container.appendChild(banner);
+
+        // Cards area
+        const cardsArea = document.createElement('div');
+        cardsArea.className = 'flex items-start gap-1 p-2 rounded-b-lg';
+        cardsArea.style.backgroundColor = section.color + '20';
+        cardsArea.style.borderLeft = `2px solid ${section.color}`;
+        cardsArea.style.borderRight = `2px solid ${section.color}`;
+        cardsArea.style.borderBottom = `2px solid ${section.color}`;
+
+        if (section.chordIndices && section.chordIndices.length > 0) {
+            section.chordIndices.forEach(chordIdx => {
+                if (chordIdx < progressionData.length) {
+                    const chord = progressionData[chordIdx];
+                    const wrapper = this._createQuickAddChordCard(chord, chordIdx, key, selectedIndex);
+                    cardsArea.appendChild(wrapper);
+                }
+            });
+        }
+
+        container.appendChild(cardsArea);
+        return container;
+    }
+
+    /**
+     * Create chord card for quick-add panel
+     * Uses main app's selection (purple/blue ring) - no separate Quick Add selection needed
+     */
+    _createQuickAddChordCard(chord, index, key, selectedIndex) {
+        const wrapper = this._createFSChordCardWrapper(chord, index, key);
+        // No custom selection styling or click handlers needed
+        // Main app's selectChordCard() handles the purple/blue ring selection
+        // and window.getSelectedChordIndex() gives us the selected index for insert
+        return wrapper;
     }
 
     _populateScaleDropdown(container) {
@@ -1285,6 +2087,29 @@ export class FullScreenBottomPanel {
         const settings = compState?.getSettings?.() || {};
         const bassPattern = settings.bassPattern || 'root-fifth';
         const bassOctave = settings.bassOctave || 'auto';
+        const key = settings.key || 'C';
+
+        // Get chord progression data
+        let chords = [];
+        if (typeof compState?.getChords === 'function') {
+            chords = compState.getChords() || [];
+        }
+        if (chords.length === 0) {
+            const progressionData = compState?.exportToProgressionData?.();
+            chords = Array.isArray(progressionData) ? progressionData : [];
+        }
+
+        // Get sections for section view
+        const sections = compState?.buildSectionView?.() || compState?.getSections?.() || [];
+        const hasSections = sections.length > 0;
+
+        // Get selected chord index
+        const selectedIndex = window.getSelectedChordIndex?.() ?? -1;
+
+        // Initialize view mode for auto-bass if not set
+        if (!this._autoBassViewMode) {
+            this._autoBassViewMode = 'scroll';
+        }
 
         // Helper to check if pattern is selected
         const sel = (val) => bassPattern === val ? 'selected' : '';
@@ -1292,17 +2117,31 @@ export class FullScreenBottomPanel {
         container.innerHTML = `
             <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 border-b border-amber-600">
                 <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Auto-Bass Patterns</span>
-                <button class="fs-panel-close-btn p-1 rounded-full hover:bg-white/20 transition-colors" title="Close panel">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
+                <div class="flex items-center gap-2">
+                    <!-- View mode toggle -->
+                    <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
+                        <button class="fs-ab-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._autoBassViewMode === 'scroll' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
+                                data-mode="scroll" style="${this._autoBassViewMode === 'scroll' ? 'color: #d97706; -webkit-text-fill-color: #d97706;' : ''}">
+                            Scroll
+                        </button>
+                        <button class="fs-ab-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._autoBassViewMode === 'section' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
+                                data-mode="section" style="${this._autoBassViewMode === 'section' ? 'color: #d97706; -webkit-text-fill-color: #d97706;' : ''}">
+                            Section
+                        </button>
+                    </div>
+                    <button class="fs-panel-close-btn p-1 rounded-full hover:bg-white/20 transition-colors" title="Close panel">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <div class="p-3 h-full">
-                <div class="flex flex-wrap items-center gap-4 mb-3">
+            <!-- Controls Row -->
+            <div class="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                <div class="flex flex-wrap items-center gap-3">
                     <div class="flex items-center gap-2">
-                        <label class="text-xs font-medium text-gray-700">Bass Pattern:</label>
-                        <select id="fs-bass-pattern" class="p-1.5 text-sm border border-gray-300 rounded-lg min-w-[180px]">
+                        <label class="text-xs font-medium text-gray-700">Pattern:</label>
+                        <select id="fs-bass-pattern" class="p-1.5 text-xs border border-gray-300 rounded-lg min-w-[150px]">
                             <optgroup label="Simple">
                                 <option value="whole-note" ${sel('whole-note')}>Whole Note</option>
                                 <option value="root-fifth" ${sel('root-fifth')}>Root-Fifth</option>
@@ -1374,30 +2213,77 @@ export class FullScreenBottomPanel {
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-medium text-gray-700">Octave:</label>
-                        <select id="fs-bass-octave" class="p-1.5 text-sm border border-gray-300 rounded-lg">
+                        <select id="fs-bass-octave" class="p-1.5 text-xs border border-gray-300 rounded-lg">
                             <option value="auto" ${bassOctave === 'auto' ? 'selected' : ''}>Auto</option>
                             <option value="2" ${bassOctave === 2 || bassOctave === '2' ? 'selected' : ''}>Oct 2</option>
                             <option value="3" ${bassOctave === 3 || bassOctave === '3' ? 'selected' : ''}>Oct 3</option>
                         </select>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <label class="flex items-center gap-1.5 cursor-pointer" title="When ON, bass plays the inversion note (3rd for 1st inv, 5th for 2nd inv)">
-                            <input type="checkbox" id="fs-bass-follows-inv" class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
-                            <span class="text-xs font-medium text-gray-700">Follow Inv</span>
-                        </label>
-                    </div>
-                    <button id="fs-bass-apply" class="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-medium rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all shadow">
+                    <label class="flex items-center gap-1.5 cursor-pointer" title="When ON, bass plays the inversion note (3rd for 1st inv, 5th for 2nd inv)">
+                        <input type="checkbox" id="fs-bass-follows-inv" class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+                        <span class="text-xs font-medium text-gray-700">Follow Inv</span>
+                    </label>
+                    <button id="fs-bass-apply" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-medium rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all shadow">
                         Apply to All
                     </button>
-                    <button id="fs-bass-revert" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-all">
+                    <button id="fs-bass-apply-selected" class="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-400 text-white text-xs font-medium rounded-lg hover:from-amber-500 hover:to-orange-500 transition-all shadow" style="opacity: 0.5;" disabled title="Shift+click chord cards to multi-select, then apply pattern to selected chords only">
+                        Apply to Selected
+                    </button>
+                    <button id="fs-bass-revert" class="px-2 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-lg transition-all">
                         Revert All
                     </button>
                 </div>
-                <div class="text-xs text-gray-500">
-                    Auto-generate bass patterns based on your chord progression. Changes apply to the bass clef.
-                </div>
             </div>
+            <!-- Section picker bar (visible in section view mode when sections exist) -->
+            <div id="fs-ab-section-picker" class="${this._autoBassViewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
+            <!-- Chord Progression Cards -->
+            <div id="fs-auto-bass-cards-container" class="flex flex-nowrap items-start gap-1 px-4 py-2" style="height: calc(100% - ${this._autoBassViewMode === 'section' && hasSections ? '133px' : '100px'}); overflow-x: auto; overflow-y: hidden;">
+            </div>
+            <style>
+                /* Scrollbar styling - amber/orange theme */
+                #fs-auto-bass-cards-container::-webkit-scrollbar { height: 10px; }
+                #fs-auto-bass-cards-container::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; margin: 0 8px; }
+                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #f59e0b, #d97706); border-radius: 5px; border: 1px solid #b45309; }
+                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #d97706, #b45309); }
+                #fs-auto-bass-cards-container { scrollbar-width: auto; scrollbar-color: #f59e0b #e2e8f0; }
+
+                /* Selection styling - same as Quick Add */
+                #fs-auto-bass-cards-container .chord-card-wrapper {
+                    outline: none !important;
+                    outline-offset: 0 !important;
+                }
+                #fs-auto-bass-cards-container .simplified-card[data-selected="true"],
+                #fs-auto-bass-cards-container .detailed-card[data-selected="true"] {
+                    border: 3px solid #a855f7 !important;
+                    box-sizing: border-box !important;
+                }
+            </style>
         `;
+
+        // Attach view mode handlers
+        container.querySelectorAll('.fs-ab-view-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._autoBassViewMode = btn.dataset.mode;
+                this._renderAutoBassPanel(container);
+            });
+        });
+
+        // Render section picker if in section view
+        if (this._autoBassViewMode === 'section' && hasSections) {
+            this._renderAutoBassSectionPicker(container.querySelector('#fs-ab-section-picker'), sections);
+        }
+
+        // Render chord cards
+        const cardsContainer = container.querySelector('#fs-auto-bass-cards-container');
+        if (cardsContainer && chords.length > 0) {
+            if (this._autoBassViewMode === 'section' && hasSections) {
+                this._renderAutoBassSectionViewCards(cardsContainer, chords, key, sections, selectedIndex);
+            } else {
+                this._renderAutoBassScrollViewCards(cardsContainer, chords, key, sections, selectedIndex);
+            }
+        } else if (cardsContainer) {
+            cardsContainer.innerHTML = '<div class="text-gray-400 text-sm p-4">No chords yet. Add chords to generate bass patterns.</div>';
+        }
 
         // Pattern change handler
         container.querySelector('#fs-bass-pattern')?.addEventListener('change', (e) => {
@@ -1427,20 +2313,262 @@ export class FullScreenBottomPanel {
             });
         }
 
-        // Apply button
-        container.querySelector('#fs-bass-apply')?.addEventListener('click', () => {
-            if (window.regenerateBassForAllChords) window.regenerateBassForAllChords();
+        // Apply to All button
+        container.querySelector('#fs-bass-apply')?.addEventListener('click', async () => {
+            if (window.applyBassPatternToAll) {
+                await window.applyBassPatternToAll();
+            } else if (window.regenerateAllBass) {
+                window.regenerateAllBass();
+            }
+            // Refresh the panel to show updated cards
+            this._renderAutoBassPanel(container);
         });
 
-        // Revert button
+        // Apply to Selected button - applies to ALL selected chord cards
+        container.querySelector('#fs-bass-apply-selected')?.addEventListener('click', async () => {
+            // Find all selected chord cards and get their indices
+            const selectedCards = document.querySelectorAll('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
+            if (selectedCards.length === 0) return;
+
+            // Get indices from data-chord-index on the wrapper (not the card itself)
+            const selectedIndices = [];
+            selectedCards.forEach(card => {
+                const wrapper = card.closest('.chord-card-wrapper');
+                const index = wrapper ? parseInt(wrapper.dataset.chordIndex, 10) : NaN;
+                if (!isNaN(index) && !selectedIndices.includes(index)) {
+                    selectedIndices.push(index);
+                }
+            });
+
+            if (selectedIndices.length === 0) return;
+
+            // Apply bass pattern to each selected chord
+            if (window.regenerateBassForMeasure) {
+                for (const index of selectedIndices) {
+                    window.regenerateBassForMeasure(index);
+                }
+            }
+
+            if (window.refreshNotationFromProgression) {
+                window.refreshNotationFromProgression();
+            }
+        });
+
+        // Update Apply to Selected button state based on current selection
+        // Use timeout to ensure DOM is ready
+        setTimeout(() => this._updateApplyToSelectedButton(), 300);
+
+        // Revert All button
         container.querySelector('#fs-bass-revert')?.addEventListener('click', () => {
-            if (window.revertBassForAllChords) window.revertBassForAllChords();
+            if (window.revertAllBassToChordVoicing) {
+                window.revertAllBassToChordVoicing();
+            }
+            // Refresh the panel
+            this._renderAutoBassPanel(container);
         });
 
         // Close button handler
         container.querySelector('.fs-panel-close-btn')?.addEventListener('click', () => {
             this.closeActivePanel();
         });
+    }
+
+    /**
+     * Render section picker for auto-bass panel
+     */
+    _renderAutoBassSectionPicker(container, sections) {
+        if (!container) return;
+
+        // Initialize selected sections if not set
+        if (!this._autoBassSelectedSectionIds) {
+            this._autoBassSelectedSectionIds = new Set();
+        }
+
+        container.innerHTML = `
+            <div class="flex items-center gap-2 px-3 py-2 bg-gray-100 border-b border-gray-200" style="overflow: visible;">
+                <!-- All button -->
+                <button class="fs-ab-section-pill px-2 py-1 text-[10px] font-medium rounded-full transition-all
+                    ${this._autoBassSelectedSectionIds.size === 0 ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}"
+                    data-section-id="all">
+                    All
+                </button>
+                <!-- Section pills -->
+                ${sections.map(section => {
+                    const isSelected = this._autoBassSelectedSectionIds.has(section.id);
+                    return `
+                        <button class="fs-ab-section-pill px-2 py-1 text-[10px] font-medium rounded-full transition-all
+                            ${isSelected ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}"
+                            data-section-id="${section.id}">
+                            ${section.label || section.name || 'Section'}
+                        </button>
+                    `;
+                }).join('')}
+            </div>
+        `;
+
+        // Add click handlers for section pills
+        container.querySelectorAll('.fs-ab-section-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                const sectionId = pill.dataset.sectionId;
+
+                if (sectionId === 'all') {
+                    // Clear selection to show all
+                    this._autoBassSelectedSectionIds.clear();
+                } else {
+                    // Toggle this section
+                    if (this._autoBassSelectedSectionIds.has(sectionId)) {
+                        this._autoBassSelectedSectionIds.delete(sectionId);
+                    } else {
+                        this._autoBassSelectedSectionIds.add(sectionId);
+                    }
+                }
+
+                // Re-render the panel
+                const panelContent = this.container?.querySelector('#fs-dock-panel-content');
+                if (panelContent) {
+                    this._renderAutoBassPanel(panelContent);
+                }
+            });
+        });
+    }
+
+    /**
+     * Render chord cards in scroll view for auto-bass panel
+     */
+    _renderAutoBassScrollViewCards(container, chords, key, sections, selectedIndex) {
+        container.innerHTML = '';
+
+        const compState = getCompositionState();
+        const sectionView = compState?.buildSectionView?.() || [];
+
+        if (sectionView.length > 0) {
+            // Render with section containers
+            sectionView.forEach(section => {
+                const sectionContainer = this._createAutoBassSectionContainer(section, chords, key, selectedIndex);
+                if (sectionContainer) {
+                    container.appendChild(sectionContainer);
+                }
+            });
+        } else {
+            // Flat cards
+            chords.forEach((chord, index) => {
+                const wrapper = this._createAutoBassChordCard(chord, index, key, selectedIndex);
+                container.appendChild(wrapper);
+            });
+        }
+    }
+
+    /**
+     * Render chord cards in section view for auto-bass panel
+     * Filters to only show selected sections (or all if none selected)
+     */
+    _renderAutoBassSectionViewCards(container, chords, key, sections, selectedIndex) {
+        container.innerHTML = '';
+
+        const compState = getCompositionState();
+        const sectionView = compState?.buildSectionView?.() || [];
+
+        // If no sections selected, show all
+        const selectedIds = this._autoBassSelectedSectionIds && this._autoBassSelectedSectionIds.size > 0
+            ? this._autoBassSelectedSectionIds
+            : new Set(sectionView.map(s => s.id));
+
+        // Filter to only selected sections
+        const filteredSections = sectionView.filter(s => selectedIds.has(s.id));
+
+        if (filteredSections.length > 0) {
+            // Render with section containers (only selected ones)
+            filteredSections.forEach(section => {
+                const sectionContainer = this._createAutoBassSectionContainer(section, chords, key, selectedIndex);
+                if (sectionContainer) {
+                    container.appendChild(sectionContainer);
+                }
+            });
+        } else {
+            // No matching sections - show empty message
+            container.innerHTML = '<div class="text-gray-400 text-sm p-4">No sections selected</div>';
+        }
+    }
+
+    /**
+     * Create section container for auto-bass panel
+     */
+    _createAutoBassSectionContainer(section, progressionData, key, selectedIndex) {
+        const container = document.createElement('div');
+        container.className = 'inline-flex flex-col rounded-lg overflow-visible flex-shrink-0';
+        container.style.marginRight = '8px';
+
+        // Section banner (amber theme)
+        const banner = document.createElement('div');
+        banner.className = 'flex items-center gap-2 px-2 py-1 rounded-t-lg';
+        banner.style.backgroundColor = section.color || '#f59e0b';
+        banner.innerHTML = `<span class="text-white text-xs font-semibold" style="-webkit-text-fill-color: white;">${section.label}</span>`;
+        container.appendChild(banner);
+
+        // Cards area
+        const cardsArea = document.createElement('div');
+        cardsArea.className = 'flex items-start gap-1 p-2 rounded-b-lg';
+        const sectionColor = section.color || '#f59e0b';
+        cardsArea.style.backgroundColor = sectionColor + '20';
+        cardsArea.style.borderLeft = `2px solid ${sectionColor}`;
+        cardsArea.style.borderRight = `2px solid ${sectionColor}`;
+        cardsArea.style.borderBottom = `2px solid ${sectionColor}`;
+
+        if (section.chordIndices && section.chordIndices.length > 0) {
+            section.chordIndices.forEach(chordIdx => {
+                if (chordIdx < progressionData.length) {
+                    const chord = progressionData[chordIdx];
+                    const wrapper = this._createAutoBassChordCard(chord, chordIdx, key, selectedIndex);
+                    cardsArea.appendChild(wrapper);
+                }
+            });
+        }
+
+        container.appendChild(cardsArea);
+        return container;
+    }
+
+    /**
+     * Create chord card for auto-bass panel
+     */
+    _createAutoBassChordCard(chord, index, key, selectedIndex) {
+        const wrapper = this._createFSChordCardWrapper(chord, index, key);
+        // Click handler to select card and update Apply to Selected button
+        wrapper.addEventListener('click', (e) => {
+            if (e.target.closest('.drag-handle') || e.target.closest('button')) return;
+
+            // Select this chord using main app's selection
+            if (window.setSelectedChordIndex) {
+                window.setSelectedChordIndex(index);
+            }
+
+            // Update Apply to Selected button after selection change
+            // Use longer timeout to ensure DOM has updated with data-selected attribute
+            setTimeout(() => this._updateApplyToSelectedButton(), 300);
+        });
+        return wrapper;
+    }
+
+    /**
+     * Update Apply to Selected button visibility/state
+     * Checks if any chord card anywhere in the document has visual selection
+     */
+    _updateApplyToSelectedButton() {
+        // Try multiple selectors to find the button
+        let btn = this.container?.querySelector('#fs-bass-apply-selected');
+        if (!btn) {
+            btn = document.querySelector('#fs-bass-apply-selected');
+        }
+
+        if (btn) {
+            // Check if any chord card anywhere has data-selected="true"
+            // The main app sets this on cards in the progression visualization
+            const selectedCard = document.querySelector('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
+            const hasVisualSelection = selectedCard !== null;
+
+            btn.disabled = !hasVisualSelection;
+            btn.style.opacity = hasVisualSelection ? '1' : '0.5';
+        }
     }
 
     _renderVoiceLeadingPanel(container) {
@@ -1915,20 +3043,135 @@ export class FullScreenBottomPanel {
 
     _renderBorrowedPanel(container) {
         const compState = getCompositionState();
-        const key = compState?.getSettings?.()?.key || 'C';
+        const settings = compState?.getSettings?.() || {};
+        const rawKey = compState?.metadata?.key || settings.key || 'C';
+        const mode = settings.mode || 'major';
 
-        // Common borrowed chords
+        // Smart key display: if key already ends with 'm' (like "Dm"), don't append mode
+        // Also extract the root note for transposition (strip trailing 'm' if present)
+        const keyEndsWithMinor = rawKey.endsWith('m') && rawKey.length > 1;
+        const key = keyEndsWithMinor ? rawKey.slice(0, -1) : rawKey;
+        const keyDisplay = keyEndsWithMinor
+            ? `${key} Minor`  // "Dm" -> "D Minor"
+            : `${rawKey} ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;  // "C" + "major" -> "C Major"
+
+        // Comprehensive borrowed chords with descriptions and suggestions
         const borrowedChords = [
-            { root: key, type: 'Minor', label: 'i (parallel minor)', from: 'Parallel Minor' },
-            { root: this._transposeNote(key, 10), type: 'Major', label: 'bVII', from: 'Mixolydian' },
-            { root: this._transposeNote(key, 8), type: 'Major', label: 'bVI', from: 'Aeolian' },
-            { root: this._transposeNote(key, 3), type: 'Minor', label: 'biii', from: 'Parallel Minor' },
-            { root: this._transposeNote(key, 5), type: 'Minor', label: 'iv', from: 'Parallel Minor' },
-            { root: this._transposeNote(key, 1), type: 'Major', label: 'bII (Neapolitan)', from: 'Phrygian' },
+            // From Parallel Minor (Aeolian)
+            {
+                root: key, type: 'Minor', numeral: 'i', label: 'parallel minor',
+                source: 'Parallel Minor',
+                description: 'Adds melancholy, introspective quality',
+                suggestion: 'Works well as a surprise tonic substitute',
+                category: 'Parallel Minor'
+            },
+            {
+                root: this._transposeNote(key, 10), type: 'Major', numeral: 'bVII', label: 'bVII',
+                source: 'Mixolydian / Parallel Minor',
+                description: 'Rock/folk flavor, powerful resolution to I',
+                suggestion: 'Classic rock cadence: bVII → I',
+                category: 'Parallel Minor'
+            },
+            {
+                root: this._transposeNote(key, 8), type: 'Major', numeral: 'bVI', label: 'bVI',
+                source: 'Parallel Minor (Aeolian)',
+                description: 'Dramatic lift, emotional depth',
+                suggestion: 'Try after V for a deceptive cadence',
+                category: 'Parallel Minor'
+            },
+            {
+                root: this._transposeNote(key, 3), type: 'Minor', numeral: 'bIII', label: 'bIII',
+                source: 'Parallel Minor',
+                description: 'Unexpected color, often to/from IV',
+                suggestion: 'Common in blues and rock progressions',
+                category: 'Parallel Minor'
+            },
+            {
+                root: this._transposeNote(key, 5), type: 'Minor', numeral: 'iv', label: 'iv',
+                source: 'Parallel Minor',
+                description: 'Melancholy plagal motion',
+                suggestion: 'Beautiful in iv → I (minor plagal cadence)',
+                category: 'Parallel Minor'
+            },
+            // Neapolitan
+            {
+                root: this._transposeNote(key, 1), type: 'Major', numeral: 'bII', label: 'Neapolitan',
+                source: 'Phrygian / Neapolitan',
+                description: 'Exotic, dramatic pre-dominant chord',
+                suggestion: 'Typically resolves to V or directly to I',
+                category: 'Chromatic'
+            },
+            // Dominant 7th variants
+            {
+                root: this._transposeNote(key, 10), type: 'Dominant 7th', numeral: 'bVII7', label: 'bVII7',
+                source: 'Mixolydian',
+                description: 'Bluesy dominant sound on bVII',
+                suggestion: 'Strong pull to I, common in blues/rock',
+                category: 'Extended'
+            },
+            {
+                root: this._transposeNote(key, 5), type: 'Minor 7th', numeral: 'iv7', label: 'iv7',
+                source: 'Parallel Minor',
+                description: 'Jazzy minor plagal with 7th',
+                suggestion: 'iv7 → I gives a sophisticated plagal cadence',
+                category: 'Extended'
+            },
+            // Augmented sixth family (simplified as dominant 7ths)
+            {
+                root: this._transposeNote(key, 8), type: 'Dominant 7th', numeral: 'bVI7', label: 'bVI7',
+                source: 'Parallel Minor',
+                description: 'Tritone sub for ii7, jazz borrowing',
+                suggestion: 'Works as tritone substitution: bVI7 → V',
+                category: 'Extended'
+            },
+            // Diminished passing chord
+            {
+                root: this._transposeNote(key, 1), type: 'Diminished 7th', numeral: '#i°7', label: '#i°7',
+                source: 'Chromatic',
+                description: 'Common diminished passing chord',
+                suggestion: 'Use between I and ii as a passing chord',
+                category: 'Chromatic'
+            },
+            // Secondary dominants (borrowed function)
+            {
+                root: this._transposeNote(key, 2), type: 'Dominant 7th', numeral: 'V7/V', label: 'V/V',
+                source: 'Secondary Dominant',
+                description: 'Dominant of the dominant',
+                suggestion: 'Creates strong pull to V chord',
+                category: 'Secondary'
+            },
+            {
+                root: this._transposeNote(key, 9), type: 'Dominant 7th', numeral: 'V7/ii', label: 'V/ii',
+                source: 'Secondary Dominant',
+                description: 'Targets the ii chord',
+                suggestion: 'V7/ii → ii → V → I is a classic sequence',
+                category: 'Secondary'
+            },
         ];
 
+        // Store for use in detail section
+        this._borrowedChordsData = borrowedChords;
+
+        const selectedChord = this._selectedBorrowedChord;
+
+        // Helper to get chord symbol suffix
+        const getChordSymbol = (type) => {
+            const symbols = {
+                'Major': '',
+                'Minor': 'm',
+                'Dominant 7th': '7',
+                'Major 7th': 'maj7',
+                'Minor 7th': 'm7',
+                'Diminished': '°',
+                'Diminished 7th': '°7',
+                'Half-Diminished 7th': 'ø7',
+                'Augmented': '+',
+            };
+            return symbols[type] || '';
+        };
+
         container.innerHTML = `
-            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-pink-500 to-rose-500 border-b border-pink-600">
+            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-slate-600 to-indigo-700 border-b border-slate-500">
                 <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Borrowed Chords</span>
                 <button class="fs-panel-close-btn p-1 rounded-full hover:bg-white/20 transition-colors" title="Close panel">
                     <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1936,30 +3179,60 @@ export class FullScreenBottomPanel {
                     </svg>
                 </button>
             </div>
-            <div class="p-3 h-full">
-                <div class="text-xs text-gray-600 mb-2">Borrowed chords from parallel modes (key: ${key})</div>
-                <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    ${borrowedChords.map(chord => `
-                        <button class="fs-borrowed-chord p-2 bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-200 rounded-lg hover:from-pink-100 hover:to-rose-100 transition-all text-center"
-                                data-root="${chord.root}" data-type="${chord.type}">
-                            <div class="font-bold text-sm text-pink-700">${chord.root}${chord.type === 'Minor' ? 'm' : ''}</div>
-                            <div class="text-[10px] text-pink-500">${chord.label}</div>
-                        </button>
-                    `).join('')}
+            <div class="px-3 pt-3 pb-1 overflow-hidden" style="height: calc(100% - 44px); display: flex; flex-direction: column;">
+                <div class="text-xs text-slate-500 mb-2 flex-shrink-0">Key: ${keyDisplay} — click a chord to see details</div>
+                <div id="fs-borrowed-chords-list" class="flex gap-2 overflow-x-auto pb-2 pt-2 pl-1 flex-shrink-0" style="scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0;">
+                    ${borrowedChords.map((chord, idx) => {
+                        const isSelected = selectedChord && selectedChord.numeral === chord.numeral;
+                        const chordName = chord.root + getChordSymbol(chord.type);
+                        return `
+                            <button class="fs-borrowed-chord flex-shrink-0 px-3 py-2 rounded-lg border transition-all text-center
+                                ${isSelected
+                                    ? 'ring-2 ring-indigo-400 bg-indigo-50 border-indigo-300'
+                                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'}"
+                                    data-idx="${idx}" data-root="${chord.root}" data-type="${chord.type}" data-numeral="${chord.numeral}"
+                                    style="min-width: 65px;">
+                                <div class="font-bold text-sm text-slate-700">${chordName}</div>
+                                <div class="text-[10px] text-slate-500">${chord.numeral}</div>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+                <div id="fs-borrowed-detail-section" class="flex-1 overflow-y-auto mt-1" style="scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0;">
+                    ${selectedChord ? this._renderBorrowedDetailSection(selectedChord) : `
+                        <div class="px-4 py-4 text-center text-slate-400 text-sm">
+                            Select a chord above to see theory details and add to your progression
+                        </div>
+                    `}
                 </div>
             </div>
+            <style>
+                #fs-borrowed-chords-list::-webkit-scrollbar { height: 6px; }
+                #fs-borrowed-chords-list::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 3px; }
+                #fs-borrowed-chords-list::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+                #fs-borrowed-chords-list::-webkit-scrollbar-thumb:hover { background: #64748b; }
+                #fs-borrowed-detail-section::-webkit-scrollbar { width: 6px; }
+                #fs-borrowed-detail-section::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 3px; }
+                #fs-borrowed-detail-section::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+                #fs-borrowed-detail-section::-webkit-scrollbar-thumb:hover { background: #64748b; }
+            </style>
         `;
 
-        // Add click handlers
+        // Add click handlers for chord selection
         container.querySelectorAll('.fs-borrowed-chord').forEach(btn => {
             btn.addEventListener('click', () => {
-                const root = btn.dataset.root;
-                const type = btn.dataset.type;
-                if (window.addChordToProgressionByParams) {
-                    window.addChordToProgressionByParams(type, root, 0, 0, true);
-                }
+                const idx = parseInt(btn.dataset.idx, 10);
+                const chord = borrowedChords[idx];
+                this._selectedBorrowedChord = chord;
+                this._borrowedChordInversion = 0; // Reset inversion on new selection
+                this._renderBorrowedPanel(container); // Re-render with selection
             });
         });
+
+        // Add event handlers for detail section if a chord is selected
+        if (selectedChord) {
+            this._attachBorrowedDetailHandlers(container);
+        }
 
         // Close button handler
         container.querySelector('.fs-panel-close-btn')?.addEventListener('click', () => {
@@ -1967,10 +3240,390 @@ export class FullScreenBottomPanel {
         });
     }
 
+    /**
+     * Render the detail section for a selected borrowed chord
+     */
+    _renderBorrowedDetailSection(chord) {
+        // Get chord symbol
+        const getChordSymbol = (type) => {
+            const symbols = {
+                'Major': '',
+                'Minor': 'm',
+                'Dominant 7th': '7',
+                'Major 7th': 'maj7',
+                'Minor 7th': 'm7',
+                'Diminished': '°',
+                'Diminished 7th': '°7',
+                'Half-Diminished 7th': 'ø7',
+                'Augmented': '+',
+            };
+            return symbols[type] || '';
+        };
+        const chordName = chord.root + getChordSymbol(chord.type);
+        const inversionLabels = ['Root', '1st', '2nd'];
+        const currentInversion = this._borrowedChordInversion || 0;
+
+        // Category colors
+        const categoryColors = {
+            'Parallel Minor': 'bg-purple-100 text-purple-700',
+            'Chromatic': 'bg-amber-100 text-amber-700',
+            'Extended': 'bg-blue-100 text-blue-700',
+            'Secondary': 'bg-green-100 text-green-700',
+        };
+        const categoryClass = categoryColors[chord.category] || 'bg-slate-100 text-slate-600';
+
+        return `
+            <div class="border-t border-slate-200 mx-3"></div>
+            <div class="px-4 py-3">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded">${chord.numeral}</span>
+                        <span class="font-semibold text-slate-800">${chordName}</span>
+                        ${chord.category ? `<span class="px-2 py-0.5 ${categoryClass} text-[10px] font-medium rounded">${chord.category}</span>` : ''}
+                    </div>
+                    <button id="fs-borrowed-close-detail" class="p-1 rounded hover:bg-slate-100 transition-colors flex-shrink-0" title="Close details">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="text-xs text-slate-500 mb-1"><span class="font-medium">Source:</span> ${chord.source}</div>
+                <div class="text-sm text-slate-700 mb-2">${chord.description}</div>
+
+                <div class="flex items-center gap-4 mb-2 flex-wrap">
+                    <button id="fs-borrowed-add-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-all shadow-sm">
+                        Add to Progression
+                    </button>
+
+                    <div class="flex items-center gap-1">
+                        <span class="text-xs text-slate-500 mr-1">Inversion:</span>
+                        ${inversionLabels.map((label, inv) => `
+                            <button class="fs-borrowed-inv-btn px-2 py-1 text-xs rounded transition-all
+                                ${inv === currentInversion
+                                    ? 'bg-indigo-500 text-white font-medium'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}"
+                                data-inversion="${inv}" title="Hold to preview ${label} inversion">
+                                ${label}
+                            </button>
+                        `).join('')}
+                        <span class="text-[10px] text-slate-400 ml-1">(hold to preview)</span>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-600 bg-slate-50 rounded px-3 py-2 border-l-2 border-indigo-400">
+                    💡 <span class="font-medium">Tip:</span> ${chord.suggestion}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Attach event handlers for the borrowed chord detail section
+     */
+    _attachBorrowedDetailHandlers(container) {
+        const chord = this._selectedBorrowedChord;
+        if (!chord) return;
+
+        // Close detail button
+        container.querySelector('#fs-borrowed-close-detail')?.addEventListener('click', () => {
+            this._selectedBorrowedChord = null;
+            this._borrowedChordInversion = 0;
+            this._renderBorrowedPanel(container);
+        });
+
+        // Add button
+        container.querySelector('#fs-borrowed-add-btn')?.addEventListener('click', () => {
+            this._addBorrowedChord(chord, this._borrowedChordInversion);
+        });
+
+        // Inversion buttons - click to select, hold to preview
+        container.querySelectorAll('.fs-borrowed-inv-btn').forEach(btn => {
+            const inv = parseInt(btn.dataset.inversion, 10);
+
+            // Click to select inversion
+            btn.addEventListener('click', () => {
+                this._borrowedChordInversion = inv;
+                // Update button styles
+                container.querySelectorAll('.fs-borrowed-inv-btn').forEach(b => {
+                    const bInv = parseInt(b.dataset.inversion, 10);
+                    if (bInv === inv) {
+                        b.className = 'fs-borrowed-inv-btn px-2 py-1 text-xs rounded transition-all bg-indigo-500 text-white font-medium';
+                    } else {
+                        b.className = 'fs-borrowed-inv-btn px-2 py-1 text-xs rounded transition-all bg-slate-100 text-slate-600 hover:bg-slate-200';
+                    }
+                });
+            });
+
+            // Hold to preview
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                this._borrowedChordInversion = inv;
+                this._startBorrowedPreview(chord.root, chord.type, inv);
+                btn.classList.add('ring-2', 'ring-indigo-400');
+            });
+
+            btn.addEventListener('mouseup', () => {
+                this._stopBorrowedPreview();
+                btn.classList.remove('ring-2', 'ring-indigo-400');
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                this._stopBorrowedPreview();
+                btn.classList.remove('ring-2', 'ring-indigo-400');
+            });
+
+            // Touch support
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this._borrowedChordInversion = inv;
+                this._startBorrowedPreview(chord.root, chord.type, inv);
+                btn.classList.add('ring-2', 'ring-indigo-400');
+            });
+
+            btn.addEventListener('touchend', () => {
+                this._stopBorrowedPreview();
+                btn.classList.remove('ring-2', 'ring-indigo-400');
+            });
+        });
+    }
+
+    /**
+     * Start preview playback for borrowed chord
+     */
+    _startBorrowedPreview(root, type, inversion = 0) {
+        try {
+            // Use the app's shared piano via window.getPiano()
+            const piano = window.getPiano?.();
+            if (!piano) {
+                console.warn('[Borrowed] Piano not available for preview');
+                return;
+            }
+
+            const notes = this._buildBorrowedChordNotes(root, type, inversion);
+            piano.triggerAttack(notes);
+            this._borrowedPreviewActive = true;
+        } catch (e) {
+            console.warn('[Borrowed] Preview error:', e);
+        }
+    }
+
+    /**
+     * Stop preview playback
+     */
+    _stopBorrowedPreview() {
+        try {
+            const piano = window.getPiano?.();
+            if (piano && this._borrowedPreviewActive) {
+                piano.releaseAll();
+                this._borrowedPreviewActive = false;
+            }
+        } catch (e) {
+            console.warn('[Borrowed] Stop preview error:', e);
+        }
+    }
+
+    /**
+     * Build chord notes for playback
+     */
+    _buildBorrowedChordNotes(root, type, inversion = 0) {
+        // Intervals: Major = [0, 4, 7], Minor = [0, 3, 7]
+        const intervals = type === 'Minor' ? [0, 3, 7] : [0, 4, 7];
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // Normalize root (handle flats)
+        let rootIdx = noteNames.indexOf(root);
+        if (rootIdx === -1) {
+            // Handle flats
+            const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+            rootIdx = noteNames.indexOf(flatMap[root] || root);
+        }
+        if (rootIdx === -1) rootIdx = 0;
+
+        // Build notes in octave 3 (bass-ish register)
+        let notes = intervals.map(interval => {
+            const noteIdx = (rootIdx + interval) % 12;
+            return noteNames[noteIdx] + '3';
+        });
+
+        // Apply inversion
+        if (inversion === 1) {
+            // Move first note up an octave
+            notes[0] = notes[0].replace('3', '4');
+            notes = [notes[1], notes[2], notes[0]];
+        } else if (inversion === 2) {
+            // Move first two notes up an octave
+            notes[0] = notes[0].replace('3', '4');
+            notes[1] = notes[1].replace('3', '4');
+            notes = [notes[2], notes[0], notes[1]];
+        }
+
+        return notes;
+    }
+
+    /**
+     * Add borrowed chord to progression
+     */
+    _addBorrowedChord(chord, inversion = 0) {
+        const compState = getCompositionState();
+        if (!compState) {
+            console.warn('[Borrowed] No composition state available');
+            return;
+        }
+
+        // Save state for undo/redo BEFORE making changes
+        window.saveStateBeforeChange?.();
+
+        // Get key for proper chord building
+        const key = compState.metadata?.key || 'C';
+
+        // Get selected chord index - prioritize chord bracket label click over measure selection
+        // 1. First check if user clicked a chord bracket label (the pill under the staff)
+        // 2. Fall back to measure selection (blue highlight)
+        // 3. Default to -1 (append to end)
+        const chordBracketIdx = window.getChordBracketSelectedIndex?.() ?? -1;
+        const measureSelectionIdx = window.getSelectedChordIndex?.() ?? -1;
+        const insertAfterIdx = chordBracketIdx >= 0 ? chordBracketIdx : measureSelectionIdx;
+
+        // Build chord data using the app's helper if available
+        let chordData = null;
+        if (window.getInvertedChordNotes) {
+            const result = window.getInvertedChordNotes(
+                chord.root,
+                chord.type,
+                inversion,
+                key,
+                0,  // octaveShift
+                window.getKeyBasedEnharmonic?.() || 'sharp',
+                window.getNotationPreference?.() || 'full'
+            );
+            const roman = window.noteToRomanNumeral?.(chord.root, key, chord.type) || chord.numeral;
+
+            // Get default beats based on time signature
+            const ts = compState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const defaultBeats = ts.num * (4 / ts.denom);
+
+            chordData = {
+                name: result?.name || `${chord.root} ${chord.type}`,
+                simpleName: result?.simpleName || chord.root,
+                notes: result?.specificNotes || [],
+                root: chord.root,
+                type: chord.type,
+                inversion: inversion || 0,
+                selectionMode: 'chord',
+                omittedNotes: [],
+                octaveShift: 0,
+                lhType: 'off',
+                lhInversion: 0,
+                lhOctaveShift: 0,
+                lhNotes: [],
+                lhOmittedNotes: [],
+                roman: roman,
+                beats: defaultBeats
+            };
+        } else {
+            // Fallback: build simple chord data
+            const notes = this._buildBorrowedChordNotes(chord.root, chord.type, inversion);
+            // Get default beats based on time signature (1 measure worth)
+            const ts = compState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const fallbackBeats = ts.num * (4 / ts.denom);
+            chordData = {
+                root: chord.root,
+                type: chord.type,
+                inversion: inversion,
+                beats: fallbackBeats,
+                notes: notes,
+                roman: chord.numeral,
+                name: chord.root + (chord.type === 'Minor' ? 'm' : '')
+            };
+        }
+
+        if (!chordData) return;
+
+        // Get section info for the selected chord BEFORE insertion
+        // This follows the same approach as Quick Add Chord
+        let sectionInfo = null;
+        if (insertAfterIdx >= 0) {
+            sectionInfo = compState.getSectionForChord?.(insertAfterIdx);
+        }
+
+        // Calculate insert position: after selected chord, or at end
+        const totalChords = compState.getChords?.()?.length || 0;
+        const insertAtIndex = insertAfterIdx >= 0 ? insertAfterIdx + 1 : totalChords;
+
+        // Use compositionState.insertChord which handles bass blocks and section updates
+        const success = compState.insertChord(insertAtIndex, chordData);
+
+        if (success) {
+            // Expand the section to include the new chord if the selected chord was in a section
+            // This ensures the new chord stays in the same section as the chord it was inserted after
+            if (sectionInfo && sectionInfo.id) {
+                const sections = compState.getSections?.() || [];
+                const section = sections.find(s => s.id === sectionInfo.id);
+                if (section) {
+                    const sectionStart = section.startIndex;
+                    const sectionEnd = section.startIndex + section.chordCount - 1;
+                    // If the inserted chord index is outside the section range, expand to include it
+                    if (insertAtIndex < sectionStart || insertAtIndex > sectionEnd) {
+                        section.chordCount++;
+                    }
+                }
+            }
+
+            // Sync and refresh the UI
+            if (window.syncProgressionToMelodyComposer) {
+                window.syncProgressionToMelodyComposer();
+            }
+
+            // Batch visual updates in animation frame
+            requestAnimationFrame(() => {
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                }
+                if (window.renderChordProgression) {
+                    window.renderChordProgression();
+                }
+            });
+
+            // Show feedback
+            const chordName = chord.root + (chord.type === 'Minor' ? 'm' : '');
+            const posText = insertAfterIdx >= 0 ? `after position ${insertAfterIdx + 1}` : 'at end';
+            const sectionText = sectionInfo ? ` in "${sectionInfo.name}"` : '';
+            if (window.toast) {
+                window.toast.success(`Added ${chord.numeral} (${chordName}) ${posText}${sectionText}`);
+            }
+
+            // Play camera shutter sound if available
+            try {
+                const shutter = window.getCameraShutter?.();
+                if (shutter && typeof shutter.triggerAttackRelease === 'function') {
+                    shutter.triggerAttackRelease('C4', '16n');
+                }
+            } catch (e) {
+                // Silently ignore shutter sound errors
+            }
+        } else {
+            if (window.toast) {
+                window.toast.error('Failed to add chord');
+            }
+        }
+    }
+
     _renderTheoryPanel(container) {
         const compState = getCompositionState();
-        const key = compState?.getSettings?.()?.key || 'C';
+        const key = compState?.metadata?.key || 'C';
+        const mode = compState?.getSettings?.()?.mode || 'major';
+        const keyDisplay = `${key} ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+
+        // Get progression data for analysis
+        const progressionData = compState?.exportToProgressionData?.() || [];
         const chords = this._getChords(compState);
+
+        // Run pattern detection
+        let analysisData = null;
+        if (progressionData.length >= 2) {
+            analysisData = this._analyzeProgression(progressionData, key);
+        }
 
         container.innerHTML = `
             <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 border-b border-yellow-600">
@@ -1981,12 +3634,12 @@ export class FullScreenBottomPanel {
                     </svg>
                 </button>
             </div>
-            <div class="p-3 h-full overflow-auto">
-                <div class="text-xs text-gray-600 mb-2">Theory insights for your progression (key: ${key})</div>
-                <div id="fs-theory-content" class="space-y-2">
+            <div class="p-2 overflow-y-auto" style="height: calc(100% - 40px);">
+                <div class="text-[10px] text-gray-500 mb-1.5">Key: ${keyDisplay} • ${chords.length} chord${chords.length !== 1 ? 's' : ''}</div>
+                <div id="fs-theory-content" class="space-y-1.5">
                     ${chords.length < 2
-                        ? '<div class="text-gray-400 text-sm">Add at least 2 chords to see theory analysis</div>'
-                        : this._generateTheoryInsights(chords, key)
+                        ? '<div class="text-gray-400 text-sm text-center py-4">Add at least 2 chords to see theory analysis</div>'
+                        : this._generateTheoryInsights(analysisData, chords, key)
                     }
                 </div>
             </div>
@@ -1998,41 +3651,282 @@ export class FullScreenBottomPanel {
         });
     }
 
-    _generateTheoryInsights(chords, key) {
-        const insights = [];
+    /**
+     * Analyze the progression using pattern detection
+     */
+    _analyzeProgression(progressionData, key) {
+        try {
+            // Run pattern detection
+            const patterns = detectAllPatterns(progressionData, key);
+            const topPatterns = getTopPatterns(patterns, 8); // Get top 8 patterns
 
-        // Check for common progressions
-        if (chords.length >= 4) {
-            const roots = chords.slice(0, 4).map(c => c.root);
-            // I-V-vi-IV detection (simplified)
-            insights.push(`
-                <div class="p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div class="font-medium text-yellow-800 text-sm">📊 Progression Analysis</div>
-                    <div class="text-xs text-yellow-700 mt-1">${chords.length} chords in ${key} major</div>
-                </div>
-            `);
+            // Use HarmonyAnalyzer for named progressions
+            const harmonyAnalyzer = new HarmonyAnalyzer();
+            const namedProgressions = harmonyAnalyzer.detectCommonPatterns(progressionData, key);
+
+            // Get harmonic rhythm analysis
+            const harmonicRhythm = this._analyzeHarmonicRhythm(progressionData);
+
+            // Analyze chord function distribution
+            const functionAnalysis = this._analyzeChordFunctions(progressionData, key);
+
+            return {
+                topPatterns,
+                namedProgressions,
+                harmonicRhythm,
+                functionAnalysis,
+                chordCount: progressionData.length
+            };
+        } catch (e) {
+            console.warn('[Theory] Analysis error:', e);
+            return null;
+        }
+    }
+
+    /**
+     * Analyze harmonic rhythm (how often chords change)
+     */
+    _analyzeHarmonicRhythm(progressionData) {
+        if (!progressionData || progressionData.length === 0) return null;
+
+        const beatDurations = progressionData.map(c => c.beats || 4);
+        const totalBeats = beatDurations.reduce((a, b) => a + b, 0);
+        const avgBeats = totalBeats / progressionData.length;
+
+        let rhythmType = 'moderate';
+        let description = '';
+
+        if (avgBeats <= 2) {
+            rhythmType = 'fast';
+            description = 'Quick harmonic changes create energy and momentum';
+        } else if (avgBeats <= 4) {
+            rhythmType = 'moderate';
+            description = 'Balanced pacing allows melodies to breathe';
+        } else {
+            rhythmType = 'slow';
+            description = 'Extended harmonies create space for development';
         }
 
-        // Check for secondary dominants
-        const hasDom7 = chords.some(c => c.type === 'Dominant 7th');
-        if (hasDom7) {
-            insights.push(`
-                <div class="p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div class="font-medium text-blue-800 text-sm">🎯 Secondary Dominant Detected</div>
-                    <div class="text-xs text-blue-700 mt-1">You have a dominant 7th chord that may function as a secondary dominant.</div>
+        return { avgBeats, rhythmType, description, totalBeats };
+    }
+
+    /**
+     * Analyze chord function distribution (tonic, subdominant, dominant)
+     */
+    _analyzeChordFunctions(progressionData, key) {
+        const functions = { tonic: 0, subdominant: 0, dominant: 0, chromatic: 0 };
+        const harmonyAnalyzer = new HarmonyAnalyzer();
+
+        progressionData.forEach(chord => {
+            const roman = harmonyAnalyzer.getRomanNumeral(chord, key);
+            const upperRoman = roman?.toUpperCase().replace(/[^IViv]/g, '') || '';
+
+            if (['I', 'VI', 'III'].includes(upperRoman)) {
+                functions.tonic++;
+            } else if (['IV', 'II'].includes(upperRoman)) {
+                functions.subdominant++;
+            } else if (['V', 'VII'].includes(upperRoman)) {
+                functions.dominant++;
+            } else {
+                functions.chromatic++;
+            }
+        });
+
+        const total = progressionData.length;
+        return {
+            tonic: Math.round((functions.tonic / total) * 100),
+            subdominant: Math.round((functions.subdominant / total) * 100),
+            dominant: Math.round((functions.dominant / total) * 100),
+            chromatic: Math.round((functions.chromatic / total) * 100)
+        };
+    }
+
+    _generateTheoryInsights(analysisData, chords, key) {
+        if (!analysisData) {
+            return `
+                <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                    <div class="text-sm text-gray-500">Keep adding chords to unlock insights!</div>
                 </div>
-            `);
+            `;
         }
 
-        if (insights.length === 0) {
-            insights.push(`
-                <div class="p-2 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div class="text-sm text-gray-600">Keep adding chords to unlock more insights!</div>
+        let html = '';
+
+        // Named Progressions Section
+        if (analysisData.namedProgressions && analysisData.namedProgressions.length > 0) {
+            html += `
+                <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-2">
+                    <div class="flex items-center gap-1.5 mb-1.5">
+                        <span class="text-sm">🎼</span>
+                        <span class="font-semibold text-purple-800 text-xs">Named Progressions</span>
+                    </div>
+                    <div class="space-y-1">
+                        ${analysisData.namedProgressions.slice(0, 3).map(prog => `
+                            <div class="bg-white/60 rounded px-2 py-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-medium text-purple-700 text-xs">${prog.name || prog.pattern}</span>
+                                    ${prog.matches ? `<span class="text-[10px] text-purple-400">m.${prog.matches[0] + 1}</span>` : ''}
+                                    ${prog.pattern ? `<span class="text-[10px] text-purple-500 font-mono">${prog.pattern.join('-')}</span>` : ''}
+                                </div>
+                                ${prog.description ? `<div class="text-[10px] text-purple-600/80 mt-0.5 leading-tight">${prog.description}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
-            `);
+            `;
         }
 
-        return insights.join('');
+        // Detected Patterns Section
+        if (analysisData.topPatterns && analysisData.topPatterns.length > 0) {
+            html += `
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-2">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <span class="text-sm">🔍</span>
+                        <span class="font-semibold text-amber-800 text-xs">Detected Patterns</span>
+                    </div>
+                    <div class="space-y-0.5">
+                        ${analysisData.topPatterns.slice(0, 5).map(pattern => {
+                            const category = PATTERN_CATEGORIES[pattern.category];
+                            const color = category?.color || '#6b7280';
+                            const icon = category?.icon || '•';
+                            const displayName = pattern.fullName || pattern.name || pattern.type;
+
+                            return `
+                                <div class="flex items-start gap-1.5 bg-white/60 rounded px-2 py-1">
+                                    <span class="text-xs leading-none mt-0.5">${icon}</span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-medium text-xs" style="color: ${color}">${displayName}</span>
+                                            ${pattern.positions ? `<span class="text-[10px] text-gray-400">m.${pattern.positions[0] + 1}</span>` : ''}
+                                        </div>
+                                        ${pattern.description ? `<div class="text-[10px] text-gray-500 leading-tight truncate">${pattern.description}</div>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Harmonic Rhythm Analysis
+        if (analysisData.harmonicRhythm) {
+            const hr = analysisData.harmonicRhythm;
+            const rhythmColors = {
+                fast: { bg: 'from-red-50 to-orange-50', border: 'border-red-200', text: 'text-red-700', icon: '⚡' },
+                moderate: { bg: 'from-green-50 to-emerald-50', border: 'border-green-200', text: 'text-green-700', icon: '🎵' },
+                slow: { bg: 'from-blue-50 to-cyan-50', border: 'border-blue-200', text: 'text-blue-700', icon: '🌊' }
+            };
+            const colors = rhythmColors[hr.rhythmType];
+
+            html += `
+                <div class="bg-gradient-to-r ${colors.bg} border ${colors.border} rounded-lg p-2">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-sm">${colors.icon}</span>
+                        <span class="font-semibold ${colors.text} text-xs">Harmonic Rhythm: ${hr.rhythmType.charAt(0).toUpperCase() + hr.rhythmType.slice(1)}</span>
+                        <span class="text-[10px] text-gray-400 ml-auto">${hr.avgBeats.toFixed(1)} beats/chord</span>
+                    </div>
+                    <div class="text-[10px] text-gray-600 mt-0.5">${hr.description}</div>
+                </div>
+            `;
+        }
+
+        // Chord Function Distribution
+        if (analysisData.functionAnalysis) {
+            const fa = analysisData.functionAnalysis;
+            html += `
+                <div class="bg-gradient-to-r from-slate-50 to-gray-50 border border-slate-200 rounded-lg p-2">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <span class="text-sm">📊</span>
+                        <span class="font-semibold text-slate-700 text-xs">Harmonic Function Balance</span>
+                    </div>
+                    <div class="flex gap-0.5 h-3 rounded-full overflow-hidden bg-gray-200">
+                        ${fa.tonic > 0 ? `<div class="bg-blue-500" style="width: ${fa.tonic}%" title="Tonic ${fa.tonic}%"></div>` : ''}
+                        ${fa.subdominant > 0 ? `<div class="bg-amber-500" style="width: ${fa.subdominant}%" title="Subdominant ${fa.subdominant}%"></div>` : ''}
+                        ${fa.dominant > 0 ? `<div class="bg-red-500" style="width: ${fa.dominant}%" title="Dominant ${fa.dominant}%"></div>` : ''}
+                        ${fa.chromatic > 0 ? `<div class="bg-purple-500" style="width: ${fa.chromatic}%" title="Chromatic ${fa.chromatic}%"></div>` : ''}
+                    </div>
+                    <div class="flex justify-between text-[9px] text-gray-500 mt-0.5">
+                        <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>T ${fa.tonic}%</span>
+                        <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>S ${fa.subdominant}%</span>
+                        <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>D ${fa.dominant}%</span>
+                        ${fa.chromatic > 0 ? `<span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>C ${fa.chromatic}%</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Composition Tips based on analysis
+        const tips = this._generateCompositionTips(analysisData, chords, key);
+        if (tips.length > 0) {
+            html += `
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg p-2">
+                    <div class="flex items-center gap-1.5 mb-1">
+                        <span class="text-sm">💡</span>
+                        <span class="font-semibold text-emerald-800 text-xs">Suggestions</span>
+                    </div>
+                    <div class="space-y-0.5">
+                        ${tips.map(tip => `
+                            <div class="text-[10px] text-emerald-700 flex items-start gap-1">
+                                <span class="text-emerald-500">→</span>
+                                <span>${tip}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        return html || `
+            <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                <div class="text-sm text-gray-500">Analysis complete - add more chords for deeper insights!</div>
+            </div>
+        `;
+    }
+
+    /**
+     * Generate composition tips based on analysis
+     */
+    _generateCompositionTips(analysisData, chords, key) {
+        const tips = [];
+        const fa = analysisData.functionAnalysis;
+        const hr = analysisData.harmonicRhythm;
+
+        // Balance suggestions
+        if (fa.dominant < 15 && chords.length >= 4) {
+            tips.push('Consider adding a V chord for stronger resolution');
+        }
+        if (fa.tonic > 60) {
+            tips.push('Try varying chord functions - your progression is tonic-heavy');
+        }
+        if (fa.chromatic > 30) {
+            tips.push('Great chromatic color! Consider resolving to diatonic chords for contrast');
+        }
+
+        // Rhythm suggestions
+        if (hr.rhythmType === 'fast' && chords.length > 8) {
+            tips.push('Consider longer chord durations to let harmonies breathe');
+        }
+        if (hr.rhythmType === 'slow' && chords.length < 4) {
+            tips.push('Try adding more harmonic movement for interest');
+        }
+
+        // Pattern-based suggestions
+        if (!analysisData.namedProgressions || analysisData.namedProgressions.length === 0) {
+            if (chords.length >= 4) {
+                tips.push('Try a classic ii-V-I or I-V-vi-IV progression for familiarity');
+            }
+        }
+
+        // Check for lack of cadences
+        const hasCadence = analysisData.topPatterns?.some(p =>
+            ['PAC', 'HC', 'DC', 'PC'].includes(p.type)
+        );
+        if (!hasCadence && chords.length >= 3) {
+            tips.push('End phrases with a cadence (V→I or IV→I) for closure');
+        }
+
+        return tips.slice(0, 3); // Limit to 3 tips
     }
 
     // ========================================================================
@@ -2044,11 +3938,30 @@ export class FullScreenBottomPanel {
         return segments.map(seg => seg.chord).filter(Boolean);
     }
 
+    /**
+     * Transpose a note by semitones, using flats for borrowed chord naming
+     * (bVII, bVI, bIII use flat spelling: Bb, Ab, Eb, not A#, G#, D#)
+     */
     _transposeNote(note, semitones) {
-        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const idx = notes.indexOf(note.replace('b', '#').charAt(0) + (note.includes('#') ? '#' : ''));
+        // Use flats for borrowed chords (more musically correct for flat-based Roman numerals)
+        const notesWithFlats = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        const notesWithSharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // Find the index - handle both sharps and flats in input
+        let idx = notesWithSharps.indexOf(note);
+        if (idx === -1) {
+            idx = notesWithFlats.indexOf(note);
+        }
+        if (idx === -1) {
+            // Try to normalize (e.g., "Cb" -> B)
+            const flatToSharp = { 'Cb': 'B', 'Fb': 'E', 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+            const normalized = flatToSharp[note];
+            if (normalized) idx = notesWithSharps.indexOf(normalized);
+        }
         if (idx === -1) return note;
-        return notes[(idx + semitones) % 12];
+
+        // Return with flat spelling (more appropriate for borrowed chords)
+        return notesWithFlats[(idx + semitones) % 12];
     }
 
     _loadFromStorage(key, defaultValue) {

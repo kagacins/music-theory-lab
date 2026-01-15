@@ -2588,7 +2588,9 @@ function highlightBuilderNotes(specificNotes) {
         window.clearHighlights();
     }
 
-    if (!specificNotes || getCurrentTab() !== 'builder') return;
+    // Allow highlighting for both classic Chord Lab ('builder') and new Chord Lab ('chordlab-new')
+    const currentTab = getCurrentTab();
+    if (!specificNotes || (currentTab !== 'builder' && currentTab !== 'chordlab-new')) return;
 
     let allNotes = [...specificNotes];
 
@@ -2611,6 +2613,9 @@ function highlightBuilderNotes(specificNotes) {
         const keyElement = document.getElementById(keyId);
         if (keyElement) keyElement.classList.add('active-builder');
     });
+
+    // Dispatch event so listeners (like FullScreenChordLabEditor) can update
+    window.dispatchEvent(new CustomEvent('builderUpdated'));
 }
 
 // ============================================================================
@@ -2736,8 +2741,11 @@ export function selectBuilderRootNote(index, playAudio = true) {
 export function selectBuilderChordType(chordType, playAudio = true, resetVoicing = true) {
     setBuilderSelectionMode('chord');
     setBuilderChordType(chordType);
-    if (resetVoicing) setBuilderOmittedNotes([]); // Reset omissions on type change
-    if (resetVoicing) setBuilderLHOmittedNotes([]);
+    if (resetVoicing) {
+        setBuilderOmittedNotes([]); // Reset omissions on type change
+        setBuilderLHOmittedNotes([]);
+        setBuilderInversion(0); // Reset to root position on type change
+    }
     updateButtonSelection('#builder-interval-selector', 'intervalType', null, 'bg-emerald-600');
     updateButtonSelection('#builder-chord-type-selector', 'chordType', chordType, 'bg-teal-600', 'text-white');
     updateBuilderDisplay();
@@ -3805,6 +3813,7 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
     const lhInversion = 0;
     const lhOctaveShift = 0;
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
+    console.log('[addChordToProgression] omittedNotes from builder:', omittedNotes);
     const lhOmittedNotes = []; // LH no longer used in chord cards
     const octaveShift = getBuilderOctaveShift() * 12; // Convert whole octaves to semitones
 
@@ -4413,4 +4422,55 @@ function updateChordSuggestions() {
             chordButton.title = `SUGGESTION: Try this chord next, using the ${suggestion.inversion} inversion for smooth voice leading.\n\n${originalTitle}`;
         }
     });
+}
+
+// ============================================================================
+// Note Toggle Functions (for Full-Screen Chord Lab)
+// ============================================================================
+
+/**
+ * Toggle a right-hand note in/out of the chord (omit/include)
+ * Plays a brief chord preview (0.5s) after toggling
+ * @param {string} note - The note to toggle (e.g., 'C4', 'E4')
+ */
+export function toggleBuilderNote(note) {
+    const omitted = getBuilderOmittedNotes();
+    const isCurrentlyOmitted = omitted.includes(note);
+
+    if (isCurrentlyOmitted) {
+        // Include the note (remove from omitted list)
+        setBuilderOmittedNotes(omitted.filter(n => n !== note));
+    } else {
+        // Omit the note (add to omitted list)
+        setBuilderOmittedNotes([...omitted, note]);
+    }
+
+    updateBuilderDisplay();
+    playBuilderChordWithDuration(); // Brief 0.5s playback
+}
+
+/**
+ * Toggle a left-hand note in/out of the chord (omit/include)
+ * Plays a brief chord preview (0.5s) after toggling (if LH is active)
+ * @param {string} note - The note to toggle (e.g., 'C2', 'G2')
+ */
+export function toggleBuilderLHNote(note) {
+    const omitted = getBuilderLHOmittedNotes();
+    const isCurrentlyOmitted = omitted.includes(note);
+
+    if (isCurrentlyOmitted) {
+        // Include the note (remove from omitted list)
+        setBuilderLHOmittedNotes(omitted.filter(n => n !== note));
+    } else {
+        // Omit the note (add to omitted list)
+        setBuilderLHOmittedNotes([...omitted, note]);
+    }
+
+    updateBuilderDisplay();
+
+    // Only play if LH is not "off"
+    const lhType = document.getElementById('builder-lh-type-select')?.value;
+    if (lhType && lhType !== 'off') {
+        playBuilderChordWithDuration(); // Brief 0.5s playback
+    }
 }

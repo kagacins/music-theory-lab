@@ -55,10 +55,10 @@ export function createModalStructure() {
     overlay.id = MODAL_ID;
     overlay.className = 'unified-modal-overlay rm-overlay';
 
-    // Close on overlay click
+    // Close on overlay click - look up function at click time to avoid timing issues
     overlay.addEventListener('click', (e) => {
-        if (e.target === overlay && closeUnifiedRecommendationModal) {
-            closeUnifiedRecommendationModal();
+        if (e.target === overlay && window.closeUnifiedRecommendationModal) {
+            window.closeUnifiedRecommendationModal();
         }
     });
 
@@ -157,9 +157,12 @@ export function createHeader() {
     const closeBtn = document.createElement('button');
     closeBtn.innerHTML = '&times;';
     closeBtn.className = 'rm-close-btn';
-    if (closeUnifiedRecommendationModal) {
-        closeBtn.addEventListener('click', closeUnifiedRecommendationModal);
-    }
+    // Always look up the close function at click time to avoid timing issues
+    closeBtn.addEventListener('click', () => {
+        if (window.closeUnifiedRecommendationModal) {
+            window.closeUnifiedRecommendationModal();
+        }
+    });
 
     header.appendChild(closeBtn);
     return header;

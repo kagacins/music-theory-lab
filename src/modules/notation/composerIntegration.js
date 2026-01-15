@@ -591,11 +591,17 @@ export class NotationComposer {
         bassNotes: [],
         chordSymbol: null,
         measureNumber: i + 1,
-        // Include chord object for harmonic analysis
+        // Include chord object for harmonic analysis and playback filtering
         chord: measure.chord ? {
           root: measure.chord.root,
           type: measure.chord.type,
           notes: measure.chord.notes,
+          omittedNotes: measure.chord.omittedNotes || [],
+          lhType: measure.chord.lhType,
+          lhInversion: measure.chord.lhInversion,
+          lhOmittedNotes: measure.chord.lhOmittedNotes || [],
+          lhOctaveShift: measure.chord.lhOctaveShift,
+          inversion: measure.chord.inversion,
         } : null,
       };
 
@@ -652,7 +658,12 @@ export class NotationComposer {
         if (measure.chord && measure.chord.notes && measure.chord.notes.length > 0) {
           // All chord notes go to bass clef
           // If notes are very high, they'll still display correctly with ledger lines
-          const chordNotes = [...measure.chord.notes];
+          // Filter out omitted notes so they don't render or play
+          const omittedNotes = measure.chord.omittedNotes || [];
+          console.log(`[composerIntegration] measure.chord.omittedNotes:`, omittedNotes);
+          console.log(`[composerIntegration] measure.chord.notes:`, measure.chord.notes);
+          const chordNotes = measure.chord.notes.filter(n => !omittedNotes.includes(n));
+          console.log(`[composerIntegration] chordNotes after filtering:`, chordNotes);
 
           measureData.bassNotes.push({
             pitches: chordNotes,
@@ -813,6 +824,12 @@ export class NotationComposer {
             root: chord.root,
             type: chord.type,
             notes: chord.notes,
+            omittedNotes: chord.omittedNotes || [],
+            lhType: chord.lhType,
+            lhInversion: chord.lhInversion,
+            lhOmittedNotes: chord.lhOmittedNotes || [],
+            lhOctaveShift: chord.lhOctaveShift,
+            inversion: chord.inversion,
           },
           // Auto-populate chord symbol from chord card data
           metadata: chordSymbol ? { chordSymbol } : null,
@@ -2784,8 +2801,15 @@ export class NotationComposer {
     // Use e.target (the actual canvas) for correct coordinates in multi-page mode
     const target = e.target || this.config.container;
     const rect = target.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+
+    // Get zoom factor from FullScreenNotationEditor if active
+    const fsEditor = window.getFullScreenNotationEditor?.();
+    const zoomFactor = (fsEditor?.isOpen || fsEditor?.isTabMode) ? (fsEditor.zoomLevel / 100) : 1;
+
+    // Convert screen coordinates to canvas internal coordinates
+    // When zoomed, screen coordinates need to be divided by zoom factor
+    const x = (e.clientX - rect.left) / zoomFactor;
+    const y = (e.clientY - rect.top) / zoomFactor;
 
     // In multi-page mode, determine which page this event is from
     let currentPageIndex = null;
@@ -2822,11 +2846,58 @@ export class NotationComposer {
     }
 
     // Show tooltip if we found a note region with analysis
-    if (hoveredRegion && !hoveredRegion.isRest && hoveredRegion.analysis && hoveredRegion.analysis.tooltip) {
-      // Use document.body to avoid overflow clipping issues
-      showNoteTooltip(document.body, hoveredRegion.analysis, e.clientX, e.clientY);
-      this.hideMeasureEditOverlay(); // Hide edit icon when showing tooltip
-      return;
+    if (hoveredRegion && !hoveredRegion.isRest) {
+      // For polyphonic notes, find which specific pitch the mouse is closest to
+      let analysisToShow = hoveredRegion.analysis;
+
+      if (hoveredRegion.pitches && hoveredRegion.pitches.length > 1 && hoveredRegion.noteHeadPositions) {
+        // Find the note head closest to the mouse Y position
+        const noteHeads = hoveredRegion.noteHeadPositions;
+        let closestIdx = 0;
+        let closestDist = Math.abs(y - noteHeads[0].y);
+
+        for (let i = 1; i < noteHeads.length; i++) {
+          const dist = Math.abs(y - noteHeads[i].y);
+          if (dist < closestDist) {
+            closestDist = dist;
+            closestIdx = i;
+          }
+        }
+
+        // Get the pitch for the closest note head
+        // noteHeadPositions are in the same order as pitches (sorted by MIDI ascending)
+        // But VexFlow getYs() returns Y positions from bottom to top of staff (higher Y = lower on screen)
+        // So lower Y = higher pitch, meaning the order might be reversed
+        // Actually, pitches are sorted by MIDI ascending (low to high)
+        // and VexFlow Y positions: lower Y = higher on staff = higher pitch
+        // So noteHeads[0] (lowest Y) corresponds to highest pitch
+        // We need to match based on sorted order: pitches are low-to-high, Ys are high-to-low
+        const pitches = [...hoveredRegion.pitches];
+        // Sort note head positions by Y descending (higher Y first = lower pitch)
+        const sortedHeads = noteHeads.map((pos, idx) => ({ pos, originalIdx: idx }))
+          .sort((a, b) => b.pos.y - a.pos.y);
+
+        // Find which sorted index the closest head corresponds to
+        const closestInSorted = sortedHeads.findIndex(h => h.originalIdx === closestIdx);
+        const hoveredPitch = pitches[closestInSorted >= 0 ? closestInSorted : 0];
+
+        // Generate analysis for the specific hovered pitch
+        if (hoveredPitch && hoveredRegion.chord) {
+          try {
+            const keySignature = window.getCompositionState?.()?.keySignature || 'C';
+            analysisToShow = analyzeChordTone(hoveredPitch, hoveredRegion.chord, keySignature);
+          } catch (e) {
+            // Fall back to the pre-computed analysis
+          }
+        }
+      }
+
+      if (analysisToShow && analysisToShow.tooltip) {
+        // Use document.body to avoid overflow clipping issues
+        showNoteTooltip(document.body, analysisToShow, e.clientX, e.clientY);
+        this.hideMeasureEditOverlay(); // Hide edit icon when showing tooltip
+        return;
+      }
     }
 
     // Hide tooltip when not over a note
@@ -2842,9 +2913,10 @@ export class NotationComposer {
       // Only update if measure changed
       if (globalMeasureIndex !== this.hoveredMeasureIndex) {
         // Position at top-right corner of the measure
+        // Scale measureBounds by zoom factor (measureBounds is in canvas internal coords)
         const measureBounds = staffPosition.measure;
-        const measureRight = rect.left + measureBounds.x + measureBounds.width;
-        const measureTop = rect.top + measureBounds.y;
+        const measureRight = rect.left + (measureBounds.x + measureBounds.width) * zoomFactor;
+        const measureTop = rect.top + measureBounds.y * zoomFactor;
         this.showMeasureEditOverlay(measureRight - 5, measureTop + 5, globalMeasureIndex);
       }
     } else {
@@ -3428,9 +3500,11 @@ export class NotationComposer {
     const noScalingExample = `A whole note in ${scalingInfo.oldTimeSignature} stays ${scalingInfo.oldDenom} beats but now straddles measures in ${scalingInfo.newTimeSignature}`;
 
     // Create dialog
+    // Use very high z-index to appear above fullscreen notation editor (which uses z-[9990])
     const dialog = document.createElement('div');
     dialog.id = 'time-signature-scaling-dialog';
-    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+    dialog.style.zIndex = '99999';
     dialog.innerHTML = `
       <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg mx-4">
         <h3 class="text-lg font-bold text-gray-800 mb-4">Time Signature Change</h3>

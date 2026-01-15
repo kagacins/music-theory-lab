@@ -73,7 +73,9 @@
       "Bash(npm run:*)",
       "Bash(timeout 10 npm run build:*)",
       "Bash(timeout 60 npm run build:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(timeout 15 npm run build-css:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

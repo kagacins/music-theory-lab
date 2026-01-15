@@ -578,13 +578,30 @@ function applyKeyChange(actualKey, type) {
         }
     }
 
-    // Update key display in melody tab header
+    // Update key display in melody tab header (Classic Studio)
     const melodyKeyDisplay = document.getElementById('melody-current-key-display');
     if (melodyKeyDisplay) melodyKeyDisplay.textContent = actualKey;
     const melodyKeyDisplayText = document.getElementById('melody-key-display-text');
     if (melodyKeyDisplayText) melodyKeyDisplayText.textContent = actualKey;
     const melodyWorkbenchKeyDisplay = document.getElementById('melody-workbench-key-display');
     if (melodyWorkbenchKeyDisplay) melodyWorkbenchKeyDisplay.textContent = actualKey;
+
+    // Update key display in New Composition Studio
+    const fsWorkbenchKeyDisplay = document.getElementById('fs-workbench-key-display');
+    if (fsWorkbenchKeyDisplay) fsWorkbenchKeyDisplay.textContent = actualKey;
+
+    // Update header badge in New Composition Studio
+    const fsKeyTimeBadge = document.getElementById('fullscreen-key-time-badge');
+    if (fsKeyTimeBadge) {
+        // Parse current badge to preserve time signature
+        const currentText = fsKeyTimeBadge.textContent || '';
+        const timeSigMatch = currentText.match(/•\s*(\d+\/\d+)/);
+        const timeSig = timeSigMatch ? timeSigMatch[1] : '4/4';
+        // Detect if minor from key string
+        const isMinor = actualKey.endsWith('m') && actualKey.length > 1 && actualKey[actualKey.length - 2] !== '#' && actualKey[actualKey.length - 2] !== 'b';
+        const keyDisplay = isMinor ? `${actualKey.slice(0, -1)} Minor` : `${actualKey} Major`;
+        fsKeyTimeBadge.textContent = `${keyDisplay} • ${timeSig}`;
+    }
 
     // Update keyboard labels and key signature display
     if (window.updateKeyboardLabels) window.updateKeyboardLabels();
@@ -596,7 +613,8 @@ function applyKeyChange(actualKey, type) {
     }
 
     // Switch to Composition Studio if not already there
-    if (window.currentTab !== 'melody' && window.switchTab) {
+    // Don't switch if already on melody (Classic) or studio-new (New Composition Studio)
+    if (window.currentTab !== 'melody' && window.currentTab !== 'studio-new' && window.switchTab) {
         window.switchTab('melody');
     }
 

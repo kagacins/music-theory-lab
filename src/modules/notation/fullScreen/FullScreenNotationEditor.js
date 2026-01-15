@@ -51,6 +51,15 @@ const ZOOM_STEP = 10;
 const DEFAULT_MEASURES_PER_SYSTEM = 4;
 const MEASURES_PER_SYSTEM_OPTIONS = [2, 3, 4, 5, 6];
 
+// Time signature options for dropdown
+const TIME_SIGNATURES = [
+    { value: '4/4', num: 4, denom: 4, label: '4/4' },
+    { value: '3/4', num: 3, denom: 4, label: '3/4' },
+    { value: '2/4', num: 2, denom: 4, label: '2/4' },
+    { value: '6/8', num: 6, denom: 8, label: '6/8' },
+    { value: '2/2', num: 2, denom: 2, label: '2/2' },
+];
+
 // ============================================================================
 // FullScreenNotationEditor CLASS
 // ============================================================================
@@ -59,6 +68,10 @@ export class FullScreenNotationEditor {
     constructor() {
         this.modal = null;
         this.isOpen = false;
+
+        // Tab mode state
+        this.isTabMode = false;
+        this.tabContent = null;
 
         // State
         this.zoomLevel = this._loadFromStorage(STORAGE_KEYS.ZOOM, DEFAULT_ZOOM);
@@ -78,6 +91,7 @@ export class FullScreenNotationEditor {
         this._boundKeyHandler = this._handleKeyDown.bind(this);
         this._boundWheelHandler = this._handleWheel.bind(this);
         this._boundProgressionUpdateHandler = this._onProgressionUpdate.bind(this);
+        this._boundTimeSignatureChangeHandler = this._onTimeSignatureChanged.bind(this);
         this._boundResizeHandler = () => {
             if (this.modal) this.modal.style.height = `${this._getVisibleViewportHeight()}px`;
         };
@@ -199,6 +213,1154 @@ export class FullScreenNotationEditor {
     }
 
     // ========================================================================
+    // TAB MODE (Composition Studio New)
+    // ========================================================================
+
+    /**
+     * Open the notation editor in tab mode (renders into #studio-new-container)
+     * This is used for the "Composition Studio (New)" tab experience
+     */
+    openInTabMode() {
+        // If already in tab mode, don't re-initialize (prevents destroying canvases)
+        if (this.isTabMode) {
+            console.log('[FullScreenNotationEditor] Already in tab mode, skipping re-init');
+            return;
+        }
+
+        // If modal mode is open, close it first
+        if (this.isOpen) {
+            this.close();
+        }
+
+        const tabContainer = document.getElementById('studio-new-container');
+        if (!tabContainer) {
+            console.error('[FullScreenNotationEditor] studio-new-container not found');
+            return;
+        }
+
+        // Mark as in tab mode
+        this.isTabMode = true;
+
+        // Get composition state for header info
+        const compState = getCompositionState();
+        const settings = compState?.getSettings() || {};
+
+        // Generate the content HTML (similar to modal but with different container styling)
+        tabContainer.innerHTML = this._generateTabModeHTML();
+
+        // Get reference to the main content div
+        this.tabContent = tabContainer.querySelector('#studio-new-content');
+
+        // Update header info (uses shared method that works with both modal and tab)
+        this._updateHeaderInfo(settings);
+
+        // Patch PageManager for zoom
+        this._patchPageManagerForZoom();
+
+        // Move notation canvases into the tab container (uses shared method)
+        this._captureNotationElements();
+
+        // Force all pages visible
+        this._forceAllPagesVisible();
+
+        // Apply current zoom (uses shared method)
+        this._applyZoom();
+
+        // Apply sidebar state (uses shared method)
+        this._applySidebarState();
+
+        // Initialize tabbed bottom panel
+        this.bottomPanel = new FullScreenBottomPanel(this.tabContent, this);
+        this.bottomPanel.init();
+
+        // Set up selection change listener
+        this._setupSelectionListener();
+
+        // Initialize sidebar from toolbar state
+        this._initializeSidebarFromToolbar();
+
+        // Attach event handlers for tab mode
+        this._attachTabModeEventHandlers();
+
+        // Add event listeners
+        document.addEventListener('keydown', this._boundKeyHandler);
+        window.addEventListener('progressionUpdated', this._boundProgressionUpdateHandler);
+        window.addEventListener('chordsChanged', this._boundProgressionUpdateHandler);
+
+        // Listen for time signature changes to update duration indicator
+        if (compState?.events) {
+            compState.events.on('timeSignatureChanged', this._boundTimeSignatureChangeHandler);
+        }
+
+        // Apply saved measures per system setting (if not default)
+        if (this.measuresPerSystem !== DEFAULT_MEASURES_PER_SYSTEM) {
+            this._onMeasuresPerSystemChange();
+        }
+
+        // Refresh notation to ensure all settings are applied (chord tone coloring, etc.)
+        if (typeof window.refreshNotationFromProgression === 'function') {
+            window.refreshNotationFromProgression();
+        }
+
+        console.log('[FullScreenNotationEditor] Opened in tab mode');
+    }
+
+    /**
+     * Close the tab mode and return to Composition Studio (Classic)
+     */
+    closeTabMode() {
+        if (!this.isTabMode) return;
+
+        // Remove event listeners
+        document.removeEventListener('keydown', this._boundKeyHandler);
+        window.removeEventListener('progressionUpdated', this._boundProgressionUpdateHandler);
+        window.removeEventListener('chordsChanged', this._boundProgressionUpdateHandler);
+
+        // Remove time signature change listener
+        const compState = getCompositionState();
+        if (compState?.events) {
+            compState.events.off('timeSignatureChanged', this._boundTimeSignatureChangeHandler);
+        }
+
+        // Remove selection change listener
+        this._removeSelectionListener();
+
+        // Close any open bottom panel
+        this.bottomPanel?.closeActivePanel();
+
+        // Restore PageManager
+        this._restorePageManager();
+
+        // Restore notation elements to original location
+        this._restoreNotationElements();
+
+        // Clear tab container
+        const tabContainer = document.getElementById('studio-new-container');
+        if (tabContainer) {
+            tabContainer.innerHTML = `
+                <div id="studio-new-loading" class="flex items-center justify-center h-screen">
+                    <div class="text-center">
+                        <div class="text-gray-400">Composition Studio (New) closed</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        this.isTabMode = false;
+        this.tabContent = null;
+
+        // Navigate back to melody tab
+        if (window.switchTab) {
+            window.switchTab('melody');
+        }
+
+        console.log('[FullScreenNotationEditor] Closed tab mode');
+    }
+
+    /**
+     * Generate the HTML for tab mode (full viewport, no fixed positioning)
+     */
+    _generateTabModeHTML() {
+        return `
+            <div id="studio-new-content" class="w-full h-screen bg-black/60 flex flex-col">
+                <!-- Header Bar -->
+                <div class="fullscreen-header h-12 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-between px-4 shadow-lg flex-shrink-0">
+                    <!-- Left: Back Button + Title -->
+                    <div class="flex items-center gap-3">
+                        <!-- Back Button (returns to Composition Studio Classic) -->
+                        <button id="studio-new-back-btn"
+                                class="p-1.5 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1"
+                                title="Return to Composition Studio (Classic)">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                            </svg>
+                            <span class="text-xs text-white/80">Classic</span>
+                        </button>
+
+                        <!-- Title/Composer (clickable to edit) -->
+                        <div id="fs-title-composer" class="cursor-pointer hover:bg-white/10 rounded px-2 py-0.5 transition-colors flex items-center gap-3"
+                             title="Click to edit title and composer">
+                            <h2 id="fs-composition-title" class="text-lg font-semibold leading-tight"
+                                style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                                Untitled Composition
+                            </h2>
+                            <span id="fs-composition-composer" class="text-sm italic hidden"
+                               style="color: rgba(255,255,255,0.7) !important; -webkit-text-fill-color: rgba(255,255,255,0.7) !important;">
+                            </span>
+                            <svg class="w-3.5 h-3.5 text-white/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                            </svg>
+                        </div>
+
+                        <!-- Key/Time Signature Badge -->
+                        <div id="fullscreen-key-time-badge" class="px-2 py-1 bg-white/20 rounded text-sm font-medium"
+                             style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                            C Major • 4/4
+                        </div>
+                    </div>
+
+                    <!-- Center: Measures Per System + Time Signature Dropdowns -->
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-white/80" style="-webkit-text-fill-color: rgba(255,255,255,0.8) !important;">
+                                Measures/Row:
+                            </label>
+                            <select id="fullscreen-measures-dropdown"
+                                    class="px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-sm text-white border-none focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                                    style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                                ${MEASURES_PER_SYSTEM_OPTIONS.map(n =>
+                                    `<option value="${n}" ${n === this.measuresPerSystem ? 'selected' : ''} style="color: #333; -webkit-text-fill-color: #333;">${n}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-white/80" style="-webkit-text-fill-color: rgba(255,255,255,0.8) !important;">
+                                Time Sig:
+                            </label>
+                            <select id="fullscreen-timesig-dropdown"
+                                    class="px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-sm text-white border-none focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                                    style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                                ${TIME_SIGNATURES.map(ts =>
+                                    `<option value="${ts.value}" ${this._isCurrentTimeSignature(ts.num, ts.denom) ? 'selected' : ''} style="color: #333; -webkit-text-fill-color: #333;">${ts.label}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Right: Zoom Controls -->
+                    <div class="flex items-center gap-2">
+                        <!-- Zoom Controls -->
+                        <div class="flex items-center gap-1 bg-white/20 rounded-lg px-2 py-1">
+                            <button id="fullscreen-zoom-out"
+                                    class="p-1 hover:bg-white/20 rounded transition-colors"
+                                    title="Zoom Out (Ctrl+-)">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                </svg>
+                            </button>
+                            <span id="fullscreen-zoom-level" class="text-sm font-medium min-w-[3rem] text-center"
+                                  style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                                ${this.zoomLevel}%
+                            </span>
+                            <button id="fullscreen-zoom-in"
+                                    class="p-1 hover:bg-white/20 rounded transition-colors"
+                                    title="Zoom In (Ctrl++)">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                            </button>
+                            <div class="w-px h-4 bg-white/30 mx-1"></div>
+                            <button id="fullscreen-fit-width"
+                                    class="p-1 hover:bg-white/20 rounded transition-colors"
+                                    title="Fit to Width">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="flex-1 flex overflow-hidden">
+                    <!-- Left Sidebar (Collapsible) -->
+                    <div id="fullscreen-sidebar"
+                         class="fullscreen-sidebar ${this.sidebarOpen ? 'w-64' : 'w-6'} h-full bg-gray-50 border-r border-gray-200 flex-shrink-0 flex flex-col transition-all duration-300 ease-in-out overflow-hidden">
+                        ${this._generateSidebarHTML()}
+                    </div>
+
+                    <!-- Canvas Container -->
+                    <div id="fullscreen-canvas-container"
+                         class="flex-1 overflow-auto bg-gray-100 p-4 relative">
+                        <!-- Canvas Wrapper (for zoom transform) -->
+                        <div id="fullscreen-canvas-wrapper"
+                             class="inline-block"
+                             style="transform-origin: top left;">
+                            <!-- Notation pages will be moved here -->
+                            <div id="fullscreen-pages-container" class="flex flex-col items-start gap-4">
+                                <!-- Pages will be cloned/moved here -->
+                            </div>
+                        </div>
+
+                        <!-- Full FAB Menu (Composition Studio style) -->
+                        ${this._generateFullFAB()}
+                    </div>
+                </div>
+
+                <!-- Bottom Panel (dock) will be added by FullScreenBottomPanel -->
+            </div>
+        `;
+    }
+
+    /**
+     * Generate sidebar HTML (extracted for reuse between modal and tab modes)
+     * Returns the complete sidebar with all notation tool sections
+     */
+    _generateSidebarHTML() {
+        return `
+            <!-- Toggle Strip (visible when collapsed) -->
+            <div class="sidebar-toggle-strip ${this.sidebarOpen ? 'hidden' : ''} w-full h-full flex flex-col items-center py-3 bg-gradient-to-b from-indigo-100 to-gray-100 cursor-pointer hover:from-indigo-200 hover:to-gray-200 border-r border-gray-300"
+                 title="Click to expand Notation Tools">
+                <!-- Expand Arrow -->
+                <button class="sidebar-expand-btn p-1.5 rounded-full bg-indigo-500 hover:bg-indigo-600 shadow-md mb-2">
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                <!-- Vertical "Tools" label -->
+                <div class="flex-1 flex items-center justify-center">
+                    <span class="text-[10px] font-semibold text-indigo-700 tracking-wider" style="writing-mode: vertical-rl; text-orientation: mixed; -webkit-text-fill-color: #4338ca;">
+                        TOOLS
+                    </span>
+                </div>
+                <!-- Music note icon at bottom -->
+                <svg class="w-4 h-4 text-indigo-500 mt-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/>
+                </svg>
+            </div>
+
+            <!-- Sidebar Content (hidden when collapsed) -->
+            <div class="sidebar-content flex flex-col h-full w-full overflow-hidden ${this.sidebarOpen ? '' : 'hidden'}">
+                <!-- Collapse Button Header -->
+                <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-gray-100 border-b border-gray-200">
+                    <span class="text-sm font-semibold text-gray-700">Notation Tools</span>
+                    <button class="sidebar-collapse-btn p-1 rounded hover:bg-gray-200 transition-colors" title="Collapse Sidebar">
+                        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- PINNED Section (sticky at top) -->
+                <div class="flex-shrink-0 p-3 pb-0 bg-gray-50 space-y-2">
+                    <!-- Jump to Section (compact, inline) -->
+                    <div class="flex items-center gap-2 p-2 bg-gradient-to-r from-indigo-50 to-slate-50 rounded-lg border border-indigo-200">
+                        <label class="text-xs text-indigo-600 font-medium whitespace-nowrap">Jump to:</label>
+                        <select id="fs-section-jump" class="flex-1 p-1.5 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-xs shadow-sm" title="Quickly navigate to a section">
+                            <option value="">-- Select --</option>
+                            <option value="fs-section-accidentals">Accidentals</option>
+                            <option value="fs-section-articulations">Articulations</option>
+                            <option value="fs-section-dynamics">Dynamics</option>
+                            <option value="fs-section-ornaments">Ornaments</option>
+                            <option value="fs-section-tuplets">Tuplets</option>
+                            <option value="fs-section-beams">Beams</option>
+                            <option value="fs-section-slurs">Slurs & Ties</option>
+                            <option value="fs-section-hairpins">Hairpins</option>
+                            <option value="fs-section-grace">Grace Notes</option>
+                            <option value="fs-section-repeat">Repeat Signs</option>
+                            <option value="fs-section-endings">Endings</option>
+                            <option value="fs-section-chord">Chord Labels</option>
+                            <option value="fs-section-lyrics">Lyrics</option>
+                            <option value="fs-section-pedal">Pedal</option>
+                            <option value="fs-section-voicing">Voicing</option>
+                            <option value="fs-section-actions">Quick Actions</option>
+                        </select>
+                    </div>
+                    <!-- Duration Section -->
+                    <div class="sidebar-section bg-indigo-50 rounded-lg border border-indigo-200 shadow-md">
+                        <div class="flex items-center justify-between p-2 border-b border-indigo-200">
+                            <span class="font-semibold text-indigo-800 text-sm">Duration</span>
+                            <span class="text-xs text-indigo-500 flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clip-rule="evenodd"/></svg>
+                                pinned
+                            </span>
+                        </div>
+                        <div class="p-2 space-y-1.5">
+                            <!-- Row 1: Duration buttons (3x2) + Dot/Rest (1x2) side by side -->
+                            <div class="flex gap-1.5">
+                                <div class="grid grid-cols-3 gap-1 flex-1">
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="1n" title="Whole note (4 beats)">𝅝</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="2n" title="Half note (2 beats)">𝅗𝅥</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="4n" title="Quarter note (1 beat)">♩</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="8n" title="Eighth note (1/2 beat)">♪</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="16n" title="16th note (1/4 beat)">𝅘𝅥𝅯</button>
+                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="32n" title="32nd note (1/8 beat)">𝅘𝅥𝅰</button>
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <button class="fs-dot-btn px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Dotted note (+50% duration)">• Dot</button>
+                                    <button class="fs-rest-btn px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Rest mode">𝄽 Rest</button>
+                                </div>
+                            </div>
+                            <!-- Row 2: Current duration indicator -->
+                            <div id="fs-duration-indicator" class="text-center text-xs text-indigo-600 font-medium py-1 bg-indigo-100 rounded">
+                                Current: Quarter Note (1 beat)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scrollable section for other tools -->
+                <div class="flex-1 min-h-0 overflow-y-auto p-3 pt-3">
+                    <div id="fullscreen-sidebar-content" class="space-y-3">
+                        ${this._generateSidebarToolSections()}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Generate the tool sections for the sidebar (Accidentals, Articulations, etc.)
+     * This method returns ALL sections that match the modal's sidebar for full feature parity
+     */
+    _generateSidebarToolSections() {
+        return `
+            <!-- Accidentals Section -->
+            <div id="fs-section-accidentals" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Accidentals</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2">
+                    <div class="flex gap-1">
+                        <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="#" title="Sharp - Raise pitch by half step. Click again to toggle off.">♯</button>
+                        <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="b" title="Flat - Lower pitch by half step. Click again to toggle off.">♭</button>
+                        <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="n" title="Natural - Cancel any sharp or flat. Click again to toggle off.">♮</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Articulations Section -->
+            <div id="fs-section-articulations" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Articulations</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="staccato" title="Staccato - Short, detached notes. Play for half duration.">. Staccato</button>
+                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="accent" title="Accent - Emphasize note with stronger attack.">> Accent</button>
+                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="tenuto" title="Tenuto - Hold note for full duration, slight emphasis.">— Tenuto</button>
+                        <button class="fs-articulation-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-articulation="marcato" title="Marcato - Strong accent, even more emphasis than accent.">^ Marcato</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamics Section -->
+            <div id="fs-section-dynamics" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Dynamics</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="grid grid-cols-4 gap-1">
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="pp" title="Pianissimo - Very soft">pp</button>
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="p" title="Piano - Soft">p</button>
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="mp" title="Mezzo-piano - Moderately soft">mp</button>
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="mf" title="Mezzo-forte - Moderately loud">mf</button>
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="f" title="Forte - Loud">f</button>
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="ff" title="Fortissimo - Very loud">ff</button>
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="sfz" title="Sforzando - Sudden strong accent">sfz</button>
+                        <button class="fs-dynamic-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-serif italic shadow-sm" data-dynamic="fp" title="Forte-piano - Loud then immediately soft">fp</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ornaments Section -->
+            <div id="fs-section-ornaments" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Ornaments</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="grid grid-cols-2 gap-1 mb-2">
+                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="trill" title="Trill - Rapid alternation between note and upper neighbor">tr Trill</button>
+                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="mordent" title="Mordent - Quick alternation: note → upper note → note">𝆰 Mordent</button>
+                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="turn" title="Turn - Four-note figure: upper → note → lower → note">𝆗 Turn</button>
+                        <button class="fs-ornament-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-ornament="invertedMordent" title="Inverted Mordent - Quick alternation: note → lower note → note">𝆱 Inv.Mord</button>
+                    </div>
+                    <button class="fs-ornament-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove ornament from selected note(s)">Remove Ornament</button>
+                </div>
+            </div>
+
+            <!-- Tuplets Section -->
+            <div id="fs-section-tuplets" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Tuplets</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="grid grid-cols-3 gap-1 mb-2">
+                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-medium shadow-sm" data-tuplet="triplet" title="Triplet - 3 notes in the time of 2. Select exactly 3 consecutive notes.">3 Trip</button>
+                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-medium shadow-sm" data-tuplet="quintuplet" title="Quintuplet - 5 notes in the time of 4. Select exactly 5 consecutive notes.">5 Quint</button>
+                        <button class="fs-tuplet-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs font-medium shadow-sm" data-tuplet="sextuplet" title="Sextuplet - 6 notes in the time of 4. Select exactly 6 consecutive notes.">6 Sext</button>
+                    </div>
+                    <button class="fs-tuplet-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove tuplet grouping from selected note(s)">Remove Tuplet</button>
+                </div>
+            </div>
+
+            <!-- Beams Section -->
+            <div id="fs-section-beams" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Beams</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="beam" title="Beam selected consecutive notes together (select 2+ beamable notes in same measure)">⟨⟩ Beam Selected</button>
+                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="breakBetween" title="Break all beams between 2 selected notes (select exactly 2 notes in same beam group)">⊥ Break Between</button>
+                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="unbeam" title="Remove this note from beaming entirely">⊘ Unbeam Note</button>
+                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-beam="clear" title="Clear manual beam settings on selected notes">✕ Clear Beam Settings</button>
+                        <button class="fs-beam-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" data-action="clearMeasureBeams" title="Clear ALL beam settings in selected measure (click measure to select)">⌧ Clear Measure Beams</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slurs & Ties Section -->
+            <div id="fs-section-slurs" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Slurs & Ties</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="tie" title="Tie Notes (T) - Connect two notes of same pitch, combining their durations">⁀ Tie Notes</button>
+                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-slur="slur" title="Add Slur - Phrase marking over notes (legato playing, connect smoothly)">⌒ Add Slur</button>
+                        <button class="fs-slur-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" data-slur="remove-slur" title="Remove slur/tie from selected notes">Remove Slur</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hairpins Section (Crescendo/Decrescendo) -->
+            <div id="fs-section-hairpins" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Hairpins</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <button class="fs-hairpin-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-hairpin="crescendo" title="Crescendo - Gradually get louder. Select 2+ consecutive notes.">< Crescendo</button>
+                        <button class="fs-hairpin-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-hairpin="decrescendo" title="Decrescendo - Gradually get softer. Select 2+ consecutive notes.">> Decrescendo</button>
+                        <button class="fs-hairpin-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove hairpin from selected note(s)">Remove Hairpin</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grace Notes Section -->
+            <div id="fs-section-grace" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Grace Notes</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="fs-grace-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-grace="acciaccatura" title="Acciaccatura - Quick crushed note (slashed stem). Played very fast before main note.">♯ Acciaccatura</button>
+                            <button class="fs-grace-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-grace="appoggiatura" title="Appoggiatura - Leaning note (no slash). Takes time from main note.">♪ Appoggiatura</button>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs text-slate-600">Adjust Pitch:</span>
+                            <div class="flex gap-1">
+                                <button class="fs-grace-transpose-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm font-bold shadow-sm" data-grace-transpose="-1" title="Lower grace note pitch by one semitone">−</button>
+                                <button class="fs-grace-transpose-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm font-bold shadow-sm" data-grace-transpose="1" title="Raise grace note pitch by one semitone">+</button>
+                            </div>
+                        </div>
+                        <button class="fs-grace-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove grace note from selected notes">Remove Grace</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Repeat Signs Section -->
+            <div id="fs-section-repeat" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Repeat Signs</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="grid grid-cols-3 gap-2">
+                        <button class="fs-repeat-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-repeat="repeatStart" title="Repeat Start - Begin repeat section">|:</button>
+                        <button class="fs-repeat-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-repeat="repeatEnd" title="Repeat End - End repeat section">:|</button>
+                        <button class="fs-repeat-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-repeat="repeatBoth" title="Repeat Both - End and start new repeat">:|:</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endings (Volta Brackets) Section -->
+            <div id="fs-section-endings" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Endings</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="1" title="1st Ending - Play on first pass">1.</button>
+                            <button class="fs-volta-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-volta="2" title="2nd Ending - Play on second pass">2.</button>
+                        </div>
+                        <button class="fs-volta-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove ending bracket from selected measure">Remove Ending</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chord Labels Section -->
+            <div id="fs-section-chord" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Chord Labels</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <input type="text" class="fs-chord-input w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm shadow-sm" placeholder="e.g., Cmaj7, Dm, G7" title="Enter chord symbol">
+                        <button class="fs-chord-apply-btn w-full p-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors text-sm shadow-sm" title="Apply chord symbol to selected note">✓ Apply Chord</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lyrics Section -->
+            <div id="fs-section-lyrics" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Lyrics</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <input type="text" class="fs-lyric-input w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm shadow-sm" placeholder="Lyric syllable" title="Enter lyric text">
+                        <select class="fs-lyric-syllabic w-full p-2 rounded bg-white border border-slate-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm shadow-sm" title="Syllable position in word">
+                            <option value="single">Single word</option>
+                            <option value="begin">Begin─ (start of word)</option>
+                            <option value="middle">─Mid─ (middle)</option>
+                            <option value="end">─End (end of word)</option>
+                        </select>
+                        <button class="fs-lyric-apply-btn w-full p-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors text-sm shadow-sm" title="Apply lyric to selected note">✓ Apply Lyric</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pedal Section -->
+            <div id="fs-section-pedal" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Pedal</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="down" title="Pedal Down (Ped.) - Depress sustain pedal">Ped</button>
+                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="up" title="Pedal Up (*) - Release sustain pedal">*</button>
+                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="change" title="Pedal Change - Quick release and re-depress">⟳</button>
+                        <button class="fs-pedal-btn p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-pedal="half" title="Half Pedal - Partial pedal for lighter sustain">½</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voicing Section -->
+            <div id="fs-section-voicing" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Voicing</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2">
+                    <div class="space-y-3">
+                        <!-- Voice Toggle -->
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">Active Voice (V to toggle)</label>
+                            <div class="flex gap-2">
+                                <button class="fs-voice-btn flex-1 p-2 rounded bg-indigo-100 border border-indigo-500 text-indigo-700 font-medium transition-colors text-sm shadow-sm" data-voice="1" title="Voice 1 - Upper voice (melody)">V1</button>
+                                <button class="fs-voice-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-voice="2" title="Voice 2 - Lower voice (harmony)">V2</button>
+                            </div>
+                        </div>
+                        <!-- V2 Rest Display Mode -->
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">Voice 2 Rests</label>
+                            <div class="flex gap-2">
+                                <button class="fs-rest-display-btn flex-1 p-2 rounded bg-indigo-100 border border-indigo-500 transition-colors text-xs shadow-sm" data-rest-mode="clean" title="Clean mode - hide redundant Voice 2 rests">Clean</button>
+                                <button class="fs-rest-display-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs shadow-sm" data-rest-mode="explicit" title="Show all Voice 2 rests explicitly">Show All</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Section -->
+            <div id="fs-section-actions" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Quick Actions</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2">
+                    <div class="space-y-2">
+                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="undo" title="Undo (Ctrl+Z)">
+                            <span>↩</span> Undo
+                        </button>
+                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="redo" title="Redo (Ctrl+Y)">
+                            <span>↪</span> Redo
+                        </button>
+                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="delete" title="Delete selected">
+                            <span>🗑</span> Delete
+                        </button>
+                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="copy" title="Copy selected (Ctrl+C)">
+                            <span>📋</span> Copy
+                        </button>
+                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="paste" title="Paste (Ctrl+V)">
+                            <span>📄</span> Paste
+                        </button>
+                        <div class="flex gap-2">
+                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="octave-up" title="Octave up (Shift+↑)">
+                                <span>↑</span> 8va
+                            </button>
+                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="octave-down" title="Octave down (Shift+↓)">
+                                <span>↓</span> 8vb
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selection Info -->
+            <div id="fs-selection-info" class="text-xs text-slate-500 p-2 text-center border-t border-slate-200 mt-2 hidden">
+                <span id="fs-selection-count">No selection</span>
+            </div>
+
+            <!-- Info Note -->
+            <div class="text-xs text-slate-400 italic p-2 text-center border-t border-slate-200 mt-2">
+                Keyboard shortcuts work in full-screen mode
+            </div>
+        `;
+    }
+
+    /**
+     * Generate the full FAB (Floating Action Button) menu HTML
+     * Replicates the comprehensive FAB system from the Classic Composition Studio
+     * @returns {string} HTML for the full FAB menu
+     */
+    _generateFullFAB() {
+        return `
+            <!-- Full FAB Menu (Composition Studio style) -->
+            <div id="fullscreen-fab-container" class="absolute right-4 z-50" style="bottom: 80px;">
+                <!-- Main FAB button -->
+                <button id="fs-fab-main" class="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Quick Actions">
+                    <svg class="w-6 h-6 fs-fab-icon transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                </button>
+
+                <!-- FAB category menu (first tier) -->
+                <div id="fs-fab-menu" class="hidden absolute bottom-16 right-0 flex flex-col-reverse gap-2 mb-2">
+                    <!-- Playback category -->
+                    <div class="fs-fab-category relative" data-category="playback">
+                        <button class="fs-fab-category-btn w-12 h-12 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Playback">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                        </button>
+                        <span class="fs-fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Playback</span>
+
+                        <!-- Playback submenu -->
+                        <div id="fs-fab-playback-submenu" class="fs-fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                            <button data-action="play-all" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
+                                <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                                <span class="text-green-700 font-medium">Play All</span>
+                            </button>
+                            <button data-action="play-chords" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                <span class="text-blue-700">Chords Only</span>
+                            </button>
+                            <button data-action="play-from-selected" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-2 active:bg-purple-100">
+                                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                                <span class="text-purple-700">From Selected</span>
+                            </button>
+                            <button data-action="play-measure" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-amber-50 flex items-center gap-2 active:bg-amber-100">
+                                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                                <span class="text-amber-700">Play Measure</span>
+                            </button>
+                            <div class="border-t border-gray-100"></div>
+                            <button data-action="toggle-metronome" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-2 active:bg-orange-100">
+                                <span class="w-4 h-4 text-orange-600 text-center">🔔</span>
+                                <span class="text-orange-700">Metronome</span>
+                                <span id="fs-fab-metronome-status" class="ml-auto text-xs text-gray-400">OFF</span>
+                            </button>
+                            <div class="border-t border-gray-100"></div>
+                            <button data-action="stop" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-2 active:bg-red-100">
+                                <svg class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
+                                <span class="text-red-700 font-medium">Stop</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Edit category -->
+                    <div class="fs-fab-category relative" data-category="edit">
+                        <button class="fs-fab-category-btn w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Edit">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </button>
+                        <span class="fs-fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Edit</span>
+                        <!-- Edit submenu -->
+                        <div id="fs-fab-edit-submenu" class="fs-fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                            <button data-action="undo" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h7c4.418 0 8 3.582 8 8M3 10l4-4m-4 4l4 4"/></svg>
+                                Undo
+                            </button>
+                            <button data-action="redo" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-7c-4.418 0-8 3.582-8 8M21 10l-4-4m4 4l-4 4"/></svg>
+                                Redo
+                            </button>
+                            <div class="border-t border-gray-100"></div>
+                            <button data-action="clear-treble" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2 active:bg-rose-100">
+                                <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM6 6L18 18M6 18L18 6"/></svg>
+                                <span class="text-rose-700">Clear Melody</span>
+                            </button>
+                            <button data-action="clear-progression" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2 active:bg-rose-100">
+                                <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                <span class="text-rose-700">Clear Chords</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- File category -->
+                    <div class="fs-fab-category relative" data-category="file">
+                        <button class="fs-fab-category-btn w-12 h-12 bg-amber-600 hover:bg-amber-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="File">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                        </button>
+                        <span class="fs-fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">File</span>
+                        <!-- File submenu -->
+                        <div id="fs-fab-file-submenu" class="fs-fab-submenu hidden absolute -bottom-24 right-14 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                            <button data-action="new-song" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
+                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <span class="text-green-700 font-medium">New Song</span>
+                            </button>
+                            <div class="border-t border-gray-100"></div>
+                            <button data-action="save" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                                Save
+                            </button>
+                            <button data-action="load" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                Load
+                            </button>
+                            <button data-action="version-history" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Version History
+                            </button>
+                            <button data-action="create-checkpoint" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-2 active:bg-purple-100">
+                                <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                                <span class="text-purple-700">Create Checkpoint</span>
+                            </button>
+                            <div class="border-t border-gray-100"></div>
+                            <button data-action="import-midi" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                Import MIDI
+                            </button>
+                            <button data-action="export-midi" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                                Export MIDI
+                            </button>
+                            <button data-action="export-pdf" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                Export PDF
+                            </button>
+                            <button data-action="export-audio" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                                Export Audio
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Suggestions category -->
+                    <div class="fs-fab-category relative" data-category="suggestions">
+                        <button class="fs-fab-category-btn w-12 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Suggestions">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/></svg>
+                        </button>
+                        <span class="fs-fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Suggestions</span>
+                        <!-- Suggestions submenu -->
+                        <div id="fs-fab-suggestions-submenu" class="fs-fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                            <button data-action="suggest-chords" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
+                                <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"></path><path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"></path></svg>
+                                <span class="text-blue-700 font-medium">Chord Ideas</span>
+                            </button>
+                            <button data-action="suggest-melody" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2 active:bg-pink-100">
+                                <svg class="w-4 h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+                                <span class="text-pink-700">Melody Ideas</span>
+                            </button>
+                            <button data-action="suggest-section" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-amber-50 flex items-center gap-2 active:bg-amber-100">
+                                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                <span class="text-amber-700">Add Section</span>
+                            </button>
+                            <div class="border-t border-gray-100"></div>
+                            <button data-action="suggest-harmonize" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-2 active:bg-purple-100">
+                                <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path></svg>
+                                <span class="text-purple-700">Harmonize</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Settings category -->
+                    <div class="fs-fab-category relative" data-category="settings">
+                        <button class="fs-fab-category-btn w-12 h-12 bg-gray-600 hover:bg-gray-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Settings">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </button>
+                        <span class="fs-fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Settings</span>
+                        <!-- Settings panel -->
+                        <div id="fs-fab-settings-submenu" class="fs-fab-submenu fs-fab-settings-panel hidden absolute right-14 bottom-0 w-56 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50">
+                            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Playback Settings</div>
+                            <!-- BPM -->
+                            <div class="flex items-center justify-between mb-3">
+                                <label class="text-sm text-gray-700">BPM</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="fs-fab-bpm-slider" min="40" max="200" value="120" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span id="fs-fab-bpm-value" class="text-sm font-semibold text-gray-700 w-8">120</span>
+                                </div>
+                            </div>
+                            <!-- Volume -->
+                            <div class="flex items-center justify-between mb-3">
+                                <label class="text-sm text-gray-700">Volume</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="fs-fab-volume-slider" min="0" max="100" value="80" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span id="fs-fab-volume-value" class="text-sm font-semibold text-gray-700 w-8">80%</span>
+                                </div>
+                            </div>
+                            <div class="border-t border-gray-100 my-2"></div>
+                            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display</div>
+                            <!-- Quick Actions Toggle -->
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-sm text-gray-700">Quick Actions Popup</label>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="fs-quick-actions-toggle" class="sr-only peer" checked>
+                                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </label>
+                            </div>
+                            <!-- Back to Classic -->
+                            <button data-action="back-to-classic" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 flex items-center gap-2 active:bg-indigo-100 rounded">
+                                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                                <span class="text-indigo-700">Back to Classic View</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Quick buttons (visible when FAB is collapsed, hidden when expanded) -->
+            <div id="fs-fab-quick-buttons" class="absolute right-4 flex flex-col gap-2 z-40" style="bottom: 150px;">
+                <!-- Suggestions button -->
+                <button id="fs-fab-quick-suggestions" class="w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Suggestions" title="Chord Suggestions">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/></svg>
+                </button>
+                <!-- Stop button -->
+                <button id="fs-fab-quick-stop" class="w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Stop" title="Stop">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
+                </button>
+                <!-- Play All button -->
+                <button id="fs-fab-quick-play" class="w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Play All" title="Play All">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                </button>
+            </div>
+        `;
+    }
+
+    /**
+     * Attach event handlers for tab mode
+     */
+    _attachTabModeEventHandlers() {
+        if (!this.tabContent) return;
+
+        // Back button
+        const backBtn = this.tabContent.querySelector('#studio-new-back-btn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => this.closeTabMode());
+        }
+
+        // Navigation menu toggle (opens main app sidebar)
+        // Sidebar expand/collapse
+        const toggleStrip = this.tabContent.querySelector('.sidebar-toggle-strip');
+        if (toggleStrip) {
+            toggleStrip.addEventListener('click', () => this._toggleSidebarTab());
+        }
+
+        const collapseBtn = this.tabContent.querySelector('.sidebar-collapse-btn');
+        if (collapseBtn) {
+            collapseBtn.addEventListener('click', () => this._toggleSidebarTab());
+        }
+
+        // Zoom controls
+        const zoomOut = this.tabContent.querySelector('#fullscreen-zoom-out');
+        const zoomIn = this.tabContent.querySelector('#fullscreen-zoom-in');
+        const fitWidth = this.tabContent.querySelector('#fullscreen-fit-width');
+
+        if (zoomOut) zoomOut.addEventListener('click', () => this._zoomOut());
+        if (zoomIn) zoomIn.addEventListener('click', () => this._zoomIn());
+        if (fitWidth) fitWidth.addEventListener('click', () => this._fitToWidth());
+
+        // Measures dropdown
+        const measuresDropdown = this.tabContent.querySelector('#fullscreen-measures-dropdown');
+        if (measuresDropdown) {
+            measuresDropdown.addEventListener('change', (e) => {
+                this.measuresPerSystem = parseInt(e.target.value);
+                this._saveToStorage(STORAGE_KEYS.MEASURES_PER_SYSTEM, this.measuresPerSystem);
+                this._onMeasuresPerSystemChange(); // Use correct method name (shared with modal)
+            });
+        }
+
+        // Time signature dropdown
+        const timesigDropdown = this.tabContent.querySelector('#fullscreen-timesig-dropdown');
+        if (timesigDropdown) {
+            timesigDropdown.addEventListener('change', (e) => {
+                const [num, denom] = e.target.value.split('/').map(Number);
+                this._onTimeSignatureChange(num, denom);
+            });
+        }
+
+        // Title/composer edit - use shared method that works for both modes
+        const titleComposer = this.tabContent.querySelector('#fs-title-composer');
+        if (titleComposer) {
+            titleComposer.addEventListener('click', () => this._showTitleComposerEditor());
+        }
+
+        // Wheel zoom
+        const canvasContainer = this.tabContent.querySelector('#fullscreen-canvas-container');
+        if (canvasContainer) {
+            canvasContainer.addEventListener('wheel', this._boundWheelHandler, { passive: false });
+        }
+
+        // === SHARED HANDLERS ===
+        // These handlers work for both modal and tab mode using _getActiveContainer()
+        // This reuses all the notation toolbar wiring from the modal version
+        this._attachSidebarToolHandlers();
+        this._attachPlaybackFABHandlers();
+    }
+
+    /**
+     * Toggle sidebar in tab mode (uses shared method)
+     */
+    _toggleSidebarTab() {
+        this.sidebarOpen = !this.sidebarOpen;
+        this._saveToStorage(STORAGE_KEYS.SIDEBAR, this.sidebarOpen);
+        this._applySidebarState(); // Use shared method
+    }
+
+    /**
+     * Apply sidebar state in tab mode
+     */
+    _applySidebarStateTab() {
+        if (!this.tabContent) return;
+
+        const sidebar = this.tabContent.querySelector('#fullscreen-sidebar');
+        const toggleStrip = this.tabContent.querySelector('.sidebar-toggle-strip');
+        const sidebarContent = this.tabContent.querySelector('.sidebar-content');
+
+        if (sidebar) {
+            sidebar.classList.toggle('w-64', this.sidebarOpen);
+            sidebar.classList.toggle('w-6', !this.sidebarOpen);
+        }
+        if (toggleStrip) {
+            toggleStrip.classList.toggle('hidden', this.sidebarOpen);
+        }
+        if (sidebarContent) {
+            sidebarContent.classList.toggle('hidden', !this.sidebarOpen);
+        }
+    }
+
+    /**
+     * Apply zoom in tab mode
+     */
+    _applyZoomTab() {
+        if (!this.tabContent) return;
+
+        const pagesContainer = this.tabContent.querySelector('#fullscreen-pages-container');
+        const zoomDisplay = this.tabContent.querySelector('#fullscreen-zoom-level');
+
+        if (pagesContainer) {
+            pagesContainer.style.transform = `scale(${this.zoomLevel / 100})`;
+            pagesContainer.style.transformOrigin = 'top center';
+        }
+        if (zoomDisplay) {
+            zoomDisplay.textContent = `${this.zoomLevel}%`;
+        }
+    }
+
+    /**
+     * Update header info in tab mode
+     */
+    _updateHeaderInfoTab(settings) {
+        if (!this.tabContent) return;
+
+        const titleEl = this.tabContent.querySelector('#fs-composition-title');
+        const composerEl = this.tabContent.querySelector('#fs-composition-composer');
+        const keyTimeBadge = this.tabContent.querySelector('#fullscreen-key-time-badge');
+
+        if (titleEl) {
+            titleEl.textContent = settings.title || 'Untitled Composition';
+        }
+        if (composerEl) {
+            if (settings.composer) {
+                composerEl.textContent = `by ${settings.composer}`;
+                composerEl.classList.remove('hidden');
+            } else {
+                composerEl.classList.add('hidden');
+            }
+        }
+        if (keyTimeBadge) {
+            const key = settings.key || 'C';
+            // Detect if minor from key string (ends with lowercase 'm' like "Gm", "Am", "F#m")
+            const isMinor = key.endsWith('m') && key.length > 1 && key[key.length - 2] !== '#' && key[key.length - 2] !== 'b';
+            const keyDisplay = isMinor ? `${key.slice(0, -1)} Minor` : `${key} Major`;
+            const ts = settings.timeSignature || { num: 4, denom: 4 };
+            keyTimeBadge.textContent = `${keyDisplay} • ${ts.num}/${ts.denom}`;
+        }
+    }
+
+    /**
+     * Capture notation elements for tab mode
+     */
+    _captureNotationElementsTab() {
+        if (!this.tabContent) return;
+
+        const pagesContainer = this.tabContent.querySelector('#fullscreen-pages-container');
+        if (!pagesContainer) return;
+
+        // Use the same logic as modal mode
+        const originalContainer = document.getElementById('notation-pages-container');
+        if (originalContainer) {
+            this.originalPagesContainer = originalContainer;
+            // Move pages to fullscreen container
+            while (originalContainer.firstChild) {
+                pagesContainer.appendChild(originalContainer.firstChild);
+            }
+        }
+    }
+
+    // ========================================================================
     // MODAL CREATION
     // ========================================================================
 
@@ -214,7 +1376,7 @@ export class FullScreenNotationEditor {
 
         this.modal = document.createElement('div');
         this.modal.id = 'fullscreen-notation-modal';
-        this.modal.className = 'fixed inset-0 bg-black/60 hidden z-[9990] flex flex-col';
+        this.modal.className = 'fixed inset-0 bg-black/60 hidden z-[500] flex flex-col';
         this.modal.tabIndex = -1; // Make focusable for keyboard events
 
         this.modal.innerHTML = `
@@ -253,18 +1415,32 @@ export class FullScreenNotationEditor {
                     </div>
                 </div>
 
-                <!-- Center: Measures Per System Dropdown -->
-                <div class="flex items-center gap-2">
-                    <label class="text-sm text-white/80" style="-webkit-text-fill-color: rgba(255,255,255,0.8) !important;">
-                        Measures/Row:
-                    </label>
-                    <select id="fullscreen-measures-dropdown"
-                            class="px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-sm text-white border-none focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
-                            style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
-                        ${MEASURES_PER_SYSTEM_OPTIONS.map(n =>
-                            `<option value="${n}" ${n === this.measuresPerSystem ? 'selected' : ''} style="color: #333; -webkit-text-fill-color: #333;">${n}</option>`
-                        ).join('')}
-                    </select>
+                <!-- Center: Measures Per System + Time Signature Dropdowns -->
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-white/80" style="-webkit-text-fill-color: rgba(255,255,255,0.8) !important;">
+                            Measures/Row:
+                        </label>
+                        <select id="fullscreen-measures-dropdown"
+                                class="px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-sm text-white border-none focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                                style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                            ${MEASURES_PER_SYSTEM_OPTIONS.map(n =>
+                                `<option value="${n}" ${n === this.measuresPerSystem ? 'selected' : ''} style="color: #333; -webkit-text-fill-color: #333;">${n}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-white/80" style="-webkit-text-fill-color: rgba(255,255,255,0.8) !important;">
+                            Time Sig:
+                        </label>
+                        <select id="fullscreen-timesig-dropdown"
+                                class="px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-sm text-white border-none focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                                style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
+                            ${TIME_SIGNATURES.map(ts =>
+                                `<option value="${ts.value}" ${this._isCurrentTimeSignature(ts.num, ts.denom) ? 'selected' : ''} style="color: #333; -webkit-text-fill-color: #333;">${ts.label}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Right: Zoom Controls + Close -->
@@ -384,19 +1560,22 @@ export class FullScreenNotationEditor {
                                 </span>
                             </div>
                             <div class="p-2 space-y-1.5">
-                                <div class="grid grid-cols-3 gap-1">
-                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="1n" title="Whole note (4 beats)">𝅝</button>
-                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="2n" title="Half note (2 beats)">𝅗𝅥</button>
-                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="4n" title="Quarter note (1 beat)">♩</button>
-                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="8n" title="Eighth note (1/2 beat)">♪</button>
-                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="16n" title="16th note (1/4 beat)">𝅘𝅥𝅯</button>
-                                    <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="32n" title="32nd note (1/8 beat)">𝅘𝅥𝅰</button>
+                                <!-- Row 1: Duration buttons (3x2) + Dot/Rest (1x2) side by side -->
+                                <div class="flex gap-1.5">
+                                    <div class="grid grid-cols-3 gap-1 flex-1">
+                                        <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="1n" title="Whole note (4 beats)">𝅝</button>
+                                        <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="2n" title="Half note (2 beats)">𝅗𝅥</button>
+                                        <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="4n" title="Quarter note (1 beat)">♩</button>
+                                        <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="8n" title="Eighth note (1/2 beat)">♪</button>
+                                        <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="16n" title="16th note (1/4 beat)">𝅘𝅥𝅯</button>
+                                        <button class="fs-duration-btn px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-lg shadow-sm leading-tight focus:outline-none" data-duration="32n" title="32nd note (1/8 beat)">𝅘𝅥𝅰</button>
+                                    </div>
+                                    <div class="flex flex-col gap-1">
+                                        <button class="fs-dot-btn px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Dotted note (+50% duration)">• Dot</button>
+                                        <button class="fs-rest-btn px-2 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Rest mode">𝄽 Rest</button>
+                                    </div>
                                 </div>
-                                <div class="flex gap-1">
-                                    <button class="fs-dot-btn flex-1 px-2 py-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Dotted note (+50% duration)">• Dot</button>
-                                    <button class="fs-rest-btn flex-1 px-2 py-1.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-400 transition-colors text-xs shadow-sm focus:outline-none" title="Rest mode">𝄽 Rest</button>
-                                </div>
-                                <!-- Current duration indicator -->
+                                <!-- Row 2: Current duration indicator -->
                                 <div id="fs-duration-indicator" class="text-center text-xs text-indigo-600 font-medium py-1 bg-indigo-100 rounded">
                                     Current: Quarter Note (1 beat)
                                 </div>
@@ -776,69 +1955,16 @@ export class FullScreenNotationEditor {
                 <div id="fullscreen-canvas-container"
                      class="flex-1 overflow-auto bg-gray-100 p-4 relative">
                     <div id="fullscreen-canvas-wrapper"
-                         class="inline-block min-w-full"
-                         style="transform-origin: top center;">
+                         class="inline-block"
+                         style="transform-origin: top left;">
                         <!-- Notation pages will be moved here -->
-                        <div id="fullscreen-pages-container" class="flex flex-col items-center gap-4">
+                        <div id="fullscreen-pages-container" class="flex flex-col items-start gap-4">
                             <!-- Pages will be cloned/moved here -->
                         </div>
                     </div>
 
-                    <!-- Playback FAB (Fixed position in bottom-right of canvas container) -->
-                    <div id="fullscreen-playback-fab" class="absolute right-6 z-50" style="bottom: 27px;">
-                        <div class="flex flex-col items-center gap-3">
-                            <!-- Stop Button (above play) -->
-                            <button id="fs-fab-stop-btn"
-                                    class="w-12 h-12 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
-                                    title="Stop">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <rect x="6" y="6" width="8" height="8"/>
-                                </svg>
-                            </button>
-
-                            <!-- Main Play Button -->
-                            <div class="relative">
-                                <button id="fs-fab-play-btn"
-                                        class="w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
-                                        title="Play (click for menu)">
-                                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
-                                    </svg>
-                                </button>
-
-                                <!-- Dropdown Menu (appears above the button) -->
-                                <div id="fs-fab-menu" class="hidden absolute bottom-16 right-0 w-48 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
-                                <button data-action="play-all" class="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-3 active:bg-green-100">
-                                    <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
-                                    <span class="text-green-700 font-medium">Play All</span>
-                                </button>
-                                <button data-action="play-chords" class="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 active:bg-blue-100">
-                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                                    <span class="text-blue-700">Chords Only</span>
-                                </button>
-                                <button data-action="play-from-selected" class="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-3 active:bg-purple-100">
-                                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
-                                    <span class="text-purple-700">From Selected</span>
-                                </button>
-                                <button data-action="play-measure" class="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-amber-50 flex items-center gap-3 active:bg-amber-100">
-                                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
-                                    <span class="text-amber-700">Play Measure</span>
-                                </button>
-                                <div class="border-t border-gray-100"></div>
-                                <button data-action="toggle-metronome" class="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-3 active:bg-orange-100">
-                                    <span class="w-4 h-4 text-orange-600 text-center">🔔</span>
-                                    <span class="text-orange-700">Metronome</span>
-                                    <span id="fs-metronome-status" class="ml-auto text-xs text-gray-400">OFF</span>
-                                </button>
-                                <div class="border-t border-gray-100"></div>
-                                <button data-action="stop" class="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-3 active:bg-red-100">
-                                    <svg class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
-                                    <span class="text-red-700 font-medium">Stop</span>
-                                </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Full FAB Menu (Composition Studio style) -->
+                    ${this._generateFullFAB()}
                 </div><!-- Close canvas container -->
 
                 <!-- Tabbed Bottom Panel - Content rendered by FullScreenBottomPanel.js -->
@@ -879,6 +2005,13 @@ export class FullScreenNotationEditor {
             this.measuresPerSystem = parseInt(e.target.value);
             this._saveToStorage(STORAGE_KEYS.MEASURES_PER_SYSTEM, this.measuresPerSystem);
             this._onMeasuresPerSystemChange();
+        });
+
+        // Time signature dropdown
+        const timesigDropdown = this.modal.querySelector('#fullscreen-timesig-dropdown');
+        timesigDropdown?.addEventListener('change', (e) => {
+            const [num, denom] = e.target.value.split('/').map(Number);
+            this._onTimeSignatureChange(num, denom);
         });
 
         // Close button
@@ -932,79 +2065,291 @@ export class FullScreenNotationEditor {
     }
 
     /**
-     * Attach event handlers for the playback FAB button
+     * Attach event handlers for the full FAB system
+     * Works for both modal and tab modes
      */
     _attachPlaybackFABHandlers() {
-        const playBtn = this.modal.querySelector('#fs-fab-play-btn');
-        const stopBtn = this.modal.querySelector('#fs-fab-stop-btn');
-        const fabMenu = this.modal.querySelector('#fs-fab-menu');
+        const container = this._getActiveContainer();
+        if (!container) return;
 
-        // Toggle menu on play button click
-        playBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            fabMenu?.classList.toggle('hidden');
-        });
+        const fabContainer = container.querySelector('#fullscreen-fab-container');
+        if (!fabContainer) return;
 
-        // Stop button - immediate stop
-        stopBtn?.addEventListener('click', () => {
+        const fabMain = fabContainer.querySelector('#fs-fab-main');
+        const fabMenu = fabContainer.querySelector('#fs-fab-menu');
+        const fabIcon = fabContainer.querySelector('.fs-fab-icon');
+        const categories = fabContainer.querySelectorAll('.fs-fab-category');
+
+        // Quick buttons container (positioned above FAB, visible when collapsed)
+        const quickButtons = container.querySelector('#fs-fab-quick-buttons');
+        const quickPlay = quickButtons?.querySelector('#fs-fab-quick-play');
+        const quickStop = quickButtons?.querySelector('#fs-fab-quick-stop');
+        const quickSuggestions = quickButtons?.querySelector('#fs-fab-quick-suggestions');
+
+        let isOpen = false;
+        let activeSubmenu = null;
+
+        // Close all submenus
+        const closeAllSubmenus = () => {
+            fabContainer.querySelectorAll('.fs-fab-submenu').forEach(sm => sm.classList.add('hidden'));
+            activeSubmenu = null;
+        };
+
+        // Show category labels
+        const showCategoryLabels = () => {
+            fabContainer.querySelectorAll('.fs-fab-label').forEach(label => {
+                label.classList.remove('opacity-0');
+                label.classList.add('opacity-100');
+            });
+        };
+
+        // Hide category labels
+        const hideCategoryLabels = () => {
+            fabContainer.querySelectorAll('.fs-fab-label').forEach(label => {
+                label.classList.add('opacity-0');
+                label.classList.remove('opacity-100');
+            });
+        };
+
+        // Close FAB menu
+        const closeFabMenu = () => {
+            isOpen = false;
             fabMenu?.classList.add('hidden');
-            window.stopPlayAllMelody?.();
-            window.stopMelody?.();
+            if (fabIcon) fabIcon.style.transform = 'rotate(0deg)';
+            closeAllSubmenus();
+            hideCategoryLabels();
+            // Show quick buttons when FAB is closed
+            quickButtons?.classList.remove('hidden');
+        };
+
+        // Toggle main FAB menu
+        fabMain?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isOpen = !isOpen;
+            fabMenu?.classList.toggle('hidden', !isOpen);
+            if (fabIcon) fabIcon.style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)';
+
+            // Toggle quick buttons visibility (hide when FAB is open)
+            quickButtons?.classList.toggle('hidden', isOpen);
+
+            if (!isOpen) {
+                closeAllSubmenus();
+                hideCategoryLabels();
+            } else {
+                showCategoryLabels();
+            }
         });
 
-        // Menu item handlers
-        fabMenu?.querySelectorAll('button[data-action]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const action = e.currentTarget.dataset.action;
-                fabMenu.classList.add('hidden');
+        // Category buttons toggle submenus
+        categories.forEach(category => {
+            const categoryBtn = category.querySelector('.fs-fab-category-btn');
+            const submenu = category.querySelector('.fs-fab-submenu');
 
-                switch (action) {
-                    case 'play-all':
-                        // Play all (melody + chords)
-                        window.playAllMelody?.();
-                        break;
-                    case 'play-chords':
-                        // Chords/progression only
-                        window.playProgressionOnly?.();
-                        break;
-                    case 'play-from-selected':
-                        // From selected measure
-                        window.playFromSelectedMeasure?.();
-                        break;
-                    case 'play-measure':
-                        // Play selected/current measure
-                        window.playSelectedMeasure?.();
-                        break;
-                    case 'toggle-metronome':
-                        // Toggle metronome
-                        const newState = window.toggleMetronome?.();
-                        const statusEl = this.modal.querySelector('#fs-metronome-status');
-                        if (statusEl) {
-                            statusEl.textContent = newState ? 'ON' : 'OFF';
-                        }
-                        break;
-                    case 'stop':
-                        window.stopPlayAllMelody?.();
-                        window.stopMelody?.();
-                        break;
+            categoryBtn?.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                if (activeSubmenu === submenu) {
+                    // Toggle off current submenu
+                    submenu?.classList.add('hidden');
+                    activeSubmenu = null;
+                } else {
+                    // Close other submenus, open this one
+                    closeAllSubmenus();
+                    submenu?.classList.remove('hidden');
+                    activeSubmenu = submenu;
                 }
             });
         });
 
+        // Quick play button
+        quickPlay?.addEventListener('click', () => {
+            window.playAllMelody?.();
+        });
+
+        // Quick stop button
+        quickStop?.addEventListener('click', () => {
+            window.stopPlayAllMelody?.();
+            window.stopMelody?.();
+        });
+
+        // Quick suggestions button - opens chord suggestions (same as Classic view)
+        quickSuggestions?.addEventListener('click', () => {
+            if (window.showUnifiedRecommendationModal) {
+                window.showUnifiedRecommendationModal({ initialTab: 'chord' });
+            }
+        });
+
+        // Handle all action buttons (in all submenus)
+        fabContainer.querySelectorAll('button[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const action = e.currentTarget.dataset.action;
+                this._handleFabAction(action);
+                closeFabMenu();
+            });
+        });
+
+        // BPM slider
+        const bpmSlider = fabContainer.querySelector('#fs-fab-bpm-slider');
+        const bpmValue = fabContainer.querySelector('#fs-fab-bpm-value');
+        if (bpmSlider && bpmValue) {
+            // Initialize from current BPM - use getTempo() or getBPM() (tempo is in metadata, not settings)
+            const currentBpm = window.getBPM?.() || window.getCompositionState?.()?.getTempo?.() || 120;
+            bpmSlider.value = currentBpm;
+            bpmValue.textContent = currentBpm;
+
+            bpmSlider.addEventListener('input', (e) => {
+                const bpm = parseInt(e.target.value);
+                bpmValue.textContent = bpm;
+                window.setBPM?.(bpm);
+            });
+        }
+
+        // Volume slider
+        const volumeSlider = fabContainer.querySelector('#fs-fab-volume-slider');
+        const volumeValue = fabContainer.querySelector('#fs-fab-volume-value');
+        if (volumeSlider && volumeValue) {
+            volumeSlider.addEventListener('input', (e) => {
+                const vol = parseInt(e.target.value);
+                volumeValue.textContent = `${vol}%`;
+                window.setMasterVolume?.(vol / 100);
+            });
+        }
+
+        // Quick Actions toggle
+        const quickActionsToggle = fabContainer.querySelector('#fs-quick-actions-toggle');
+        if (quickActionsToggle) {
+            // Initialize state from noteEditor
+            const noteEditor = window.getNotationComposer?.()?.noteEditor;
+            if (noteEditor) {
+                quickActionsToggle.checked = noteEditor.isQuickActionsEnabled?.() ?? true;
+            }
+
+            quickActionsToggle.addEventListener('change', (e) => {
+                const noteEditor = window.getNotationComposer?.()?.noteEditor;
+                if (noteEditor) {
+                    noteEditor.setQuickActionsEnabled(e.target.checked);
+                }
+            });
+        }
+
         // Close menu when clicking outside
         document.addEventListener('click', (e) => {
-            if (this.isOpen && fabMenu && !fabMenu.contains(e.target) && !playBtn?.contains(e.target)) {
-                fabMenu.classList.add('hidden');
+            if ((this.isOpen || this.isTabMode) && isOpen) {
+                if (!fabContainer.contains(e.target)) {
+                    closeFabMenu();
+                }
             }
         });
     }
 
     /**
+     * Handle FAB action button clicks
+     * @param {string} action - The action to perform
+     */
+    _handleFabAction(action) {
+        const container = this._getActiveContainer();
+
+        switch (action) {
+            // Playback actions
+            case 'play-all':
+                window.playAllMelody?.();
+                break;
+            case 'play-chords':
+                window.playProgressionOnly?.();
+                break;
+            case 'play-from-selected':
+                window.playFromSelectedMeasure?.();
+                break;
+            case 'play-measure':
+                window.playSelectedMeasure?.();
+                break;
+            case 'toggle-metronome':
+                const newState = window.toggleMetronome?.();
+                const statusEl = container?.querySelector('#fs-fab-metronome-status');
+                if (statusEl) {
+                    statusEl.textContent = newState ? 'ON' : 'OFF';
+                    statusEl.classList.toggle('text-green-600', newState);
+                    statusEl.classList.toggle('text-gray-400', !newState);
+                }
+                break;
+            case 'stop':
+                window.stopPlayAllMelody?.();
+                window.stopMelody?.();
+                break;
+
+            // Edit actions
+            case 'undo':
+                window.notationUndo?.();
+                break;
+            case 'redo':
+                window.notationRedo?.();
+                break;
+            case 'clear-treble':
+                window.clearTrebleStaff?.();
+                break;
+            case 'clear-progression':
+                window.clearProgression?.();
+                break;
+
+            // File actions
+            case 'new-song':
+                window.newSong?.();
+                break;
+            case 'save':
+                window.saveProject?.();
+                break;
+            case 'load':
+                window.loadProject?.();
+                break;
+            case 'version-history':
+                window.showVersionHistory?.();
+                break;
+            case 'create-checkpoint':
+                window.createCheckpoint?.();
+                break;
+            case 'import-midi':
+                window.importMIDI?.();
+                break;
+            case 'export-midi':
+                window.exportMIDI?.();
+                break;
+            case 'export-pdf':
+                window.exportPDF?.();
+                break;
+            case 'export-audio':
+                window.exportAudio?.();
+                break;
+
+            // Suggestions actions
+            case 'suggest-chords':
+                window.showUnifiedRecommendationModal?.({ initialTab: 'chord' });
+                break;
+            case 'suggest-melody':
+                window.showUnifiedRecommendationModal?.({ initialTab: 'melody' });
+                break;
+            case 'suggest-section':
+                window.showSectionSuggestions?.();
+                break;
+            case 'suggest-harmonize':
+                window.showHarmonizationPanel?.();
+                break;
+
+            // Settings actions
+            case 'back-to-classic':
+                this.closeTabMode();
+                window.switchTab?.('melody');
+                break;
+        }
+    }
+
+    /**
      * Attach event handlers for sidebar tool buttons
      * These connect to the existing notation toolbar functionality
+     * Works for both modal and tab modes by using _getActiveContainer()
      */
     _attachSidebarToolHandlers() {
-        const sidebar = this.modal.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         // Get toolbar reference for direct method calls
@@ -1020,8 +2365,8 @@ export class FullScreenNotationEditor {
         };
 
         // Duration buttons - NOTE: These are in the PINNED header section, not in sidebar-content
-        // So we search the entire modal for them
-        this.modal.querySelectorAll('.fs-duration-btn').forEach(btn => {
+        // So we search the entire container for them
+        container.querySelectorAll('.fs-duration-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const duration = e.currentTarget.dataset.duration;
                 if (duration && window.setNotationDuration) {
@@ -1033,7 +2378,7 @@ export class FullScreenNotationEditor {
 
         // Dot button - also in pinned header
         // Use toolbar's toggleDotted to apply to selected notes (not just input mode)
-        const dotBtn = this.modal.querySelector('.fs-dot-btn');
+        const dotBtn = container.querySelector('.fs-dot-btn');
         dotBtn?.addEventListener('click', () => {
             const composer = window.getNotationComposer?.();
             const toolbar = composer?.toolbar;
@@ -1051,9 +2396,19 @@ export class FullScreenNotationEditor {
         });
 
         // Rest button - also in pinned header
-        const restBtn = this.modal.querySelector('.fs-rest-btn');
+        // CRITICAL: Must use toolbar.toggleRestMode() NOT window.setNotationRestMode()
+        // toolbar.toggleRestMode() triggers onRestModeChange callback which:
+        // 1. If notes are selected: calls noteEditor.toggleRestOnSelected() to convert notes to/from rests
+        // 2. If no notes selected: just toggles rest mode for new note entry
+        // window.setNotationRestMode() ONLY does #2, which is why rest toggle was broken
+        const restBtn = container.querySelector('.fs-rest-btn');
         restBtn?.addEventListener('click', () => {
-            if (window.setNotationRestMode) {
+            const toolbar = getToolbar();
+            if (toolbar) {
+                toolbar.toggleRestMode();
+                this._updateRestButton(toolbar.isRestMode);
+            } else if (window.setNotationRestMode) {
+                // Fallback to old behavior if toolbar not available
                 const state = window.getNotationState?.();
                 const newRestMode = !state?.isRestMode;
                 window.setNotationRestMode(newRestMode);
@@ -1274,10 +2629,10 @@ export class FullScreenNotationEditor {
                         toolbar?.onPaste?.();
                         break;
                     case 'octave-up':
-                        toolbar?.onOctaveShift?.(12);
+                        toolbar?.onOctaveShift?.(1);  // 1 = one octave up
                         break;
                     case 'octave-down':
-                        toolbar?.onOctaveShift?.(-12);
+                        toolbar?.onOctaveShift?.(-1);  // -1 = one octave down
                         break;
                 }
             });
@@ -1375,8 +2730,8 @@ export class FullScreenNotationEditor {
 
         // Quick Section Selector (jump to section)
         // Note: The dropdown is in the pinned header area, not inside #fullscreen-sidebar-content,
-        // so we search from this.modal instead of sidebar
-        const sectionJump = this.modal.querySelector('#fs-section-jump');
+        // so we search from container instead of sidebar
+        const sectionJump = container.querySelector('#fs-section-jump');
         sectionJump?.addEventListener('change', (e) => {
             const sectionId = e.target.value;
             if (!sectionId) return;
@@ -1405,7 +2760,8 @@ export class FullScreenNotationEditor {
      * Update voice toggle buttons to reflect active voice
      */
     _updateVoiceButtons(activeVoice) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-voice-btn').forEach(btn => {
@@ -1433,7 +2789,7 @@ export class FullScreenNotationEditor {
 
         // Create our sync function
         this._selectionSyncHandler = () => {
-            if (!this.isOpen) return;
+            if (!this.isOpen && !this.isTabMode) return;
             this._syncSidebarWithSelection();
         };
 
@@ -1444,7 +2800,7 @@ export class FullScreenNotationEditor {
             if (originalUpdateSelection) {
                 composer.toolbar.updateSelectionState = (selectedNotes) => {
                     originalUpdateSelection(selectedNotes);
-                    if (this.isOpen) {
+                    if (this.isOpen || this.isTabMode) {
                         this._syncSidebarWithToolbar(composer.toolbar);
                     }
                 };
@@ -1468,7 +2824,7 @@ export class FullScreenNotationEditor {
      * Sync sidebar button states with the main toolbar's selection state
      */
     _syncSidebarWithToolbar(toolbar) {
-        if (!toolbar || !this.modal) return;
+        if (!toolbar || (!this.modal && !this.tabContent)) return;
 
         const hasSelection = toolbar.selectedNotesCount > 0;
 
@@ -1628,10 +2984,11 @@ export class FullScreenNotationEditor {
      * Update active state of duration buttons in sidebar (pinned header)
      */
     _updateActiveDurationButton(activeDuration) {
-        if (!this.modal) return;
+        const container = this._getActiveContainer();
+        if (!container) return;
 
         // Duration buttons are in the PINNED header, not sidebar-content
-        const buttons = this.modal.querySelectorAll('.fs-duration-btn');
+        const buttons = container.querySelectorAll('.fs-duration-btn');
         buttons.forEach(btn => {
             const isActive = btn.dataset.duration === activeDuration;
             btn.classList.toggle('bg-indigo-200', isActive);
@@ -1643,19 +3000,69 @@ export class FullScreenNotationEditor {
         });
 
         // Update the duration indicator text
-        const indicator = this.modal.querySelector('#fs-duration-indicator');
+        const indicator = container.querySelector('#fs-duration-indicator');
         if (indicator) {
-            const durationNames = {
-                '1n': 'Whole Note (4 beats)',
-                '2n': 'Half Note (2 beats)',
-                '4n': 'Quarter Note (1 beat)',
-                '8n': 'Eighth Note (½ beat)',
-                '16n': '16th Note (¼ beat)',
-                '32n': '32nd Note (⅛ beat)'
+            // Get time signature to calculate beats correctly
+            const compState = getCompositionState();
+            const ts = compState?.getTimeSignature?.() || { num: 4, denom: 4 };
+            const denom = ts.denom || 4;
+
+            // The denominator tells us which note = 1 beat
+            // denom=4: quarter=1 beat, denom=8: eighth=1 beat, denom=2: half=1 beat
+            // Duration values relative to quarter note
+            const durationToQuarterRatio = {
+                '1n': 4,      // whole = 4 quarters
+                '2n': 2,      // half = 2 quarters
+                '4n': 1,      // quarter = 1 quarter
+                '8n': 0.5,    // eighth = 0.5 quarters
+                '16n': 0.25,  // 16th = 0.25 quarters
+                '32n': 0.125  // 32nd = 0.125 quarters
             };
+
+            // How many quarters equal 1 beat based on denom
+            // denom=4: 1 quarter = 1 beat, denom=8: 0.5 quarters = 1 beat, denom=2: 2 quarters = 1 beat
+            const quartersPerBeat = 4 / denom;
+            const noteQuarters = durationToQuarterRatio[activeDuration] || 1;
+            let beats = noteQuarters / quartersPerBeat;
+
             const isDotted = window.getNotationState?.()?.isDotted;
-            const baseName = durationNames[activeDuration] || activeDuration;
-            indicator.textContent = `Current: ${baseName}${isDotted ? ' (dotted)' : ''}`;
+            if (isDotted) beats *= 1.5;
+
+            // Format beats nicely
+            const formatBeats = (b) => {
+                if (b === 8) return '8';
+                if (b === 4) return '4';
+                if (b === 2) return '2';
+                if (b === 1) return '1';
+                if (b === 0.5) return '½';
+                if (b === 0.25) return '¼';
+                if (b === 0.125) return '⅛';
+                if (b === 3) return '3';
+                if (b === 1.5) return '1½';
+                if (b === 0.75) return '¾';
+                // Handle fractions like 1/3
+                if (b < 1 && b > 0) {
+                    const inverse = 1 / b;
+                    if (Math.abs(inverse - Math.round(inverse)) < 0.01) {
+                        return `1/${Math.round(inverse)}`;
+                    }
+                }
+                return b.toFixed(2).replace(/\.?0+$/, '');
+            };
+
+            const noteNames = {
+                '1n': 'Whole',
+                '2n': 'Half',
+                '4n': 'Quarter',
+                '8n': 'Eighth',
+                '16n': '16th',
+                '32n': '32nd'
+            };
+
+            const noteName = noteNames[activeDuration] || activeDuration;
+            const beatStr = formatBeats(beats);
+            const beatWord = beats === 1 ? 'beat' : 'beats';
+            indicator.textContent = `Current: ${noteName}${isDotted ? ' (dotted)' : ''} = ${beatStr} ${beatWord}`;
         }
     }
 
@@ -1663,7 +3070,9 @@ export class FullScreenNotationEditor {
      * Update active state of accidental buttons in sidebar
      */
     _updateActiveAccidentalButton(activeAccidental) {
-        const sidebar = this.modal.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        if (!container) return;
+        const sidebar = container.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-accidental-btn').forEach(btn => {
@@ -1679,10 +3088,11 @@ export class FullScreenNotationEditor {
      * Update dot button state (in pinned header)
      */
     _updateDotButton(isDotted) {
-        if (!this.modal) return;
+        const container = this._getActiveContainer();
+        if (!container) return;
 
         // Dot button is in the PINNED header, not sidebar-content
-        const dotBtn = this.modal.querySelector('.fs-dot-btn');
+        const dotBtn = container.querySelector('.fs-dot-btn');
         if (dotBtn) {
             dotBtn.classList.toggle('bg-indigo-200', isDotted);
             dotBtn.classList.toggle('border-indigo-500', isDotted);
@@ -1699,10 +3109,11 @@ export class FullScreenNotationEditor {
      * Update rest button state (in pinned header)
      */
     _updateRestButton(isRest) {
-        if (!this.modal) return;
+        const container = this._getActiveContainer();
+        if (!container) return;
 
         // Rest button is in the PINNED header, not sidebar-content
-        const restBtn = this.modal.querySelector('.fs-rest-btn');
+        const restBtn = container.querySelector('.fs-rest-btn');
         if (restBtn) {
             restBtn.classList.toggle('bg-indigo-100', isRest);
             restBtn.classList.toggle('border-indigo-400', isRest);
@@ -1728,7 +3139,8 @@ export class FullScreenNotationEditor {
      * Update rest display mode buttons (Clean vs Show All)
      */
     _updateRestDisplayButtons(mode) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-rest-display-btn').forEach(btn => {
@@ -1744,7 +3156,8 @@ export class FullScreenNotationEditor {
      * Update active state of articulation buttons in sidebar
      */
     _updateActiveArticulationButton(activeArticulation) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-articulation-btn').forEach(btn => {
@@ -1760,7 +3173,8 @@ export class FullScreenNotationEditor {
      * Update active state of dynamic buttons in sidebar
      */
     _updateActiveDynamicButton(activeDynamic) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-dynamic-btn').forEach(btn => {
@@ -1776,7 +3190,8 @@ export class FullScreenNotationEditor {
      * Update active state of ornament buttons in sidebar
      */
     _updateActiveOrnamentButton(activeOrnament) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-ornament-btn').forEach(btn => {
@@ -1793,7 +3208,8 @@ export class FullScreenNotationEditor {
      * Mirrors notationToolbar.updatePedalButtonsForSelection()
      */
     _updatePedalButtons(selectionPedal) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-pedal-btn').forEach(btn => {
@@ -1811,7 +3227,8 @@ export class FullScreenNotationEditor {
      * @param {string|null} activeTuplet - 'triplet', 'quintuplet', 'sextuplet', or null
      */
     _updateActiveTupletButton(activeTuplet) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-tuplet-btn').forEach(btn => {
@@ -1828,7 +3245,8 @@ export class FullScreenNotationEditor {
      * @param {boolean} hasSlur - Whether selected notes have a slur
      */
     _updateSlurButton(hasSlur) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         // Update the slur button (not tie, that's separate)
@@ -1846,7 +3264,8 @@ export class FullScreenNotationEditor {
      * @param {string|null} hairpinType - 'crescendo', 'decrescendo', or null
      */
     _updateHairpinButtons(hairpinType) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-hairpin-btn').forEach(btn => {
@@ -1863,7 +3282,8 @@ export class FullScreenNotationEditor {
      * @param {string|null} graceType - 'acciaccatura', 'appoggiatura', or null
      */
     _updateGraceNoteButtons(graceType) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         sidebar.querySelectorAll('.fs-grace-btn').forEach(btn => {
@@ -1880,7 +3300,8 @@ export class FullScreenNotationEditor {
      * @param {Object} beamState - Object with start, end, unbeam properties
      */
     _updateBeamButtons(beamState) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         // Beam buttons show active if the selected notes have specific beam settings
@@ -1913,7 +3334,8 @@ export class FullScreenNotationEditor {
      * @param {boolean} isTied - Whether selected notes have a tie
      */
     _updateTieButton(isTied) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         const tieBtn = sidebar.querySelector('.fs-slur-btn[data-slur="tie"]');
@@ -1930,7 +3352,8 @@ export class FullScreenNotationEditor {
      * Mirrors notationToolbar.updateVoltaButtonsForSelection()
      */
     _updateVoltaButtons(selectionMeasureIndices) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         // Get composition state to check volta brackets
@@ -1972,7 +3395,8 @@ export class FullScreenNotationEditor {
      * Mirrors notationToolbar.updateRepeatButtonsForSelection()
      */
     _updateRepeatButtons(selectionMeasureIndices) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         // Get composition state to check repeat signs
@@ -2019,7 +3443,8 @@ export class FullScreenNotationEditor {
      * Mirrors notationToolbar.updateLyricButtonsForSelection()
      */
     _updateLyricButtons(selectionHasLyric) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
         const applyBtn = sidebar.querySelector('.fs-lyric-apply-btn');
@@ -2041,8 +3466,9 @@ export class FullScreenNotationEditor {
      * Update selection info display
      */
     _updateSelectionInfo(count) {
-        const selectionInfo = this.modal?.querySelector('#fs-selection-info');
-        const selectionCount = this.modal?.querySelector('#fs-selection-count');
+        const container = this._getActiveContainer();
+        const selectionInfo = container?.querySelector('#fs-selection-info');
+        const selectionCount = container?.querySelector('#fs-selection-count');
         if (!selectionInfo || !selectionCount) return;
 
         if (count > 0) {
@@ -2088,7 +3514,8 @@ export class FullScreenNotationEditor {
      * @param {Object} toolbar - The main notation toolbar instance
      */
     _updateContextualButtonStates(toolbar) {
-        const sidebar = this.modal?.querySelector('#fullscreen-sidebar-content');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar || !toolbar) return;
 
         // Helper to set button disabled state
@@ -2229,7 +3656,8 @@ export class FullScreenNotationEditor {
             // IMPORTANT: Canvas may have 2x internal resolution for retina displays
             // (canvas.width = 2406, but CSS displays it at 1203px base)
             // So we use the zoom level directly, not the rect/canvas ratio
-            if (self.isOpen && self.zoomLevel !== 100) {
+            // NOTE: Works for both modal (isOpen) and tab mode (isTabMode)
+            if ((self.isOpen || self.isTabMode) && self.zoomLevel !== 100) {
                 // The zoom transform scales everything by zoomLevel/100
                 // Original coordinates are in "zoomed screen space"
                 // We need to divide by zoom factor to get back to "base screen space"
@@ -2292,8 +3720,9 @@ export class FullScreenNotationEditor {
             return;
         }
 
-        // Get fullscreen container
-        const fullscreenPages = this.modal.querySelector('#fullscreen-pages-container');
+        // Get fullscreen container (works for both modal and tab modes)
+        const container = this._getActiveContainer();
+        const fullscreenPages = container?.querySelector('#fullscreen-pages-container');
         if (!fullscreenPages) return;
 
         // Clear any existing content in fullscreen container
@@ -2333,14 +3762,29 @@ export class FullScreenNotationEditor {
             overlay._originalNextSibling = overlay.nextSibling;
             fullscreenPages.appendChild(overlay);
         });
+
+        // CRITICAL: Update PageManager's container so new pages are created in fullscreen container
+        // This ensures that when adding chords triggers a new page, it goes to the right place
+        const composer = window.getNotationComposer?.();
+        if (composer?.pageManager?.setContainer) {
+            composer.pageManager.setContainer(fullscreenPages);
+        }
     }
 
     /**
      * Restore notation elements to their original location
      */
     _restoreNotationElements() {
-        const fullscreenPages = this.modal.querySelector('#fullscreen-pages-container');
+        const container = this._getActiveContainer();
+        const fullscreenPages = container?.querySelector('#fullscreen-pages-container');
         if (!fullscreenPages || !this.originalPagesContainer) return;
+
+        // CRITICAL: Restore PageManager's container back to original before moving elements
+        // This ensures future page creation goes to the normal container
+        const composer = window.getNotationComposer?.();
+        if (composer?.pageManager?.setContainer) {
+            composer.pageManager.setContainer(this.originalPagesContainer);
+        }
 
         // Move elements back to original container
         // Collect all children that have original parent references
@@ -2371,16 +3815,18 @@ export class FullScreenNotationEditor {
      */
     _updateHeaderInfo(settings) {
         const compState = getCompositionState();
+        const container = this._getActiveContainer();
+        if (!container) return;
 
         // Update title display
-        const titleEl = this.modal.querySelector('#fs-composition-title');
+        const titleEl = container.querySelector('#fs-composition-title');
         if (titleEl) {
             const title = compState?.metadata?.title || 'Untitled Composition';
             titleEl.textContent = title;
         }
 
         // Update composer display (shown inline with title, separated by dash)
-        const composerEl = this.modal.querySelector('#fs-composition-composer');
+        const composerEl = container.querySelector('#fs-composition-composer');
         if (composerEl) {
             const composer = compState?.metadata?.composer;
             if (composer) {
@@ -2393,12 +3839,25 @@ export class FullScreenNotationEditor {
         }
 
         // Update key/time badge
-        const badge = this.modal.querySelector('#fullscreen-key-time-badge');
+        // Key is in metadata (e.g., "C", "Gm", "F#", "Bbm")
+        // The mode is encoded in the key string: lowercase 'm' suffix = minor
+        const badge = container.querySelector('#fullscreen-key-time-badge');
         if (badge) {
-            const key = settings.key || 'C';
-            const mode = settings.mode || 'Major';
-            const timeSig = settings.timeSignature || '4/4';
-            badge.textContent = `${key} ${mode} • ${timeSig}`;
+            const key = compState?.metadata?.key || settings.key || 'C';
+            // Detect if minor from key string (ends with lowercase 'm' like "Gm", "Am", "F#m")
+            const isMinor = key.endsWith('m') && key.length > 1 && key[key.length - 2] !== '#' && key[key.length - 2] !== 'b';
+            const keyDisplay = isMinor ? `${key.slice(0, -1)} Minor` : `${key} Major`;
+            // Time signature can be object or string
+            let timeSig = '4/4';
+            const ts = compState?.metadata?.timeSignature || settings.timeSignature;
+            if (ts) {
+                if (typeof ts === 'object' && ts.num && ts.denom) {
+                    timeSig = `${ts.num}/${ts.denom}`;
+                } else if (typeof ts === 'string') {
+                    timeSig = ts;
+                }
+            }
+            badge.textContent = `${keyDisplay} • ${timeSig}`;
         }
     }
 
@@ -2419,7 +3878,8 @@ export class FullScreenNotationEditor {
      * Apply current sidebar state to DOM
      */
     _applySidebarState() {
-        const sidebar = this.modal.querySelector('#fullscreen-sidebar');
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar');
         const sidebarContent = sidebar?.querySelector('.sidebar-content');
         const toggleStrip = sidebar?.querySelector('.sidebar-toggle-strip');
 
@@ -2454,7 +3914,8 @@ export class FullScreenNotationEditor {
      * Apply current bottom panel state to DOM
      */
     _applyBottomPanelState() {
-        const panel = this.modal.querySelector('#fullscreen-bottom-panel');
+        const container = this._getActiveContainer();
+        const panel = container?.querySelector('#fullscreen-bottom-panel');
         const content = panel?.querySelector('#bottom-panel-content');
         const chevron = panel?.querySelector('.bottom-panel-chevron');
 
@@ -2488,7 +3949,9 @@ export class FullScreenNotationEditor {
      * Update the view mode buttons to reflect current state
      */
     _updateViewModeButtons() {
-        const buttons = this.modal.querySelectorAll('.fs-view-mode-btn');
+        const container = this._getActiveContainer();
+        const buttons = container?.querySelectorAll('.fs-view-mode-btn');
+        if (!buttons) return;
         buttons.forEach(btn => {
             const mode = btn.dataset.mode;
             if (mode === this.fullscreenViewMode) {
@@ -2522,8 +3985,11 @@ export class FullScreenNotationEditor {
      * Show the title/composer editor popover
      */
     _showTitleComposerEditor() {
+        const container = this._getActiveContainer();
+        if (!container) return;
+
         // Don't open if already open
-        if (this.modal.querySelector('#fs-title-editor-popover')) {
+        if (container.querySelector('#fs-title-editor-popover')) {
             return;
         }
 
@@ -2534,7 +4000,7 @@ export class FullScreenNotationEditor {
         // Create popover with two input fields
         const popover = document.createElement('div');
         popover.id = 'fs-title-editor-popover';
-        popover.className = 'absolute top-14 left-20 bg-white rounded-lg shadow-2xl p-4 z-[100000] w-80 border border-gray-200';
+        popover.className = 'absolute top-14 left-20 bg-white rounded-lg shadow-2xl p-4 z-[510] w-80 border border-gray-200';
         popover.innerHTML = `
             <div class="space-y-3">
                 <div class="flex items-center justify-between mb-2">
@@ -2568,7 +4034,7 @@ export class FullScreenNotationEditor {
             </div>
         `;
 
-        this.modal.appendChild(popover);
+        container.appendChild(popover);
 
         // Focus title input
         const titleInput = popover.querySelector('#fs-title-input');
@@ -2580,9 +4046,14 @@ export class FullScreenNotationEditor {
         popover.querySelector('#fs-title-cancel').addEventListener('click', () => this._closeTitleEditor());
         popover.querySelector('#fs-title-close').addEventListener('click', () => this._closeTitleEditor());
 
-        // Save on Enter in either input
+        // Handle keyboard in inputs
         popover.querySelectorAll('input').forEach(input => {
             input.addEventListener('keydown', (e) => {
+                // Allow standard keyboard shortcuts (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z)
+                if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    e.stopPropagation(); // Prevent global handlers from intercepting
+                    return; // Let browser handle normally
+                }
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     this._saveTitleComposer();
@@ -2608,8 +4079,9 @@ export class FullScreenNotationEditor {
      * Save title and composer from the editor popover
      */
     _saveTitleComposer() {
-        const titleInput = this.modal.querySelector('#fs-title-input');
-        const composerInput = this.modal.querySelector('#fs-composer-input');
+        const container = this._getActiveContainer();
+        const titleInput = container?.querySelector('#fs-title-input');
+        const composerInput = container?.querySelector('#fs-composer-input');
 
         if (!titleInput || !composerInput) return;
 
@@ -2638,7 +4110,8 @@ export class FullScreenNotationEditor {
      * Close the title/composer editor popover
      */
     _closeTitleEditor() {
-        const popover = this.modal.querySelector('#fs-title-editor-popover');
+        const container = this._getActiveContainer();
+        const popover = container?.querySelector('#fs-title-editor-popover');
         if (popover) {
             popover.remove();
         }
@@ -2665,8 +4138,9 @@ export class FullScreenNotationEditor {
      * Render the chord progression in the bottom panel
      */
     _renderChordProgression() {
-        const container = this.modal.querySelector('#fs-chord-cards-container');
-        const sectionPicker = this.modal.querySelector('#fs-section-picker');
+        const activeContainer = this._getActiveContainer();
+        const container = activeContainer?.querySelector('#fs-chord-cards-container');
+        const sectionPicker = activeContainer?.querySelector('#fs-section-picker');
 
         if (!container) return;
 
@@ -3067,7 +4541,8 @@ export class FullScreenNotationEditor {
      * Highlight a specific card in the bottom panel
      */
     _highlightCard(index) {
-        const container = this.modal.querySelector('#fs-chord-cards-container');
+        const activeContainer = this._getActiveContainer();
+        const container = activeContainer?.querySelector('#fs-chord-cards-container');
         if (!container) return;
 
         // Remove highlight from all cards
@@ -3150,8 +4625,11 @@ export class FullScreenNotationEditor {
      */
     _onProgressionUpdate() {
         // Re-render chord progression in bottom panel
-        if (this.isOpen) {
+        if (this.isOpen || this.isTabMode) {
             this.bottomPanel?.refresh();
+            // Also update time signature dropdown and header in case it changed
+            this._updateTimeSignatureDropdown();
+            this._updateHeaderInfo(getCompositionState()?.getSettings?.() || {});
         }
     }
 
@@ -3181,9 +4659,10 @@ export class FullScreenNotationEditor {
      * Fit notation to container width
      */
     _fitToWidth() {
-        const container = this.modal.querySelector('#fullscreen-canvas-container');
-        const wrapper = this.modal.querySelector('#fullscreen-canvas-wrapper');
-        const pages = this.modal.querySelector('#fullscreen-pages-container');
+        const activeContainer = this._getActiveContainer();
+        const container = activeContainer?.querySelector('#fullscreen-canvas-container');
+        const wrapper = activeContainer?.querySelector('#fullscreen-canvas-wrapper');
+        const pages = activeContainer?.querySelector('#fullscreen-pages-container');
 
         if (!container || !pages) return;
 
@@ -3206,8 +4685,9 @@ export class FullScreenNotationEditor {
      * Apply current zoom level to canvas wrapper
      */
     _applyZoom() {
-        const wrapper = this.modal.querySelector('#fullscreen-canvas-wrapper');
-        const zoomLabel = this.modal.querySelector('#fullscreen-zoom-level');
+        const container = this._getActiveContainer();
+        const wrapper = container?.querySelector('#fullscreen-canvas-wrapper');
+        const zoomLabel = container?.querySelector('#fullscreen-zoom-level');
 
         if (wrapper) {
             wrapper.style.transform = `scale(${this.zoomLevel / 100})`;
@@ -3249,6 +4729,92 @@ export class FullScreenNotationEditor {
         }
     }
 
+    /**
+     * Check if the given time signature matches the current composition's time signature
+     * Used for selecting the correct option in the dropdown
+     */
+    _isCurrentTimeSignature(num, denom) {
+        const compState = getCompositionState();
+        const ts = compState?.getTimeSignature?.() || { num: 4, denom: 4 };
+        return ts.num === num && ts.denom === denom;
+    }
+
+    /**
+     * Handle time signature change from dropdown
+     * Delegates to NotationComposer's time signature change handler which may show scaling dialog
+     */
+    _onTimeSignatureChange(num, denom) {
+        const notationComposer = window.getNotationComposer?.();
+
+        if (notationComposer) {
+            // Use the NotationComposer's handler which checks if scaling is needed
+            // and shows the scaling dialog if there are existing notes
+            const compState = getCompositionState();
+
+            if (compState) {
+                const scalingInfo = compState.getTimeSignatureScalingInfo(num, denom);
+
+                if (scalingInfo.needsScaling) {
+                    // Show dialog asking user about scaling
+                    notationComposer.showTimeSignatureScalingDialog(num, denom, scalingInfo);
+                } else {
+                    // No chords or same beats per measure - just change directly
+                    notationComposer.applyTimeSignatureChange(num, denom, false);
+                }
+            }
+        } else {
+            // Fallback: direct state update
+            const compState = getCompositionState();
+            if (compState?.setTimeSignature) {
+                compState.setTimeSignature(num, denom);
+            }
+            if (typeof window.refreshNotationFromProgression === 'function') {
+                window.refreshNotationFromProgression();
+            }
+        }
+
+        // Update the header badge to reflect new time signature
+        this._updateHeaderInfo(getCompositionState()?.getSettings?.() || {});
+
+        // Update duration indicator to show correct beats for new time signature
+        const toolbar = window.getNotationComposer?.()?.toolbar;
+        const currentDuration = toolbar?.currentDuration || '4n';
+        this._updateActiveDurationButton(currentDuration);
+    }
+
+    /**
+     * Event handler for when time signature actually changes (from compositionState event)
+     * This is called AFTER the change is applied, unlike _onTimeSignatureChange which initiates the change
+     */
+    _onTimeSignatureChanged() {
+        // Update duration indicator to show correct beats for new time signature
+        const toolbar = window.getNotationComposer?.()?.toolbar;
+        const currentDuration = toolbar?.currentDuration || '4n';
+        this._updateActiveDurationButton(currentDuration);
+
+        // Also update the dropdown and header
+        this._updateTimeSignatureDropdown();
+        this._updateHeaderInfo(getCompositionState()?.getSettings?.() || {});
+    }
+
+    /**
+     * Update the time signature dropdown to reflect current state
+     * Called after time signature changes (e.g., from scaling dialog)
+     */
+    _updateTimeSignatureDropdown() {
+        const container = this._getActiveContainer();
+        if (!container) return;
+
+        const dropdown = container.querySelector('#fullscreen-timesig-dropdown');
+        if (!dropdown) return;
+
+        const compState = getCompositionState();
+        const ts = compState?.getTimeSignature?.() || { num: 4, denom: 4 };
+        const value = `${ts.num}/${ts.denom}`;
+
+        dropdown.value = value;
+    }
+
     // ========================================================================
     // EVENT HANDLERS
     // ========================================================================
@@ -3259,7 +4825,7 @@ export class FullScreenNotationEditor {
      * We only intercept full-screen specific shortcuts here.
      */
     _handleKeyDown(e) {
-        if (!this.isOpen) return;
+        if (!this.isOpen && !this.isTabMode) return;
 
         // NOTE: Escape is NOT used to close full-screen mode because
         // it's needed for deselecting notes in the notation editor.
@@ -3295,7 +4861,7 @@ export class FullScreenNotationEditor {
      * Handle mouse wheel events for zoom
      */
     _handleWheel(e) {
-        if (!this.isOpen) return;
+        if (!this.isOpen && !this.isTabMode) return;
 
         // Only zoom with Ctrl/Cmd held
         if (e.ctrlKey || e.metaKey) {
@@ -3312,6 +4878,17 @@ export class FullScreenNotationEditor {
     // ========================================================================
     // STORAGE HELPERS
     // ========================================================================
+
+    /**
+     * Get the active container (modal or tab content)
+     * @returns {HTMLElement|null}
+     */
+    _getActiveContainer() {
+        if (this.isTabMode && this.tabContent) {
+            return this.tabContent;
+        }
+        return this.modal;
+    }
 
     /**
      * Get the visible viewport height.
@@ -3412,5 +4989,25 @@ export function refreshFullscreenChordPanel() {
     }
 }
 
+/**
+ * Initialize the Composition Studio (New) tab
+ * Called when switching to the studio-new tab
+ */
+export function initStudioNewTab() {
+    getFullScreenNotationEditor().openInTabMode();
+}
+
+/**
+ * Close the Composition Studio (New) tab and return to Classic
+ * Called when the back button is pressed
+ */
+export function closeStudioNewTab() {
+    getFullScreenNotationEditor().closeTabMode();
+}
+
 // Expose to window for updateSingleCard to call
 window.refreshFullscreenChordPanel = refreshFullscreenChordPanel;
+
+// Expose tab mode functions to window
+window.initStudioNewTab = initStudioNewTab;
+window.closeStudioNewTab = closeStudioNewTab;

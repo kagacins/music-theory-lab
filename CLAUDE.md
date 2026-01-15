@@ -377,6 +377,52 @@ Tailwind's `text-white` class will NOT work due to the `-webkit-text-fill-color`
 
 ---
 
+## CRITICAL: Popup/Modal Click Events in Composition Studio
+
+**When creating popups or modals in the Composition Studio (New) tab, you MUST set `pointer-events: auto` and use maximum z-index.**
+
+The Composition Studio uses a complex layered canvas system where click events can "pass through" overlaid elements to the canvas beneath them. This causes popups to close immediately when clicking their buttons because the click registers on the canvas instead of the button.
+
+### Symptom:
+- Popup opens correctly
+- Clicking any button in the popup immediately closes it
+- Console shows click target is CANVAS instead of the button element
+- `popup.contains(e.target)` returns `false` even when clicking inside popup bounds
+
+### Solution - Always set these styles on popups:
+```javascript
+popup.style.cssText = `
+  z-index: 2147483647;        /* Maximum possible z-index */
+  pointer-events: auto;       /* CRITICAL: Ensure popup captures clicks */
+  isolation: isolate;         /* Create new stacking context */
+  /* ... other styles ... */
+`;
+```
+
+### Additional Safeguards:
+For click-outside handlers, use a geometric bounds check as fallback:
+```javascript
+const popupRect = popup.getBoundingClientRect();
+const clickInPopupBounds =
+  e.clientX >= popupRect.left && e.clientX <= popupRect.right &&
+  e.clientY >= popupRect.top && e.clientY <= popupRect.bottom;
+
+if (clickInPopupBounds) {
+  return; // Don't close - click is inside popup bounds
+}
+```
+
+### Why This Happens:
+The Composition Studio's notation canvases may have event handlers or CSS properties that interfere with normal event bubbling. The combination of:
+1. Maximum z-index (2147483647)
+2. `pointer-events: auto`
+3. `isolation: isolate`
+4. Geometric bounds checking
+
+...ensures popups work reliably regardless of the underlying canvas structure.
+
+---
+
 ## CRITICAL: User Notifications - Toasts vs Modals
 
 **NEVER use native browser `alert()`, `prompt()`, or `confirm()` dialogs. Use the themed alternatives instead.**
@@ -1437,6 +1483,86 @@ lineOffset = -lowestLine + OFFSET;
 
 ---
 
+## CRITICAL: FullScreen Bottom Panel Scrollbar Positioning
+
+**File:** `src/modules/notation/fullScreen/FullScreenBottomPanel.js`
+
+The fullscreen dock panels (Quick Add Chord, Chord Progression, etc.) use horizontally scrolling containers for chord cards. The scrollbar with arrow buttons must be fully visible within the panel bounds.
+
+### The Problem
+
+The panel has a fixed `max-height` set in `PANEL_HEIGHTS`, and the cards container uses `calc(100% - Xpx)` for its height. If `X` is too small, the scrollbar gets clipped at the bottom (and arrows get clipped on left/right).
+
+### The Solution: Container Height Calculation
+
+The cards container height must leave enough room for the scrollbar (approximately 20-25px). The formula is:
+
+```javascript
+style="height: calc(100% - ${hasExtraUI ? 'LARGER_VALUE' : 'SMALLER_VALUE'}px)"
+```
+
+**Current working values for Quick Add panel:**
+- **Scroll view (no sections):** `97px` subtracted
+- **Section view (with section picker):** `130px` subtracted
+
+```javascript
+// In _renderQuickAddPanel():
+<div id="fs-quick-add-cards-container"
+     style="height: calc(100% - ${this._quickAddViewMode === 'section' && hasSections ? '130px' : '97px'});
+            overflow-x: auto; overflow-y: hidden;">
+```
+
+### How to Adjust
+
+If the scrollbar is clipped:
+- **Scrollbar too LOW (clipped at bottom):** INCREASE the subtracted value (e.g., `97px` → `105px`)
+- **Scrollbar too HIGH (too much empty space below):** DECREASE the subtracted value (e.g., `97px` → `90px`)
+
+### Reference: Chord Progression Panel
+
+The Chord Progression panel uses similar logic:
+```javascript
+// In _renderChordsPanel():
+<div id="fs-chord-cards-container"
+     style="height: calc(100% - ${this.viewMode === 'section' && hasSections ? '120px' : '58px'})"
+```
+
+### Scrollbar Styling
+
+Both panels use custom scrollbar styling with arrows. The track needs `margin: 0 8px` to leave room for arrow buttons:
+
+```css
+#fs-quick-add-cards-container::-webkit-scrollbar { height: 10px; }
+#fs-quick-add-cards-container::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 5px;
+    margin: 0 8px;  /* IMPORTANT: Space for arrow buttons */
+}
+#fs-quick-add-cards-container::-webkit-scrollbar-thumb {
+    background: linear-gradient(to right, #4d7c0f, #3f6212);  /* Forest green theme */
+    border-radius: 5px;
+}
+```
+
+### Selection Outline Fix
+
+Selected cards in the Quick Add panel must NOT use Tailwind's `ring-offset-2` class, which causes the selection ring to extend outside the card bounds. Instead, CSS overrides remove the outline from the wrapper and apply a border to the card:
+
+```css
+#fs-quick-add-cards-container .chord-card-wrapper {
+    outline: none !important;
+    outline-offset: 0 !important;
+}
+
+#fs-quick-add-cards-container .simplified-card[data-selected="true"],
+#fs-quick-add-cards-container .detailed-card[data-selected="true"] {
+    border: 3px solid #a855f7 !important;
+    box-sizing: border-box !important;
+}
+```
+
+---
+
 ## 📚 Additional Resources
 
 - [docs/MODULE_INDEX.md](docs/MODULE_INDEX.md) - Find modules by functionality
@@ -1447,4 +1573,4 @@ lineOffset = -lowestLine + OFFSET;
 
 ---
 
-**Last Updated:** 2026-01-08
+**Last Updated:** 2026-01-11

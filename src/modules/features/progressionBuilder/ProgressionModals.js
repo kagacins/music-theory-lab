@@ -88,7 +88,7 @@ import { showUnifiedRecommendationModal } from '../../ui/recommendations/Unified
 
 import { dispatchBuilderEvent, isGuidedModeActive } from '../../ui/lessonGuidedMode.js';
 
-import { showPromptModal } from '../../ui/modals.js';
+import { showPromptModal, showConfirmModal } from '../../ui/modals.js';
 
 // ============================================================================
 // IMPORTS - Cross-module dependencies
@@ -581,7 +581,9 @@ export function showAddSectionMenu(event, containerId) {
 
     // Create menu
     const menu = document.createElement('div');
-    menu.className = 'section-type-menu fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
+    // Use z-[9995] to appear above fullscreen overlay (z-[9990])
+    menu.className = 'section-type-menu fixed bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
+    menu.style.zIndex = '9995';
 
     // Position near the button (getBoundingClientRect returns viewport-relative coords, use fixed positioning)
     const button = event.target.closest('button') || event.target;
@@ -836,7 +838,9 @@ export function showSectionMenu(event, sectionId) {
 
     // Create context menu
     const menu = document.createElement('div');
-    menu.className = 'section-context-menu fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
+    // Use z-[9995] to appear above fullscreen overlay (z-[9990])
+    menu.className = 'section-context-menu fixed bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
+    menu.style.zIndex = '9995';
 
     // Get button position (getBoundingClientRect returns viewport-relative coords)
     const button = event.target.closest('button') || event.target;
@@ -870,19 +874,29 @@ export function showSectionMenu(event, sectionId) {
             // Show duplication options dialog
             showDuplicateSectionDialog(sectionId, section.label, compositionState);
         }},
-        { label: 'Delete Section', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16', action: () => {
-            if (confirm(`Delete "${section.label}"? Chords will become ungrouped.`)) {
+        { label: 'Delete Section', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16', action: async () => {
+            const confirmed = await showConfirmModal({
+                title: 'Delete Section',
+                message: `Delete "${section.label}"? Chords will become ungrouped.`,
+                confirmText: 'Delete',
+                danger: false
+            });
+            if (confirmed) {
                 compositionState.deleteSection(sectionId);
-                // TODO: renderProgressionDisplay needs to be imported
                 if (renderProgressionDisplay) {
                     renderProgressionDisplay('melody-progression-visualization', true);
                 }
             }
         }, danger: false },
-        { label: 'Delete Section & Chords', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', action: () => {
+        { label: 'Delete Section & Chords', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', action: async () => {
             const chordCount = section.chordIndices?.length || 0;
-            if (confirm(`Delete "${section.label}" AND its ${chordCount} chord(s)? This cannot be undone.`)) {
-                // Delete chords first, then the section
+            const confirmed = await showConfirmModal({
+                title: 'Delete Section & Chords',
+                message: `Delete "${section.label}" AND its ${chordCount} chord(s)? This cannot be undone.`,
+                confirmText: 'Delete All',
+                danger: true
+            });
+            if (confirmed) {
                 deleteSectionAndChords(sectionId, compositionState);
             }
         }, danger: true }
@@ -945,9 +959,10 @@ export function showChangeSectionTypeDialog(sectionId, currentType, compositionS
         custom: { label: 'Custom', color: '#78716C' }
     };
 
-    // Create overlay
+    // Create overlay - use z-[9995] to appear above fullscreen overlay (z-[9990])
     const overlay = document.createElement('div');
-    overlay.className = 'change-section-type-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    overlay.className = 'change-section-type-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+    overlay.style.zIndex = '9995';
 
     // Create dialog
     const dialog = document.createElement('div');
@@ -1104,9 +1119,10 @@ export function showDuplicateSectionDialog(sectionId, sectionLabel, compositionS
     const existingDialog = document.querySelector('.duplicate-section-dialog-overlay');
     if (existingDialog) existingDialog.remove();
 
-    // Create overlay
+    // Create overlay - use z-[9995] to appear above fullscreen overlay (z-[9990])
     const overlay = document.createElement('div');
-    overlay.className = 'duplicate-section-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    overlay.className = 'duplicate-section-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+    overlay.style.zIndex = '9995';
 
     // Create dialog
     const dialog = document.createElement('div');
@@ -1562,7 +1578,7 @@ export function showTruncationWarningDialog(truncationInfo, onConfirm, onCancel)
     }
 
     const modalHTML = `
-        <div id="truncation-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div id="truncation-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[700]">
             <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
                 <div class="bg-amber-500 px-6 py-4">
                     <h3 class="text-xl font-bold text-white flex items-center gap-2">

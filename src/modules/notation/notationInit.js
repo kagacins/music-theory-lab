@@ -261,6 +261,10 @@ export function initEnhancedNotation(options = {}) {
   // Get page navigator container
   const pageNavigatorContainer = document.getElementById('notation-page-navigator');
 
+  // Check stored chord tone highlighting preference (default to true)
+  const storedChordToneHighlighting = localStorage.getItem('chord-tone-highlighting');
+  const enableHarmonicColoring = storedChordToneHighlighting !== 'false';
+
   // Create new notation composer with PageManager and Pagination
   notationComposer = new NotationComposer({
     container: primaryCanvas, // Legacy - kept for backward compat
@@ -270,7 +274,7 @@ export function initEnhancedNotation(options = {}) {
     measuresPerLine: 4,
     showMeasureNumbers: true,
     showChordSymbols: true,
-    enableHarmonicColoring: true,
+    enableHarmonicColoring: enableHarmonicColoring,
     enableMelodySuggestions: true,
     enablePagination: true, // NEW: Enable pagination
     viewMode: 'single', // NEW: Single page view
@@ -675,6 +679,8 @@ export function initEnhancedNotation(options = {}) {
       }
     },
     onNoteDelete: (deletion) => {
+      console.log('[onNoteDelete] CALLED with deletion:', JSON.stringify(deletion, null, 2));
+
       // Get voice index from deletion (default to 0 for backward compatibility)
       const voiceIndex = deletion.voiceIndex ?? 0;
 

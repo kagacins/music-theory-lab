@@ -121,7 +121,9 @@ import {
     addNoteToIdentifierInput,
     setBuilderChord,
     playChordPreview,
-    stopChordPreview
+    stopChordPreview,
+    toggleBuilderNote,
+    toggleBuilderLHNote
 } from '../modules/features/chordBuilder.js';
 import {
     playArpeggio,
@@ -252,6 +254,7 @@ import {
     getBuilderSelectionMode,
     getBuilderIntervalType,
     getBuilderOmittedNotes,
+    getBuilderChordNotes,
     setBuilderChordType,
     setBuilderIntervalType
 } from '../modules/state/builderState.js';
@@ -446,6 +449,13 @@ import {
     toggleFullScreenNotation,
     getFullScreenNotationEditor
 } from '../modules/notation/fullScreen/FullScreenNotationEditor.js';
+
+// Full-Screen Chord Lab Editor
+import {
+    initChordLabNewTab,
+    closeChordLabNewTab,
+    getFullScreenChordLabEditor
+} from '../modules/features/chordLab/FullScreenChordLabEditor.js';
 
 import {
     ENHARMONIC_MAP,
@@ -1393,6 +1403,8 @@ export function setupWindowExports() {
     window.setBuilderChord = setBuilderChord;
     window.playChordPreview = playChordPreview;
     window.stopChordPreview = stopChordPreview;
+    window.toggleBuilderNote = toggleBuilderNote;
+    window.toggleBuilderLHNote = toggleBuilderLHNote;
     window.loadProgression = loadProgression;
 
     // Chord and Interval tooltip toggles
@@ -1863,6 +1875,27 @@ export function setupWindowExports() {
     window.setDynamic = setDynamic;
     window.setMelodyTempo = setMelodyTempo;
     window.getCurrentTempo = getCurrentTempo;
+
+    // Unified BPM setter - updates both compositionState.metadata.tempo AND interactiveMelody.tempo
+    // This ensures all playback functions use the correct tempo
+    window.setBPM = (bpm) => {
+        const validBpm = Math.max(40, Math.min(300, parseInt(bpm) || 120));
+        // Update compositionState (the official source of truth for saved projects)
+        const compState = getCompositionState();
+        if (compState && typeof compState.setTempo === 'function') {
+            compState.setTempo(validBpm);
+        }
+        // Update interactiveMelody.tempo (used by playback functions)
+        setMelodyTempo(validBpm);
+    };
+    window.getBPM = () => {
+        // Get from compositionState first (official source), fall back to getCurrentTempo
+        const compState = getCompositionState();
+        if (compState && typeof compState.getTempo === 'function') {
+            return compState.getTempo();
+        }
+        return getCurrentTempo();
+    };
 
     // Composition State functions
     window.CompositionState = CompositionState;
@@ -2351,6 +2384,7 @@ export function setupWindowExports() {
     window.getBuilderSelectionMode = getBuilderSelectionMode;
     window.getBuilderIntervalType = getBuilderIntervalType;
     window.getBuilderOmittedNotes = getBuilderOmittedNotes;
+    window.getBuilderChordNotes = getBuilderChordNotes;
     window.setBuilderChordType = setBuilderChordType;
     window.setBuilderIntervalType = setBuilderIntervalType;
 
@@ -2402,4 +2436,9 @@ export function setupWindowExports() {
     window.closeFullScreenNotation = closeFullScreenNotation;
     window.toggleFullScreenNotation = toggleFullScreenNotation;
     window.getFullScreenNotationEditor = getFullScreenNotationEditor;
+
+    // Full-Screen Chord Lab Editor
+    window.initChordLabNewTab = initChordLabNewTab;
+    window.closeChordLabNewTab = closeChordLabNewTab;
+    window.getFullScreenChordLabEditor = getFullScreenChordLabEditor;
 }

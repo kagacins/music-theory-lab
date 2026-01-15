@@ -12,7 +12,7 @@
  * - Composition settings (auto-generate bass, voice leading, etc.)
  */
 
-import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+import { DEFAULT_TIME_SIGNATURE, ensureChordId } from '../../data/music-data.js';
 import { getCurrentKey, setCurrentKey } from '../state/trainerState.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
 
@@ -143,6 +143,11 @@ export function createProjectData(compositionState) {
         // Full measures data (preserves multi-voice notation - Voice 1 & Voice 2)
         // This is needed because BuildingBlockSequence cannot represent simultaneous voices
         measures: compositionState.measures ? JSON.parse(JSON.stringify(compositionState.measures)) : [],
+
+        // BASS PRESERVATION: Store bass data keyed by chord ID
+        // This enables bass edits to survive chord reordering across save/load cycles
+        bassDataByChordId: compositionState.bassDataByChordId ?
+            Object.fromEntries(compositionState.bassDataByChordId) : {},
 
         // Tempo markings (stored separately from measures)
         tempoMarkings: compositionState.tempoMarkings ? [...compositionState.tempoMarkings] : [],
@@ -387,8 +392,13 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             console.log('[IMTL Import] Step 3: Loading progression data, length:', projectData.progressionData.length);
 
             // Ensure all chords have notes computed (some may have been saved with notes: null)
+            // AND ensure all chords have unique IDs (for bass preservation system)
             const key = projectData.metadata?.key || 'C';
             const progressionWithNotes = projectData.progressionData.map(chord => {
+                // CRITICAL: Ensure each chord has a unique ID for bass preservation
+                // Old projects may not have chord IDs - generate them now
+                ensureChordId(chord);
+
                 if (!chord.notes || !Array.isArray(chord.notes) || chord.notes.length === 0) {
                     // Regenerate notes from root/type/inversion
                     if (chord.root && chord.type) {
@@ -585,7 +595,14 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             compositionState._nextVoltaId = maxVoltaId + 1;
         }
 
-        // 13. Trigger notation refresh
+        // 13. BASS PRESERVATION: Restore bass data by chord ID
+        // This enables bass edits to survive chord reordering across save/load cycles
+        if (projectData.bassDataByChordId && typeof projectData.bassDataByChordId === 'object') {
+            console.log('[IMTL Import] Restoring bassDataByChordId:', Object.keys(projectData.bassDataByChordId).length, 'entries');
+            compositionState.bassDataByChordId = new Map(Object.entries(projectData.bassDataByChordId));
+        }
+
+        // 14. Trigger notation refresh
         if (callbacks.onNotationRefresh) {
             callbacks.onNotationRefresh();
         }

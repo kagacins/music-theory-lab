@@ -144,7 +144,8 @@ import {
     INVERSION_NAMES,
     MAJOR_SCALE_STEPS,
     ENHARMONIC_MAP,
-    ROMAN_MAP_BASE
+    ROMAN_MAP_BASE,
+    ensureChordId
 } from '../../../data/music-data.js';
 
 // Community submission context (for edit flow)
@@ -1347,7 +1348,7 @@ function showTruncationWarningDialog(truncationInfo, onConfirm, onCancel) {
     }
 
     const modalHTML = `
-        <div id="truncation-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div id="truncation-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[700]">
             <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
                 <div class="bg-amber-500 px-6 py-4">
                     <h3 class="text-xl font-bold text-white flex items-center gap-2">
@@ -1835,11 +1836,22 @@ export function updateChordAndRenderPreservingTrebleNotes(index, options = {}) {
         });
 
         // Regenerate bass for this building block (chord)
+        // BUT: Check if user has edited bass for this chord - if so, preserve it!
         const autoGenerateBass = compositionState.getSettings().autoGenerateBass;
         const measure = compositionState.getMeasure(index);
+        const chordId = chord.id || measure?.chord?.id;
+        const hasUserEditedBass = chordId && compositionState.hasUserEditedBass && compositionState.hasUserEditedBass(chordId);
 
-        if (autoGenerateBass) {
+        console.log(`%c[updateChordAndRenderPreservingTrebleNotes] Chord ${index}: chordId=${chordId}, hasUserEditedBass=${hasUserEditedBass}, autoGenerateBass=${autoGenerateBass}`,
+            hasUserEditedBass ? 'background: #ff9800; color: black' : 'background: #2196f3; color: white');
+
+        if (hasUserEditedBass) {
+            // User has manually edited bass for this chord - restore from Map instead of regenerating
+            console.log(`%c[updateChordAndRenderPreservingTrebleNotes] PRESERVING user-edited bass for chord ${index}`, 'background: #4caf50; color: white; font-weight: bold');
+            compositionState.restoreBassFromChordIds();
+        } else if (autoGenerateBass) {
             // Use building-block-aware regeneration that handles multi-measure chords
+            console.log(`%c[updateChordAndRenderPreservingTrebleNotes] REGENERATING bass for chord ${index}`, 'background: #f44336; color: white; font-weight: bold');
             compositionState.regenerateAutoBassByChordIndex(index);
         } else {
             // Create simple whole-note bass from chord notes
@@ -2172,6 +2184,10 @@ export function addNoChordToProgression() {
 export function addToProgressionData(chordData, options = {}) {
     const trainerState = getTrainerState();
 
+    // CRITICAL: Ensure chord has a unique ID for bass preservation system
+    // This ID tracks bass edits across reorders/inserts/removes
+    ensureChordId(chordData);
+
     // Auto-respell chord root to match key's enharmonic preference
     // BUT: Don't respell borrowed chords - they need their flat/sharp for theory identification
     if (chordData.root) {
@@ -2323,6 +2339,8 @@ export function addToProgressionData(chordData, options = {}) {
     if (chordData.roman && !trainerState.progressionRomans.includes(chordData.roman)) {
         trainerState.progressionRomans.push(chordData.roman);
     }
+    console.log('[addToProgressionData] chordData.omittedNotes:', chordData.omittedNotes);
+    console.log('[addToProgressionData] Full chordData:', JSON.stringify(chordData, null, 2));
     setProgressionData(trainerState.progressionData);
 
     // Mark progression as ready when chords are added (fixes Chord Lab playback)
@@ -3081,11 +3099,6 @@ export function updateMultiSelectVisuals() {
 
     // Dispatch event for tutorial validation
     const totalChords = document.querySelectorAll('.chord-card-wrapper').length;
-    console.log('[ProgressionController] Dispatching chordsSelectionChanged:', {
-        selectedCount: selectedIndices.length,
-        totalChords,
-        selectedIndices
-    });
     dispatchBuilderEvent('chordsSelectionChanged', {
         selectedCount: selectedIndices.length,
         totalChords,
@@ -4311,6 +4324,11 @@ export function handleUndo() {
 
         // Update undo/redo button states
         updateUndoRedoButtons();
+
+        // Refresh fullscreen chord panel if open (Quick Add, etc.)
+        if (window.refreshFullscreenChordPanel) {
+            window.refreshFullscreenChordPanel();
+        }
     }
 }
 
@@ -4362,6 +4380,11 @@ export function handleRedo() {
 
         // Update undo/redo button states
         updateUndoRedoButtons();
+
+        // Refresh fullscreen chord panel if open (Quick Add, etc.)
+        if (window.refreshFullscreenChordPanel) {
+            window.refreshFullscreenChordPanel();
+        }
     }
 }
 

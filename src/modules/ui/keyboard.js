@@ -731,8 +731,9 @@ export function updateKeyboardLabels() {
         if (isMinorKey) {
             rootNoteName = rootNoteName.replace(/m$/, '');
         }
-    } else if (currentTab === 'builder') {
+    } else if (currentTab === 'builder' || currentTab === 'chordlab-new') {
         // Always read builderRootIndex fresh from window
+        // chordlab-new uses the same builderRootIndex as the classic Chord Lab
         const currentBuilderRootIndex = window.builderRootIndex !== undefined ? window.builderRootIndex : 0;
         if (!SHARP_NOTES || !FLAT_NOTES || currentBuilderRootIndex < 0 || currentBuilderRootIndex >= (enharmonicPreference === 'sharp' ? SHARP_NOTES.length : FLAT_NOTES.length)) {
             return; // Invalid state

@@ -31,6 +31,23 @@ export class PageManager {
   }
 
   /**
+   * Update the container where new pages are appended
+   * Used when switching between normal and fullscreen modes
+   * @param {HTMLElement} newContainer - New container element
+   */
+  setContainer(newContainer) {
+    this.container = newContainer;
+  }
+
+  /**
+   * Get the current container
+   * @returns {HTMLElement} - Current container element
+   */
+  getContainer() {
+    return this.container;
+  }
+
+  /**
    * Create a new page canvas
    * @returns {Object} - Page object with canvas and context
    */

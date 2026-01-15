@@ -5638,7 +5638,7 @@ function createPseudoSectionContainer(section, progressionData, key) {
             chosenClass: 'sortable-chosen',
             dragClass: 'sortable-drag',
             handle: '.drag-handle',
-            filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+            filter: 'button, select, input, .play-btn, .delete-btn, .edit-btn, .expand-btn, .info-tooltip-btn, .no-drag',
             preventOnFilter: false,
             draggable: '.chord-card-wrapper[data-chord-index]',
             swapThreshold: 0.65,
@@ -5765,7 +5765,7 @@ function createUnifiedSectionContainer(section, progressionData, key) {
             dragClass: 'sortable-drag',
             handle: '.drag-handle',
             // Exclude buttons from triggering drag - let them receive clicks
-            filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+            filter: 'button, select, input, .play-btn, .delete-btn, .edit-btn, .expand-btn, .info-tooltip-btn, .no-drag',
             preventOnFilter: false,
             draggable: '.chord-card-wrapper[data-chord-index]',
             swapThreshold: 0.65,
@@ -5915,6 +5915,11 @@ function createSimplifiedCardHTML(chord, index, key) {
                         </button>
                         <button class="delete-btn px-1 py-0.5 bg-red-600/80 hover:bg-red-600 text-white text-[8px] rounded transition" title="Delete">
                             ✕
+                        </button>
+                        <button class="edit-btn px-1 py-0.5 bg-amber-500/80 hover:bg-amber-500 text-white rounded transition flex items-center justify-center" title="Edit Chord">
+                            <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                            </svg>
                         </button>
                         <button class="expand-btn px-1 py-0.5 bg-gray-600/80 hover:bg-gray-600 text-white text-[8px] rounded transition" title="Expand">
                             ⋯
@@ -6088,6 +6093,11 @@ export function createDetailedCardHTML(chord, index, key) {
                     <button class="suggestions-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Suggest">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
+                        </svg>
+                    </button>
+                    <button class="edit-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Edit Chord">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
                         </svg>
                     </button>
                     <button class="collapse-btn p-1 hover:bg-white hover:bg-opacity-20 rounded transition" title="Collapse">
@@ -6705,6 +6715,17 @@ export function attachCardEventListeners(wrapper, index) {
         });
     }
 
+    // Edit button - opens chord bracket editor
+    const editBtn = wrapper.querySelector('.edit-btn');
+    if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.showChordBracketEditor) {
+                window.showChordBracketEditor(index, null, e);
+            }
+        });
+    }
+
     // Add click handler to simplified and detailed cards
     // Clicking anywhere on the card (except buttons) selects it WITHOUT playing
     // Supports multi-select with Ctrl/Cmd+click and Shift+click
@@ -7012,80 +7033,8 @@ export function attachCardEventListeners(wrapper, index) {
             inversionWasChanged = false;
         };
 
-        // Show tooltip on hover (desktop) - only when over the actual card, not controls below
-        // We don't use cardWrapper mouseenter for tooltip anymore - only use simplifiedCard mouseenter below
-
-        // When mouse leaves card, only cancel the pending show timeout
-        cardWrapper.addEventListener('mouseleave', (e) => {
-            isOverCard = false;
-            if (tooltipTimeout) {
-                clearTimeout(tooltipTimeout);
-                tooltipTimeout = null;
-            }
-            // Start delayed hide if user doesn't enter tooltip
-            scheduleHideTooltip();
-        });
-
-        // Redundant listener on the card itself to improve reliability
-        simplifiedCard.addEventListener('mouseenter', () => {
-            isOverCard = true;
-            if (hideTimeout) {
-                clearTimeout(hideTimeout);
-                hideTimeout = null;
-            }
-            if (!isTooltipPinned && !tooltipTimeout) {
-                tooltipTimeout = setTimeout(() => {
-                    showTooltip();
-                }, 150);
-            }
-        });
-
-        // If cursor moves on the card and tooltip failed to appear, recover quickly
-        simplifiedCard.addEventListener('mousemove', () => {
-            isOverCard = true;
-            ensureTooltipVisible();
-        });
-
-        // Hide tooltip when mouse leaves the simplified card itself (not just the wrapper)
-        simplifiedCard.addEventListener('mouseleave', () => {
-            isOverCard = false;
-            if (tooltipTimeout) {
-                clearTimeout(tooltipTimeout);
-                tooltipTimeout = null;
-            }
-            // Schedule hide - tooltip will stay open if user moves to it
-            scheduleHideTooltip();
-        });
-
-        // Keep tooltip open when mouse enters it
-        chordTooltip.addEventListener('mouseenter', () => {
-            isOverTooltip = true;
-            isTooltipPinned = true;
-            if (hideTimeout) {
-                clearTimeout(hideTimeout);
-                hideTimeout = null;
-            }
-        });
-
-        // ONLY hide when mouse leaves the tooltip itself
-        chordTooltip.addEventListener('mouseleave', () => {
-            isOverTooltip = false;
-            scheduleHideTooltip();
-        });
-
-        // Hide tooltip when hovering over duration controls
-        const durationControls = wrapper.querySelector('.flex.items-center.justify-center.gap-1.mt-1');
-        if (durationControls) {
-            durationControls.addEventListener('mouseenter', () => {
-                if (tooltipTimeout) {
-                    clearTimeout(tooltipTimeout);
-                    tooltipTimeout = null;
-                }
-                if (!isTooltipPinned) {
-                    chordTooltip.classList.add('hidden');
-                }
-            });
-        }
+        // Tooltip is only shown via info button click - no hover behavior
+        // This provides predictable, consistent tooltip behavior
 
         // Close button click - close tooltip
         const tooltipCloseBtn = chordTooltip.querySelector('.tooltip-close-btn');
@@ -7094,39 +7043,38 @@ export function attachCardEventListeners(wrapper, index) {
                 e.stopPropagation();
                 chordTooltip.classList.add('hidden');
                 isTooltipPinned = false;
-                // Update the card UI after closing to show any inversion changes
-                updateSingleCard(index);
-                updateTensionCurveIfVisible();
 
-                // Sync notation if inversion was changed
-                if (inversionWasChanged && window.updateChordAndRenderPreservingTrebleNotes) {
-                    window.updateChordAndRenderPreservingTrebleNotes(index);
+                // Only update card UI if inversion was changed
+                if (inversionWasChanged) {
+                    updateSingleCard(index);
+                    updateTensionCurveIfVisible();
+                    if (window.updateChordAndRenderPreservingTrebleNotes) {
+                        window.updateChordAndRenderPreservingTrebleNotes(index);
+                    }
+                    inversionWasChanged = false;
                 }
-
-                // Reset the flag
-                inversionWasChanged = false;
             });
         }
 
-        // Info button click - toggle tooltip (for touchscreens)
+        // Info button click - toggle tooltip
         if (infoTooltipBtn) {
             infoTooltipBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isVisible = !chordTooltip.classList.contains('hidden');
                 if (isVisible) {
+                    // Hide tooltip
                     chordTooltip.classList.add('hidden');
                     isTooltipPinned = false;
-                    // Update the card UI after closing to show any inversion changes
-                    updateSingleCard(index);
-                    updateTensionCurveIfVisible();
 
-                    // Sync notation if inversion was changed
-                    if (inversionWasChanged && window.updateChordAndRenderPreservingTrebleNotes) {
-                        window.updateChordAndRenderPreservingTrebleNotes(index);
+                    // Only update card UI if inversion was changed
+                    if (inversionWasChanged) {
+                        updateSingleCard(index);
+                        updateTensionCurveIfVisible();
+                        if (window.updateChordAndRenderPreservingTrebleNotes) {
+                            window.updateChordAndRenderPreservingTrebleNotes(index);
+                        }
+                        inversionWasChanged = false;
                     }
-
-                    // Reset the flag
-                    inversionWasChanged = false;
                 } else {
                     // Show tooltip using the same positioning logic
                     showTooltip();

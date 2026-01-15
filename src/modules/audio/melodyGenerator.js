@@ -2805,7 +2805,7 @@ function startMeasurePlayback(canvas, measureIndex) {
     if (bassAutoFillActive && bassNoteData.length > 0) {
         // Bass auto-fill is active - play ONLY bass notes with proper timing
 
-        const tempo = interactiveMelody.tempo || 120;
+        const tempo = interactiveMelody.tempo || window.getCompositionState?.()?.getTempo?.() || 120;
         const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
 
         const currentKey = getCurrentKey() || 'C';
@@ -2951,7 +2951,7 @@ function startMeasurePlayback(canvas, measureIndex) {
     
     // Start playing melody notes sequentially (quarter notes)
     if (measureMelodyNotes.length > 0) {
-        const tempo = interactiveMelody.tempo || 120;
+        const tempo = interactiveMelody.tempo || window.getCompositionState?.()?.getTempo?.() || 120;
         const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
         const currentKey = getCurrentKey() || 'C';
 
@@ -3617,7 +3617,7 @@ export function playInteractiveMelodyWithChords() {
     Tone.Transport.position = 0;
 
     // Calculate timing based on tempo
-    const tempo = interactiveMelody.tempo || 120;
+    const tempo = interactiveMelody.tempo || window.getCompositionState?.()?.getTempo?.() || 120;
 
     // Set Transport BPM to match tempo - this ensures note durations like '1n' are correct
     Tone.Transport.bpm.value = tempo;
@@ -4013,7 +4013,8 @@ export async function playAllMelody(options = {}) {
 
     // Parse time signature (default to 4/4)
     const [beatsPerMeasure, beatValue] = interactiveMelody.timeSignature.split('/').map(Number);
-    const tempo = interactiveMelody.tempo || 120;
+    // Get tempo from interactiveMelody first, then fall back to compositionState
+    const tempo = interactiveMelody.tempo || window.getCompositionState?.()?.getTempo?.() || 120;
 
     // Set Transport BPM to match tempo - this ensures note durations like '1n' are correct
     Tone.Transport.bpm.value = tempo;

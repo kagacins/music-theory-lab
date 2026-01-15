@@ -94,6 +94,34 @@ body[data-active-tab="learn"] #action-bar {
     box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
 }
 
+/* Studio New (full-screen) - make body not interfere with element inspection */
+body[data-active-tab="studio-new"] {
+    background: transparent !important;
+    pointer-events: none;
+}
+
+body[data-active-tab="studio-new"] #tab-studio-new {
+    pointer-events: auto;
+}
+
+/* Re-enable pointer events for modals/dialogs that are appended to body */
+body[data-active-tab="studio-new"] .rm-overlay,
+body[data-active-tab="studio-new"] .unified-modal-overlay,
+body[data-active-tab="studio-new"] [id$="-modal"],
+body[data-active-tab="studio-new"] [id$="-overlay"],
+body[data-active-tab="studio-new"] [id$="-dialog"] {
+    pointer-events: auto;
+}
+
+/* Ensure all children of dialogs/modals also have pointer events */
+body[data-active-tab="studio-new"] .rm-overlay *,
+body[data-active-tab="studio-new"] .unified-modal-overlay *,
+body[data-active-tab="studio-new"] [id$="-modal"] *,
+body[data-active-tab="studio-new"] [id$="-overlay"] *,
+body[data-active-tab="studio-new"] [id$="-dialog"] * {
+    pointer-events: auto;
+}
+
 /* Tab-specific action bar element visibility */
 /* .melody-only - only shown on melody/composition tab */
 /* .trainer-melody-only - shown on trainer and melody tabs */
@@ -314,6 +342,7 @@ body[data-active-tab="learn"] #main-app > .max-w-7xl.mx-auto {
     -webkit-backdrop-filter: blur(20px);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: var(--shadow-soft);
+    pointer-events: auto; /* Ensure clicks work when fullscreen mode is active */
 }
 
 /* ============================================================================
@@ -3291,6 +3320,7 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
     display: flex;
     align-items: center;
     justify-content: center;
+    pointer-events: auto; /* Ensure clicks work when fullscreen mode is active */
 }
 
 .circle-of-fifths-panel.hidden {

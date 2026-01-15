@@ -12,6 +12,12 @@ import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 // State
 let currentEditorIndex = null;
 let editorElement = null;
+let lastSelectedChordIndex = null;  // Persists after editor closes, for insertion point
+
+// Dragging state
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 
 /**
  * Get scale notes for a key (for highlighting in-scale notes)
@@ -205,9 +211,12 @@ function createEditorHTML(chord, index, key) {
 
     return `
         <div class="chord-bracket-editor bg-white border-2 border-indigo-500 rounded-lg shadow-xl overflow-hidden" style="width: 260px;">
-            <!-- Compact Header with Play/Suggest buttons -->
-            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-2 py-1.5 flex justify-between items-center">
+            <!-- Draggable Header with Play/Suggest buttons -->
+            <div class="editor-drag-handle bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-2 py-1.5 flex justify-between items-center cursor-move select-none">
                 <div class="flex items-center gap-2">
+                    <svg class="w-3 h-3 opacity-60" fill="currentColor" viewBox="0 0 20 20" title="Drag to move">
+                        <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+                    </svg>
                     <span class="text-base font-bold">${chordSymbol}</span>
                     <span class="text-sm opacity-80">${roman}</span>
                     ${functionLabel ? `<span class="text-xs opacity-70">${functionLabel}</span>` : ''}
@@ -282,6 +291,16 @@ function createEditorHTML(chord, index, key) {
                         ${inversionButtons.join('')}
                     </div>
                 </div>
+
+                <!-- Action buttons row -->
+                <div class="flex items-center justify-center mt-2 pt-2 border-t border-gray-200">
+                    <button class="set-bass-btn px-3 py-1.5 text-[11px] font-semibold bg-emerald-500 hover:bg-emerald-600 text-white rounded flex items-center gap-1.5" title="Set bass to the displayed chord notes for the full duration">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                        Set Bass to Chord
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -307,47 +326,63 @@ export function showChordBracketEditor(chordIndex, region, event) {
 
     const chord = progression[chordIndex];
     currentEditorIndex = chordIndex;
+    lastSelectedChordIndex = chordIndex;  // Remember for insertion even after editor closes
 
     // Create the editor element
     editorElement = document.createElement('div');
     editorElement.id = 'chord-bracket-editor-popup';
-    editorElement.className = 'fixed z-[100000]';
+    editorElement.className = 'fixed z-[600]';  // Above fullscreen (500) but reasonable
     editorElement.innerHTML = createEditorHTML(chord, chordIndex, key);
 
     document.body.appendChild(editorElement);
 
-    // Position the editor near the click
+    // Position the editor to the SIDE of the chord (left or right based on viewport position)
     const editorBox = editorElement.querySelector('.chord-bracket-editor');
     const editorWidth = 260;
     const editorHeight = editorBox?.offsetHeight || 280;
 
-    // Use event coordinates for positioning
-    let left = event.clientX - editorWidth / 2;
-    let top = event.clientY - editorHeight - 10; // Position above the click
-
-    // Keep within viewport
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const horizontalGapRight = 20;  // Gap when editor is to the right of chord
+    const horizontalGapLeft = 140;  // Larger gap when editor is to the left of chord
 
+    let left, top;
+
+    // Check if there's enough space to the RIGHT of the click to fit the editor
+    const spaceOnRight = viewportWidth - event.clientX - horizontalGapRight - 10; // 10px margin
+    const hasSpaceOnRight = spaceOnRight >= editorWidth;
+
+    if (hasSpaceOnRight) {
+        // Position editor to the RIGHT of the chord
+        left = event.clientX + horizontalGapRight;
+    } else {
+        // Not enough space on right - position editor to the LEFT of the chord
+        left = event.clientX - editorWidth - horizontalGapLeft;
+    }
+
+    // Vertically center the editor around the click point
+    top = event.clientY - editorHeight / 2;
+
+    // Keep within viewport bounds
     if (left < 10) left = 10;
     if (left + editorWidth > viewportWidth - 10) left = viewportWidth - editorWidth - 10;
-    if (top < 10) {
-        // Position below if not enough space above
-        top = event.clientY + 20;
-    }
+    if (top < 10) top = 10;
     if (top + editorHeight > viewportHeight - 10) {
         top = viewportHeight - editorHeight - 10;
     }
 
     editorElement.style.left = `${left}px`;
     editorElement.style.top = `${top}px`;
+    editorElement.style.pointerEvents = 'auto';  // Ensure clicks are captured in fullscreen mode
 
     // Attach event listeners
     attachEditorEventListeners(editorElement, chordIndex, key);
 
-    // Close on click outside
+    // Close on click outside and handle dragging
     setTimeout(() => {
         document.addEventListener('mousedown', handleOutsideClick);
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
     }, 100);
 }
 
@@ -360,21 +395,66 @@ export function hideChordBracketEditor() {
         editorElement = null;
     }
     currentEditorIndex = null;
+    isDragging = false;
     document.removeEventListener('mousedown', handleOutsideClick);
+    document.removeEventListener('mousemove', handleDragMove);
+    document.removeEventListener('mouseup', handleDragEnd);
 }
 
 /**
  * Handle clicks outside the editor to close it
  */
 function handleOutsideClick(event) {
+    // Don't close if we're dragging
+    if (isDragging) return;
     if (editorElement && !editorElement.contains(event.target)) {
         hideChordBracketEditor();
     }
 }
 
 /**
+ * Handle drag movement
+ */
+function handleDragMove(event) {
+    if (!isDragging || !editorElement) return;
+
+    const newLeft = event.clientX - dragOffsetX;
+    const newTop = event.clientY - dragOffsetY;
+
+    // Keep editor within viewport bounds
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const editorRect = editorElement.getBoundingClientRect();
+
+    const clampedLeft = Math.max(0, Math.min(newLeft, viewportWidth - editorRect.width));
+    const clampedTop = Math.max(0, Math.min(newTop, viewportHeight - editorRect.height));
+
+    editorElement.style.left = `${clampedLeft}px`;
+    editorElement.style.top = `${clampedTop}px`;
+}
+
+/**
+ * Handle drag end
+ */
+function handleDragEnd() {
+    isDragging = false;
+}
+
+/**
+ * Helper: Check if bass is user-edited for a chord
+ */
+function isBassUserEdited(chordIndex) {
+    const compositionState = window.getCompositionState?.();
+    return compositionState?.checkIfBassIsEdited?.(chordIndex) || false;
+}
+
+
+/**
  * Attach event listeners to the editor controls
  * Uses ProgressionController functions for consistency with chord cards and built-in audio feedback
+ *
+ * All chord property changes (root, type, inversion, duration, octave, notes) apply immediately.
+ * Bass is controlled separately via the "Set Bass to Chord" button.
  */
 function attachEditorEventListeners(editor, chordIndex, key) {
     const closeBtn = editor.querySelector('.close-editor-btn');
@@ -388,6 +468,22 @@ function attachEditorEventListeners(editor, chordIndex, key) {
     const notesNoneBtn = editor.querySelector('.notes-none-btn');
     const playBtn = editor.querySelector('.play-btn');
     const suggestBtn = editor.querySelector('.suggest-btn');
+    const setBassBtn = editor.querySelector('.set-bass-btn');
+    const dragHandle = editor.querySelector('.editor-drag-handle');
+
+    // Drag handle - make editor draggable
+    if (dragHandle && editorElement) {
+        dragHandle.addEventListener('mousedown', (e) => {
+            // Don't start drag if clicking on buttons
+            if (e.target.closest('button')) return;
+
+            isDragging = true;
+            const rect = editorElement.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            e.preventDefault();
+        });
+    }
 
     // Close button
     if (closeBtn) {
@@ -606,6 +702,110 @@ function attachEditorEventListeners(editor, chordIndex, key) {
             }
         });
     }
+
+    // "Set Bass to Chord" button - sets bass to the displayed notes for the chord's duration
+    if (setBassBtn) {
+        setBassBtn.addEventListener('click', () => {
+            console.log('%c[chordBracketEditor] "Set Bass to Chord" clicked', 'background: #10b981; color: white; font-weight: bold');
+
+            // Save state for undo BEFORE making changes
+            if (window.saveStateBeforeChange) {
+                window.saveStateBeforeChange();
+            }
+
+            const compositionState = window.getCompositionState?.();
+            if (!compositionState) return;
+
+            // Get the chord data
+            const progression = getProgressionData();
+            const chord = progression?.[chordIndex];
+            if (!chord) return;
+
+            // Get the displayed notes (checked notes = not omitted)
+            const allNotes = chord.notes || [];
+            const omittedNotes = chord.omittedNotes || [];
+            const displayedNotes = allNotes.filter(n => !omittedNotes.includes(n));
+
+            console.log('[SET-BASS] chordIndex:', chordIndex);
+            console.log('[SET-BASS] displayedNotes:', displayedNotes);
+            console.log('[SET-BASS] chord.beats:', chord.beats);
+
+            if (displayedNotes.length === 0) {
+                console.warn('[SET-BASS] No notes to set for bass');
+                return;
+            }
+
+            // Get the building block for this chord
+            const block = compositionState.bassBlockSequence?.blocks?.[chordIndex];
+            if (!block) {
+                console.warn('[SET-BASS] No bass block found for chord', chordIndex);
+                return;
+            }
+
+            // UNITS_PER_BEAT is 48 to support tuplets - get it from the block's method
+            const totalUnits = block.getTotalUnits();
+
+            console.log('[SET-BASS] block.beats:', block.beats);
+            console.log('[SET-BASS] block.units.length BEFORE:', block.units?.length);
+            console.log('[SET-BASS] totalUnits we want:', totalUnits);
+
+            const notesBefore = block.getNotes?.() || [];
+            console.log('[SET-BASS] BEFORE getNotes():', notesBefore.map(n => ({
+                pitches: n.pitches,
+                startUnit: n.startUnit,
+                durationUnits: n.durationUnits,
+                isRest: n.isRest
+            })));
+
+            // Re-initialize the block with empty units, then set our note
+            block._initializeUnits([]);
+
+            console.log('[SET-BASS] After _initializeUnits, block.units.length:', block.units?.length);
+
+            // Now set our single note spanning the full duration
+            block.setNote(0, totalUnits, displayedNotes, {});
+
+            // Mark as user-edited so it won't be auto-regenerated
+            block.userEdited = true;
+            block.autoGenerated = false;
+            console.log('[SET-BASS] Set block.userEdited = true, block.autoGenerated = false');
+            console.log('[SET-BASS] Verify: block.userEdited is now:', block.userEdited);
+
+            const notesAfter = block.getNotes?.() || [];
+            console.log('[SET-BASS] AFTER getNotes():', notesAfter.map(n => ({
+                pitches: n.pitches,
+                startUnit: n.startUnit,
+                durationUnits: n.durationUnits,
+                isRest: n.isRest
+            })));
+
+            // Re-render to measures and refresh notation
+            console.log('[SET-BASS] Calling renderBassBlocksToMeasures...');
+            compositionState.renderBassBlocksToMeasures();
+
+            // Check what's in measures after render
+            const measure = compositionState.getMeasure?.(0);
+            if (measure) {
+                const bassNotes = measure.notation?.bass?.voices?.[0]?.notes || [];
+                console.log('[SET-BASS] After render, measure 0 bass notes:', bassNotes.map(n => ({
+                    pitches: n.pitches,
+                    duration: n.duration,
+                    beat: n.beat,
+                    isRest: n.isRest
+                })));
+            }
+
+            if (window.refreshNotationFromProgression) {
+                window.refreshNotationFromProgression();
+            }
+
+            // Verify userEdited flag survived the refresh
+            console.log('[SET-BASS] After refresh, block.userEdited is:', block.userEdited);
+
+            // Play the chord to give audio feedback
+            playChordOnce(chordIndex);
+        });
+    }
 }
 
 /**
@@ -708,11 +908,36 @@ function refreshAllUI(chordIndex) {
     }
 }
 
+/**
+ * Get the last selected chord index from clicking a chord bracket label
+ * Returns the chord index of the last clicked chord bracket, or -1 if none ever clicked
+ * This persists even after the editor popup is closed
+ */
+export function getChordBracketSelectedIndex() {
+    // Return the last selected index (persists after editor closes)
+    // Falls back to current editor index if available
+    if (lastSelectedChordIndex !== null) {
+        return lastSelectedChordIndex;
+    }
+    return currentEditorIndex !== null ? currentEditorIndex : -1;
+}
+
+/**
+ * Clear the chord bracket selection (call when user clicks elsewhere or starts fresh)
+ */
+export function clearChordBracketSelection() {
+    lastSelectedChordIndex = null;
+}
+
 // Export to window for use from composerIntegration
 window.showChordBracketEditor = showChordBracketEditor;
 window.hideChordBracketEditor = hideChordBracketEditor;
+window.getChordBracketSelectedIndex = getChordBracketSelectedIndex;
+window.clearChordBracketSelection = clearChordBracketSelection;
 
 export default {
     showChordBracketEditor,
-    hideChordBracketEditor
+    hideChordBracketEditor,
+    getChordBracketSelectedIndex,
+    clearChordBracketSelection
 };

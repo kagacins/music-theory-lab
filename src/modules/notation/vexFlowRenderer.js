@@ -171,11 +171,11 @@ export const CLEF_RANGES = {
     max32: 111  // D#8 - notes at E8 (112) and above get 32va (three octaves)
   },
   bass: {
-    min: 36,    // C2 - notes below get 8vb
+    min: 28,    // E1 - notes below get 8vb (allows ~4 ledger lines below bass clef for C2, B1, A1, etc.)
     max: 68,    // G#4 - notes at A4 (69) and above get 8va (~3 ledger lines)
-    min16: 24,  // C1 - notes below get 16vb
+    min16: 16,  // E0 - notes below get 16vb
     max16: 80,  // G#5 - notes at A5 and above get 16va
-    min32: 12,  // C0 - notes below get 32vb
+    min32: 4,   // E-1 - notes below get 32vb
     max32: 92   // G#6 - notes at A7 and above get 32va
   },
 };

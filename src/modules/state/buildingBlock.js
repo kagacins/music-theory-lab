@@ -583,6 +583,10 @@ export class BuildingBlock {
         this.chord = options.chord || {};
         this.beats = options.beats || DEFAULT_BEATS;
 
+        // Track whether user has manually edited the bass notes in this block
+        // When true, prevents automatic regeneration when chord properties change
+        this.userEdited = options.userEdited ?? false;
+
         // Initialize units array
         this.units = [];
         this._initializeUnits(options.initialPitches);
@@ -620,6 +624,75 @@ export class BuildingBlock {
      */
     getTotalUnits() {
         return this.beats * UNITS_PER_BEAT;
+    }
+
+    /**
+     * Check what notes would be affected by reducing duration to newBeats
+     * Returns null if no notes would be affected, otherwise returns truncation info
+     * Checks ALL bass notes (both user-edited and auto-generated)
+     * @param {number} newBeats - Proposed new duration in beats
+     * @returns {Object|null} - Truncation info or null if safe to truncate
+     */
+    getTruncationInfo(newBeats) {
+        console.log('[getTruncationInfo] Called with newBeats:', newBeats, 'current beats:', this.beats);
+
+        // Only check if we're shortening the duration
+        if (newBeats >= this.beats) {
+            console.log('[getTruncationInfo] Returning null - not shortening (newBeats >= current beats)');
+            return null;
+        }
+
+        const newTotalUnits = Math.floor(newBeats * UNITS_PER_BEAT);
+        const notes = this.getNotes();
+        console.log('[getTruncationInfo] newTotalUnits:', newTotalUnits, 'notes:', notes.map(n => ({ pitches: n.pitches, startUnit: n.startUnit, durationUnits: n.durationUnits, isRest: n.isRest })));
+
+        // Find notes that would be affected
+        const truncatedNotes = []; // Notes completely removed
+        let adjustedNote = null;   // Note that would be shortened
+
+        for (const note of notes) {
+            if (note.isRest) continue; // Don't warn about rests
+
+            const noteEndUnit = note.startUnit + note.durationUnits;
+
+            if (note.startUnit >= newTotalUnits) {
+                // Note starts after the new boundary - will be completely removed
+                truncatedNotes.push({
+                    pitches: note.pitches,
+                    startUnit: note.startUnit,
+                    durationUnits: note.durationUnits,
+                    startBeat: note.startUnit / UNITS_PER_BEAT,
+                    durationBeats: note.durationUnits / UNITS_PER_BEAT
+                });
+            } else if (noteEndUnit > newTotalUnits) {
+                // Note spans the boundary - will be shortened
+                const originalDurationUnits = note.durationUnits;
+                const newDurationUnits = newTotalUnits - note.startUnit;
+                adjustedNote = {
+                    pitches: note.pitches,
+                    original: {
+                        durationUnits: originalDurationUnits,
+                        duration: (originalDurationUnits / UNITS_PER_BEAT).toFixed(2) + ' beats'
+                    },
+                    adjusted: {
+                        durationUnits: newDurationUnits,
+                        duration: (newDurationUnits / UNITS_PER_BEAT).toFixed(2) + ' beats'
+                    }
+                };
+            }
+        }
+
+        // Return null if nothing would be affected
+        if (truncatedNotes.length === 0 && !adjustedNote) {
+            return null;
+        }
+
+        return {
+            truncatedNotes,
+            adjustedNote,
+            oldBeats: this.beats,
+            newBeats
+        };
     }
 
     /**
@@ -838,6 +911,7 @@ export class BuildingBlock {
             chordIndex: this.chordIndex,
             chord: { ...this.chord },
             beats: this.beats,
+            userEdited: this.userEdited, // Preserve edit state in clone
         });
 
         cloned.units = this.units.map(u => u.clone());
@@ -853,6 +927,7 @@ export class BuildingBlock {
             chordIndex: this.chordIndex,
             chord: this.chord,
             beats: this.beats,
+            userEdited: this.userEdited, // Preserve edit state across save/load
             // Use Unit.toJSON() to capture all musical attributes
             units: this.units.map(u => u.toJSON()),
         };
@@ -867,6 +942,7 @@ export class BuildingBlock {
             chordIndex: json.chordIndex,
             chord: json.chord,
             beats: json.beats,
+            userEdited: json.userEdited ?? false, // Restore edit state from save
         });
 
         block.units = json.units.map(u => new Unit(u));

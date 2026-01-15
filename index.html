@@ -133,7 +133,7 @@
 </head>
 <body class="bg-gray-900 min-h-screen font-sans antialiased overscroll-y-none">
     <!-- NEW: Sidebar Navigation -->
-    <div id="sidebar" class="fixed top-0 left-0 h-full bg-gray-800 text-white w-72 transform -translate-x-full transition-transform duration-300 ease-in-out z-30 shadow-2xl flex flex-col">
+    <div id="sidebar" class="fixed top-0 left-0 h-full bg-gray-800 text-white w-72 transform -translate-x-full transition-transform duration-300 ease-in-out z-[10001] shadow-2xl flex flex-col">
         <div class="p-4 flex-shrink-0">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-indigo-300">Navigation</h2>
@@ -146,14 +146,14 @@
             <div class="p-4 pt-0">
             <nav class="flex flex-col gap-1">
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-melody" onclick="window.switchTab && window.switchTab('melody')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Composition Studio</button>
+                    <button id="sidebar-btn-melody" onclick="window.switchTab && window.switchTab('studio-new')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Composition Studio</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build melodies over chord progressions or create standalone melodic ideas. Craft and explore musical phrases with powerful generation tools.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Chord Lab</button>
+                    <button id="sidebar-btn-builder" onclick="window.switchTab && window.switchTab('chordlab-new')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Chord Lab</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build custom chords, intervals, and voicings from scratch. This is your creative canvas.</div>
@@ -339,7 +339,7 @@
         </div>
     </div><!-- close flex-1 overflow-y-auto -->
     </div><!-- close sidebar -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden" onclick="window.toggleSidebar && window.toggleSidebar()"></div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-[10000] hidden" onclick="window.toggleSidebar && window.toggleSidebar()"></div>
 
     <!-- Landing Page -->
     <div id="landing-page" class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white relative overflow-hidden">
@@ -394,7 +394,7 @@
             <!-- Features Grid -->
             <div class="grid md:grid-cols-2 gap-6 mb-12">
                 <!-- Composition Studio -->
-                <div class="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-teal-500/50 hover:bg-white/15 shadow-xl shadow-black/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('melody')">
+                <div class="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-teal-500/50 hover:bg-white/15 shadow-xl shadow-black/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('studio-new')">
                     <div class="flex items-start gap-4 mb-4">
                         <div class="p-3 bg-teal-500/20 rounded-xl group-hover:bg-teal-500/30 transition-colors">
                             <svg class="w-8 h-8 text-teal-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z"></path></svg>
@@ -432,7 +432,7 @@
                 </div>
 
                 <!-- Chord Lab -->
-                <div class="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-amber-500/50 hover:bg-white/15 shadow-xl shadow-black/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('builder')">
+                <div class="group bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:border-amber-500/50 hover:bg-white/15 shadow-xl shadow-black/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('chordlab-new')">
                     <div class="flex items-start gap-4 mb-4">
                         <div class="p-3 bg-amber-500/20 rounded-xl group-hover:bg-amber-500/30 transition-colors">
                             <svg class="w-8 h-8 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
@@ -659,14 +659,42 @@
 
                 <!-- Header Tab buttons - Icon + Text Pills -->
                 <div class="hidden md:flex items-center gap-1">
-                    <button id="header-tab-btn-melody" onclick="window.switchTab && window.switchTab('melody')" class="header-tab-pill" data-tab="melody" title="Composition Studio">
-                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z"></path></svg>
-                        <span class="flex flex-col leading-none text-left"><span class="font-semibold">Composition</span><span class="text-[9px] opacity-80">Studio</span></span>
-                    </button>
-                    <button id="header-tab-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="header-tab-pill" data-tab="builder" title="Chord Lab">
-                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
-                        <span class="flex flex-col leading-none text-left"><span class="font-semibold">Chord</span><span class="text-[9px] opacity-80">Lab</span></span>
-                    </button>
+                    <!-- Composition Studio with hover popup for New/Classic -->
+                    <div class="relative group">
+                        <button id="header-tab-btn-melody" onclick="window.switchTab && window.switchTab('studio-new')" class="header-tab-pill" data-tab="melody" title="Composition Studio - Click for New, hover for options">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z"></path></svg>
+                            <span class="flex flex-col leading-none text-left"><span class="font-semibold">Composition</span><span class="text-[9px] opacity-80">Studio</span></span>
+                        </button>
+                        <!-- Hover popup for New/Classic options -->
+                        <div class="composition-studio-popup absolute left-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 min-w-[140px] overflow-hidden">
+                            <button onclick="window.switchTab && window.switchTab('studio-new')" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 transition-colors">
+                                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                                <span class="font-medium">New</span>
+                            </button>
+                            <button onclick="window.switchTab && window.switchTab('melody')" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 transition-colors border-t border-gray-100">
+                                <svg class="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z"/></svg>
+                                <span class="font-medium">Classic</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Chord Lab with hover popup for New/Classic -->
+                    <div class="relative group">
+                        <button id="header-tab-btn-builder" onclick="window.switchTab && window.switchTab('chordlab-new')" class="header-tab-pill" data-tab="builder" title="Chord Lab - Click for New, hover for options">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+                            <span class="flex flex-col leading-none text-left"><span class="font-semibold">Chord</span><span class="text-[9px] opacity-80">Lab</span></span>
+                        </button>
+                        <!-- Hover popup for New/Classic options -->
+                        <div class="chord-lab-popup absolute left-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 min-w-[140px] overflow-hidden">
+                            <button onclick="window.switchTab && window.switchTab('chordlab-new')" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2 transition-colors">
+                                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                                <span class="font-medium">New</span>
+                            </button>
+                            <button onclick="window.switchTab && window.switchTab('builder')" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors border-t border-gray-100">
+                                <svg class="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+                                <span class="font-medium">Classic</span>
+                            </button>
+                        </div>
+                    </div>
                     <button id="header-tab-btn-scales" onclick="window.switchTab && window.switchTab('scales')" class="header-tab-pill" data-tab="scales" title="Scale Explorer">
                         <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm-3 1a1 1 0 10-2 0v3a1 1 0 102 0V8zM8 9a1 1 0 00-2 0v2a1 1 0 102 0V9z" clip-rule="evenodd"></path></svg>
                         <span class="flex flex-col leading-none text-left"><span class="font-semibold">Scale</span><span class="text-[9px] opacity-80">Explorer</span></span>
@@ -961,7 +989,7 @@
         <!-- Quick buttons for Composition Studio (above FAB, visible when FAB collapsed) -->
         <div id="fab-melody-quick-buttons" class="fixed bottom-36 right-4 z-50 hidden flex flex-col gap-2">
             <!-- Full-Screen Notation button -->
-            <button id="fab-fullscreen-quick" onclick="window.openFullScreenNotation && window.openFullScreenNotation()" class="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Full-Screen Notation" title="Full-Screen Notation Editor">
+            <button id="fab-fullscreen-quick" onclick="window.switchTab && window.switchTab('studio-new')" class="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Composition Studio (New)" title="Composition Studio (New)">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
             </button>
             <!-- Suggestions button -->
@@ -2273,15 +2301,6 @@
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/></svg>
                                     <span class="hidden sm:inline">Colors</span>
                                 </button>
-                                <!-- Tooltips Toggle -->
-                                <div class="flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full" onclick="event.stopPropagation()" title="Show/hide chord tooltips on hover">
-                                    <span class="text-[9px] font-semibold text-white/80">Tooltips</span>
-                                    <label class="relative inline-flex items-center cursor-pointer mx-1">
-                                        <input type="checkbox" id="progression-tooltips-toggle" class="sr-only peer" checked onchange="window.toggleProgressionTooltips && window.toggleProgressionTooltips(this.checked)">
-                                        <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
-                                    </label>
-                                    <span class="text-[9px] font-semibold text-white/80" id="progression-tooltips-status">On</span>
-                                </div>
                             </div>
                             <!-- Section View Toggle (placeholder - populated by JS when sections exist) -->
                             <div id="header-section-view-toggle" class="hidden" onclick="event.stopPropagation()"></div>
@@ -2563,7 +2582,7 @@
                                     DNA
                                 </span>
                                 <!-- Full Screen Button -->
-                                <span id="fullscreen-notation-btn" onclick="window.openFullScreenNotation && window.openFullScreenNotation()" title="Open Full-Screen Notation Editor" class="px-2 py-1.5 bg-white/20 hover:bg-white/30 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors text-white">
+                                <span id="fullscreen-notation-btn" onclick="window.switchTab && window.switchTab('studio-new')" title="Open Composition Studio (New)" class="px-2 py-1.5 bg-white/20 hover:bg-white/30 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors text-white">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
                                     </svg>
@@ -3162,6 +3181,38 @@
                     <div class="text-center py-12">
                         <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
                         <p class="text-gray-500">Loading learning content...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: TAB CONTENT: COMPOSITION STUDIO (NEW) -->
+        <!-- This tab provides the new full-screen composition experience -->
+        <!-- Uses fixed positioning to cover entire viewport since it's a full-screen editor -->
+        <div id="tab-studio-new" class="tab-content hidden fixed inset-0 z-[100]">
+            <!-- Container for the new studio - content rendered by FullScreenNotationEditor in tab mode -->
+            <div id="studio-new-container" class="w-full h-full bg-gray-900">
+                <!-- Loading state -->
+                <div id="studio-new-loading" class="flex items-center justify-center h-full">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+                        <div class="text-gray-400">Loading Composition Studio (New)...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: TAB CONTENT: CHORD LAB (NEW) -->
+        <!-- This tab provides the new full-screen chord lab experience -->
+        <!-- Uses fixed positioning starting below the header (top-14 = 56px header height) -->
+        <div id="tab-chordlab-new" class="tab-content hidden fixed top-14 left-0 right-0 bottom-0 z-[99]">
+            <!-- Container for the new chord lab - content rendered by FullScreenChordLabEditor in tab mode -->
+            <div id="chordlab-new-container" class="w-full h-full bg-gray-100">
+                <!-- Loading state -->
+                <div id="chordlab-new-loading" class="flex items-center justify-center h-full">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+                        <div class="text-gray-500">Loading Chord Lab (New)...</div>
                     </div>
                 </div>
             </div>

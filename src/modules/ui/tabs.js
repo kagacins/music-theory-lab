@@ -90,6 +90,17 @@ export function switchTab(tabId, options = {}) {
     const previousTab = getCurrentTab();
     const previousLessonId = currentLessonId;
 
+    // Restore keyboard when switching AWAY from chordlab-new
+    // The new Chord Lab captures the keyboard element, so we need to restore it for other tabs
+    if (previousTab === 'chordlab-new' && tabId !== 'chordlab-new') {
+        if (window.getFullScreenChordLabEditor) {
+            const editor = window.getFullScreenChordLabEditor();
+            if (editor && editor._restoreKeyboard) {
+                editor._restoreKeyboard();
+            }
+        }
+    }
+
     // Push to browser history if requested and tab is changing
     if (pushHistory && previousTab !== tabId) {
         // First, update the current state with the lesson if we're leaving the learn tab
@@ -120,15 +131,53 @@ export function switchTab(tabId, options = {}) {
         actionBar.classList.add('hidden');
     }
 
-    // Show/hide FAB based on tab (always visible for builder and melody)
+    // Show/hide FAB based on tab (always visible for builder and melody, hidden for studio-new)
     const mobileFab = document.getElementById('mobile-fab');
     if (mobileFab) {
         if (tabId === 'builder' || tabId === 'melody') {
-            // Always show FAB in Chord Lab and Composition Studio
+            // Always show FAB in Chord Lab and Composition Studio (Classic)
             mobileFab.classList.remove('hidden', 'touch-device-only');
         } else {
-            // Hide FAB on other tabs
+            // Hide FAB on other tabs (including studio-new which has its own controls)
             mobileFab.classList.add('hidden');
+        }
+    }
+
+    // Hide keyboard section for studio-new and chordlab-new (full-screen experiences with their own keyboards)
+    const keyboardSection = document.getElementById('keyboard-section');
+    if (keyboardSection) {
+        if (tabId === 'studio-new' || tabId === 'chordlab-new') {
+            keyboardSection.classList.add('hidden');
+        } else {
+            keyboardSection.classList.remove('hidden');
+        }
+    }
+
+    // Adjust header for studio-new (full-width, simplified)
+    const mainHeader = document.getElementById('main-header');
+    const headerWrapper = mainHeader?.parentElement; // The max-w-7xl wrapper
+    const headerDisplayPanels = document.getElementById('header-display-panels');
+
+    if (mainHeader && headerWrapper) {
+        if (tabId === 'studio-new' || tabId === 'chordlab-new') {
+            // Show header but in full-width mode for full-screen tabs
+            mainHeader.classList.remove('hidden');
+            // Make wrapper full-width and add fixed positioning
+            headerWrapper.classList.remove('max-w-7xl');
+            headerWrapper.classList.add('studio-new-header-wrapper');
+            // Hide the info display panels (key sig, chord display) for cleaner look
+            if (headerDisplayPanels) {
+                headerDisplayPanels.classList.add('hidden');
+            }
+        } else {
+            mainHeader.classList.remove('hidden');
+            // Restore normal width constraint
+            headerWrapper.classList.add('max-w-7xl');
+            headerWrapper.classList.remove('studio-new-header-wrapper');
+            // Show the info display panels again
+            if (headerDisplayPanels) {
+                headerDisplayPanels.classList.remove('hidden');
+            }
         }
     }
 
@@ -144,10 +193,16 @@ export function switchTab(tabId, options = {}) {
         fabMelodyQuickBtns.classList.toggle('hidden', tabId !== 'melody');
     }
 
-    const tabs = ['builder', 'melody', 'scales', 'learn'];
+    const tabs = ['builder', 'melody', 'scales', 'learn', 'studio-new', 'chordlab-new'];
     // Also hide the old trainer tab content
     const trainerTab = document.getElementById('tab-trainer');
     if (trainerTab) trainerTab.classList.add('hidden');
+
+    // Also hide the chordlab-new tab container when not active (it has fixed positioning)
+    const chordlabNewTab = document.getElementById('tab-chordlab-new');
+    if (chordlabNewTab) {
+        chordlabNewTab.classList.toggle('hidden', tabId !== 'chordlab-new');
+    }
 
     tabs.forEach(id => {
         document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tabId);
@@ -166,6 +221,12 @@ export function switchTab(tabId, options = {}) {
         } else if (id === 'learn') {
             activeColor = 'bg-blue-500'; // Blue for Learn tab
             inactiveHover = 'hover:bg-gray-700';
+        } else if (id === 'studio-new') {
+            activeColor = 'bg-indigo-600'; // Indigo for Composition Studio (New)
+            inactiveHover = 'hover:bg-gray-700';
+        } else if (id === 'chordlab-new') {
+            activeColor = 'bg-amber-500'; // Amber for Chord Lab (New), matching classic Chord Lab
+            inactiveHover = 'hover:bg-gray-700';
         }
         
         // Update sidebar button (if it exists)
@@ -183,8 +244,11 @@ export function switchTab(tabId, options = {}) {
         const headerBtn = document.getElementById(`header-tab-btn-${id}`);
         if (headerBtn) {
             // Remove old styling classes
-            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
-            if (id === tabId) {
+            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'bg-amber-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
+            // Special case: melody button should be active for both 'melody' and 'studio-new' tabs
+            // Special case: builder button should be active for both 'builder' and 'chordlab-new' tabs
+            const isActive = (id === tabId) || (id === 'melody' && tabId === 'studio-new') || (id === 'builder' && tabId === 'chordlab-new');
+            if (isActive) {
                 // Add active class for new pill styling (CSS handles the gradient)
                 headerBtn.classList.add('active');
                 // Also add legacy classes for backwards compatibility
@@ -216,7 +280,7 @@ export function switchTab(tabId, options = {}) {
     // Note: Stop all playback functionality would go here if needed
 
     // Adjust spacing based on tab (Chord Lab and Composition Studio have no action bar, so content moves closer to keyboard)
-    const keyboardSection = document.getElementById('keyboard-section');
+    // Note: keyboardSection already declared above for studio-new visibility handling
     if (keyboardSection) {
         if (tabId === 'builder' || tabId === 'melody') {
             // Remove margin since action bar is hidden - content moves up
@@ -387,6 +451,22 @@ export function switchTab(tabId, options = {}) {
             sharedChordDisplay.classList.remove('w-72', 'w-80');
             sharedChordDisplay.classList.add('w-64');
         }
+    } else if (tabId === 'studio-new') {
+        // Initialize Composition Studio (New) - the new full-screen experience as a tab
+        // First ensure melody/composition state is synced
+        if (window.syncProgressionToMelodyComposer) {
+            window.syncProgressionToMelodyComposer();
+        }
+
+        // Initialize the full-screen notation editor in tab mode
+        if (window.initStudioNewTab) {
+            window.initStudioNewTab();
+        }
+    } else if (tabId === 'chordlab-new') {
+        // Initialize Chord Lab (New) - the new full-screen chord lab experience as a tab
+        if (window.initChordLabNewTab) {
+            window.initChordLabNewTab();
+        }
     }
 
     // Update the tab subtitle to show current tab name
@@ -396,13 +476,17 @@ export function switchTab(tabId, options = {}) {
             'builder': 'Chord Lab',
             'melody': 'Composition Studio',
             'scales': 'Scale Explorer',
-            'learn': 'Theory Academy'
+            'learn': 'Theory Academy',
+            'studio-new': 'Composition Studio (New)',
+            'chordlab-new': 'Chord Lab (New)'
         };
         const tabColors = {
             'builder': 'text-amber-600',
             'melody': 'text-violet-600',
             'scales': 'text-lime-600',
-            'learn': 'text-blue-600'
+            'learn': 'text-blue-600',
+            'studio-new': 'text-indigo-600',
+            'chordlab-new': 'text-amber-600'
         };
         // Remove all color classes and add the new one
         tabSubtitle.className = 'text-[10px] font-semibold leading-tight ' + (tabColors[tabId] || 'text-gray-600');

@@ -220,9 +220,9 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups, timeSignature = '4/4')
 export const GRAND_STAFF_DEFAULTS = {
   measureWidth: 252,           // Width of each measure (balanced for 16 sixteenth notes and standard screens)
   staffSpacing: 80,            // Vertical space between staves
-  systemMarginTop: 30,         // Top margin for each system (volta brackets + chord symbols)
-  systemMarginBottom: 60,      // Bottom margin (bass ledger lines + some padding)
-  braceWidth: 15,              // Width for the brace
+  systemMarginTop: 45,         // Top margin for each system (volta brackets + chord symbols + title spacing)
+  systemMarginBottom: 80,      // Bottom margin (bass ledger lines + chord bracket labels with Roman numerals)
+  braceWidth: 30,              // Width for the brace (includes left margin)
   measurePadding: 10,          // Padding within measures
   clefWidth: 24,               // Width for clef
   keySignatureWidth: 14,       // Width per accidental in key signature
@@ -3952,7 +3952,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     const measureInSystem = measureIndex % measuresPerLine;
     const isFirstInSystem = measureInSystem === 0;
 
-    const x = dimensions.braceWidth + (measureInSystem * measureWidth) +
+    const x = (dimensions.leftOffset || 0) + dimensions.braceWidth + (measureInSystem * measureWidth) +
       (isFirstInSystem ? 0 : dimensions.firstMeasureExtra);
     const y = dimensions.trebleY + (systemIndex * dimensions.systemHeight);
     const w = isFirstInSystem
@@ -4334,14 +4334,18 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           const textX = span.startX + (span.width / 2);
           const textY = bracketY + 25;
           const estimatedTextWidth = chordName.length * 8;
+          const hasRoman = !!chordData?.roman;
+          // Expand pill width to accommodate Roman numeral if present
+          const romanWidth = hasRoman ? chordData.roman.length * 7 : 0;
+          const pillWidth = Math.max(estimatedTextWidth, romanWidth) + 16;
 
           // Add background pill when active
           if (isActiveBlock) {
             const bgPill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            bgPill.setAttribute('x', textX - estimatedTextWidth / 2 - 8);
+            bgPill.setAttribute('x', textX - pillWidth / 2);
             bgPill.setAttribute('y', textY - 13);
-            bgPill.setAttribute('width', estimatedTextWidth + 16);
-            bgPill.setAttribute('height', 20);
+            bgPill.setAttribute('width', pillWidth);
+            bgPill.setAttribute('height', hasRoman ? 34 : 20);  // Taller if Roman numeral present
             bgPill.setAttribute('rx', '10');
             bgPill.setAttribute('ry', '10');
             bgPill.setAttribute('fill', '#6366f1');
@@ -4360,16 +4364,33 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           text.textContent = chordName;
           group.appendChild(text);
 
+          // Draw Roman numeral below chord name if available
+          const romanNumeral = chordData?.roman;
+          if (romanNumeral) {
+            const romanText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            romanText.setAttribute('x', textX);
+            romanText.setAttribute('y', textY + 14);  // 14px below chord name
+            romanText.setAttribute('text-anchor', 'middle');
+            romanText.setAttribute('font-family', 'Arial, sans-serif');
+            romanText.setAttribute('font-size', '11');
+            romanText.setAttribute('font-weight', 'normal');
+            romanText.setAttribute('fill', isActiveBlock ? 'rgba(255,255,255,0.85)' : '#666');
+            romanText.textContent = romanNumeral;
+            group.appendChild(romanText);
+          }
+
           // Register click region for the chord bracket label
           if (chordData && chordIndex >= 0) {
             // Estimate text width based on character count (approximate)
             const estimatedTextWidth = chordName.length * 8;
+            // Expand height to include Roman numeral
+            const regionHeight = romanNumeral ? 40 : 25;
             chordBracketRegions.push({
               type: 'chordBracket',
               x: textX - estimatedTextWidth / 2 - 5,
               y: textY - 15,
               width: estimatedTextWidth + 10,
-              height: 25,
+              height: regionHeight,
               chordIndex,
               chordData,
               chordName,
@@ -4411,15 +4432,19 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           const textX = span.startX + (span.width / 2);
           const textY = bracketY + 5;
           const estimatedTextWidth = chordName.length * 8;
+          const hasRoman = !!chordData?.roman;
+          // Expand pill width to accommodate Roman numeral if present
+          const romanWidth = hasRoman ? chordData.roman.length * 7 : 0;
+          const pillWidthCalc = Math.max(estimatedTextWidth, romanWidth) + 16;
 
           // Draw background pill when active
           if (isActiveBlock) {
             ctx.fillStyle = '#6366f1';
             ctx.beginPath();
-            const pillX = textX - estimatedTextWidth / 2 - 8;
+            const pillX = textX - pillWidthCalc / 2;
             const pillY = textY - 3;
-            const pillWidth = estimatedTextWidth + 16;
-            const pillHeight = 20;
+            const pillWidth = pillWidthCalc;
+            const pillHeight = hasRoman ? 34 : 20;  // Taller if Roman numeral present
             const radius = 10;
             // Rounded rectangle
             ctx.moveTo(pillX + radius, pillY);
@@ -4441,16 +4466,26 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           ctx.textBaseline = 'top';
           ctx.fillText(chordName, textX, textY);
 
+          // Draw Roman numeral below chord name if available
+          const romanNumeral = chordData?.roman;
+          if (romanNumeral) {
+            ctx.font = '11px Arial, sans-serif';
+            ctx.fillStyle = isActiveBlock ? 'rgba(255,255,255,0.85)' : '#666';
+            ctx.fillText(romanNumeral, textX, textY + 15);  // 15px below chord name
+          }
+
           // Register click region for the chord bracket label
           if (chordData && chordIndex >= 0) {
             // Estimate text width based on character count (approximate)
             const estimatedTextWidth = chordName.length * 8;
+            // Expand height to include Roman numeral
+            const regionHeight = romanNumeral ? 40 : 25;
             chordBracketRegions.push({
               type: 'chordBracket',
               x: textX - estimatedTextWidth / 2 - 5,
               y: textY - 5,
               width: estimatedTextWidth + 10,
-              height: 25,
+              height: regionHeight,
               chordIndex,
               chordData,
               chordName,
@@ -5441,8 +5476,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         currentTrebleOttava = null;
         trebleOttavaStart = null;
         trebleOttavaEnd = null;
-        trebleHighestPitchLine = Infinity;
-        trebleLowestPitchLine = -Infinity;
+        trebleHighestPitchLine = -Infinity;  // Reset for MAX finding (same as initial)
+        trebleLowestPitchLine = Infinity;    // Reset for MIN finding (same as initial)
         trebleNoteCount = 0;
         continue;
       }
@@ -5456,8 +5491,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         trebleOttavaStart = null;
         trebleOttavaEnd = null;
         trebleNoteCount = 0;
-        trebleHighestPitchLine = Infinity;
-        trebleLowestPitchLine = -Infinity;
+        trebleHighestPitchLine = -Infinity;  // Reset for MAX finding (same as initial)
+        trebleLowestPitchLine = Infinity;    // Reset for MIN finding (same as initial)
         continue;
       }
 
@@ -5475,12 +5510,13 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           trebleOttavaEnd = trebleNotes[endIdx];
           trebleNoteCount += bracketNoteCount;
           // Update line positions for notes in this bracket
-          // In treble: smaller line = higher pitch, larger line = lower pitch
+          // VexFlow: larger line = higher pitch, smaller line = lower pitch
           for (let j = startIdx; j <= endIdx && j < trebleNotes.length; j++) {
-            const noteHighestLine = getHighestPitchLine(trebleNotes[j]); // smallest line number = highest pitch
-            const noteLowestLine = getLowestPitchLine(trebleNotes[j]);   // largest line number = lowest pitch
-            if (noteHighestLine < trebleHighestPitchLine) trebleHighestPitchLine = noteHighestLine;
-            if (noteLowestLine > trebleLowestPitchLine) trebleLowestPitchLine = noteLowestLine;
+            const noteHighestLine = getHighestPitchLine(trebleNotes[j]); // largest line number = highest pitch
+            const noteLowestLine = getLowestPitchLine(trebleNotes[j]);   // smallest line number = lowest pitch
+            // Track max highest (for 8va) and min lowest (for 8vb) - same logic as new bracket
+            if (noteHighestLine > trebleHighestPitchLine) trebleHighestPitchLine = noteHighestLine;
+            if (noteLowestLine < trebleLowestPitchLine) trebleLowestPitchLine = noteLowestLine;
           }
         } else {
           // Different label or gap - draw previous bracket if exists

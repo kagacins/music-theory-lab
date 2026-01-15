@@ -82,7 +82,7 @@ function setupKeyboardShortcuts() {
         // Check which tab we're in - undo/redo works on builder, trainer, and melody tabs
         const currentTab = document.querySelector('[id^="tab-"]:not(.hidden)');
         const tabId = currentTab ? currentTab.id : '';
-        const isUndoRedoTab = tabId === 'tab-builder' || tabId === 'tab-trainer' || tabId === 'tab-melody';
+        const isUndoRedoTab = tabId === 'tab-builder' || tabId === 'tab-trainer' || tabId === 'tab-melody' || tabId === 'tab-studio-new';
 
         // Only handle undo/redo in tabs that support it
         if (!isUndoRedoTab) return;
@@ -215,8 +215,8 @@ function setupKeyboardShortcuts() {
                     if (window.currentTab === 'melody') {
                         // In Melody Composer - show melody recommendations
                         window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal('melody');
-                    } else if (window.currentTab === 'trainer' || window.currentTab === 'builder') {
-                        // In Progression Builder or Chord Builder - show chord recommendations
+                    } else if (window.currentTab === 'trainer' || window.currentTab === 'builder' || window.currentTab === 'studio-new') {
+                        // In Progression Builder, Chord Builder, or Composition Studio (New) - show chord recommendations
                         window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal('chord');
                     }
                 }

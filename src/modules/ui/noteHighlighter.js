@@ -131,8 +131,8 @@ export function showNoteTooltip(container, analysis, x, y) {
     tooltip.className = 'chord-tone-tooltip';
     tooltip.style.cssText = `
         position: fixed;
-        left: ${x}px;
-        top: ${y - 80}px;
+        left: ${x + 15}px;
+        top: ${y - 90}px;
         background: white;
         border: 1px solid #e5e7eb;
         border-radius: 8px;

@@ -379,34 +379,64 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
 
     if (inversion >= numNotes) inversion = 0;
 
-    for (let i = 0; i < inversion; i++) {
-        const noteToShift = invertedNotes.shift();
-        if (!noteToShift) {
-            console.warn(`No note to shift for inversion ${i} of chord ${rootNote} ${chordType}`);
-            break;
+    // For inversions, rotate notes and shift the bottom notes up one octave.
+    // Standard inversion: take the bottom N notes and move them up an octave.
+    if (inversion > 0) {
+        // Parse all notes to get their components
+        const notesWithMidi = invertedNotes.map((note, idx) => {
+            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            if (!match) return { note, midi: 0, name: note, octave: 0, originalIndex: idx };
+            return {
+                note,
+                name: match[1],
+                octave: parseInt(match[2], 10),
+                midi: noteToMidi(note),
+                originalIndex: idx
+            };
+        });
+
+        // Move the first 'inversion' notes up by one octave
+        for (let i = 0; i < inversion && i < notesWithMidi.length; i++) {
+            notesWithMidi[i].octave += 1;
+            notesWithMidi[i].midi += 12;
+            notesWithMidi[i].note = notesWithMidi[i].name + notesWithMidi[i].octave;
         }
 
-        const shiftedMidi = noteToMidi(noteToShift) + 12;
-        // Validate shiftedMidi before converting
-        if (isNaN(shiftedMidi) || shiftedMidi === null || shiftedMidi === undefined) {
-            console.warn(`Invalid MIDI value for shifted note: ${noteToShift} -> ${shiftedMidi}`);
-            break;
+        // Sort all notes by MIDI value (ascending pitch order)
+        notesWithMidi.sort((a, b) => a.midi - b.midi);
+
+        // For extended chords (5+ notes like 9ths, 11ths, 13ths), the root position
+        // already spans more than an octave. After standard rotation, the intended
+        // bass note (at original index 'inversion') may not be the lowest.
+        // We ensure the intended bass note IS the lowest by moving other notes UP.
+        //
+        // Note: For chords like Maj7#11, the #11 starts in a higher octave than
+        // the 7th. This means 4th inversion (F#/Gb in bass) will naturally have
+        // a higher bass note than 3rd inversion (B in bass). This is correct
+        // because we're putting each successive chord tone in the bass.
+        if (numNotes >= 5) {
+            // Find the intended bass note (was at originalIndex === inversion)
+            const bassNoteData = notesWithMidi.find(n => n.originalIndex === inversion);
+            if (bassNoteData) {
+                const otherNotes = notesWithMidi.filter(n => n.originalIndex !== inversion);
+
+                // Move any notes that are AT OR BELOW the bass note UP by one octave
+                // This ensures bass is lowest without changing the bass note's octave
+                for (const noteData of otherNotes) {
+                    while (noteData.midi <= bassNoteData.midi) {
+                        noteData.octave += 1;
+                        noteData.midi += 12;
+                        noteData.note = noteData.name + noteData.octave;
+                    }
+                }
+
+                // Re-sort after adjustments
+                notesWithMidi.sort((a, b) => a.midi - b.midi);
+            }
         }
 
-        // Convert the new MIDI value back to a note name. Tone.js handles the octave correctly.
-        const rawShiftedNote = Tone.Midi(shiftedMidi).toNote();
-        if (!rawShiftedNote || typeof rawShiftedNote !== 'string') {
-            console.warn(`Invalid note from MIDI ${shiftedMidi}: ${rawShiftedNote}`);
-            break;
-        }
-
-        // Now, resolve its enharmonic spelling based on the key and user preference.
-        const resolvedNote = resolveEnharmonic(rawShiftedNote, key, enharmonicPreference);
-        if (resolvedNote && typeof resolvedNote === 'string') {
-            invertedNotes.push(resolvedNote);
-        } else {
-            console.warn(`Invalid resolved note: ${resolvedNote} from ${rawShiftedNote}`);
-        }
+        // Extract the sorted note names
+        invertedNotes = notesWithMidi.map(n => n.note);
     }
 
     const simpleName = rootNote + (chordDef.symbol || '');

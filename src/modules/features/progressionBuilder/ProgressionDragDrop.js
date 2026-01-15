@@ -183,7 +183,7 @@ export function initializeSectionCardsAreaSortables(container) {
             dragClass: 'sortable-drag',
             handle: '.drag-handle',
             // Exclude buttons from triggering drag - let them receive clicks
-            filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+            filter: 'button, select, input, .play-btn, .delete-btn, .edit-btn, .expand-btn, .info-tooltip-btn, .no-drag',
             preventOnFilter: false,
             draggable: '.chord-card-wrapper[data-chord-index]',
             swapThreshold: 0.65,
@@ -341,7 +341,7 @@ export function initializeSimplifiedSortable(container) {
         handle: '.drag-handle, .section-drag-handle, .section-banner',
         // CRITICAL: Exclude buttons and interactive elements from triggering drag
         // This allows play, delete, expand buttons inside drag-handle to work
-        filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+        filter: 'button, select, input, .play-btn, .delete-btn, .edit-btn, .expand-btn, .info-tooltip-btn, .no-drag',
         preventOnFilter: false, // Don't prevent default on filtered elements - let buttons work normally
         // Allow dragging direct children that are cards or sections
         draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',

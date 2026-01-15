@@ -91,7 +91,8 @@ import {
     initializeSectionContainerSortable,
     initializeSectionCardsAreaSortables,
     initializeSectionChipsSortable,
-    initializeSimplifiedSortable
+    initializeSimplifiedSortable,
+    handleCardDragWithinSection
 } from './ProgressionDragDrop.js';
 
 // State imports
@@ -146,6 +147,7 @@ import {
     updateChordType,
     updateChordRoot,
     updateChordInversion,
+    updateChordDuration,
     updateRHOctaveShift,
     updateChordAndRenderPreservingTrebleNotes,
 
@@ -428,6 +430,9 @@ if (typeof window !== 'undefined') {
     window.updateCardShifts = updateCardShifts;
     window.buildSectionChipsWithUngrouped = buildSectionChipsWithUngrouped;
 
+    // Drag-Drop
+    window.handleCardDragWithinSection = handleCardDragWithinSection;
+
     // View Mode
     window.setProgressionViewMode = setProgressionViewMode;
     window.getProgressionViewMode = getProgressionViewMode;
@@ -472,6 +477,7 @@ if (typeof window !== 'undefined') {
     window.updateChordType = updateChordType;
     window.updateChordRoot = updateChordRoot;
     window.updateChordInversion = updateChordInversion;
+    window.updateChordDuration = updateChordDuration;
     window.updateRHOctaveShift = updateRHOctaveShift;
     window.updateChordAndRenderPreservingTrebleNotes = updateChordAndRenderPreservingTrebleNotes;
     window.collapseChordCard = collapseChordCard;

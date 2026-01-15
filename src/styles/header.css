@@ -82,6 +82,13 @@
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
 }
 
+.header-tab-pill[data-tab="studio-new"].active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
 /* Inactive pill hover with tab-specific tint */
 .header-tab-pill[data-tab="builder"]:not(.active):hover {
     background: rgba(245, 158, 11, 0.1);
@@ -105,6 +112,12 @@
     background: rgba(59, 130, 246, 0.1);
     color: #2563eb;
     border-color: rgba(59, 130, 246, 0.2);
+}
+
+.header-tab-pill[data-tab="studio-new"]:not(.active):hover {
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+    border-color: rgba(99, 102, 241, 0.2);
 }
 
 /* ============================================================================
@@ -157,4 +170,41 @@
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+}
+
+/* ============================================================================
+   STUDIO-NEW FULL-WIDTH HEADER MODE
+   When Composition Studio (New) is active, header expands to full width
+   and becomes fixed at top
+   ============================================================================ */
+
+.studio-new-header-wrapper {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 101; /* Above tab-studio-new which is z-[100] */
+    padding: 0.5rem;
+    margin: 0 !important;
+    max-width: none !important;
+}
+
+.studio-new-header-wrapper #main-header {
+    border-radius: 0;
+    margin: 0;
+}
+
+/* Adjust tab-studio-new to account for header when header is visible */
+body[data-active-tab="studio-new"] #tab-studio-new {
+    top: 64px !important; /* header height (h-14 = 56px) + wrapper padding (8px) */
+    height: calc(100vh - 64px) !important;
+}
+
+/* Ensure pointer-events work on the header wrapper in studio-new mode */
+.studio-new-header-wrapper {
+    pointer-events: auto;
+}
+
+.studio-new-header-wrapper #main-header {
+    pointer-events: auto;
 }
