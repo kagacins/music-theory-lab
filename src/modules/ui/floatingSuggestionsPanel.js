@@ -10,6 +10,65 @@
 import { initSectionIntentUI, refreshUI as refreshSectionIntentUI } from './sectionIntentUI.js';
 import { initGenerateTabUI, refreshUI as refreshGenerateTabUI } from './generateTabUI.js';
 import { showUnifiedRecommendationModal, closeUnifiedRecommendationModal } from './recommendations/UnifiedRecommendationModal/index.js';
+import { getCompositionState } from '../state/compositionState.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+
+/**
+ * Get the chord index for the currently selected note in the notation editor
+ * This looks up which chord contains the selected note based on beat position
+ * @returns {number|null} - Chord index or null if no note is selected
+ */
+function getChordIndexForSelectedNote() {
+    const compositionState = getCompositionState();
+    if (!compositionState) return null;
+
+    // Get the notation composer and its note editor
+    const notationComposer = window.getNotationComposer?.();
+    if (!notationComposer?.noteEditor) return null;
+
+    const selectedNotes = notationComposer.noteEditor.selectedNotes;
+    if (!selectedNotes || selectedNotes.size === 0) return null;
+
+    // Get the first selected note's info
+    const firstNoteId = Array.from(selectedNotes)[0];
+    const parsed = notationComposer.noteEditor.parseNoteId(firstNoteId);
+    if (!parsed) return null;
+
+    const [measureIndex, staff, voiceIndex, noteIndex] = parsed;
+
+    // Get the note to find its beat position
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) return null;
+
+    const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+    const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex];
+    if (!voice || !voice.notes || !voice.notes[noteIndex]) return null;
+
+    const note = voice.notes[noteIndex];
+
+    // Calculate absolute beat position
+    const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+    const beatsPerMeasure = parseInt(timeSignature.split('/')[0]) || 4;
+    const absoluteBeat = (measureIndex * beatsPerMeasure) + (note.beat || 0);
+
+    // Find the chord segment containing this beat
+    const segment = compositionState.getChordSegmentForBeat(absoluteBeat);
+    if (segment) {
+        return segment.chordIndex;
+    }
+
+    // Fallback: check if the note has a chordIndex property
+    if (note.chordIndex !== undefined) {
+        return note.chordIndex;
+    }
+
+    // Fallback: use the measure's chord index
+    if (measure.chord?.chordIndex !== undefined) {
+        return measure.chord.chordIndex;
+    }
+
+    return null;
+}
 
 let panel = null;
 let isVisible = false;
@@ -115,8 +174,15 @@ function setupKeyboardShortcuts() {
                 if (existingModal) {
                     closeUnifiedRecommendationModal();
                 } else {
-                    // Don't specify initialTab - let modal use localStorage value
-                    showUnifiedRecommendationModal({});
+                    // Try to get the chord index for the currently selected note
+                    // This ensures the modal selects the correct chord even when
+                    // chords span multiple measures or have variable durations
+                    const chordIndex = getChordIndexForSelectedNote();
+                    const options = {};
+                    if (chordIndex !== null) {
+                        options.selectedChordIndex = chordIndex;
+                    }
+                    showUnifiedRecommendationModal(options);
                 }
             }
         }
@@ -130,7 +196,12 @@ function setupKeyboardShortcuts() {
                 if (existingModal) {
                     closeUnifiedRecommendationModal();
                 } else {
-                    showUnifiedRecommendationModal({ initialTab: 'melody' });
+                    const chordIndex = getChordIndexForSelectedNote();
+                    const options = { initialTab: 'melody' };
+                    if (chordIndex !== null) {
+                        options.selectedChordIndex = chordIndex;
+                    }
+                    showUnifiedRecommendationModal(options);
                 }
             }
         }
@@ -144,7 +215,12 @@ function setupKeyboardShortcuts() {
                 if (existingModal) {
                     closeUnifiedRecommendationModal();
                 } else {
-                    showUnifiedRecommendationModal({ initialTab: 'section' });
+                    const chordIndex = getChordIndexForSelectedNote();
+                    const options = { initialTab: 'section' };
+                    if (chordIndex !== null) {
+                        options.selectedChordIndex = chordIndex;
+                    }
+                    showUnifiedRecommendationModal(options);
                 }
             }
         }

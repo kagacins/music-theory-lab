@@ -3858,10 +3858,32 @@ export class NoteEditor {
     }
 
     if (changedCount > 0) {
+      console.log('[DEBUG applyDurationChangePreserveDotted] About to render, changedCount:', changedCount);
+      // Log current state of the note we just changed
+      if (noteIds.length > 0) {
+        const [mi, st, vi, ni] = this.parseNoteId(noteIds[0]);
+        const m = compositionState?.measures[mi];
+        const v = m?.notation?.[st]?.voices?.[vi];
+        console.log('[DEBUG applyDurationChangePreserveDotted] Note state BEFORE render:', v?.notes?.[ni]);
+      }
       this.composerIntegration.render(true);
+      // Log state AFTER render
+      if (noteIds.length > 0) {
+        const [mi, st, vi, ni] = this.parseNoteId(noteIds[0]);
+        const m = compositionState?.measures[mi];
+        const v = m?.notation?.[st]?.voices?.[vi];
+        console.log('[DEBUG applyDurationChangePreserveDotted] Note state AFTER render:', v?.notes?.[ni]);
+      }
 
       setTimeout(() => {
         this.renderOverlay();
+        // Log state after overlay render
+        if (noteIds.length > 0) {
+          const [mi, st, vi, ni] = this.parseNoteId(noteIds[0]);
+          const m = compositionState?.measures[mi];
+          const v = m?.notation?.[st]?.voices?.[vi];
+          console.log('[DEBUG applyDurationChangePreserveDotted] Note state AFTER overlay:', v?.notes?.[ni]);
+        }
       }, 50);
     }
   }
@@ -5513,18 +5535,43 @@ export class NoteEditor {
       window.saveStateBeforeChange();
     }
 
-    const { measureIndex, staff, voiceIndex, noteIndex } = overflow;
+    const { measureIndex, staff, voiceIndex, noteIndex, availableBeats } = overflow;
     const measure = compositionState.measures[measureIndex];
     const voiceKey = staff === 'treble' ? 'treble' : 'bass';
     const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
 
     if (!voice || !voice.notes[noteIndex]) return;
 
-    // Set dotted
-    voice.notes[noteIndex].dotted = true;
+    const note = voice.notes[noteIndex];
+    const currentDuration = note.duration || '4n';
+    const currentBeats = this.durationToBeats(currentDuration, false);
+    const dottedBeats = currentBeats * 1.5;
 
-    // Calculate how much space we need
-    const noteBeats = this.durationToBeats(voice.notes[noteIndex].duration || '4n', true);
+    // Check if dotted note would fit in available space
+    if (dottedBeats <= availableBeats) {
+      // Dotted fits - set dotted and truncate downstream notes
+      note.dotted = true;
+    } else {
+      // Dotted doesn't fit even as the only note change
+      // Find the largest duration that fits with dotted, or without dotted
+      const fitResult = this.beatsToDuration(availableBeats);
+      if (fitResult.dotted && this.durationToBeats(fitResult.duration, true) <= availableBeats) {
+        // A smaller dotted duration fits
+        note.duration = fitResult.duration;
+        note.dotted = true;
+      } else if (this.durationToBeats(fitResult.duration, false) <= availableBeats) {
+        // Non-dotted duration fits
+        note.duration = fitResult.duration;
+        note.dotted = false;
+      } else {
+        // Can't fit - don't change the note
+        console.warn('[NoteEditor] Cannot fit note in available space, keeping original');
+        return;
+      }
+    }
+
+    // Calculate how much space we need after the change
+    const noteBeats = this.durationToBeats(note.duration || '4n', note.dotted || false);
 
     // Calculate beat position of this note
     let noteBeat = 0;
@@ -11739,7 +11786,7 @@ export class NoteEditor {
 
     // Attach handlers and setup drag
     this._attachQuickActionsHandlers(popup);
-    this._setupQuickActionsDragging(popup);
+    this._attachDragHandlers(popup);
 
     // Update accidental state to reflect actual note state
     this._updateQuickActionsAccidentalState(popup);

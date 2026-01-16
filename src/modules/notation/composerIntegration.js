@@ -3187,7 +3187,6 @@ export class NotationComposer {
     }
 
     // Regular click = Select this bass block for editing
-    console.log('[ComposerIntegration] Selecting bass block:', chordIndex);
 
     // Set the active staff to bass and the active block index
     this.compositionState.setActiveStaff('bass');
@@ -3196,6 +3195,16 @@ export class NotationComposer {
     // Also update the toolbar to show bass mode
     if (this.toolbar) {
       this.toolbar.setStaffSelectionMode('bass');
+    }
+
+    // Sync with chord card selection so they stay in sync
+    // This ensures the unified recommendation modal knows which chord is selected
+    if (window.setSelectedChordIndex) {
+      window.setSelectedChordIndex(chordIndex);
+    }
+    // Also select the chord card visually
+    if (window.selectChordCard) {
+      window.selectChordCard(chordIndex);
     }
 
     // Re-render to show the block highlight

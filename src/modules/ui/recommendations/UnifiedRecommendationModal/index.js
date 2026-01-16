@@ -368,6 +368,14 @@ export function showUnifiedRecommendationModal(options = {}) {
 
     document.addEventListener('chord-suggestion-preference-changed', handlePreferenceChange);
 
+    // Add keyboard shortcut handler for Escape and number keys
+    const keydownHandler = (e) => {
+        // Only handle if modal is still open
+        if (!document.getElementById(MODAL_ID)) return;
+        handleKeydown(e);
+    };
+    document.addEventListener('keydown', keydownHandler);
+
     // Also listen for weight changes (from Chord Explorer settings)
     // This ensures sequence recommendations update when user saves weight settings
     document.addEventListener('chord-weights-changed', handlePreferenceChange);
@@ -414,6 +422,7 @@ export function showUnifiedRecommendationModal(options = {}) {
                 if (node === modal || node.contains?.(modal)) {
                     document.removeEventListener('chord-suggestion-preference-changed', handlePreferenceChange);
                     document.removeEventListener('chord-weights-changed', handlePreferenceChange);
+                    document.removeEventListener('keydown', keydownHandler);
                     window.removeEventListener('progressionUpdated', handleProgressionUpdate);
                     observer.disconnect();
                     return;
