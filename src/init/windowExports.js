@@ -44,6 +44,7 @@ import { initTheoryMoments, toggleTheoryMoments, recallTheoryMoment } from '../m
 import { initWhyThisWorksEnhanced } from '../modules/teaching/whyThisWorksEnhanced.js';
 import { initTheoryOverlay, toggleTheoryOverlay } from '../modules/teaching/theoryOverlay.js';
 import { initCompositionInsights, showInsightsDashboard, trackProgression } from '../modules/teaching/compositionInsights.js';
+import { getCoachEngine, initCoachEngine } from '../modules/teaching/coachEngine/index.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from '../modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from '../modules/features/guitarFretboard.js';
 import {
@@ -1828,6 +1829,34 @@ export function setupWindowExports() {
     window.initCompositionInsights = initCompositionInsights;
     window.showInsightsDashboard = showInsightsDashboard;
     window.trackProgression = trackProgression;
+
+    // Coach Engine functions
+    window.getCoachEngine = getCoachEngine;
+    window.initCoachEngine = initCoachEngine;
+    window.toggleCoachEngine = function(enabled) {
+        const engine = getCoachEngine();
+        engine.setEnabled(enabled);
+        // Update UI
+        const statusEl = document.getElementById('coach-engine-status');
+        if (statusEl) {
+            statusEl.textContent = enabled ? 'On' : 'Off';
+        }
+        return enabled;
+    };
+    window.triggerCoachAnalysis = function() {
+        const engine = getCoachEngine();
+        engine.analyzeCurrentComposition();
+    };
+    window.setCoachSkillLevel = function(level) {
+        const engine = getCoachEngine();
+        engine.setSkillLevel(level);
+    };
+    window.recallCoachNudge = function() {
+        if (window.recallCoachNudge) {
+            return window.recallCoachNudge();
+        }
+        return false;
+    };
 
     // Melody Generator functions
     window.generateProgressionMelody = generateProgressionMelody;

@@ -421,8 +421,33 @@ export class FullScreenNotationEditor {
                         </div>
                     </div>
 
-                    <!-- Right: Metronome + Zoom Controls -->
+                    <!-- Right: Coach + Metronome + Zoom Controls -->
                     <div class="flex items-center gap-2">
+                        <!-- Coach Engine Toggle -->
+                        <div class="flex items-center gap-1 px-2 py-1 bg-white/20 rounded-lg" title="Toggle Coach - Proactive tips & observations">
+                            <span class="text-xs font-medium" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Coach</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="fullscreen-coach-toggle-checkbox" class="sr-only peer" checked
+                                       onchange="window.toggleCoachEngine && window.toggleCoachEngine(this.checked)">
+                                <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer
+                                            peer-checked:after:translate-x-full peer-checked:after:border-white
+                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                            after:bg-white after:border-gray-300 after:border after:rounded-full
+                                            after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
+                        </div>
+
+                        <!-- Analyze Button -->
+                        <button id="fullscreen-analyze-btn"
+                                onclick="window.triggerCoachAnalysis && window.triggerCoachAnalysis()"
+                                class="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 rounded-lg transition-colors"
+                                title="Analyze progression for insights">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #ffffff;">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                            <span class="text-xs font-medium" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Analyze</span>
+                        </button>
+
                         <!-- Metronome Toggle -->
                         <button id="fullscreen-metronome-toggle"
                                 class="flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors ${this._isMetronomeEnabled() ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'}"

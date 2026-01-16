@@ -51,6 +51,10 @@ import {
 } from '../modules/teaching/compositionInsights.js';
 
 import {
+    initCoachEngine
+} from '../modules/teaching/coachEngine/index.js';
+
+import {
     initSongAnalyzer
 } from '../modules/features/songAnalyzer.js';
 
@@ -233,6 +237,10 @@ export async function initializeModules() {
     initTheoryMoments();
     initTheoryOverlay();
     initCompositionInsights();
+
+    // Coach Engine - Unified proactive observations and suggestions
+    // (Tier 1: Floating nudges, integrates with Tier 2 panels and Tier 3 modal)
+    initCoachEngine();
 
 
     // ===========================

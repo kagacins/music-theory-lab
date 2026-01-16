@@ -113,7 +113,7 @@ export function initChordFunctionLegend() {
 function createLegendHTML(compact = false) {
     if (compact) {
         return `
-            <div id="chord-function-legend" class="fixed bottom-4 right-4 transition-all duration-300" style="z-index: 9995;">
+            <div id="chord-function-legend" class="fixed bottom-4 right-4 transition-all duration-300" style="z-index: 9995; pointer-events: auto;">
                 <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden" style="max-width: 280px;">
                     <!-- Header -->
                     <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
@@ -147,7 +147,7 @@ function createLegendHTML(compact = false) {
 
     // Full expanded legend
     return `
-        <div id="chord-function-legend" class="fixed bottom-4 right-4 transition-all duration-300" style="z-index: 9995;">
+        <div id="chord-function-legend" class="fixed bottom-4 right-4 transition-all duration-300" style="z-index: 9995; pointer-events: auto;">
             <div class="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden" style="max-width: 340px;">
                 <!-- Header -->
                 <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
