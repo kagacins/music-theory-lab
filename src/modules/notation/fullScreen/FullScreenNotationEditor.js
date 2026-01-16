@@ -5213,10 +5213,18 @@ export function getFullScreenNotationEditor() {
 
 /**
  * Open the full-screen notation editor
- * Convenience function for window export
+ * @deprecated Modal mode is deprecated. Use switchTab('studio-new') for the tabbed Composition Studio.
+ * This function now redirects to the tabbed version.
  */
 export function openFullScreenNotation() {
-    getFullScreenNotationEditor().open();
+    console.warn('[DEPRECATED] openFullScreenNotation() modal mode is deprecated. Redirecting to tabbed Composition Studio.');
+    // Redirect to tabbed Composition Studio instead of modal
+    if (window.switchTab) {
+        window.switchTab('studio-new');
+    } else {
+        // Fallback if switchTab not available yet
+        getFullScreenNotationEditor().open();
+    }
 }
 
 /**

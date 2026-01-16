@@ -171,7 +171,7 @@ export function showNudge(item) {
     const popup = document.createElement('div');
     popup.id = 'coach-nudge-popup';
     popup.className = 'fixed top-4 right-4 z-[99998] max-w-sm';
-    popup.style.animation = 'coachSlideIn 0.3s ease-out';
+    popup.style.cssText = 'animation: coachSlideIn 0.3s ease-out; pointer-events: auto;';
 
     // Get message content for current skill level
     const message = getMessageForSkillLevel(item, skillLevel);
@@ -414,10 +414,12 @@ function setupNudgeEventListeners(popup, item) {
             // Also save to the shared theory skill level
             localStorage.setItem('theorySkillLevel', skillLevel);
 
-            // Update content
+            // Update content - use innerHTML to allow HTML formatting
             const contentEl = document.getElementById('coach-nudge-content');
             if (contentEl) {
-                contentEl.textContent = getMessageForSkillLevel(item, skillLevel);
+                const newMessage = getMessageForSkillLevel(item, skillLevel);
+                contentEl.innerHTML = newMessage;
+                console.log('[FloatingNudgePresenter] Skill level changed to:', skillLevel, '- Message:', newMessage);
             }
         });
     }

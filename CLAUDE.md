@@ -451,11 +451,19 @@ Tailwind's `text-white` class will NOT work due to the `-webkit-text-fill-color`
 
 ---
 
-## CRITICAL: Popup/Modal Click Events in Composition Studio
+## CRITICAL: Popup/Modal Click Events in Fullscreen Tabs (Composition Studio & Chord Lab)
 
-**When creating popups or modals in the Composition Studio (New) tab, you MUST set `pointer-events: auto` and use maximum z-index.**
+**When creating ANY overlay (popups, modals, legends, floating panels) that appears over the tabbed Composition Studio (New) or Chord Lab tabs, you MUST set `pointer-events: auto`.**
 
-The Composition Studio uses a complex layered canvas system where click events can "pass through" overlaid elements to the canvas beneath them. This causes popups to close immediately when clicking their buttons because the click registers on the canvas instead of the button.
+Both the Composition Studio and Chord Lab use complex layered canvas systems where click events can "pass through" overlaid elements to the canvas beneath them. This causes popups to close immediately when clicking their buttons because the click registers on the canvas instead of the button.
+
+### This applies to ALL overlays including:
+- Floating nudges/notifications (coach engine)
+- Legend popups (chord function colors)
+- Context menus
+- Modal dialogs
+- Floating panels
+- Any dynamically created UI that appears over the canvas
 
 ### Symptom:
 - Popup opens correctly
