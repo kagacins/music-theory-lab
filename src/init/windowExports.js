@@ -443,11 +443,8 @@ import {
     getMeasureIsolationEditor
 } from '../modules/notation/measureIsolation/index.js';
 
-// Full-Screen Notation Editor
+// Full-Screen Notation Editor (Tab mode only - modal mode is deprecated)
 import {
-    openFullScreenNotation,
-    closeFullScreenNotation,
-    toggleFullScreenNotation,
     getFullScreenNotationEditor
 } from '../modules/notation/fullScreen/FullScreenNotationEditor.js';
 
@@ -2467,10 +2464,9 @@ export function setupWindowExports() {
     };
     window.getMeasureIsolationEditor = getMeasureIsolationEditor;
 
-    // Full-Screen Notation Editor
-    window.openFullScreenNotation = openFullScreenNotation;
-    window.closeFullScreenNotation = closeFullScreenNotation;
-    window.toggleFullScreenNotation = toggleFullScreenNotation;
+    // Full-Screen Notation Editor (Tab mode only - modal mode is deprecated)
+    // NOTE: openFullScreenNotation, closeFullScreenNotation, toggleFullScreenNotation are REMOVED
+    // Users access Composition Studio via switchTab('studio-new'), not modal
     window.getFullScreenNotationEditor = getFullScreenNotationEditor;
 
     // Full-Screen Chord Lab Editor

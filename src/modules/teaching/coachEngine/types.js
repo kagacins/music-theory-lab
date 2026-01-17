@@ -129,7 +129,7 @@ export const OBSERVATION_TYPES = {
         id: 'deceptive-cadence',
         priority: 85,
         emoji: '🎉',
-        title: 'Deceptive Cadence!',
+        title: 'Deceptive Cadence',
         message: {
             simple: "Surprise! The V chord went to vi instead of I - that's a plot twist in music!",
             intermediate: "Deceptive cadence (V→vi) - the listener expects I but gets vi, creating emotional depth.",
@@ -148,7 +148,7 @@ export const OBSERVATION_TYPES = {
         id: 'plagal-cadence',
         priority: 70,
         emoji: '🙏',
-        title: 'Plagal Cadence!',
+        title: 'Plagal Cadence',
         message: {
             simple: "The 'Amen' cadence! IV to I sounds peaceful and hymn-like.",
             intermediate: "Plagal cadence (IV→I) - a softer resolution than V→I, common in hymns and pop.",
@@ -206,7 +206,7 @@ export const OBSERVATION_TYPES = {
         id: 'borrowed-bVI',
         priority: 85,
         emoji: '🎭',
-        title: 'Borrowed bVI!',
+        title: 'Borrowed bVI',
         message: {
             simple: "Dramatic! This chord is borrowed from the parallel minor key.",
             intermediate: "bVI (flat-six) borrowed from parallel minor - creates an epic, cinematic sound.",
@@ -225,7 +225,7 @@ export const OBSERVATION_TYPES = {
         id: 'borrowed-bVII',
         priority: 85,
         emoji: '🎸',
-        title: 'Borrowed bVII!',
+        title: 'Borrowed bVII',
         message: {
             simple: "Rock and roll! bVII has that classic rock/folk flavor.",
             intermediate: "bVII (flat-seven) from Mixolydian - the sound of classic rock and folk music.",
@@ -244,7 +244,7 @@ export const OBSERVATION_TYPES = {
         id: 'borrowed-iv',
         priority: 80,
         emoji: '😢',
-        title: 'Minor iv!',
+        title: 'Minor iv',
         message: {
             simple: "Beautiful melancholy! The minor iv adds a touch of sadness.",
             intermediate: "Minor iv borrowed from parallel minor - creates a bittersweet plagal sound.",
@@ -263,7 +263,7 @@ export const OBSERVATION_TYPES = {
         id: 'borrowed-bIII',
         priority: 75,
         emoji: '🌈',
-        title: 'Borrowed bIII!',
+        title: 'Borrowed bIII',
         message: {
             simple: "Colorful! bIII opens up new harmonic territory.",
             intermediate: "bIII (flat-three) from parallel minor - adds unexpected brightness in minor context.",
@@ -283,11 +283,11 @@ export const OBSERVATION_TYPES = {
         id: 'secondary-dominant',
         priority: 80,
         emoji: '🔥',
-        title: 'Secondary Dominant!',
+        title: 'Secondary Dominant',
         message: {
-            simple: "Nice! This chord really wants to pull somewhere specific.",
-            intermediate: "Secondary dominant (V/x) - creates temporary tonicization of a non-tonic chord.",
-            advanced: "Secondary dominant provides chromatic alteration and applied dominant function, intensifying motion to the target chord."
+            simple: "Nice! This is {{label}} - it really wants to pull to {{target}}.",
+            intermediate: "Secondary dominant {{label}} - creates temporary tonicization, pulling strongly toward {{target}}.",
+            advanced: "{{label}} provides chromatic alteration and applied dominant function, intensifying motion to {{target}}."
         },
         actions: {
             learnMore: 'lesson-secondary-dominants',
@@ -303,11 +303,11 @@ export const OBSERVATION_TYPES = {
         id: 'circle-of-fifths',
         priority: 80,
         emoji: '🔄',
-        title: 'Circle of Fifths!',
+        title: 'Circle of Fifths',
         message: {
-            simple: "Classic! Your chords are following the circle of fifths - super smooth.",
-            intermediate: "Circle of fifths progression - one of the smoothest harmonic movements in music.",
-            advanced: "Descending fifths sequence provides strong root motion with consistent voice leading patterns across all voices."
+            simple: "Classic! {{sequence}} follows the circle of fifths - super smooth root motion.",
+            intermediate: "Circle of fifths progression: {{sequence}} - each chord is a fifth below the previous.",
+            advanced: "Descending fifths sequence ({{sequence}}) provides strong root motion with consistent voice leading patterns."
         },
         actions: {
             learnMore: 'lesson-circle-of-fifths',
@@ -322,7 +322,7 @@ export const OBSERVATION_TYPES = {
         id: 'harmonic-sequence',
         priority: 70,
         emoji: '📐',
-        title: 'Harmonic Sequence!',
+        title: 'Harmonic Sequence',
         message: {
             simple: "Pattern detected! You're repeating a chord pattern at different pitches.",
             intermediate: "Harmonic sequence - a pattern repeated at different pitch levels creates unity and direction.",
@@ -342,7 +342,7 @@ export const OBSERVATION_TYPES = {
         id: 'dorian-pattern',
         priority: 75,
         emoji: '🎷',
-        title: 'Dorian Mode!',
+        title: 'Dorian Mode',
         message: {
             simple: "Jazzy! That i-IV movement is the sound of Dorian mode.",
             intermediate: "Dorian i-IV pattern - the characteristic sound of jazz, funk, and soul.",
@@ -361,7 +361,7 @@ export const OBSERVATION_TYPES = {
         id: 'mixolydian-pattern',
         priority: 75,
         emoji: '🎸',
-        title: 'Mixolydian Mode!',
+        title: 'Mixolydian Mode',
         message: {
             simple: "Rock on! That I-bVII movement is classic Mixolydian.",
             intermediate: "Mixolydian I-bVII pattern - the backbone of rock, blues, and folk music.",
@@ -381,11 +381,11 @@ export const OBSERVATION_TYPES = {
         id: 'chromatic-mediant',
         priority: 70,
         emoji: '✨',
-        title: 'Chromatic Mediant!',
+        title: 'Chromatic Mediant',
         message: {
-            simple: "Colorful! These chords are a third apart with chromatic alterations - very cinematic!",
-            intermediate: "Chromatic mediant relationship - chords a third apart with altered quality, common in film scores.",
-            advanced: "Chromatic mediant preserves one common tone while chromatically altering others, creating dramatic color shift without functional progression."
+            simple: "Colorful! {{from}} to {{to}} are a third apart with chromatic alterations - very cinematic!",
+            intermediate: "Chromatic mediant: {{from}} → {{to}} - chords a third apart with altered quality, common in film scores.",
+            advanced: "{{from}} → {{to}} preserves one common tone while chromatically altering others, creating dramatic color shift without functional progression."
         },
         actions: {
             learnMore: 'lesson-chromatic-harmony',
@@ -401,7 +401,7 @@ export const OBSERVATION_TYPES = {
         id: 'smooth-voice-leading',
         priority: 55,
         emoji: '🌊',
-        title: 'Smooth Voice Leading!',
+        title: 'Smooth Voice Leading',
         message: {
             simple: "Beautiful flow! Your voices are moving smoothly between chords.",
             intermediate: "Excellent voice leading - stepwise motion and common tones create smooth connections.",
@@ -420,7 +420,7 @@ export const OBSERVATION_TYPES = {
         id: 'tension-climax',
         priority: 60,
         emoji: '📈',
-        title: 'Tension Peak!',
+        title: 'Tension Peak',
         message: {
             simple: "Maximum drama! This is the most tense moment in your progression.",
             intermediate: "Tension climax reached - this is your emotional peak before resolution.",
@@ -451,9 +451,9 @@ export const SUGGESTION_TYPES = {
         emoji: '✨',
         title: 'Smoother Voice Leading?',
         message: {
-            simple: "Using a different position of this chord would sound smoother.",
-            intermediate: "{{chord}} in {{suggestedInversion}} inversion creates stepwise bass motion.",
-            advanced: "{{suggestedInversion}} inversion yields {{interval}} bass motion vs {{currentInterval}}, improving VL score by ~{{improvement}}%."
+            simple: "Try {{chord}} in {{inversionLabel}}{{octaveNote}} - the bass will move more smoothly from {{prevBass}} to {{newBass}}.",
+            intermediate: "{{chord}} in {{inversionLabel}}{{octaveNote}} creates stepwise bass motion instead of the {{currentInterval}} jump.",
+            advanced: "{{inversionLabel}} of {{chord}}{{octaveNote}} yields {{interval}} bass motion vs {{currentInterval}}, improving voice leading by ~{{improvement}}%."
         },
         actions: {
             preview: true,
@@ -473,9 +473,9 @@ export const SUGGESTION_TYPES = {
         emoji: '⚠️',
         title: 'Parallel Fifths',
         message: {
-            simple: "These voices are moving together in a way that classical music avoids.",
-            intermediate: "Parallel fifths between {{voice1}} and {{voice2}} - common in rock, avoided in classical.",
-            advanced: "Parallel P5 motion ({{notes}}) weakens voice independence. Consider contrary motion or different voicing."
+            simple: "{{voice1}} and {{voice2}} move together in fifths from {{fromChordName}} to {{toChordName}} - classical music avoids this.",
+            intermediate: "Parallel fifths between {{voice1}} and {{voice2}} ({{fromChordName}}→{{toChordName}}) - common in rock, avoided in classical.",
+            advanced: "Parallel P5 motion ({{notes}}) from {{fromChordName}} to {{toChordName}} weakens voice independence. Consider contrary motion or different voicing."
         },
         actions: {
             preview: true,
@@ -493,9 +493,9 @@ export const SUGGESTION_TYPES = {
         emoji: '⚠️',
         title: 'Parallel Octaves',
         message: {
-            simple: "Two voices are doubling each other - this reduces independence.",
-            intermediate: "Parallel octaves reduce voice independence - the voices merge into one.",
-            advanced: "Parallel P8 motion merges two voices into one perceived line, reducing textural richness."
+            simple: "{{voice1}} and {{voice2}} double each other from {{fromChordName}} to {{toChordName}} - this reduces independence.",
+            intermediate: "Parallel octaves between {{voice1}} and {{voice2}} ({{fromChordName}}→{{toChordName}}) - the voices merge into one.",
+            advanced: "Parallel P8 motion ({{notes}}) from {{fromChordName}} to {{toChordName}} merges two voices into one perceived line, reducing textural richness."
         },
         actions: {
             preview: true,
@@ -513,9 +513,9 @@ export const SUGGESTION_TYPES = {
         emoji: '🔀',
         title: 'Voice Crossing',
         message: {
-            simple: "Your melody went below the bass - this can sound muddy.",
-            intermediate: "Voice crossing at M{{measure}} - voices swap registers, potentially muddying texture.",
-            advanced: "Voice crossing disrupts registral stratification. Consider voice exchange or re-voicing to maintain clarity."
+            simple: "Voices cross from {{fromChordName}} to {{toChordName}} ({{crossingNotesSummary}}) - this can sound muddy.",
+            intermediate: "Voice crossing: {{voice1}} goes {{crossingDirection}} {{voice2}} moving from {{fromChordName}} to {{toChordName}}. Notes: {{crossingNotesSummary}}",
+            advanced: "Voice crossing ({{crossingNotesSummary}}) from {{fromChordName}} to {{toChordName}} disrupts registral stratification. Consider voice exchange or re-voicing."
         },
         actions: {
             preview: true,
@@ -534,9 +534,9 @@ export const SUGGESTION_TYPES = {
         emoji: '🎨',
         title: 'Add Some Color?',
         message: {
-            simple: "Try borrowing a chord from the parallel minor for more emotion!",
-            intermediate: "Your progression is all diatonic - a borrowed {{suggestion}} here would add color.",
-            advanced: "Modal interchange via {{suggestion}} would provide chromatic interest without leaving the tonal center."
+            simple: "Try replacing {{currentChord}} with {{suggestionWithRoman}} - borrowed from parallel minor for more emotion!",
+            intermediate: "Your progression is all diatonic - replacing {{currentChord}} ({{roman}}) with {{suggestionWithRoman}} would add color. {{reason}}",
+            advanced: "Modal interchange: replace {{currentChord}} with {{suggestionWithRoman}} for chromatic interest. {{reason}}"
         },
         actions: {
             preview: true,
@@ -555,9 +555,9 @@ export const SUGGESTION_TYPES = {
         emoji: '🔥',
         title: 'Intensify the Pull?',
         message: {
-            simple: "Adding a chord that really wants to go to your next chord!",
-            intermediate: "Try {{suggestion}} before {{target}} - it creates a stronger pull.",
-            advanced: "Secondary dominant {{suggestion}} provides applied dominant function to {{target}}, intensifying the arrival."
+            simple: "Try adding {{suggestionChord}} before {{targetChord}} - it creates a stronger pull!",
+            intermediate: "Try {{suggestionWithRoman}} before {{targetChord}} - it creates a stronger pull. {{reason}}",
+            advanced: "Secondary dominant {{suggestionWithRoman}} provides applied dominant function to {{targetChord}}, intensifying the arrival. Pattern: {{pattern}}"
         },
         actions: {
             preview: true,
@@ -575,9 +575,9 @@ export const SUGGESTION_TYPES = {
         emoji: '🎹',
         title: 'Add a 7th?',
         message: {
-            simple: "Adding a 7th to this chord would make it richer!",
-            intermediate: "Try {{chord}}7 instead of {{chord}} - adds color and tension.",
-            advanced: "Seventh extension adds dissonance requiring resolution, increasing harmonic momentum."
+            simple: "Try changing {{currentChord}} to {{suggestionChord}} - the 7th makes it richer!",
+            intermediate: "Try {{suggestionChord}} instead of {{currentChord}} - {{reason}}",
+            advanced: "Converting {{currentChord}} to {{suggestionChord}} adds dissonance requiring resolution, increasing harmonic momentum."
         },
         actions: {
             preview: true,
@@ -596,9 +596,9 @@ export const SUGGESTION_TYPES = {
         emoji: '🏠',
         title: 'Resolve to Home?',
         message: {
-            simple: "That V chord really wants to go home to I!",
-            intermediate: "Your dominant (V) is unresolved - it creates strong expectation for I.",
-            advanced: "Unresolved dominant function creates harmonic tension. Consider authentic resolution or deceptive alternative."
+            simple: "That {{currentChord}} chord really wants to go home to {{suggestionChord}}!",
+            intermediate: "Your dominant ({{currentChord}}) is unresolved - it creates strong expectation for {{suggestionChord}}.",
+            advanced: "Unresolved dominant function creates harmonic tension. Consider authentic resolution to {{suggestionChord}} or deceptive alternative."
         },
         actions: {
             preview: true,
@@ -616,9 +616,9 @@ export const SUGGESTION_TYPES = {
         emoji: '🎭',
         title: 'Try a Surprise?',
         message: {
-            simple: "Instead of going to I, try vi for a surprise ending!",
-            intermediate: "Your V→I could become V→vi (deceptive cadence) for emotional depth.",
-            advanced: "Deceptive resolution to vi provides surprise while maintaining common tones with expected I."
+            simple: "Instead of {{toChord}}, try {{suggestionChord}} for a surprise ending!",
+            intermediate: "Your {{fromChord}}→{{toChord}} could become {{fromChord}}→{{suggestionWithRoman}} (deceptive cadence) for emotional depth.",
+            advanced: "Deceptive resolution to {{suggestionWithRoman}} provides surprise while maintaining common tones with expected tonic."
         },
         actions: {
             preview: true,
@@ -626,6 +626,101 @@ export const SUGGESTION_TYPES = {
             compare: true
         },
         cooldown: 180000
+    },
+
+    'resolve-sus4': {
+        type: COACH_ITEM_TYPES.SUGGESTION,
+        category: COACH_CATEGORIES.RESOLUTION,
+        id: 'resolve-sus4',
+        priority: 75,
+        emoji: '🎯',
+        title: 'Resolve the Suspension?',
+        message: {
+            simple: "That {{currentChord}} has tension! Try {{suggestionChord}} to let it resolve.",
+            intermediate: "Your {{currentChord}} suspends the 3rd - the 4th wants to fall down to create {{suggestionChord}}.",
+            advanced: "The suspended 4th in {{currentChord}} creates melodic tension. Resolve to {{suggestionChord}} for satisfying voice leading (4→3)."
+        },
+        actions: {
+            preview: true,
+            apply: true
+        },
+        cooldown: 60000
+    },
+
+    'resolve-sus2': {
+        type: COACH_ITEM_TYPES.SUGGESTION,
+        category: COACH_CATEGORIES.RESOLUTION,
+        id: 'resolve-sus2',
+        priority: 70,
+        emoji: '🎯',
+        title: 'Resolve the Suspension?',
+        message: {
+            simple: "That {{currentChord}} sounds open! Try {{suggestionChord}} to complete it.",
+            intermediate: "Your {{currentChord}} suspends the 3rd - the 2nd can rise up to create {{suggestionChord}}.",
+            advanced: "The suspended 2nd in {{currentChord}} creates an open sonority. Resolve to {{suggestionChord}} for traditional voice leading (2→3)."
+        },
+        actions: {
+            preview: true,
+            apply: true
+        },
+        cooldown: 60000
+    },
+
+    'resolve-diminished': {
+        type: COACH_ITEM_TYPES.SUGGESTION,
+        category: COACH_CATEGORIES.RESOLUTION,
+        id: 'resolve-diminished',
+        priority: 80,
+        emoji: '⚡',
+        title: 'Resolve the Tension?',
+        message: {
+            simple: "That {{currentChord}} is very tense! It wants to resolve to {{suggestionChord}}.",
+            intermediate: "Your {{currentChord}} contains a tritone that pulls strongly toward {{suggestionChord}}.",
+            advanced: "The diminished chord {{currentChord}} functions as a leading-tone chord, resolving up by half-step to {{suggestionChord}}."
+        },
+        actions: {
+            preview: true,
+            apply: true
+        },
+        cooldown: 60000
+    },
+
+    'resolve-augmented': {
+        type: COACH_ITEM_TYPES.SUGGESTION,
+        category: COACH_CATEGORIES.RESOLUTION,
+        id: 'resolve-augmented',
+        priority: 75,
+        emoji: '✨',
+        title: 'Resolve the Augmented?',
+        message: {
+            simple: "That {{currentChord}} sounds restless! Try moving to {{suggestionChord}}.",
+            intermediate: "Your {{currentChord}} has a raised 5th that wants to continue rising to {{suggestionChord}}.",
+            advanced: "The augmented 5th in {{currentChord}} creates chromatic tension, typically resolving up by half-step."
+        },
+        actions: {
+            preview: true,
+            apply: true
+        },
+        cooldown: 60000
+    },
+
+    'resolve-dominant7': {
+        type: COACH_ITEM_TYPES.SUGGESTION,
+        category: COACH_CATEGORIES.RESOLUTION,
+        id: 'resolve-dominant7',
+        priority: 78,
+        emoji: '🔥',
+        title: 'Resolve the Seventh?',
+        message: {
+            simple: "That {{currentChord}} has a lot of pull! It wants to go to {{suggestionChord}}.",
+            intermediate: "Your {{currentChord}} contains a tritone between the 3rd and 7th - it pulls strongly to {{suggestionChord}}.",
+            advanced: "The tritone in {{currentChord}} (between scale degrees 4 and 7) resolves inward to the root and 3rd of {{suggestionChord}}."
+        },
+        actions: {
+            preview: true,
+            apply: true
+        },
+        cooldown: 45000
     },
 
     // Rhythm Suggestions

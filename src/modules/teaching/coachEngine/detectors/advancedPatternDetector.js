@@ -429,16 +429,17 @@ export function detectParallelHarmony(context) {
                         emoji: '➡️',
                         title: 'Parallel Harmony',
                         message: {
-                            simple: `You're moving ${quality} chords in parallel - this creates a bold, modern sound!`,
-                            intermediate: `Parallel ${quality.toLowerCase()} chords (${chords.join(' → ')}) create a modal, non-functional sound used in pop, film, and impressionist music.`,
-                            advanced: `Parallel planing ignores traditional voice leading rules for a distinctive effect. This technique is common in Debussy, film scores, and contemporary pop.`
+                            simple: `You're moving ${quality} chords in parallel (${chords.join(' → ')}) - bold and modern! Note: this creates parallel fifths, which classical music avoids but pop/rock embraces.`,
+                            intermediate: `Parallel ${quality.toLowerCase()} chords (${chords.join(' → ')}) create a modal, non-functional sound. This intentionally creates parallel fifths - avoided in classical but common in pop, film, and impressionist music.`,
+                            advanced: `Parallel planing (${chords.join(' → ')}) ignores traditional voice leading rules (including parallel 5ths/8ves) for a distinctive effect. Common in Debussy, film scores, and contemporary pop.`
                         },
                         data: {
                             quality,
                             interval: intervalPattern,
                             startIndex: parallelStart,
                             length: parallelLength,
-                            chords
+                            chords,
+                            parallelHarmonyIndices: Array.from({length: parallelLength}, (_, j) => parallelStart + j)
                         },
                         actions: {
                             deepDive: true
@@ -464,16 +465,17 @@ export function detectParallelHarmony(context) {
                     emoji: '➡️',
                     title: 'Parallel Harmony',
                     message: {
-                        simple: `You're moving ${quality} chords in parallel - this creates a bold, modern sound!`,
-                        intermediate: `Parallel ${quality.toLowerCase()} chords (${chords.join(' → ')}) create a modal, non-functional sound used in pop, film, and impressionist music.`,
-                        advanced: `Parallel planing ignores traditional voice leading rules for a distinctive effect. This technique is common in Debussy, film scores, and contemporary pop.`
+                        simple: `You're moving ${quality} chords in parallel (${chords.join(' → ')}) - bold and modern! Note: this creates parallel fifths, which classical music avoids but pop/rock embraces.`,
+                        intermediate: `Parallel ${quality.toLowerCase()} chords (${chords.join(' → ')}) create a modal, non-functional sound. This intentionally creates parallel fifths - avoided in classical but common in pop, film, and impressionist music.`,
+                        advanced: `Parallel planing (${chords.join(' → ')}) ignores traditional voice leading rules (including parallel 5ths/8ves) for a distinctive effect. Common in Debussy, film scores, and contemporary pop.`
                     },
                     data: {
                         quality,
                         interval: intervalPattern,
                         startIndex: parallelStart,
                         length: parallelLength,
-                        chords
+                        chords,
+                        parallelHarmonyIndices: Array.from({length: parallelLength}, (_, j) => parallelStart + j)
                     },
                     actions: {
                         deepDive: true
@@ -500,19 +502,121 @@ export function detectParallelHarmony(context) {
             emoji: '➡️',
             title: 'Parallel Harmony',
             message: {
-                simple: `You're moving ${quality} chords in parallel - this creates a bold, modern sound!`,
-                intermediate: `Parallel ${quality.toLowerCase()} chords (${chords.join(' → ')}) create a modal, non-functional sound used in pop, film, and impressionist music.`,
-                advanced: `Parallel planing ignores traditional voice leading rules for a distinctive effect. This technique is common in Debussy, film scores, and contemporary pop.`
+                simple: `You're moving ${quality} chords in parallel (${chords.join(' → ')}) - bold and modern! Note: this creates parallel fifths, which classical music avoids but pop/rock embraces.`,
+                intermediate: `Parallel ${quality.toLowerCase()} chords (${chords.join(' → ')}) create a modal, non-functional sound. This intentionally creates parallel fifths - avoided in classical but common in pop, film, and impressionist music.`,
+                advanced: `Parallel planing (${chords.join(' → ')}) ignores traditional voice leading rules (including parallel 5ths/8ves) for a distinctive effect. Common in Debussy, film scores, and contemporary pop.`
             },
             data: {
                 quality,
                 interval: intervalPattern,
                 startIndex: parallelStart,
                 length: parallelLength,
-                chords
+                chords,
+                parallelHarmonyIndices: Array.from({length: parallelLength}, (_, j) => parallelStart + j)
             },
             actions: {
                 deepDive: true
+            }
+        });
+    }
+
+    return items;
+}
+
+// ============================================================================
+// TENSION CLIMAX DETECTION
+// ============================================================================
+
+/**
+ * Get tension score for a chord based on its function
+ * @param {Object} chord - Chord object
+ * @returns {number} Tension score (0-100)
+ */
+function getChordTension(chord) {
+    const roman = normalizeRoman(chord.roman || chord.romanNumeral);
+    const romanUpper = roman.toUpperCase();
+    const type = chord.type || '';
+
+    let tension = 30;  // Base tension for tonic function
+
+    // Dominant function = highest tension
+    if (romanUpper === 'V' || romanUpper === 'VII') {
+        tension = 80;
+    }
+    // Subdominant function = medium tension
+    else if (romanUpper === 'IV' || romanUpper === 'II') {
+        tension = 50;
+    }
+    // Chromatic/borrowed = elevated tension
+    else if (roman.includes('b') || roman.includes('#')) {
+        tension = 65;
+    }
+
+    // Seventh chords add tension
+    if (type.includes('7') || type.includes('7th')) {
+        tension += 10;
+    }
+
+    // Diminished/augmented add tension
+    if (type.includes('dim') || type.includes('Diminished') || type.includes('aug') || type.includes('Augmented')) {
+        tension += 15;
+    }
+
+    return Math.min(100, tension);
+}
+
+/**
+ * Detect tension climax (point of maximum tension in progression)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectTensionClimax(context) {
+    const { progression } = context;
+    const items = [];
+
+    if (!progression || progression.length < 4) {
+        return items;
+    }
+
+    // Calculate tension for each chord
+    const tensions = progression.map(chord => getChordTension(chord));
+
+    // Find the peak tension
+    let peakIndex = 0;
+    let peakTension = tensions[0];
+
+    for (let i = 1; i < tensions.length; i++) {
+        if (tensions[i] > peakTension) {
+            peakTension = tensions[i];
+            peakIndex = i;
+        }
+    }
+
+    // Only report if:
+    // 1. Peak tension is significantly high (>= 70)
+    // 2. Peak is not at the very beginning or end (interesting climax placement)
+    // 3. There's meaningful tension variance
+    const avgTension = tensions.reduce((a, b) => a + b, 0) / tensions.length;
+    const variance = tensions.reduce((sum, t) => sum + Math.pow(t - avgTension, 2), 0) / tensions.length;
+
+    const isInterestingClimax = peakTension >= 70 &&
+                                peakIndex > 0 &&
+                                peakIndex < tensions.length - 1 &&
+                                variance >= 100;  // Meaningful variance
+
+    if (isInterestingClimax) {
+        const peakChord = progression[peakIndex];
+        const chordSymbol = peakChord.root + (peakChord.type === 'Minor' ? 'm' : (peakChord.type === 'Diminished' ? '°' : ''));
+
+        items.push({
+            ...OBSERVATION_TYPES['tension-climax'],
+            data: {
+                peakIndex,
+                peakChord: chordSymbol,
+                peakTension,
+                avgTension: Math.round(avgTension),
+                position: `chord ${peakIndex + 1} of ${tensions.length}`,
+                tensions
             }
         });
     }
@@ -554,6 +658,12 @@ export function detectAdvancedPatterns(context) {
         items.push(...detectParallelHarmony(context));
     } catch (e) {
         console.warn('[AdvancedPatternDetector] Parallel harmony error:', e);
+    }
+
+    try {
+        items.push(...detectTensionClimax(context));
+    } catch (e) {
+        console.warn('[AdvancedPatternDetector] Tension climax error:', e);
     }
 
     return items;

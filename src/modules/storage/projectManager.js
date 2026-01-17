@@ -612,6 +612,13 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             callbacks.onMetadataUpdated(projectData.metadata);
         }
 
+        // 15. Trigger coach analysis after project load (with delay for everything to settle)
+        setTimeout(() => {
+            if (window.triggerCoachAnalysis) {
+                window.triggerCoachAnalysis();
+            }
+        }, 1000);
+
         console.log('[projectManager] Project applied successfully');
         return { success: true };
 

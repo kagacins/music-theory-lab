@@ -1,12 +1,32 @@
 /**
  * FullScreenNotationEditor.js - Full-Screen Notation Editing Mode
  *
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  IMPORTANT: MODAL MODE IS DEPRECATED - DO NOT DEVELOP ON IT  ⚠️          ║
+ * ║                                                                              ║
+ * ║  This file supports TWO modes:                                               ║
+ * ║    1. TAB MODE (isTabMode=true) - The "Composition Studio (New)" tab         ║
+ * ║       → This is the ONLY mode users can access                               ║
+ * ║       → ALL new development should target this mode                          ║
+ * ║       → Uses enterTabMode() and _generateTabModeHTML()                       ║
+ * ║                                                                              ║
+ * ║    2. MODAL MODE (isOpen=true) - DEPRECATED, NO USER ACCESS                  ║
+ * ║       → Users have NO way to open this modal                                 ║
+ * ║       → Do NOT add features to open(), close(), toggle() methods             ║
+ * ║       → Do NOT modify _generateModalHTML() or modal event handlers           ║
+ * ║       → This code is dead weight waiting for removal                         ║
+ * ║                                                                              ║
+ * ║  When adding UI elements (Coach, Colors, etc.), add them to:                 ║
+ * ║    → _generateTabModeHTML() method (around line 357)                         ║
+ * ║    → NOT to index.html Staff Notation Card (that's the classic interface)    ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
+ *
  * Provides a full-screen notation editing experience similar to traditional
  * music notation software, while preserving all unique Music Theory Lab features
  * (chord brackets, measure coloring, chord labels, isolated measure modal, etc.).
  *
  * Key features:
- * - Full-screen modal overlay with larger notation display
+ * - Tabbed full-screen interface (Composition Studio New tab)
  * - Collapsible left sidebar with vertical toolbar
  * - Zoom controls (−/+, fit-width, Ctrl+wheel)
  * - Continuous vertical scroll through all pages
@@ -15,8 +35,8 @@
  *
  * Architecture:
  * - Uses existing NotationComposer and PageManager infrastructure
- * - Clones/moves canvases into full-screen container
- * - Restores original layout when closing
+ * - Tab mode renders into #studio-new-tab container
+ * - Shared code between modes uses _getActiveContainer() for queries
  */
 
 import { getCompositionState } from '../../state/compositionState.js';
@@ -421,32 +441,9 @@ export class FullScreenNotationEditor {
                         </div>
                     </div>
 
-                    <!-- Right: Coach + Metronome + Zoom Controls -->
+                    <!-- Right: Metronome + Zoom Controls -->
                     <div class="flex items-center gap-2">
-                        <!-- Coach Engine Toggle -->
-                        <div class="flex items-center gap-1 px-2 py-1 bg-white/20 rounded-lg" title="Toggle Coach - Proactive tips & observations">
-                            <span class="text-xs font-medium" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Coach</span>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="fullscreen-coach-toggle-checkbox" class="sr-only peer" checked
-                                       onchange="window.toggleCoachEngine && window.toggleCoachEngine(this.checked)">
-                                <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer
-                                            peer-checked:after:translate-x-full peer-checked:after:border-white
-                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-                                            after:bg-white after:border-gray-300 after:border after:rounded-full
-                                            after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
-                            </label>
-                        </div>
-
-                        <!-- Analyze Button -->
-                        <button id="fullscreen-analyze-btn"
-                                onclick="window.triggerCoachAnalysis && window.triggerCoachAnalysis()"
-                                class="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 rounded-lg transition-colors"
-                                title="Analyze progression for insights">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #ffffff;">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                            </svg>
-                            <span class="text-xs font-medium" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Analyze</span>
-                        </button>
+                        <!-- Coach Toggle and Analyze Button HIDDEN: Coach is accessed via measure compass icons -->
 
                         <!-- Metronome Toggle -->
                         <button id="fullscreen-metronome-toggle"
@@ -1408,8 +1405,9 @@ export class FullScreenNotationEditor {
         }
         if (keyTimeBadge) {
             const key = settings.key || 'C';
-            // Detect if minor from key string (ends with lowercase 'm' like "Gm", "Am", "F#m")
-            const isMinor = key.endsWith('m') && key.length > 1 && key[key.length - 2] !== '#' && key[key.length - 2] !== 'b';
+            // Detect if minor from key string (ends with lowercase 'm' like "Gm", "Am", "F#m", "Gbm")
+            // Key ends with 'm' but not 'dim' (diminished)
+            const isMinor = key.endsWith('m') && key.length > 1 && !key.endsWith('dim');
             const keyDisplay = isMinor ? `${key.slice(0, -1)} Minor` : `${key} Major`;
             const ts = settings.timeSignature || { num: 4, denom: 4 };
             keyTimeBadge.textContent = `${keyDisplay} • ${ts.num}/${ts.denom}`;
@@ -4058,8 +4056,9 @@ export class FullScreenNotationEditor {
         const badge = container.querySelector('#fullscreen-key-time-badge');
         if (badge) {
             const key = compState?.metadata?.key || settings.key || 'C';
-            // Detect if minor from key string (ends with lowercase 'm' like "Gm", "Am", "F#m")
-            const isMinor = key.endsWith('m') && key.length > 1 && key[key.length - 2] !== '#' && key[key.length - 2] !== 'b';
+            // Detect if minor from key string (ends with lowercase 'm' like "Gm", "Am", "F#m", "Gbm")
+            // Key ends with 'm' but not 'dim' (diminished)
+            const isMinor = key.endsWith('m') && key.length > 1 && !key.endsWith('dim');
             const keyDisplay = isMinor ? `${key.slice(0, -1)} Minor` : `${key} Major`;
             // Time signature can be object or string
             let timeSig = '4/4';

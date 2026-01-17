@@ -945,6 +945,14 @@ export class CompositionState {
         };
 
         // ====================================================================
+        // COACH HIGHLIGHTS - Visual feedback from Coach Engine analysis
+        // ====================================================================
+        // When the coach detects issues or patterns, these indices can be set
+        // to highlight the corresponding chord regions in the notation.
+        this.coachHighlightIndices = [];    // Array of chord indices to highlight
+        this._coachHighlightTimeout = null; // Auto-clear timeout
+
+        // ====================================================================
         // SONG SECTIONS - Grouping chords into song structure
         // ====================================================================
         // Sections allow organizing chord cards into named groups like
@@ -4476,6 +4484,62 @@ export class CompositionState {
             totalBeats: block.beats,
             chordName: chord ? `${chord.root}${chord.type === 'Major' ? '' : chord.type}` : `Block ${blockIndex}`,
         };
+    }
+
+    // ========================================================================
+    // COACH HIGHLIGHT METHODS
+    // ========================================================================
+
+    /**
+     * Get the current coach highlight indices
+     * @returns {number[]} - Array of chord indices to highlight
+     */
+    getCoachHighlightIndices() {
+        return this.coachHighlightIndices || [];
+    }
+
+    /**
+     * Set chord indices to highlight for coach feedback
+     * @param {number[]} indices - Array of chord indices to highlight
+     * @param {number} duration - Auto-clear duration in ms (default: 5000, 0 = no auto-clear)
+     */
+    setCoachHighlightIndices(indices, duration = 5000) {
+        // Clear any existing timeout
+        if (this._coachHighlightTimeout) {
+            clearTimeout(this._coachHighlightTimeout);
+            this._coachHighlightTimeout = null;
+        }
+
+        // Validate indices
+        const maxIndex = (this.storedProgressionData?.length || 0) - 1;
+        const validIndices = (indices || []).filter(i =>
+            typeof i === 'number' && i >= 0 && i <= maxIndex
+        );
+
+        this.coachHighlightIndices = validIndices;
+        this.events.emit('coachHighlightChanged', validIndices);
+
+        // Auto-clear after duration
+        if (duration > 0 && validIndices.length > 0) {
+            this._coachHighlightTimeout = setTimeout(() => {
+                this.clearCoachHighlight();
+            }, duration);
+        }
+    }
+
+    /**
+     * Clear all coach highlights
+     */
+    clearCoachHighlight() {
+        if (this._coachHighlightTimeout) {
+            clearTimeout(this._coachHighlightTimeout);
+            this._coachHighlightTimeout = null;
+        }
+
+        if (this.coachHighlightIndices.length > 0) {
+            this.coachHighlightIndices = [];
+            this.events.emit('coachHighlightChanged', []);
+        }
     }
 
     /**

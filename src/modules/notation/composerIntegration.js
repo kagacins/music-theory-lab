@@ -182,6 +182,12 @@ export class NotationComposer {
     this.activeNotes = new Set();     // Note IDs for red highlighting during playback
     this.hoveredMeasureIndex = -1;    // Track hovered measure for edit icon overlay
     this.measureEditOverlay = null;   // DOM element for measure edit icon
+    this.coachIndicatorOverlay = null; // DOM element for coach insight icon
+    this.measureCoachItems = new Map(); // Map<measureIndex, Array<coachItem>>
+    this.chordCoachItems = new Map();   // Map<chordIndex, Array<coachItem>> for chord-based overlay
+    this.chordSymbolRegions = [];       // Position data for chord symbols above staff
+    this.chordLabelOverlayContainer = null; // DOM container for chord label overlays
+    this._chordBadgeUpdateTimer = null; // Debounce timer for badge placement
     this.lastMouseClientX = 0;        // Track last mouse position for scroll detection
     this.lastMouseClientY = 0;
     this.overlayPositionCheckInterval = null; // Interval to check if mouse moved away during scroll
@@ -1148,6 +1154,8 @@ export class NotationComposer {
         // Phase 2 Bass Block Isolation: active block highlighting
         activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
+        // Coach Engine highlights (for analysis feedback)
+        coachHighlightIndices: compositionState ? compositionState.getCoachHighlightIndices() : [],
         // Hairpins (crescendo/decrescendo)
         hairpins: compositionState ? compositionState.hairpins : [],
         // Slurs (phrase marks)
@@ -1185,6 +1193,25 @@ export class NotationComposer {
       this.chordBracketRegions = this.renderedSystem.chordBracketRegions;
     } else {
       this.chordBracketRegions = [];
+    }
+
+    // Store chord symbol regions for coach overlay positioning
+    // Use the LATEST rendered positions - always replace to avoid stale data
+    if (this.renderedSystem && this.renderedSystem.chordSymbolRegions) {
+      const newRegions = this.renderedSystem.chordSymbolRegions;
+      // Only update if regions actually changed (different count or different positions)
+      const regionsChanged = !this.chordSymbolRegions ||
+        this.chordSymbolRegions.length !== newRegions.length ||
+        newRegions.some((r, i) => {
+          const old = this.chordSymbolRegions[i];
+          return !old || r.x !== old.x || r.y !== old.y || r.chordIndex !== old.chordIndex;
+        });
+
+      if (regionsChanged) {
+        this.chordSymbolRegions = [...newRegions];
+        // Only schedule badge update if positions actually changed
+        this._scheduleChordBadgeUpdate();
+      }
     }
 
     // Apply harmonic coloring if enabled
@@ -1529,6 +1556,22 @@ export class NotationComposer {
       this.chordBracketRegions = [];
     }
 
+    // Update chord symbol regions for coach overlay - only if positions changed
+    if (this.renderedSystem && this.renderedSystem.chordSymbolRegions) {
+      const newRegions = this.renderedSystem.chordSymbolRegions;
+      const regionsChanged = !this.chordSymbolRegions ||
+        this.chordSymbolRegions.length !== newRegions.length ||
+        newRegions.some((r, i) => {
+          const old = this.chordSymbolRegions[i];
+          return !old || r.x !== old.x || r.y !== old.y || r.chordIndex !== old.chordIndex;
+        });
+
+      if (regionsChanged) {
+        this.chordSymbolRegions = [...newRegions];
+        this._scheduleChordBadgeUpdate();
+      }
+    }
+
     // SECTION VIEW: Draw ghost note after VexFlow rendering (same as performRender)
     if (this.noteEditor && this.noteEditor.ghostNote) {
       if (this.pageManager) {
@@ -1662,6 +1705,7 @@ export class NotationComposer {
     const allRenderedMeasures = [];
     const allNoteRegions = [];
     const allChordBracketRegions = [];
+    const allChordSymbolRegions = []; // For coach overlay positioning
 
     for (let pageIndex = 0; pageIndex * measuresPerPage < measures.length; pageIndex++) {
       const startMeasure = pageIndex * measuresPerPage;
@@ -1696,6 +1740,8 @@ export class NotationComposer {
         // Phase 2 Bass Block Isolation: active block highlighting
         activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
+        // Coach Engine highlights (for analysis feedback)
+        coachHighlightIndices: compositionState ? compositionState.getCoachHighlightIndices() : [],
         // Hairpins (crescendo/decrescendo)
         hairpins: compositionState ? compositionState.hairpins : [],
         // Slurs (phrase marks)
@@ -1745,6 +1791,16 @@ export class NotationComposer {
           });
         });
       }
+
+      // Collect chord symbol regions for coach overlay (adjust to global)
+      if (renderedPage && renderedPage.chordSymbolRegions) {
+        renderedPage.chordSymbolRegions.forEach(region => {
+          allChordSymbolRegions.push({
+            ...region,
+            pageIndex: pageIndex,
+          });
+        });
+      }
     }
 
     // Update PageManager layout to apply view mode (continuous/single/two-page)
@@ -1755,6 +1811,7 @@ export class NotationComposer {
       measures: allRenderedMeasures,
       noteRegions: allNoteRegions,
       chordBracketRegions: allChordBracketRegions,
+      chordSymbolRegions: allChordSymbolRegions,
     };
   }
 
@@ -1925,6 +1982,8 @@ export class NotationComposer {
       // Phase 2 Bass Block Isolation: active block highlighting
       activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
       chordSegments: compositionState ? compositionState.getChordSegments() : [],
+      // Coach Engine highlights (for analysis feedback)
+      coachHighlightIndices: compositionState ? compositionState.getCoachHighlightIndices() : [],
       // Hairpins (crescendo/decrescendo)
       hairpins: compositionState ? compositionState.hairpins : [],
       // Slurs (phrase marks)
@@ -1940,6 +1999,7 @@ export class NotationComposer {
     const allRenderedMeasures = [];
     const allNoteRegions = [];
     const allChordBracketRegions = [];
+    const allChordSymbolRegions = []; // For coach overlay positioning
 
     // Collect rendered measures (adjust indices back to global)
     if (renderedPage && renderedPage.measures) {
@@ -1979,6 +2039,16 @@ export class NotationComposer {
       });
     }
 
+    // Collect chord symbol regions for coach overlay
+    if (renderedPage && renderedPage.chordSymbolRegions) {
+      renderedPage.chordSymbolRegions.forEach(region => {
+        allChordSymbolRegions.push({
+          ...region,
+          pageIndex: currentPageIndex,
+        });
+      });
+    }
+
     // Update page navigator display
     if (this.pageNavigator) {
       this.pageNavigator.updateDisplay();
@@ -2008,6 +2078,7 @@ export class NotationComposer {
       measures: allRenderedMeasures,
       noteRegions: allNoteRegions,
       chordBracketRegions: allChordBracketRegions,
+      chordSymbolRegions: allChordSymbolRegions,
     };
   }
 
@@ -2020,6 +2091,7 @@ export class NotationComposer {
     const allRenderedMeasures = [];
     const allNoteRegions = [];
     const allChordBracketRegions = [];
+    const allChordSymbolRegions = []; // For coach overlay positioning
 
     // Get settings
     const compositionState = getCompositionState();
@@ -2120,6 +2192,15 @@ export class NotationComposer {
           }));
           allChordBracketRegions.push(...adjustedBrackets);
         }
+
+        // Accumulate chord symbol regions for coach overlay with page index
+        if (renderResult.chordSymbolRegions) {
+          const adjustedSymbols = renderResult.chordSymbolRegions.map(region => ({
+            ...region,
+            pageIndex: pageIndex,
+          }));
+          allChordSymbolRegions.push(...adjustedSymbols);
+        }
       }
     }
 
@@ -2133,6 +2214,7 @@ export class NotationComposer {
       measures: allRenderedMeasures,
       noteRegions: allNoteRegions,
       chordBracketRegions: allChordBracketRegions,
+      chordSymbolRegions: allChordSymbolRegions,
     };
   }
 
@@ -2918,6 +3000,9 @@ export class NotationComposer {
         const measureRight = rect.left + (measureBounds.x + measureBounds.width) * zoomFactor;
         const measureTop = rect.top + measureBounds.y * zoomFactor;
         this.showMeasureEditOverlay(measureRight - 5, measureTop + 5, globalMeasureIndex);
+
+        // NOTE: Measure-based coach indicator is disabled - now using chord-based overlays above staff
+        // The old measure compass icon is replaced by clickable badges on chord labels
       }
     } else {
       // Use delayed hide to allow mouse to reach the overlay
@@ -2944,7 +3029,7 @@ export class NotationComposer {
 
   /**
    * Schedule hiding the measure edit overlay with a delay
-   * This allows the user to move their mouse from the canvas to the overlay
+   * This allows the user to move their mouse from the canvas to the overlay or coach indicator
    */
   scheduleMeasureEditOverlayHide() {
     // Clear any existing hide timer
@@ -2953,7 +3038,8 @@ export class NotationComposer {
     }
     // Set a short delay before hiding
     this.measureEditHideTimer = setTimeout(() => {
-      if (!this.isMouseOverEditOverlay) {
+      // Don't hide if mouse is over either the edit overlay or coach indicator
+      if (!this.isMouseOverEditOverlay && !this.isMouseOverCoachIndicator) {
         this.hideMeasureEditOverlay();
       }
     }, 150);
@@ -3073,6 +3159,9 @@ export class NotationComposer {
     if (this.measureEditOverlay) {
       this.measureEditOverlay.style.display = 'none';
     }
+    // Also hide coach indicator
+    this.hideCoachIndicator();
+
     if (!preserveIndex) {
       this.hoveredMeasureIndex = -1;
     }
@@ -3088,7 +3177,8 @@ export class NotationComposer {
 
     // Check every 100ms if mouse is still over a measure
     this.overlayPositionCheckInterval = setInterval(() => {
-      if (this.isMouseOverEditOverlay) return; // Don't hide if mouse is on overlay
+      // Don't hide if mouse is on edit overlay or coach indicator
+      if (this.isMouseOverEditOverlay || this.isMouseOverCoachIndicator) return;
 
       // Get element at last known mouse position
       const elementAtPoint = document.elementFromPoint(this.lastMouseClientX, this.lastMouseClientY);
@@ -3116,6 +3206,792 @@ export class NotationComposer {
       clearInterval(this.overlayPositionCheckInterval);
       this.overlayPositionCheckInterval = null;
     }
+  }
+
+  // ============================================================================
+  // COACH INDICATOR OVERLAY
+  // ============================================================================
+
+  /**
+   * Update coach items for measures (called after analysis)
+   * @param {Array} coachItems - Array of coach items with chordIndices data
+   */
+  updateMeasureCoachItems(coachItems) {
+    this.measureCoachItems.clear();
+
+    if (!coachItems || coachItems.length === 0) return;
+
+    // Get chord segments to map chord indices to measures
+    const chordSegments = this.compositionState?.getChordSegments() || [];
+
+    // Get beats per measure for calculating measure index from startBeat
+    const timeSignature = this.compositionState?.getTimeSignature() || { num: 4, denom: 4 };
+    const beatsPerMeasure = timeSignature.num;
+
+    for (const item of coachItems) {
+      // Get chord indices from this item
+      // Priority: Use explicit chordIndex/chordIndices if provided
+      // Only fall back to startIndex/endIndex if no explicit indices given
+      let chordIndices = [];
+      if (item.data?.chordIndex !== undefined) {
+        chordIndices.push(item.data.chordIndex);
+      }
+      if (item.data?.chordIndices?.length > 0) {
+        chordIndices.push(...item.data.chordIndices);
+      }
+      // Only use startIndex/endIndex as fallback when no explicit indices provided
+      if (chordIndices.length === 0) {
+        if (item.data?.startIndex !== undefined) {
+          chordIndices.push(item.data.startIndex);
+        }
+        if (item.data?.endIndex !== undefined) {
+          chordIndices.push(item.data.endIndex);
+        }
+      }
+
+      // Map chord indices to measure indices
+      for (const chordIndex of chordIndices) {
+        const segment = chordSegments.find(s => s.chordIndex === chordIndex);
+        if (segment) {
+          // Calculate measure index from startBeat (segments have startBeat, not startMeasure)
+          const measureIndex = Math.floor(segment.startBeat / beatsPerMeasure);
+          if (!this.measureCoachItems.has(measureIndex)) {
+            this.measureCoachItems.set(measureIndex, []);
+          }
+          // Avoid duplicates
+          const existing = this.measureCoachItems.get(measureIndex);
+          if (!existing.some(i => i.id === item.id)) {
+            existing.push(item);
+          }
+        }
+      }
+    }
+
+    console.log('[NotationComposer] Updated measure coach items:', this.measureCoachItems.size, 'measures affected');
+
+    // Also build chord-based mapping for chord label overlays
+    this.chordCoachItems.clear();
+    for (const item of coachItems) {
+      // Get all chord indices this item relates to
+      // Priority: Use explicit chordIndex/chordIndices if provided
+      // Only fall back to startIndex/endIndex if no explicit indices given
+      let chordIndices = [];
+      if (item.data?.chordIndex !== undefined) {
+        chordIndices.push(item.data.chordIndex);
+      }
+      if (item.data?.chordIndices?.length > 0) {
+        chordIndices.push(...item.data.chordIndices);
+      }
+      // Only use startIndex/endIndex as fallback when no explicit indices provided
+      if (chordIndices.length === 0) {
+        if (item.data?.startIndex !== undefined) {
+          chordIndices.push(item.data.startIndex);
+        }
+        if (item.data?.endIndex !== undefined) {
+          chordIndices.push(item.data.endIndex);
+        }
+      }
+
+      // Add item to each chord's list
+      for (const chordIndex of chordIndices) {
+        if (!this.chordCoachItems.has(chordIndex)) {
+          this.chordCoachItems.set(chordIndex, []);
+        }
+        const existing = this.chordCoachItems.get(chordIndex);
+        if (!existing.some(i => i.id === item.id)) {
+          existing.push(item);
+        }
+      }
+    }
+
+    // NOTE: updateChordLabelOverlays is NOT called here - the caller (_scheduleChordBadgeUpdate)
+    // will call it after coach analysis completes, avoiding duplicate calls
+  }
+
+  /**
+   * Create the coach indicator overlay icon (lazy initialization)
+   */
+  createCoachIndicatorOverlay() {
+    if (this.coachIndicatorOverlay) return this.coachIndicatorOverlay;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'coach-indicator-overlay';
+    overlay.className = 'coach-indicator-overlay';
+    // Badge is OUTSIDE the button so it won't be clipped by button's border-radius
+    overlay.innerHTML = `
+      <button class="coach-indicator-btn" title="Coach insights for this measure">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      </button>
+      <span class="coach-badge">0</span>
+    `;
+    overlay.style.cssText = `
+      position: fixed;
+      z-index: 1001;
+      pointer-events: auto;
+      display: none;
+    `;
+
+    // Track when mouse is over the coach indicator to prevent hiding (same pattern as edit overlay)
+    overlay.addEventListener('mouseenter', () => {
+      this.isMouseOverCoachIndicator = true;
+      if (this.measureEditHideTimer) {
+        clearTimeout(this.measureEditHideTimer);
+        this.measureEditHideTimer = null;
+      }
+    });
+    overlay.addEventListener('mouseleave', () => {
+      this.isMouseOverCoachIndicator = false;
+      this.scheduleMeasureEditOverlayHide();
+    });
+
+    // Style the button
+    const btn = overlay.querySelector('.coach-indicator-btn');
+    btn.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: pointer;
+      color: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: transform 0.15s, box-shadow 0.15s;
+    `;
+
+    // Style the badge - positioned at bottom-right, OUTSIDE button to avoid clipping
+    const badge = overlay.querySelector('.coach-badge');
+    badge.style.cssText = `
+      position: absolute;
+      bottom: -2px;
+      right: -4px;
+      min-width: 16px;
+      height: 16px;
+      background: #ef4444;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: bold;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      border: 2px solid white;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      z-index: 1;
+      pointer-events: none;
+    `;
+
+    btn.addEventListener('mouseenter', () => {
+      btn.style.transform = 'scale(1.15)';
+      btn.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.5)';
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.transform = 'scale(1)';
+      btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    });
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const measureIndex = this.hoveredMeasureIndex;
+      const items = this.measureCoachItems.get(measureIndex) || [];
+      console.log('[CoachIndicator] Click - measureIndex:', measureIndex, 'items:', items.length);
+
+      if (items.length > 0) {
+        // Show coach popup near the indicator
+        this.showCoachPopupForMeasure(measureIndex, items, e.clientX, e.clientY);
+      }
+    });
+
+    document.body.appendChild(overlay);
+    this.coachIndicatorOverlay = overlay;
+    return overlay;
+  }
+
+  /**
+   * Show coach indicator at measure position
+   * @param {number} x - X position (client coordinates)
+   * @param {number} y - Y position (client coordinates)
+   * @param {number} measureIndex - Measure index
+   */
+  showCoachIndicator(x, y, measureIndex) {
+    const items = this.measureCoachItems.get(measureIndex);
+    if (!items || items.length === 0) return;
+
+    const overlay = this.createCoachIndicatorOverlay();
+
+    // Update badge count
+    const badge = overlay.querySelector('.coach-badge');
+    badge.textContent = items.length;
+    badge.style.display = items.length > 1 ? 'flex' : 'none';
+
+    // Position to the LEFT of the edit icon (edit icon is at x-14, y-14)
+    // Edit icon is 28px wide (24px + 4px padding), so coach icon goes 32px left of edit icon position
+    overlay.style.left = `${x - 46}px`;  // 32px to the left of edit icon
+    overlay.style.top = `${y - 12}px`;   // Slightly lower than edit icon (2px down)
+    overlay.style.display = 'block';
+  }
+
+  /**
+   * Hide the coach indicator overlay
+   */
+  hideCoachIndicator() {
+    if (this.coachIndicatorOverlay) {
+      this.coachIndicatorOverlay.style.display = 'none';
+    }
+  }
+
+  /**
+   * Show coach popup for measure with multiple items
+   * @param {number} measureIndex - Measure index
+   * @param {Array} items - Coach items for this measure
+   * @param {number} x - Click X position
+   * @param {number} y - Click Y position
+   */
+  showCoachPopupForMeasure(measureIndex, items, x, y) {
+    // Remove any existing popup
+    const existingPopup = document.getElementById('coach-measure-popup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'coach-measure-popup';
+
+    // Calculate popup dimensions for positioning
+    const popupWidth = 300;  // Approximate width
+    const popupHeight = Math.min(350, 60 + items.length * 80);  // Approximate height
+    const margin = 10;
+
+    // Get viewport dimensions
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Calculate best position - prefer to the RIGHT of click point
+    let popupX = x + margin;  // Default: to the right of click
+    let popupY = y;  // Same vertical position
+
+    // If goes off right edge, flip to the left of click instead
+    if (popupX + popupWidth > viewportWidth - margin) {
+      popupX = x - popupWidth - margin;
+    }
+
+    // If still goes off left edge, clamp to left edge
+    if (popupX < margin) {
+      popupX = margin;
+    }
+
+    // If goes off bottom, move up
+    if (popupY + popupHeight > viewportHeight - margin) {
+      popupY = viewportHeight - popupHeight - margin;
+    }
+
+    // Final clamp to ensure it's visible
+    popupX = Math.max(margin, popupX);
+    popupY = Math.max(margin, popupY);
+
+    popup.style.cssText = `
+      position: fixed;
+      left: ${popupX}px;
+      top: ${popupY}px;
+      z-index: 2147483647;
+      pointer-events: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      border: 1px solid #e5e7eb;
+      max-width: 320px;
+      min-width: 260px;
+      overflow: hidden;
+    `;
+
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    `;
+    header.innerHTML = `
+      <span>💡 Insights for Measure ${measureIndex + 1}</span>
+      <button id="coach-popup-close" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; line-height: 1;">&times;</button>
+    `;
+    popup.appendChild(header);
+
+    // Items list
+    const list = document.createElement('div');
+    list.style.cssText = `
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 8px;
+    `;
+
+    items.forEach((item, idx) => {
+      const itemEl = document.createElement('div');
+      itemEl.style.cssText = `
+        padding: 10px 12px;
+        margin-bottom: 6px;
+        background: #f9fafb;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 1px solid #e5e7eb;
+        transition: all 0.15s;
+      `;
+      itemEl.addEventListener('mouseenter', () => {
+        itemEl.style.background = '#fef3c7';
+        itemEl.style.borderColor = '#f59e0b';
+      });
+      itemEl.addEventListener('mouseleave', () => {
+        itemEl.style.background = '#f9fafb';
+        itemEl.style.borderColor = '#e5e7eb';
+      });
+
+      const emoji = item.emoji || (item.type === 'observation' ? '👀' : item.type === 'suggestion' ? '💡' : '🎯');
+      const title = item.title || item.id;
+
+      // Get the raw message template
+      let rawMessage = typeof item.message === 'object'
+        ? (item.message.simple || item.message.intermediate || Object.values(item.message)[0])
+        : (item.message || '');
+
+      // Interpolate template variables with actual data values
+      const message = rawMessage.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        return item.data && item.data[key] !== undefined ? item.data[key] : match;
+      });
+
+      itemEl.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 8px;">
+          <span style="font-size: 16px;">${emoji}</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 12px; color: #374151; margin-bottom: 2px;">${title}</div>
+            <div style="font-size: 11px; color: #6b7280; line-height: 1.4; word-wrap: break-word;">${message}</div>
+          </div>
+        </div>
+      `;
+
+      itemEl.addEventListener('click', () => {
+        // Get popup position to place nudge nearby
+        const popupRect = popup.getBoundingClientRect();
+        const nudgeWidth = 350;  // Approximate nudge width
+        const margin = 10;
+        const viewportWidth = window.innerWidth;
+
+        // Calculate nudge position - prefer right of popup, but flip to left if needed
+        let nudgeX = popupRect.right + margin;
+        let nudgeY = popupRect.top;
+
+        // If nudge would go off right edge, position to left of popup instead
+        if (nudgeX + nudgeWidth > viewportWidth - margin) {
+          nudgeX = popupRect.left - nudgeWidth - margin;
+        }
+
+        // If still off screen (left edge), clamp to left edge
+        if (nudgeX < margin) {
+          nudgeX = margin;
+        }
+
+        const nudgePosition = { x: nudgeX, y: nudgeY };
+
+        // Show the full nudge for this item, positioned intelligently
+        // Pass keepSummaryOpen: true to use fade animation and stay open
+        if (window.showCoachNudge) {
+          window.showCoachNudge(item, nudgePosition, { keepSummaryOpen: true });
+        }
+        // Don't close the summary popup - let user close it manually
+      });
+
+      list.appendChild(itemEl);
+    });
+
+    popup.appendChild(list);
+    document.body.appendChild(popup);
+
+    // Close button handler
+    popup.querySelector('#coach-popup-close').addEventListener('click', () => {
+      popup.remove();
+    });
+
+    // Close on outside click
+    const closeOnOutsideClick = (e) => {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('click', closeOnOutsideClick);
+    }, 100);
+  }
+
+  // ============================================================================
+  // CHORD LABEL OVERLAY (Above-measure chord symbols with coach badges)
+  // ============================================================================
+
+  /**
+   * Schedule chord badge update with debouncing
+   * This ensures badges are only placed ONCE after all rendering settles,
+   * avoiding stale position issues from multiple render passes
+   */
+  _scheduleChordBadgeUpdate() {
+    // Prevent re-entry during badge update cycle
+    if (this._isUpdatingBadges) {
+      return;
+    }
+
+    // Clear any pending update
+    if (this._chordBadgeUpdateTimer) {
+      clearTimeout(this._chordBadgeUpdateTimer);
+    }
+
+    // Schedule update after a short delay to let rendering settle
+    this._chordBadgeUpdateTimer = setTimeout(() => {
+      this._isUpdatingBadges = true;
+      try {
+        // ALWAYS re-run coach analysis when chords change
+        // This ensures badge counts update when chords are added/removed/reordered
+        if (window.triggerCoachAnalysis) {
+          // Clear existing items to force fresh analysis
+          this.chordCoachItems.clear();
+          window.triggerCoachAnalysis();
+        }
+
+        // Now place the badges with final positions
+        this.updateChordLabelOverlays();
+      } finally {
+        // Allow next update after a short delay
+        setTimeout(() => {
+          this._isUpdatingBadges = false;
+        }, 200);
+      }
+    }, 100); // 100ms debounce - enough for multiple render passes to complete
+  }
+
+  /**
+   * Update chord label overlays positioned above chord symbols
+   * Shows clickable badges with coach item counts
+   */
+  updateChordLabelOverlays() {
+    // Get the canvas/container element for positioning
+    // For multi-page mode, use the page manager's container
+    let container = this.config?.container;
+    if (this.pageManager && this.pageManager.container) {
+      container = this.pageManager.container;
+    }
+    if (!container) {
+      return;
+    }
+
+    // CRITICAL: Remove ALL old overlay containers AND individual badge overlays from the entire document
+    // This ensures we don't have orphaned overlays from previous containers or fullscreen mode
+    document.querySelectorAll('#chord-label-overlay-container').forEach(el => el.remove());
+    document.querySelectorAll('.chord-label-overlay').forEach(el => el.remove());
+    document.querySelectorAll('.chord-coach-badge').forEach(el => el.remove());
+
+    // Create fresh overlay container in the current container
+    this.chordLabelOverlayContainer = document.createElement('div');
+    this.chordLabelOverlayContainer.id = 'chord-label-overlay-container';
+    this.chordLabelOverlayContainer.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    `;
+    // Position relative to container
+    container.style.position = 'relative';
+    container.appendChild(this.chordLabelOverlayContainer);
+
+    // If no chord symbol regions, nothing to show
+    if (!this.chordSymbolRegions || this.chordSymbolRegions.length === 0) {
+      return;
+    }
+
+    // Get zoom factor for positioning
+    const zoomFactor = this.config?.zoomLevel || 1;
+
+    // Get container rect for positioning calculations
+    const containerRect = container.getBoundingClientRect();
+
+    // Create a badge for each chord symbol that has coach items
+    for (const region of this.chordSymbolRegions) {
+      const chordIndex = region.chordIndex;
+      const items = this.chordCoachItems.get(chordIndex) || [];
+      const itemCount = items.length;
+
+      // For multi-page mode, find the canvas for this region's page
+      let canvasOffsetX = 0;
+      let canvasOffsetY = 0;
+
+      // Try pageManager first (multi-page mode)
+      if (this.pageManager && region.pageIndex !== undefined) {
+        const page = this.pageManager.getPage(region.pageIndex);
+        if (page && page.canvas) {
+          const canvasRect = page.canvas.getBoundingClientRect();
+          canvasOffsetX = canvasRect.left - containerRect.left;
+          canvasOffsetY = canvasRect.top - containerRect.top;
+        }
+      } else if (this.pageManager && region.pageIndex === undefined) {
+        // pageManager exists but region doesn't have pageIndex - try to get first page canvas
+        const page = this.pageManager.getPage(0);
+        if (page && page.canvas) {
+          const canvasRect = page.canvas.getBoundingClientRect();
+          canvasOffsetX = canvasRect.left - containerRect.left;
+          canvasOffsetY = canvasRect.top - containerRect.top;
+        }
+      } else if (!this.pageManager && this.config?.container) {
+        // Legacy single-canvas mode - use config.container directly
+        const canvas = this.config.container;
+        if (canvas) {
+          const canvasRect = canvas.getBoundingClientRect();
+          canvasOffsetX = canvasRect.left - containerRect.left;
+          canvasOffsetY = canvasRect.top - containerRect.top;
+        }
+      }
+
+      // Create clickable overlay element
+      const overlay = document.createElement('div');
+      overlay.className = 'chord-label-overlay';
+      overlay.dataset.chordIndex = chordIndex;
+
+      // Position the badge just below the chord label, centered horizontally
+      // region.x and region.y are canvas coordinates for where the chord text was drawn
+      // region.y is the text baseline, so +2 puts badge just below the text
+      const labelWidth = region.width || (region.chordSymbol?.length || 1) * 8; // Estimate if not provided
+      const badgeX = canvasOffsetX + ((region.x + labelWidth / 2) * zoomFactor) - 8; // Centered under label
+      const badgeY = canvasOffsetY + ((region.y + 2) * zoomFactor); // Just below chord label (2px below baseline)
+
+      overlay.style.cssText = `
+        position: absolute;
+        left: ${badgeX}px;
+        top: ${badgeY}px;
+        pointer-events: auto;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 6px;
+        background: ${itemCount > 0 ? 'rgba(245, 158, 11, 0.15)' : 'transparent'};
+        border-radius: 8px;
+        transition: background 0.15s;
+      `;
+
+      // Badge with count (always show, even if count is 0 - but style differently)
+      const badge = document.createElement('span');
+      badge.className = 'chord-coach-badge';
+      badge.textContent = itemCount > 0 ? itemCount : '';
+      badge.style.cssText = `
+        display: ${itemCount > 0 ? 'flex' : 'none'};
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border-radius: 8px;
+        font-size: 10px;
+        font-weight: bold;
+        color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      `;
+      overlay.appendChild(badge);
+
+      // Hover effect
+      overlay.addEventListener('mouseenter', () => {
+        if (itemCount > 0) {
+          overlay.style.background = 'rgba(245, 158, 11, 0.3)';
+        }
+      });
+      overlay.addEventListener('mouseleave', () => {
+        overlay.style.background = itemCount > 0 ? 'rgba(245, 158, 11, 0.15)' : 'transparent';
+      });
+
+      // Click handler - show coach popup for this chord
+      overlay.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (itemCount > 0) {
+          this.showCoachPopupForChord(chordIndex, items, e.clientX, e.clientY);
+        }
+      });
+
+      this.chordLabelOverlayContainer.appendChild(overlay);
+    }
+  }
+
+  /**
+   * Show coach popup for a specific chord
+   * @param {number} chordIndex - Chord index
+   * @param {Array} items - Coach items for this chord
+   * @param {number} x - Click X position
+   * @param {number} y - Click Y position
+   */
+  showCoachPopupForChord(chordIndex, items, x, y) {
+    // Remove any existing popup
+    const existingPopup = document.getElementById('coach-measure-popup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'coach-measure-popup';
+
+    // Calculate popup dimensions for positioning
+    const popupWidth = 300;
+    const popupHeight = Math.min(350, 60 + items.length * 80);
+    const margin = 10;
+
+    // Get viewport dimensions
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Calculate best position - prefer to the RIGHT of click point
+    let popupX = x + margin;
+    let popupY = y;
+
+    // If goes off right edge, flip to the left
+    if (popupX + popupWidth > viewportWidth - margin) {
+      popupX = x - popupWidth - margin;
+    }
+
+    // Clamp positions
+    popupX = Math.max(margin, popupX);
+    popupY = Math.max(margin, Math.min(popupY, viewportHeight - popupHeight - margin));
+
+    popup.style.cssText = `
+      position: fixed;
+      left: ${popupX}px;
+      top: ${popupY}px;
+      z-index: 2147483647;
+      pointer-events: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      border: 1px solid #e5e7eb;
+      max-width: 360px;
+      min-width: 280px;
+      overflow: hidden;
+    `;
+
+    // Header - show chord number
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    `;
+    header.innerHTML = `
+      <span>💡 Insights for Chord ${chordIndex + 1}</span>
+      <button id="coach-popup-close" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; line-height: 1;">&times;</button>
+    `;
+    popup.appendChild(header);
+
+    // Items list
+    const list = document.createElement('div');
+    list.style.cssText = `
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 8px;
+    `;
+
+    items.forEach((item) => {
+      const itemEl = document.createElement('div');
+      itemEl.style.cssText = `
+        padding: 10px 12px;
+        margin-bottom: 6px;
+        background: #f9fafb;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 1px solid #e5e7eb;
+        transition: all 0.15s;
+      `;
+      itemEl.addEventListener('mouseenter', () => {
+        itemEl.style.background = '#fef3c7';
+        itemEl.style.borderColor = '#f59e0b';
+      });
+      itemEl.addEventListener('mouseleave', () => {
+        itemEl.style.background = '#f9fafb';
+        itemEl.style.borderColor = '#e5e7eb';
+      });
+
+      const emoji = item.emoji || (item.type === 'observation' ? '👀' : item.type === 'suggestion' ? '💡' : '🎯');
+      const title = item.title || item.id;
+
+      // Get the raw message template
+      let rawMessage = typeof item.message === 'object'
+        ? (item.message.simple || item.message.intermediate || Object.values(item.message)[0])
+        : (item.message || '');
+
+      // Interpolate template variables with actual data values
+      const message = rawMessage.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        return item.data && item.data[key] !== undefined ? item.data[key] : match;
+      });
+
+      itemEl.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 10px;">
+          <span style="font-size: 20px;">${emoji}</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 14px; color: #374151; margin-bottom: 3px;">${title}</div>
+            <div style="font-size: 13px; color: #6b7280; line-height: 1.5; word-wrap: break-word;">${message}</div>
+          </div>
+        </div>
+      `;
+
+      itemEl.addEventListener('click', () => {
+        const popupRect = popup.getBoundingClientRect();
+        const nudgeWidth = 350;
+        const margin = 10;
+
+        let nudgeX = popupRect.right + margin;
+        let nudgeY = popupRect.top;
+
+        if (nudgeX + nudgeWidth > viewportWidth - margin) {
+          nudgeX = popupRect.left - nudgeWidth - margin;
+        }
+        if (nudgeX < margin) {
+          nudgeX = margin;
+        }
+
+        // Show the full nudge for this item, positioned intelligently
+        // Pass keepSummaryOpen: true to use fade animation and stay open
+        if (window.showCoachNudge) {
+          window.showCoachNudge(item, { x: nudgeX, y: nudgeY }, { keepSummaryOpen: true });
+        }
+        // Don't close the summary popup - let user close it manually
+      });
+
+      list.appendChild(itemEl);
+    });
+
+    popup.appendChild(list);
+    document.body.appendChild(popup);
+
+    // Close button handler
+    popup.querySelector('#coach-popup-close').addEventListener('click', () => {
+      popup.remove();
+    });
+
+    // Close on outside click
+    const closeOnOutsideClick = (e) => {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('click', closeOnOutsideClick);
+    }, 100);
   }
 
   /**

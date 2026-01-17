@@ -44,7 +44,8 @@ export {
     generateVoiceLeadingSuggestions,
     suggestInversions,
     detectParallelMotion,
-    detectVoiceCrossing
+    detectVoiceCrossing,
+    detectSmoothVoiceLeading
 } from './voiceLeadingSuggestions.js';
 
 export {
@@ -52,5 +53,6 @@ export {
     suggestBorrowedChords,
     suggestSecondaryDominants,
     suggestSevenths,
-    suggestResolutions
+    suggestResolutions,
+    suggestHarmonicRhythmVariation
 } from './harmonicSuggestions.js';

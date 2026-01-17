@@ -3374,6 +3374,9 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
 
   // Draw chord symbols for all chords that start in this measure
   // Uses chordStartsInfo array to support multiple chords per measure (e.g., 1.25 beat chord + next chord)
+  // Also captures exact rendered positions for coach badge overlays
+  const renderedChordLabelPositions = [];
+
   if (isBlockStart && chordStartsInfo.length > 0) {
     // Position chord symbols immediately above treble staff top line
     const chordY = trebleY + 20;
@@ -3390,13 +3393,15 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       context.setFont('Times New Roman, serif', 14, 'normal');
       context.setFillStyle('#000000'); // Black (standard for chord symbols)
 
-      // Draw each chord symbol at its beat position
-      chordStartsInfo.forEach(({ beatOffset, chordSymbol }) => {
+      // Draw each chord symbol at its beat position and capture position
+      chordStartsInfo.forEach(({ beatOffset, chordSymbol, segmentIndex }) => {
         if (chordSymbol) {
           let chordX;
+          let xSource = 'unknown';
           // Try to find exact note position for this beat
           if (measureBeatToNoteX.has(beatOffset)) {
             chordX = measureBeatToNoteX.get(beatOffset);
+            xSource = 'exact-beat';
           } else {
             // Fallback: find closest beat position or use linear calculation
             let closestBeat = null;
@@ -3410,13 +3415,27 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
             }
             if (closestBeat !== null) {
               chordX = measureBeatToNoteX.get(closestBeat);
+              xSource = `closest-beat(${closestBeat})`;
             } else {
               // Final fallback: linear interpolation
               const beatFraction = beatOffset / beatsPerMeasureForPosition;
               chordX = noteStartX + (noteAreaWidth * beatFraction) + 7;
+              xSource = `linear(noteStartX=${noteStartX}, beatFrac=${beatFraction.toFixed(2)})`;
             }
           }
+          console.log(`[grandStaff] Drawing chord "${chordSymbol}" (segment ${segmentIndex}) at x=${Math.round(chordX)}, y=${Math.round(chordY)}, beatOffset=${beatOffset}, source=${xSource}`);
           context.fillText(chordSymbol, chordX, chordY);
+
+          // Capture the exact rendered position for coach badge overlays
+          const textWidth = chordSymbol.length * 8; // Approximate width
+          renderedChordLabelPositions.push({
+            chordIndex: segmentIndex,
+            chordSymbol,
+            x: chordX,
+            y: chordY,
+            width: textWidth,
+            height: 18
+          });
         }
       });
 
@@ -3530,6 +3549,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     noteRegions,
     hasMultipleVoicesInMeasure, // Flag indicating if multi-voice is active
     beatToNoteX: measureBeatToNoteX, // Map of beat positions to actual VexFlow X positions for this measure
+    renderedChordLabelPositions, // Exact positions where chord labels were drawn (for coach badge overlays)
   };
 }
 
@@ -3905,6 +3925,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     // Phase 2 Bass Block Isolation: active block highlighting
     activeBassBlockIndex = -1,   // Index of the active bass block for highlighting (-1 = none)
     chordSegments = [],          // Array of chord segments for block boundary visualization
+    // Coach Engine highlights (for analysis feedback)
+    coachHighlightIndices = [],  // Array of chord indices to highlight with amber/yellow for coach feedback
     // Hairpins (crescendo/decrescendo)
     hairpins = [],               // Array of hairpin objects from compositionState
     // Slurs (curved lines for phrasing)
@@ -3941,6 +3963,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
 
   // Collection for chord bracket click regions
   const chordBracketRegions = [];
+
+  // Collection for chord symbol positions (above staff) for coach badge overlay
+  const chordSymbolRegions = [];
 
   // Array to hold rendered measure data including beat-to-X position maps
   // This will be populated during measure rendering and used for accurate bracket/coloring positioning
@@ -4800,6 +4825,114 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // Draw the active bass block highlight
   drawActiveBassBlockHighlight();
 
+  // ========================================================================
+  // Draw coach highlights (for analysis feedback from Coach Engine)
+  // ========================================================================
+  function drawCoachHighlights() {
+    if (!coachHighlightIndices || coachHighlightIndices.length === 0 || !chordSegments || chordSegments.length === 0) {
+      return;
+    }
+
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+    const highlightColor = 'rgba(251, 191, 36, 0.25)'; // Amber/yellow with transparency
+    const borderColor = 'rgba(251, 191, 36, 0.8)';     // Stronger amber for border
+
+    for (const chordIndex of coachHighlightIndices) {
+      const segment = chordSegments.find(s => s.chordIndex === chordIndex);
+      if (!segment) continue;
+
+      const startBeat = segment.startBeat;
+      const endBeat = startBeat + segment.durationBeats;
+
+      // Convert global beat positions to global measure indices
+      const globalStartMeasure = Math.floor(startBeat / beatsPerMeasure);
+      const globalEndMeasure = Math.floor(endBeat / beatsPerMeasure);
+
+      // Convert to local measure indices for this page
+      const localStartMeasure = globalStartMeasure - globalMeasureOffset;
+      const localEndMeasure = globalEndMeasure - globalMeasureOffset;
+
+      // Skip if this block is entirely outside this page's measures
+      if (localEndMeasure < 0 || localStartMeasure >= measures.length) {
+        continue;
+      }
+
+      // Clamp to this page's measure range
+      const startMeasure = Math.max(0, localStartMeasure);
+      const endMeasure = Math.min(measures.length - 1, localEndMeasure);
+
+      // Calculate beat positions within measures
+      const startBeatInMeasure = localStartMeasure < 0 ? 0 : (startBeat % beatsPerMeasure);
+      const endBeatInMeasure = localEndMeasure >= measures.length ? beatsPerMeasure : (endBeat % beatsPerMeasure);
+
+      // Draw the highlight across BOTH staves (treble and bass)
+      for (let m = startMeasure; m <= endMeasure; m++) {
+        if (m >= measures.length) break;
+
+        const systemIndex = Math.floor(m / measuresPerLine);
+        const measureInSystem = m % measuresPerLine;
+        const isFirstInSystem = measureInSystem === 0;
+
+        const measureX = dimensions.braceWidth + (measureInSystem * measureWidth) +
+          (isFirstInSystem ? 0 : dimensions.firstMeasureExtra);
+        const fullWidth = isFirstInSystem
+          ? measureWidth + dimensions.firstMeasureExtra
+          : measureWidth;
+
+        // Calculate Y position to span BOTH staves
+        const trebleY = dimensions.trebleY + (systemIndex * dimensions.systemHeight);
+        const bassY = trebleY + 80 + staffSpacing;
+        const totalHeight = (bassY + 80) - trebleY; // From top of treble to bottom of bass
+
+        // Calculate horizontal position and width within this measure
+        let x, w;
+
+        if (m === startMeasure && m === endMeasure) {
+          const startFraction = startBeatInMeasure / beatsPerMeasure;
+          const endFraction = endBeatInMeasure / beatsPerMeasure;
+          x = measureX + (fullWidth * startFraction);
+          w = fullWidth * (endFraction - startFraction);
+        } else if (m === startMeasure) {
+          const startFraction = startBeatInMeasure / beatsPerMeasure;
+          x = measureX + (fullWidth * startFraction);
+          w = fullWidth * (1 - startFraction);
+        } else if (m === endMeasure) {
+          const endFraction = endBeatInMeasure === 0 ? 0 : endBeatInMeasure / beatsPerMeasure;
+          if (isFirstInSystem) {
+            x = measureX + dimensions.firstMeasureExtra;
+            w = measureWidth * endFraction;
+          } else {
+            x = measureX;
+            w = fullWidth * endFraction;
+          }
+        } else {
+          x = measureX;
+          w = fullWidth;
+        }
+
+        // Draw the highlight
+        if (context.svg) {
+          // Background fill
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', x);
+          rect.setAttribute('y', trebleY - 10); // Extend slightly above treble staff
+          rect.setAttribute('width', w);
+          rect.setAttribute('height', totalHeight + 20); // Extend slightly below bass staff
+          rect.setAttribute('fill', highlightColor);
+          rect.setAttribute('stroke', borderColor);
+          rect.setAttribute('stroke-width', '2');
+          rect.setAttribute('rx', '4'); // Rounded corners
+          rect.setAttribute('class', 'coach-highlight-region');
+          // Insert at the beginning so it's behind notes
+          context.svg.insertBefore(rect, context.svg.firstChild);
+        }
+      }
+    }
+  }
+
+  // Draw coach highlights if any
+  drawCoachHighlights();
+
   // NOTE: Chord span shading and brackets are drawn AFTER measure rendering (see below)
   // This allows us to use actual VexFlow note positions for accurate alignment
 
@@ -4818,6 +4951,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     const compositionState = window.getCompositionState();
     const segments = compositionState?.getChordSegments?.() || [];
 
+    console.log('[grandStaff] Processing', segments.length, 'segments for chord labels, beatsPerMeasure:', beatsPerMeasureForSymbols);
     segments.forEach((segment, segmentIndex) => {
       // Calculate the measure index where this building block starts
       const startMeasure = Math.floor(segment.startBeat / beatsPerMeasureForSymbols);
@@ -4833,6 +4967,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           ? `${segment.chord.root} ${segment.chord.simpleName || segment.chord.type}`
           : `${segment.chord.root}${getChordTypeSuffix(segment.chord.type)}`;
       }
+      console.log('[grandStaff] Segment', segmentIndex, ':', segment.chord?.root, 'startBeat:', segment.startBeat, '-> measure', startMeasure, ', beat', beatInMeasure, ', symbol:', chordSymbol);
       // Get existing array for this measure or create new one
       if (!chordStartsInMeasure.has(startMeasure)) {
         chordStartsInMeasure.set(startMeasure, []);
@@ -4847,6 +4982,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
 
   // If no segments found, fall back to showing chord symbol on every measure
   const hasSegments = buildingBlockStartMeasures.size > 0;
+  console.log('[grandStaff] chordStartsInMeasure map:', Array.from(chordStartsInMeasure.entries()));
+  console.log('[grandStaff] measures.length:', measures.length, ', hasSegments:', hasSegments);
 
   // Render each measure
   const renderedMeasures = [];
@@ -4965,6 +5102,22 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   measureBeatMaps = renderedMeasures.map(rm => ({
     beatToNoteX: rm.beatToNoteX || new Map()
   }));
+
+  // Collect chord symbol regions from rendered measures
+  // These are the EXACT positions where chord labels were drawn (captured during rendering)
+  for (let i = 0; i < renderedMeasures.length; i++) {
+    const renderedMeasure = renderedMeasures[i];
+    if (renderedMeasure.renderedChordLabelPositions && renderedMeasure.renderedChordLabelPositions.length > 0) {
+      for (const pos of renderedMeasure.renderedChordLabelPositions) {
+        chordSymbolRegions.push({
+          ...pos,
+          measureIndex: i
+        });
+      }
+    }
+  }
+  console.log('[grandStaff] chordSymbolRegions collected from rendered measures:', chordSymbolRegions.length, 'regions',
+    chordSymbolRegions.map(r => ({ chordIndex: r.chordIndex, symbol: r.chordSymbol, x: Math.round(r.x), y: Math.round(r.y) })));
 
   // Draw chord span shading and brackets - alternating colors for consecutive chords
   // Uses beat-based positioning with actual VexFlow note positions for accurate alignment
@@ -5818,7 +5971,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     dimensions,
     measures: renderedMeasures,
     noteRegions: allNoteRegions,
-    chordBracketRegions,  // Click regions for chord bracket labels
+    chordBracketRegions,  // Click regions for chord bracket labels (below staff)
+    chordSymbolRegions,   // Position data for chord symbols (above staff) for coach overlay
   };
 }
 

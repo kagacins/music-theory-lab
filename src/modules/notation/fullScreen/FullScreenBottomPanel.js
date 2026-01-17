@@ -23,6 +23,10 @@ import {
     PATTERN_CATEGORIES
 } from '../../analysis/patternDetection.js';
 import { HarmonyAnalyzer } from '../../analysis/harmonyAnalyzer.js';
+import { detectAllObservations } from '../../teaching/coachEngine/detectors/index.js';
+import { generateAllSuggestions } from '../../teaching/coachEngine/generators/index.js';
+import { scanAllOpportunities } from '../../teaching/coachEngine/scanners/opportunityScanner.js';
+import { COACH_ITEM_TYPES } from '../../teaching/coachEngine/types.js';
 
 // ============================================================================
 // CONSTANTS
@@ -3611,9 +3615,14 @@ export class FullScreenBottomPanel {
 
     _renderTheoryPanel(container) {
         const compState = getCompositionState();
-        const key = compState?.metadata?.key || 'C';
+        const rawKey = compState?.metadata?.key || 'C';
         const mode = compState?.getSettings?.()?.mode || 'major';
-        const keyDisplay = `${key} ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+        // Handle keys that already have 'm' suffix (e.g., "Bbm" should display as "Bb Minor", not "Bbm Major")
+        const keyEndsWithMinor = rawKey.endsWith('m') && rawKey.length > 1 && !rawKey.endsWith('dim');
+        const key = keyEndsWithMinor ? rawKey.slice(0, -1) : rawKey;
+        const keyDisplay = keyEndsWithMinor
+            ? `${key} Minor`
+            : `${rawKey} ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
 
         // Get progression data for analysis
         const progressionData = compState?.exportToProgressionData?.() || [];
@@ -3670,11 +3679,15 @@ export class FullScreenBottomPanel {
             // Analyze chord function distribution
             const functionAnalysis = this._analyzeChordFunctions(progressionData, key);
 
+            // Get coach engine insights (progression-wide observations, suggestions, opportunities)
+            const coachInsights = this._getCoachInsights(progressionData, key);
+
             return {
                 topPatterns,
                 namedProgressions,
                 harmonicRhythm,
                 functionAnalysis,
+                coachInsights,
                 chordCount: progressionData.length
             };
         } catch (e) {
@@ -3739,6 +3752,56 @@ export class FullScreenBottomPanel {
             dominant: Math.round((functions.dominant / total) * 100),
             chromatic: Math.round((functions.chromatic / total) * 100)
         };
+    }
+
+    /**
+     * Get coach engine insights (observations, suggestions, opportunities)
+     * Filters to only progression-wide items (not chord-specific)
+     */
+    _getCoachInsights(progressionData, key) {
+        if (!progressionData || progressionData.length < 2) {
+            return { observations: [], suggestions: [], opportunities: [] };
+        }
+
+        try {
+            // Build context for coach engine
+            const context = {
+                progression: progressionData,
+                key: key,
+                mode: key?.endsWith('m') && !key?.endsWith('dim') ? 'minor' : 'major'
+            };
+
+            // Run all detectors, generators, and scanners
+            const allObservations = detectAllObservations(context);
+            const allSuggestions = generateAllSuggestions(context);
+            const allOpportunities = scanAllOpportunities(context);
+
+            // Filter to progression-wide items (items without specific chord index,
+            // or items that are about the whole progression like tension-climax, smooth-voice-leading, vary-harmonic-rhythm)
+            const progressionWideIds = [
+                'tension-climax', 'smooth-voice-leading', 'harmonic-sequence',
+                'circle-of-fifths', 'vary-harmonic-rhythm',
+                'no-borrowed-chords', 'no-cadence', 'no-secondary-dominants',
+                'flat-tension', 'bass-always-root', 'no-extensions', 'function-imbalance'
+            ];
+
+            const isProgressionWide = (item) => {
+                // Items explicitly marked as progression-wide by ID
+                if (progressionWideIds.includes(item.id)) return true;
+                // Opportunities are always progression-wide
+                if (item.type === COACH_ITEM_TYPES.OPPORTUNITY) return true;
+                return false;
+            };
+
+            return {
+                observations: allObservations.filter(isProgressionWide),
+                suggestions: allSuggestions.filter(isProgressionWide),
+                opportunities: allOpportunities // All opportunities are progression-wide
+            };
+        } catch (e) {
+            console.warn('[Theory] Coach insights error:', e);
+            return { observations: [], suggestions: [], opportunities: [] };
+        }
     }
 
     _generateTheoryInsights(analysisData, chords, key) {
@@ -3856,6 +3919,26 @@ export class FullScreenBottomPanel {
             `;
         }
 
+        // Coach Insights Section (progression-wide observations and suggestions from coach engine)
+        if (analysisData.coachInsights) {
+            const { observations, suggestions, opportunities } = analysisData.coachInsights;
+            const allInsights = [...observations, ...suggestions, ...opportunities];
+
+            if (allInsights.length > 0) {
+                html += `
+                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-2">
+                        <div class="flex items-center gap-1.5 mb-1.5">
+                            <span class="text-sm">🎓</span>
+                            <span class="font-semibold text-indigo-800 text-xs">Coach Insights</span>
+                        </div>
+                        <div class="space-y-1.5">
+                            ${allInsights.slice(0, 5).map(insight => this._renderCoachInsight(insight)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
         // Composition Tips based on analysis
         const tips = this._generateCompositionTips(analysisData, chords, key);
         if (tips.length > 0) {
@@ -3927,6 +4010,73 @@ export class FullScreenBottomPanel {
         }
 
         return tips.slice(0, 3); // Limit to 3 tips
+    }
+
+    /**
+     * Render a single coach insight item
+     */
+    _renderCoachInsight(insight) {
+        // Get the message for simple skill level (or fallback)
+        let message = '';
+        if (typeof insight.message === 'object') {
+            message = insight.message.simple || insight.message.intermediate || 'Interesting pattern detected!';
+        } else if (typeof insight.message === 'string') {
+            message = insight.message;
+        }
+
+        // Interpolate data placeholders
+        if (insight.data && typeof message === 'string') {
+            message = message.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+                return insight.data[key] !== undefined ? insight.data[key] : match;
+            });
+        }
+
+        // Determine styling based on type
+        const typeStyles = {
+            [COACH_ITEM_TYPES.OBSERVATION]: {
+                bg: 'bg-emerald-100/60',
+                border: 'border-emerald-300',
+                text: 'text-emerald-800',
+                label: 'Noticed',
+                labelBg: 'bg-emerald-500'
+            },
+            [COACH_ITEM_TYPES.SUGGESTION]: {
+                bg: 'bg-purple-100/60',
+                border: 'border-purple-300',
+                text: 'text-purple-800',
+                label: 'Try This',
+                labelBg: 'bg-purple-500'
+            },
+            [COACH_ITEM_TYPES.OPPORTUNITY]: {
+                bg: 'bg-amber-100/60',
+                border: 'border-amber-300',
+                text: 'text-amber-800',
+                label: 'Explore',
+                labelBg: 'bg-amber-500'
+            }
+        };
+
+        const style = typeStyles[insight.type] || typeStyles[COACH_ITEM_TYPES.OBSERVATION];
+        const emoji = insight.emoji || '💡';
+        const title = insight.title || 'Insight';
+
+        return `
+            <div class="${style.bg} border ${style.border} rounded px-2 py-1.5">
+                <div class="flex items-start gap-1.5">
+                    <span class="text-sm leading-none">${emoji}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="font-medium text-xs ${style.text}">${title}</span>
+                            <span class="text-[8px] px-1.5 py-0.5 rounded-full text-white ${style.labelBg}">${style.label}</span>
+                        </div>
+                        <div class="text-[10px] ${style.text} opacity-80 leading-tight mt-0.5">${message}</div>
+                        ${insight.data?.suggestion ? `
+                            <div class="text-[10px] ${style.text} opacity-70 italic mt-0.5">💡 ${insight.data.suggestion}</div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     // ========================================================================

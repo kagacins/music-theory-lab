@@ -63,11 +63,15 @@ export function detectCircleOfFifths(context) {
     const { progression } = context;
     const items = [];
 
-    if (!progression || progression.length < 3) {
+    // Require at least 4 chords (3 intervals of descending fifths)
+    // This prevents false positives like A-E-A (which is just V-I motion)
+    if (!progression || progression.length < 4) {
         return items;
     }
 
-    // Look for 3+ consecutive chords descending by fifths
+    // Look for 4+ consecutive chords descending by fifths (3+ intervals)
+    // TRUE circle of fifths = consistent DESCENDING fifths (interval 5)
+    // e.g., Am → Dm → G → C (each root goes DOWN by 5 semitones)
     let sequenceStart = -1;
     let sequenceLength = 0;
 
@@ -77,8 +81,11 @@ export function detectCircleOfFifths(context) {
 
         const interval = getInterval(prev.root, curr.root);
 
-        // Descending fifth = 5 semitones down = 7 semitones up
-        const isDescendingFifth = interval === 5 || interval === 7;
+        // ONLY count descending fifths (5 semitones = going DOWN the circle)
+        // Do NOT count ascending fifths (7 semitones = going UP, opposite direction)
+        // This is the key fix: A→E is 7 (ascending fifth, wrong direction)
+        // E→A is 5 (descending fifth, correct direction)
+        const isDescendingFifth = interval === 5;
 
         if (isDescendingFifth) {
             if (sequenceStart === -1) {
@@ -89,15 +96,18 @@ export function detectCircleOfFifths(context) {
             }
         } else {
             // End of sequence
-            if (sequenceLength >= 3) {
+            // Require 4+ chords (3+ descending fifth intervals)
+            if (sequenceLength >= 4) {
                 // Report this sequence
                 const sequenceChords = progression.slice(sequenceStart, sequenceStart + sequenceLength);
+                const chordLabels = sequenceChords.map(c => c.root + (c.type === 'Minor' ? 'm' : ''));
                 items.push({
                     ...OBSERVATION_TYPES['circle-of-fifths'],
                     data: {
                         startIndex: sequenceStart,
                         length: sequenceLength,
-                        chords: sequenceChords.map(c => c.root + (c.type === 'Minor' ? 'm' : '')),
+                        chords: chordLabels,
+                        sequence: chordLabels.join(' → '),  // For message interpolation
                         pattern: sequenceChords.map(c => c.roman || c.romanNumeral).join(' → ')
                     }
                 });
@@ -108,14 +118,17 @@ export function detectCircleOfFifths(context) {
     }
 
     // Check for sequence at end
-    if (sequenceLength >= 3) {
+    // Require 4+ chords (3+ descending fifth intervals)
+    if (sequenceLength >= 4) {
         const sequenceChords = progression.slice(sequenceStart, sequenceStart + sequenceLength);
+        const chordLabels = sequenceChords.map(c => c.root + (c.type === 'Minor' ? 'm' : ''));
         items.push({
             ...OBSERVATION_TYPES['circle-of-fifths'],
             data: {
                 startIndex: sequenceStart,
                 length: sequenceLength,
-                chords: sequenceChords.map(c => c.root + (c.type === 'Minor' ? 'm' : '')),
+                chords: chordLabels,
+                sequence: chordLabels.join(' → '),  // For message interpolation
                 pattern: sequenceChords.map(c => c.roman || c.romanNumeral).join(' → ')
             }
         });
@@ -246,13 +259,26 @@ export function detectSecondaryDominants(context) {
             if (scaleIndex > 0) { // Not the tonic (that would just be V)
                 const targetLabel = SCALE_DEGREE_LABELS[scaleIndex];
 
-                // Check if chord itself is NOT diatonic (confirms it's borrowed for sec dom function)
+                // Check if chord itself is diatonic
                 const chordIntervalFromKey = ((chordRootSemitone - keyRootSemitone) + 12) % 12;
                 const chordScaleIndex = MAJOR_SCALE.indexOf(chordIntervalFromKey);
 
-                // If chord IS diatonic, only report if it's clearly functioning as sec dom
-                // (e.g., D major in key of C going to G = V/V)
-                if (chordScaleIndex === -1 || (chordScaleIndex !== 4)) { // Not the regular V
+                // A secondary dominant must be either:
+                // 1. Not diatonic at all (chromatic chord), OR
+                // 2. A major chord on a scale degree that's normally minor (like II, III, VI, VII)
+                //    - In major: ii, iii, vi are normally minor; vii° is diminished
+                //    - So if we have a MAJOR chord on degree 1, 3, 5, or 6 that's diatonic and normal
+
+                // Skip if this is just a normal diatonic chord in its expected function:
+                // - Skip I (tonic) - scale index 0
+                // - Skip IV (subdominant) - scale index 3
+                // - Skip V (dominant) - scale index 4
+                // These are normally major in a major key and have their own functions
+
+                const isDiatonicMajorFunction = chordScaleIndex === 0 || chordScaleIndex === 3 || chordScaleIndex === 4;
+
+                if (!isDiatonicMajorFunction) {
+                    // This is a secondary dominant - either non-diatonic or a "majorized" normally-minor chord
                     items.push({
                         ...OBSERVATION_TYPES['secondary-dominant'],
                         data: {
@@ -270,6 +296,106 @@ export function detectSecondaryDominants(context) {
     }
 
     return items;
+}
+
+// ============================================================================
+// HARMONIC SEQUENCE DETECTION
+// ============================================================================
+
+/**
+ * Detect harmonic sequences (repeating interval patterns)
+ * This detects patterns like I-IV-vii-iii (descending thirds) that aren't circle of fifths
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectHarmonicSequence(context) {
+    const { progression } = context;
+    const items = [];
+
+    if (!progression || progression.length < 4) {
+        return items;
+    }
+
+    // Calculate intervals between consecutive chords
+    const intervals = [];
+    for (let i = 1; i < progression.length; i++) {
+        const interval = getInterval(progression[i - 1].root, progression[i].root);
+        intervals.push(interval);
+    }
+
+    // Look for repeating interval patterns (length 1 or 2)
+    // Pattern of 1: same interval repeats (e.g., all descending thirds)
+    // Pattern of 2: alternating intervals (e.g., down 3, up 2, down 3, up 2)
+
+    // Check for single repeating interval (not fifths - that's detected separately)
+    let singleIntervalRun = 1;
+    let runInterval = intervals[0];
+
+    for (let i = 1; i < intervals.length; i++) {
+        if (intervals[i] === runInterval && runInterval !== 5 && runInterval !== 7) {
+            singleIntervalRun++;
+        } else {
+            if (singleIntervalRun >= 3) {
+                const sequenceChords = progression.slice(i - singleIntervalRun, i + 1);
+                const chordLabels = sequenceChords.map(c => c.roman || c.romanNumeral || c.root);
+                const intervalName = getIntervalName(runInterval);
+
+                items.push({
+                    ...OBSERVATION_TYPES['harmonic-sequence'],
+                    data: {
+                        startIndex: i - singleIntervalRun,
+                        length: singleIntervalRun + 1,
+                        intervalPattern: intervalName,
+                        chords: chordLabels,
+                        pattern: chordLabels.join(' → ')
+                    }
+                });
+                break;
+            }
+            singleIntervalRun = 1;
+            runInterval = intervals[i];
+        }
+    }
+
+    // Check for sequence at end
+    if (singleIntervalRun >= 3 && runInterval !== 5 && runInterval !== 7) {
+        const sequenceChords = progression.slice(progression.length - singleIntervalRun - 1);
+        const chordLabels = sequenceChords.map(c => c.roman || c.romanNumeral || c.root);
+        const intervalName = getIntervalName(runInterval);
+
+        items.push({
+            ...OBSERVATION_TYPES['harmonic-sequence'],
+            data: {
+                startIndex: progression.length - singleIntervalRun - 1,
+                length: singleIntervalRun + 1,
+                intervalPattern: intervalName,
+                chords: chordLabels,
+                pattern: chordLabels.join(' → ')
+            }
+        });
+    }
+
+    return items;
+}
+
+/**
+ * Get human-readable interval name
+ */
+function getIntervalName(semitones) {
+    const names = {
+        1: 'minor 2nd',
+        2: 'major 2nd',
+        3: 'minor 3rd',
+        4: 'major 3rd',
+        5: 'perfect 4th',
+        6: 'tritone',
+        7: 'perfect 5th',
+        8: 'minor 6th',
+        9: 'major 6th',
+        10: 'minor 7th',
+        11: 'major 7th'
+    };
+    return names[semitones] || `${semitones} semitones`;
 }
 
 // ============================================================================
@@ -335,6 +461,7 @@ export function detectChromaticMediants(context) {
 export function detectSequencesAndPatterns(context) {
     return [
         ...detectCircleOfFifths(context),
+        ...detectHarmonicSequence(context),
         ...detectModalPatterns(context),
         ...detectSecondaryDominants(context),
         ...detectChromaticMediants(context)

@@ -224,11 +224,21 @@ class CoachEngine {
     /**
      * Manually trigger analysis of current composition
      * Useful for testing or when user explicitly requests analysis
+     * @param {boolean} clearCooldowns - If true, clears all cooldowns first (for manual "Analyze" button)
      */
-    analyzeCurrentComposition() {
+    analyzeCurrentComposition(clearCooldowns = true) {
+        // When user manually clicks "Analyze", they want to see results regardless of cooldowns
+        if (clearCooldowns) {
+            this.cooldowns.clear();
+            this._lastNudgeTime = 0;
+            console.log('[CoachEngine] Cooldowns cleared for manual analysis');
+        }
+
         const context = this._buildContext();
         if (context) {
             this._runAnalysis(context);
+        } else {
+            console.log('[CoachEngine] No context available for analysis (no progression?)');
         }
     }
 
@@ -402,6 +412,12 @@ class CoachEngine {
             queued: this.queue.length
         });
 
+        // Update measure coach items for notation overlay icons
+        // Pass ALL detected items (not just filtered) so the icons show everything
+        if (window.updateMeasureCoachItems) {
+            window.updateMeasureCoachItems(allItems);
+        }
+
         // Process queue
         this._processQueue();
     }
@@ -557,8 +573,17 @@ class CoachEngine {
 
     /**
      * Show a nudge using the presenter
+     * NOTE: Automatic floating nudges are disabled - coach is accessed via measure compass icons
      */
     _showNudge(item) {
+        // DISABLED: Automatic floating nudges
+        // Coach insights are now accessed only through measure compass icons
+        // The items are still tracked in history and displayed via the notation overlay
+        console.log('[CoachEngine] Nudge queued (auto-display disabled):', item.id, item.title);
+        return;
+
+        // Original code preserved for reference:
+        /*
         if (!this._presenter) {
             console.warn('[CoachEngine] No presenter set, cannot show nudge');
             return;
@@ -579,6 +604,7 @@ class CoachEngine {
         });
 
         console.log('[CoachEngine] Showing nudge:', item.id, item.title);
+        */
     }
 
     /**
@@ -587,23 +613,33 @@ class CoachEngine {
     _buildDisplayItem(item) {
         const typeDef = getCoachItemType(item.id) || item;
 
-        // Get message for skill level
-        let message = '';
-        if (typeDef.message) {
-            message = typeDef.message[this.skillLevel] ||
-                      typeDef.message.intermediate ||
-                      typeDef.message.simple ||
-                      '';
+        // Preserve the full message object (with all skill levels) for runtime switching
+        // The presenter will select the appropriate message based on its current skill level
+        let messageObj = typeDef.message || item.message || {};
+
+        // If message is a string (legacy), convert to object
+        if (typeof messageObj === 'string') {
+            messageObj = {
+                simple: messageObj,
+                intermediate: messageObj,
+                advanced: messageObj
+            };
         }
 
-        // Interpolate template variables
-        if (item.data) {
-            message = this._interpolateMessage(message, item.data);
+        // Interpolate template variables into ALL skill level messages
+        if (item.data && typeof messageObj === 'object') {
+            const interpolatedMessages = {};
+            for (const level of ['simple', 'intermediate', 'advanced']) {
+                if (messageObj[level]) {
+                    interpolatedMessages[level] = this._interpolateMessage(messageObj[level], item.data);
+                }
+            }
+            messageObj = interpolatedMessages;
         }
 
         return {
             ...item,
-            message,
+            message: messageObj,  // Keep as object with all skill levels
             emoji: typeDef.emoji || '💡',
             title: typeDef.title || item.title || 'Tip',
             actions: typeDef.actions || item.actions || {},

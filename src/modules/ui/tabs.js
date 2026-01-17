@@ -513,6 +513,14 @@ export function switchTab(tabId, options = {}) {
         if (window.initStudioNewTab) {
             window.initStudioNewTab();
         }
+
+        // Trigger coach analysis when entering Composition Studio (New)
+        // Use a small delay to ensure everything is initialized
+        setTimeout(() => {
+            if (window.triggerCoachAnalysis) {
+                window.triggerCoachAnalysis();
+            }
+        }, 500);
     } else if (tabId === 'chordlab-new') {
         // Initialize Chord Lab (New) - the new full-screen chord lab experience as a tab
         if (window.initChordLabNewTab) {

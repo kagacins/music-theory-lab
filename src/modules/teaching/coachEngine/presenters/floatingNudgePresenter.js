@@ -74,7 +74,80 @@ export function initFloatingNudgePresenter() {
     window.canRecallCoachNudge = canRecallCoachNudge;
     window.showCoachNudge = showNudge;
 
+    // Expose diagnostic function
+    window.coachDiagnostics = runCoachDiagnostics;
+
     console.log('[FloatingNudgePresenter] Initialized');
+}
+
+/**
+ * Run diagnostics on the coach system - call via window.coachDiagnostics()
+ */
+function runCoachDiagnostics() {
+    console.group('🔍 Coach Engine Diagnostics');
+
+    // Check if styles are injected
+    const styleEl = document.getElementById('coach-nudge-styles');
+    console.log('CSS Styles injected:', !!styleEl);
+
+    // Check current nudge state
+    console.log('Current nudge:', currentNudge);
+    console.log('Last shown nudge:', lastShownNudge);
+    console.log('Is enabled:', isEnabled);
+    console.log('Skill level:', skillLevel);
+
+    // Check for popup
+    const popup = document.getElementById('coach-nudge-popup');
+    console.log('Popup element exists:', !!popup);
+
+    if (popup) {
+        // Check action buttons
+        const showBtn = popup.querySelector('.coach-action-show');
+        const hearBtn = popup.querySelector('.coach-action-hear');
+        const deepDiveBtn = popup.querySelector('.coach-action-deepdive');
+
+        console.log('Show button found:', !!showBtn);
+        console.log('Hear button found:', !!hearBtn);
+        console.log('Learn More button found:', !!deepDiveBtn);
+    }
+
+    // Check global functions
+    console.log('window.setCoachHighlight exists:', typeof window.setCoachHighlight === 'function');
+    console.log('window.showUnifiedRecommendationModal exists:', typeof window.showUnifiedRecommendationModal === 'function');
+    console.log('window.playNotesArray exists:', typeof window.playNotesArray === 'function');
+    console.log('window.getPiano exists:', typeof window.getPiano === 'function');
+
+    // Check chord cards
+    const fsContainer = document.getElementById('fs-chord-cards-container');
+    if (fsContainer) {
+        const cards = fsContainer.querySelectorAll('[data-chord-index]');
+        console.log('Chord cards in fullscreen container:', cards.length);
+        cards.forEach((card, i) => {
+            console.log(`  Card ${i}: data-chord-index="${card.getAttribute('data-chord-index')}"`);
+        });
+    } else {
+        console.log('Fullscreen chord container not found');
+    }
+
+    // Check coach engine
+    if (window.coachEngine) {
+        console.log('Coach engine instance:', window.coachEngine);
+        console.log('Queue length:', window.coachEngine.queue?.length || 0);
+        console.log('History length:', window.coachEngine.history?.length || 0);
+        console.log('Cooldowns:', window.coachEngine.cooldowns?.size || 0);
+    } else {
+        console.log('Coach engine not found on window');
+    }
+
+    console.groupEnd();
+
+    return {
+        stylesInjected: !!styleEl,
+        popupExists: !!popup,
+        coachEngine: window.coachEngine,
+        currentNudge,
+        lastShownNudge
+    };
 }
 
 /**
@@ -141,11 +214,17 @@ export function isNudgesEnabled() {
 // DISPLAY
 // ============================================================================
 
+// Track if current nudge should stay open (no auto-hide)
+let keepCurrentNudgeOpen = false;
+
 /**
  * Show a coach nudge
  * @param {Object} item - The coach item to display
+ * @param {Object} [position] - Optional position { x, y } for custom positioning
+ * @param {Object} [options] - Optional display options
+ * @param {boolean} [options.keepSummaryOpen] - If true, use fade animation and disable auto-hide
  */
-export function showNudge(item) {
+export function showNudge(item, position = null, options = {}) {
     if (!isEnabled || !item) {
         console.log('[FloatingNudgePresenter] Nudge skipped (disabled or no item)');
         return;
@@ -163,6 +242,7 @@ export function showNudge(item) {
     // Store for recall
     lastShownNudge = item;
     currentNudge = item;
+    keepCurrentNudgeOpen = options.keepSummaryOpen || false;
 
     // Get theme for this item type
     const theme = TYPE_THEMES[item.type] || TYPE_THEMES[COACH_ITEM_TYPES.OBSERVATION];
@@ -170,8 +250,18 @@ export function showNudge(item) {
     // Create the popup element
     const popup = document.createElement('div');
     popup.id = 'coach-nudge-popup';
-    popup.className = 'fixed top-4 right-4 z-[99998] max-w-sm';
-    popup.style.cssText = 'animation: coachSlideIn 0.3s ease-out; pointer-events: auto;';
+
+    // Choose animation based on options
+    const animation = options.keepSummaryOpen ? 'coachFadeIn 0.25s ease-out' : 'coachSlideIn 0.3s ease-out';
+
+    // Use custom position if provided, otherwise default to top-right
+    if (position && position.x !== undefined && position.y !== undefined) {
+        popup.className = 'fixed z-[99998] max-w-sm';
+        popup.style.cssText = `animation: ${animation}; pointer-events: auto; left: ${position.x}px; top: ${position.y}px;`;
+    } else {
+        popup.className = 'fixed top-4 right-4 z-[99998] max-w-sm';
+        popup.style.cssText = `animation: ${animation}; pointer-events: auto;`;
+    }
 
     // Get message content for current skill level
     const message = getMessageForSkillLevel(item, skillLevel);
@@ -196,7 +286,7 @@ export function showNudge(item) {
 
             <!-- Content -->
             <div class="px-4 py-3">
-                <p id="coach-nudge-content" class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">${message}</p>
+                <p id="coach-nudge-content" class="text-gray-700 dark:text-gray-300 text-base leading-relaxed">${message}</p>
 
                 ${item.data ? renderDataSection(item) : ''}
             </div>
@@ -224,14 +314,38 @@ export function showNudge(item) {
     // Add to DOM
     document.body.appendChild(popup);
 
+    // Check if popup is clipped by viewport bottom and adjust position
+    requestAnimationFrame(() => {
+        const rect = popup.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const bottomMargin = 16; // Minimum margin from bottom edge
+
+        if (rect.bottom > viewportHeight - bottomMargin) {
+            // Popup is clipped at bottom - move it up
+            const overflow = rect.bottom - (viewportHeight - bottomMargin);
+
+            if (position && position.y !== undefined) {
+                // Custom positioned popup - adjust the top position
+                const newTop = Math.max(bottomMargin, position.y - overflow);
+                popup.style.top = `${newTop}px`;
+            } else {
+                // Default top-right positioned popup - switch to bottom positioning
+                popup.classList.remove('top-4');
+                popup.classList.add('bottom-4');
+            }
+        }
+    });
+
     // Setup event listeners
     setupNudgeEventListeners(popup, item);
 
-    // Start auto-hide timer
-    const delay = AUTO_HIDE_DELAYS[item.type] || 10000;
-    startAutoHideTimer(delay);
+    // Start auto-hide timer (skip if keepSummaryOpen is set - user must close manually)
+    if (!options.keepSummaryOpen) {
+        const delay = AUTO_HIDE_DELAYS[item.type] || 10000;
+        startAutoHideTimer(delay);
+    }
 
-    console.log('[FloatingNudgePresenter] Showing nudge:', item.id);
+    console.log('[FloatingNudgePresenter] Showing nudge:', item.id, options.keepSummaryOpen ? '(manual close required)' : '');
 }
 
 /**
@@ -241,17 +355,24 @@ export function showNudge(item) {
  * @returns {string}
  */
 function getMessageForSkillLevel(item, level) {
+    let message = 'Interesting pattern detected!';
+
     // Check if message is an object with skill levels
     if (typeof item.message === 'object' && item.message !== null) {
-        return item.message[level] || item.message.simple || item.message.intermediate || 'Interesting pattern detected!';
+        message = item.message[level] || item.message.simple || item.message.intermediate || message;
+    } else if (typeof item.message === 'string') {
+        message = item.message;
     }
 
-    // If message is a string, return it
-    if (typeof item.message === 'string') {
-        return item.message;
+    // Interpolate template placeholders with item.data values
+    // Templates use {{key}} syntax, e.g., "Try {{suggestion}} for color"
+    if (item.data && typeof message === 'string') {
+        message = message.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+            return item.data[key] !== undefined ? item.data[key] : match;
+        });
     }
 
-    return 'Interesting pattern detected!';
+    return message;
 }
 
 /**
@@ -265,14 +386,45 @@ function renderDataSection(item) {
 
     let html = '<div class="mt-2 text-xs text-gray-500 dark:text-gray-400">';
 
+    // Instance list - clickable locations when multiple occurrences
+    if (data.instances && data.instances.length > 0) {
+        const count = data.instanceCount || data.instances.length;
+        html += `
+            <div class="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div class="font-semibold text-amber-700 dark:text-amber-300 mb-1">
+                    📍 Found in ${count} location${count > 1 ? 's' : ''}:
+                </div>
+                <div class="space-y-1 max-h-24 overflow-y-auto">
+                    ${data.instances.map((inst, idx) => `
+                        <button class="coach-instance-btn w-full text-left px-2 py-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50 transition text-amber-800 dark:text-amber-200 flex items-center gap-2"
+                                data-instance-index="${idx}">
+                            <span class="w-5 h-5 flex items-center justify-center bg-amber-200 dark:bg-amber-700 rounded-full text-[10px] font-bold">${idx + 1}</span>
+                            <span class="truncate">${inst.label || `Location ${idx + 1}`}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     // Pattern display
     if (data.pattern) {
         html += `<div class="mt-1"><strong>Pattern:</strong> ${data.pattern}</div>`;
     }
 
-    // Chords involved
-    if (data.chords && Array.isArray(data.chords)) {
+    // Chords involved (only if no instances list, to avoid redundancy)
+    if (!data.instances && data.chords && Array.isArray(data.chords)) {
         html += `<div class="mt-1"><strong>Chords:</strong> ${data.chords.join(' → ')}</div>`;
+    }
+
+    // Voice info for voice leading issues
+    if (data.voice1 && data.voice2) {
+        html += `<div class="mt-1"><strong>Voices:</strong> ${data.voice1} and ${data.voice2}</div>`;
+    }
+
+    // Notes involved
+    if (data.notes && !data.instances) {
+        html += `<div class="mt-1"><strong>Notes:</strong> ${data.notes}</div>`;
     }
 
     // Suggestions
@@ -300,66 +452,51 @@ function renderDataSection(item) {
  * @returns {string} HTML string
  */
 function renderActions(item) {
-    const actions = item.actions;
-    if (!actions) return '';
-
+    const actions = item.actions || {};
     let buttons = [];
 
-    // Preview action (for suggestions)
-    if (actions.preview) {
-        buttons.push(`
-            <button class="coach-action-btn coach-action-preview px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition flex items-center gap-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                Preview
-            </button>
-        `);
-    }
+    // NOTE: Show, Hear It, Preview, and Apply buttons are temporarily disabled
+    // as they don't work reliably. They can be re-enabled when properly implemented.
 
-    // Apply action (for suggestions)
-    if (actions.apply) {
-        buttons.push(`
-            <button class="coach-action-btn coach-action-apply px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white transition flex items-center gap-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                Apply
-            </button>
-        `);
-    }
+    // TEMPORARILY DISABLED: "Show" button - highlights referenced chord(s) in the progression
+    // const hasChordReference = item.data?.chordIndex !== undefined ||
+    //                           item.data?.chordIndices?.length > 0 ||
+    //                           item.data?.startIndex !== undefined;
+    // if (hasChordReference) {
+    //     buttons.push(`
+    //         <button class="coach-action-btn coach-action-show ...">Show</button>
+    //     `);
+    // }
 
-    // Compare action
-    if (actions.compare) {
-        buttons.push(`
-            <button class="coach-action-btn coach-action-compare px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition flex items-center gap-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                </svg>
-                Compare
-            </button>
-        `);
-    }
+    // TEMPORARILY DISABLED: "Hear It" button - plays the detected/referenced chord
+    // if (item.data?.chord && (item.type === COACH_ITEM_TYPES.OBSERVATION || actions.preview)) {
+    //     buttons.push(`
+    //         <button class="coach-action-btn coach-action-hear ...">Hear It</button>
+    //     `);
+    // }
 
-    // Open panel action
-    if (actions.openPanel) {
-        buttons.push(`
-            <button class="coach-action-btn coach-action-panel px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition flex items-center gap-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                </svg>
-                Explore
-            </button>
-        `);
-    }
+    // TEMPORARILY DISABLED: Preview action (for suggestions with a suggested chord)
+    // if (actions.preview && item.data?.suggestedChord) {
+    //     buttons.push(`
+    //         <button class="coach-action-btn coach-action-preview ...">Preview</button>
+    //     `);
+    // }
 
-    // Deep dive / modal action
-    if (actions.deepDive) {
+    // TEMPORARILY DISABLED: Apply action (for suggestions with actionable data)
+    // if (actions.apply && (item.data?.suggestedChord || item.data?.suggestedInversion !== undefined)) {
+    //     buttons.push(`
+    //         <button class="coach-action-btn coach-action-apply ...">Apply</button>
+    //     `);
+    // }
+
+    // Learn More button - only show for OBSERVATION type items (like cadences, sequences)
+    // Don't show for SUGGESTION items (like "Try a Surprise") since those modals have
+    // placeholder content and don't add useful information
+    if (item.type === COACH_ITEM_TYPES.OBSERVATION) {
         buttons.push(`
-            <button class="coach-action-btn coach-action-deepdive px-3 py-1.5 text-xs font-medium rounded-lg border border-indigo-300 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition flex items-center gap-1">
+            <button class="coach-action-btn coach-action-deepdive px-3 py-1.5 text-xs font-medium rounded-lg border border-indigo-300 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition flex items-center gap-1" title="Learn more about this concept">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                 </svg>
                 Learn More
             </button>
@@ -399,27 +536,29 @@ function formatCategory(category) {
  * @param {Object} item - The coach item
  */
 function setupNudgeEventListeners(popup, item) {
-    // Close button
-    const closeBtn = document.getElementById('coach-nudge-close');
+    // Close button - use popup.querySelector to find within the popup element
+    const closeBtn = popup.querySelector('#coach-nudge-close');
     if (closeBtn) {
         closeBtn.addEventListener('click', () => hideNudge());
+    } else {
+        console.warn('[FloatingNudgePresenter] Close button not found');
     }
 
-    // Skill level selector
-    const skillSelect = document.getElementById('coach-nudge-skill-level');
+    // Skill level selector - use popup.querySelector to find within the popup element
+    const skillSelect = popup.querySelector('#coach-nudge-skill-level');
     if (skillSelect) {
         skillSelect.addEventListener('change', (e) => {
-            skillLevel = e.target.value;
+            const newLevel = e.target.value;
+            skillLevel = newLevel;
             savePreferences();
             // Also save to the shared theory skill level
             localStorage.setItem('theorySkillLevel', skillLevel);
 
-            // Update content - use innerHTML to allow HTML formatting
-            const contentEl = document.getElementById('coach-nudge-content');
+            // Update content - use popup.querySelector to find within the popup element
+            const contentEl = popup.querySelector('#coach-nudge-content');
             if (contentEl) {
                 const newMessage = getMessageForSkillLevel(item, skillLevel);
                 contentEl.innerHTML = newMessage;
-                console.log('[FloatingNudgePresenter] Skill level changed to:', skillLevel, '- Message:', newMessage);
             }
         });
     }
@@ -435,34 +574,92 @@ function setupNudgeEventListeners(popup, item) {
 
     popup.addEventListener('mouseleave', () => {
         isHovering = false;
-        startAutoHideTimer(3000); // 3 seconds after mouse leaves
+        // Only auto-hide if not in keepOpen mode
+        if (!keepCurrentNudgeOpen) {
+            startAutoHideTimer(3000); // 3 seconds after mouse leaves
+        }
     });
 
-    // Action buttons
+    // Instance navigation buttons (clickable location list)
+    const instanceBtns = popup.querySelectorAll('.coach-instance-btn');
+    console.log('[FloatingNudgePresenter] Instance buttons found:', instanceBtns.length);
+    instanceBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(btn.dataset.instanceIndex);
+            handleInstanceClick(item, idx);
+        });
+    });
+
+    // Action buttons - log what we find
+    console.log('[FloatingNudgePresenter] Setting up action button listeners...');
+
+    const showBtn = popup.querySelector('.coach-action-show');
+    console.log('[FloatingNudgePresenter] Show button found:', !!showBtn);
+    if (showBtn) {
+        showBtn.addEventListener('click', (e) => {
+            console.log('[FloatingNudgePresenter] Show button CLICKED');
+            e.stopPropagation();
+            handleShowAction(item);
+        });
+    }
+
+    const hearBtn = popup.querySelector('.coach-action-hear');
+    console.log('[FloatingNudgePresenter] Hear button found:', !!hearBtn);
+    if (hearBtn) {
+        hearBtn.addEventListener('click', (e) => {
+            console.log('[FloatingNudgePresenter] Hear button CLICKED');
+            e.stopPropagation();
+            handleHearAction(item);
+        });
+    }
+
     const previewBtn = popup.querySelector('.coach-action-preview');
+    console.log('[FloatingNudgePresenter] Preview button found:', !!previewBtn);
     if (previewBtn) {
-        previewBtn.addEventListener('click', () => handlePreviewAction(item));
+        previewBtn.addEventListener('click', (e) => {
+            console.log('[FloatingNudgePresenter] Preview button CLICKED');
+            e.stopPropagation();
+            handlePreviewAction(item);
+        });
     }
 
     const applyBtn = popup.querySelector('.coach-action-apply');
+    console.log('[FloatingNudgePresenter] Apply button found:', !!applyBtn);
     if (applyBtn) {
-        applyBtn.addEventListener('click', () => handleApplyAction(item));
+        applyBtn.addEventListener('click', (e) => {
+            console.log('[FloatingNudgePresenter] Apply button CLICKED');
+            e.stopPropagation();
+            handleApplyAction(item);
+        });
     }
 
     const compareBtn = popup.querySelector('.coach-action-compare');
     if (compareBtn) {
-        compareBtn.addEventListener('click', () => handleCompareAction(item));
+        compareBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleCompareAction(item);
+        });
     }
 
     const panelBtn = popup.querySelector('.coach-action-panel');
     if (panelBtn) {
-        panelBtn.addEventListener('click', () => handlePanelAction(item));
+        panelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handlePanelAction(item);
+        });
     }
 
     const deepDiveBtn = popup.querySelector('.coach-action-deepdive');
+    console.log('[FloatingNudgePresenter] Learn More button found:', !!deepDiveBtn);
     if (deepDiveBtn) {
-        deepDiveBtn.addEventListener('click', () => handleDeepDiveAction(item));
+        deepDiveBtn.addEventListener('click', (e) => {
+            console.log('[FloatingNudgePresenter] Learn More button CLICKED');
+            e.stopPropagation();
+            handleDeepDiveAction(item);
+        });
     }
+
+    console.log('[FloatingNudgePresenter] Action button setup complete');
 }
 
 // ============================================================================
@@ -470,48 +667,294 @@ function setupNudgeEventListeners(popup, item) {
 // ============================================================================
 
 /**
- * Handle preview action
+ * Handle click on a specific instance in the location list
  * @param {Object} item - Coach item
+ * @param {number} instanceIndex - Index of the clicked instance
  */
-function handlePreviewAction(item) {
-    console.log('[FloatingNudgePresenter] Preview action:', item.id);
-
-    // If there's chord data, try to play it
-    if (item.data?.chord) {
-        const chord = item.data.chord;
-        if (window.previewChord) {
-            window.previewChord(chord);
-        } else if (window.playChord && chord.root && chord.type) {
-            window.playChord(chord.root, chord.type, chord.inversion || 0);
-        }
+function handleInstanceClick(item, instanceIndex) {
+    const instances = item.data?.instances;
+    if (!instances || instanceIndex >= instances.length) {
+        console.warn('[FloatingNudgePresenter] Invalid instance index:', instanceIndex);
+        return;
     }
 
-    // If there's a specific suggestion, try to preview it
-    if (item.data?.suggestedChord) {
-        const suggested = item.data.suggestedChord;
-        if (window.previewChord) {
-            window.previewChord(suggested);
+    const instance = instances[instanceIndex];
+    console.log('[FloatingNudgePresenter] Instance click:', instanceIndex, instance);
+
+    // Get chord indices from this instance
+    let indices = instance.chordIndices || [];
+    if (instance.fromChordIndex !== undefined) {
+        indices.push(instance.fromChordIndex);
+    }
+    if (instance.toChordIndex !== undefined) {
+        indices.push(instance.toChordIndex);
+    }
+    if (instance.chordIndex !== undefined) {
+        indices.push(instance.chordIndex);
+    }
+    indices = [...new Set(indices)];
+
+    if (indices.length > 0) {
+        // Highlight the chord cards for this instance
+        highlightChordCards(indices);
+
+        // Scroll to the first chord
+        scrollToChordCard(indices[0]);
+
+        // Also highlight specific notes if available
+        if (instance.fromNotes || instance.toNotes || instance.crossedNotes) {
+            highlightNotesInNotation(instance);
         }
     }
 }
 
 /**
- * Handle apply action
+ * Highlight specific notes in the VexFlow notation
+ * @param {Object} instance - Instance data with note information
+ */
+function highlightNotesInNotation(instance) {
+    // This function will highlight notes in the staff notation
+    // For now, we'll use a CSS-based approach targeting note elements
+    // In the future, this could be enhanced to work with VexFlow's note elements directly
+
+    // Remove any existing note highlights
+    document.querySelectorAll('.coach-note-highlight').forEach(el => {
+        el.classList.remove('coach-note-highlight');
+    });
+
+    // Try to find and highlight notes in the notation
+    // The notation renderer would need to support this - for now we'll
+    // trigger an event that the notation system can listen for
+    if (window.highlightNotesInStaff) {
+        const notes = [
+            ...(instance.fromNotes || []),
+            ...(instance.toNotes || []),
+            ...(instance.crossedNotes || [])
+        ];
+        window.highlightNotesInStaff(notes, instance.chordIndices || []);
+    }
+
+    console.log('[FloatingNudgePresenter] Note highlight requested for:', instance);
+}
+
+/**
+ * Handle "Show" action - highlights the referenced chord(s) in the progression
+ * @param {Object} item - Coach item
+ */
+function handleShowAction(item) {
+    console.log('[FloatingNudgePresenter] ========== SHOW ACTION ==========');
+    console.log('[FloatingNudgePresenter] Item ID:', item.id);
+    console.log('[FloatingNudgePresenter] Item data:', JSON.stringify(item.data, null, 2));
+
+    // If there are instances, show the first one
+    if (item.data?.instances?.length > 0) {
+        console.log('[FloatingNudgePresenter] Has instances, delegating to handleInstanceClick');
+        handleInstanceClick(item, 0);
+        return;
+    }
+
+    // Collect chord indices to highlight
+    let indices = [];
+
+    if (item.data?.chordIndex !== undefined) {
+        console.log('[FloatingNudgePresenter] Found chordIndex:', item.data.chordIndex);
+        indices.push(item.data.chordIndex);
+    }
+    if (item.data?.chordIndices?.length > 0) {
+        console.log('[FloatingNudgePresenter] Found chordIndices:', item.data.chordIndices);
+        indices.push(...item.data.chordIndices);
+    }
+    // For cadences that span two chords
+    if (item.data?.startIndex !== undefined) {
+        indices.push(item.data.startIndex);
+        if (item.data?.endIndex !== undefined) {
+            indices.push(item.data.endIndex);
+        }
+    }
+
+    // Remove duplicates
+    indices = [...new Set(indices)];
+
+    if (indices.length === 0) {
+        console.warn('[FloatingNudgePresenter] No chord indices to highlight');
+        return;
+    }
+
+    // Highlight the chord cards
+    highlightChordCards(indices);
+
+    // Scroll the first chord into view
+    scrollToChordCard(indices[0]);
+}
+
+/**
+ * Highlight chord cards at the specified indices
+ * @param {number[]} indices - Chord indices to highlight
+ */
+function highlightChordCards(indices) {
+    console.log('[FloatingNudgePresenter] highlightChordCards called with indices:', indices);
+
+    // Remove any existing highlights
+    document.querySelectorAll('.coach-highlight').forEach(el => {
+        el.classList.remove('coach-highlight');
+    });
+
+    // Also trigger the VexFlow notation highlight if available
+    if (window.setCoachHighlight && indices.length > 0) {
+        window.setCoachHighlight(indices, 5000);
+    }
+
+    let totalCardsFound = 0;
+
+    // Add highlight to each chord card
+    for (const index of indices) {
+        // Find chord cards with this index across all visualizations
+        const selectors = [
+            `#progression-visualization [data-chord-index="${index}"]`,
+            `#melody-progression-visualization [data-chord-index="${index}"]`,
+            `#builder-progression-visualization [data-chord-index="${index}"]`,
+            `#fs-chord-cards-container [data-chord-index="${index}"]`,
+            `.chord-card-wrapper[data-chord-index="${index}"]`
+        ];
+
+        for (const selector of selectors) {
+            const cards = document.querySelectorAll(selector);
+            totalCardsFound += cards.length;
+            cards.forEach(card => {
+                card.classList.add('coach-highlight');
+                console.log('[FloatingNudgePresenter] Added highlight to card:', selector, card);
+            });
+        }
+    }
+
+    console.log('[FloatingNudgePresenter] Total cards found and highlighted:', totalCardsFound);
+
+    // Auto-remove highlight after 5 seconds
+    setTimeout(() => {
+        document.querySelectorAll('.coach-highlight').forEach(el => {
+            el.classList.remove('coach-highlight');
+        });
+    }, 5000);
+}
+
+/**
+ * Scroll a chord card into view
+ * @param {number} index - Chord index
+ */
+function scrollToChordCard(index) {
+    // Try to find a visible chord card container
+    const containers = [
+        document.getElementById('fs-chord-cards-container'),
+        document.getElementById('progression-visualization'),
+        document.getElementById('melody-progression-visualization')
+    ];
+
+    for (const container of containers) {
+        if (!container || container.offsetParent === null) continue; // Skip hidden containers
+
+        const card = container.querySelector(`[data-chord-index="${index}"]`);
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            break;
+        }
+    }
+}
+
+/**
+ * Handle "Hear It" action - plays the detected chord
+ * @param {Object} item - Coach item
+ */
+function handleHearAction(item) {
+    console.log('[FloatingNudgePresenter] Hear action:', item.id);
+
+    const chord = item.data?.chord;
+    if (!chord) {
+        console.warn('[FloatingNudgePresenter] No chord data to play');
+        return;
+    }
+
+    // Use the chord's notes array if available (preserves correct octaves)
+    if (chord.notes && chord.notes.length > 0) {
+        if (window.playNotesArray) {
+            window.playNotesArray(chord.notes);
+        } else if (window.getPiano) {
+            const piano = window.getPiano();
+            if (piano) {
+                piano.triggerAttackRelease(chord.notes, '2n');
+            }
+        }
+    } else if (chord.root && chord.type) {
+        // Fallback to generating notes
+        if (window.playChord) {
+            window.playChord(chord.root, chord.type, chord.inversion || 0);
+        }
+    }
+}
+
+/**
+ * Handle preview action - plays the suggested chord
+ * @param {Object} item - Coach item
+ */
+function handlePreviewAction(item) {
+    console.log('[FloatingNudgePresenter] Preview action:', item.id);
+
+    const suggested = item.data?.suggestedChord;
+    if (!suggested) {
+        console.warn('[FloatingNudgePresenter] No suggested chord to preview');
+        return;
+    }
+
+    // Play the suggested chord
+    if (suggested.notes && suggested.notes.length > 0) {
+        if (window.playNotesArray) {
+            window.playNotesArray(suggested.notes);
+        } else if (window.getPiano) {
+            const piano = window.getPiano();
+            if (piano) {
+                piano.triggerAttackRelease(suggested.notes, '2n');
+            }
+        }
+    } else if (suggested.root && suggested.type) {
+        if (window.playChord) {
+            window.playChord(suggested.root, suggested.type, suggested.inversion || 0);
+        }
+    }
+}
+
+/**
+ * Handle apply action - applies the suggested change
  * @param {Object} item - Coach item
  */
 function handleApplyAction(item) {
     console.log('[FloatingNudgePresenter] Apply action:', item.id);
 
-    // Apply the suggestion
-    if (item.data?.suggestedChord && item.data?.chordIndex !== undefined) {
-        const suggested = item.data.suggestedChord;
-        const index = item.data.chordIndex;
+    const chordIndex = item.data?.chordIndex;
+    if (chordIndex === undefined) {
+        console.warn('[FloatingNudgePresenter] No chord index for apply action');
+        return;
+    }
 
+    // Apply suggested chord replacement
+    if (item.data?.suggestedChord) {
+        const suggested = item.data.suggestedChord;
         if (window.updateChordAtIndex) {
-            window.updateChordAtIndex(index, suggested);
+            window.updateChordAtIndex(chordIndex, suggested);
             hideNudge();
+            return;
         }
-    } else if (item.data?.applyFunction && typeof window[item.data.applyFunction] === 'function') {
+    }
+
+    // Apply inversion change
+    if (item.data?.suggestedInversion !== undefined) {
+        if (window.setChordInversion) {
+            window.setChordInversion(chordIndex, item.data.suggestedInversion);
+            hideNudge();
+            return;
+        }
+    }
+
+    // Custom apply function
+    if (item.data?.applyFunction && typeof window[item.data.applyFunction] === 'function') {
         window[item.data.applyFunction](item.data);
         hideNudge();
     }
@@ -525,9 +968,9 @@ function handleCompareAction(item) {
     console.log('[FloatingNudgePresenter] Compare action:', item.id);
 
     // Open the unified recommendation modal in compare mode
-    if (window.openUnifiedRecommendationModal) {
+    if (window.showUnifiedRecommendationModal) {
         const chordIndex = item.data?.chordIndex ?? 0;
-        window.openUnifiedRecommendationModal(chordIndex, 'compare');
+        window.showUnifiedRecommendationModal({ chordIndex, initialTab: 'chord' });
         hideNudge();
     }
 }
@@ -555,30 +998,479 @@ function handlePanelAction(item) {
 }
 
 /**
- * Handle deep dive action (open modal for detailed exploration)
+ * Handle deep dive / learn more action
+ * Shows an educational modal with information about the concept
  * @param {Object} item - Coach item
  */
 function handleDeepDiveAction(item) {
-    console.log('[FloatingNudgePresenter] Deep dive action:', item.id);
+    console.log('[FloatingNudgePresenter] ========== LEARN MORE ACTION ==========');
+    console.log('[FloatingNudgePresenter] Item ID:', item.id);
+    console.log('[FloatingNudgePresenter] Item category:', item.category);
 
-    // Open the unified recommendation modal
-    if (window.openUnifiedRecommendationModal) {
-        const chordIndex = item.data?.chordIndex ?? 0;
+    // Show the educational modal with information about this coach item's concept
+    showLearnMoreModal(item);
+    hideNudge();
+}
 
-        // Determine the best tab to open based on category
-        let tab = 'suggest';
-        if (item.category === COACH_CATEGORIES.VOICE_LEADING) {
-            tab = 'optimize';
-        } else if (item.category === COACH_CATEGORIES.BORROWED) {
-            tab = 'transform';
-        } else if (item.category === COACH_CATEGORIES.SEQUENCE) {
-            tab = 'sequence';
+/**
+ * Show an educational modal for a coach item
+ * @param {Object} item - Coach item
+ */
+function showLearnMoreModal(item) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('coach-learn-more-modal');
+    if (existingModal) existingModal.remove();
+
+    // Get educational content for this item
+    const content = getEducationalContent(item);
+
+    // Create the modal
+    const modal = document.createElement('div');
+    modal.id = 'coach-learn-more-modal';
+    modal.className = 'fixed inset-0 z-[99999] flex items-center justify-center p-4';
+    modal.style.cssText = 'animation: coachFadeIn 0.2s ease-out;';
+
+    modal.innerHTML = `
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="document.getElementById('coach-learn-more-modal')?.remove()"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden">
+            <!-- Header -->
+            <div class="px-6 py-4 bg-gradient-to-r ${content.gradientClass} text-white">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl">${content.emoji}</span>
+                        <div>
+                            <h2 class="text-xl font-bold">${content.title}</h2>
+                            <span class="text-xs opacity-80">${content.category}</span>
+                        </div>
+                    </div>
+                    <button onclick="document.getElementById('coach-learn-more-modal')?.remove()"
+                            class="text-white/80 hover:text-white transition p-1">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="px-6 py-4 overflow-y-auto max-h-[calc(80vh-180px)]">
+                <!-- Main explanation -->
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">What is this?</h3>
+                    <p class="text-gray-600 dark:text-gray-300 leading-relaxed">${content.explanation}</p>
+                </div>
+
+                ${content.analogy ? `
+                    <div class="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                        <div class="flex items-start gap-2">
+                            <span class="text-lg">💡</span>
+                            <p class="text-amber-800 dark:text-amber-200 text-sm">${content.analogy}</p>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${content.examples?.length > 0 ? `
+                    <div class="mb-4">
+                        <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Examples</h3>
+                        <ul class="list-disc list-inside text-gray-600 dark:text-gray-300 space-y-1 text-sm">
+                            ${content.examples.map(ex => `<li>${ex}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+
+                ${content.tip ? `
+                    <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div class="flex items-start gap-2">
+                            <span class="text-lg">🎯</span>
+                            <div>
+                                <span class="font-medium text-blue-800 dark:text-blue-200 text-sm">Tip: </span>
+                                <span class="text-blue-700 dark:text-blue-300 text-sm">${content.tip}</span>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-100 dark:border-gray-600 flex justify-end">
+                <button onclick="document.getElementById('coach-learn-more-modal')?.remove()"
+                        class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium transition">
+                    Got it!
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close on Escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', handleEscape);
         }
+    };
+    document.addEventListener('keydown', handleEscape);
+}
 
-        window.openUnifiedRecommendationModal(chordIndex, tab);
+/**
+ * Get educational content for a coach item
+ * @param {Object} item - Coach item
+ * @returns {Object} Educational content object
+ */
+function getEducationalContent(item) {
+    // Map coach item IDs to educational content
+    const contentMap = {
+        // Cadences
+        'perfect-cadence': {
+            title: 'Perfect Authentic Cadence',
+            category: 'Cadences',
+            emoji: '✅',
+            gradientClass: 'from-emerald-500 to-teal-500',
+            explanation: "The Perfect Authentic Cadence (V→I) is the strongest, most conclusive ending in music. It's the musical equivalent of a full stop at the end of a sentence - final, complete, and satisfying.",
+            analogy: "Think of it like a ball finally landing after being thrown. The V chord is like the ball in the air (tension), and the I chord is the satisfying 'thunk' when it lands (resolution).",
+            examples: ["End of 'Happy Birthday'", "End of 'Twinkle Twinkle Little Star'", "Almost every Classical piece ends this way"],
+            tip: "Use V→I to create strong endings for your phrases and sections."
+        },
+        'plagal-cadence': {
+            title: 'Plagal Cadence (The Amen Cadence)',
+            category: 'Cadences',
+            emoji: '🙏',
+            gradientClass: 'from-purple-500 to-indigo-500',
+            explanation: "The Plagal Cadence (IV→I) is a softer, gentler ending. It's called the 'Amen' cadence because hymns often end this way - peaceful and settled rather than dramatic.",
+            analogy: "If V→I is landing after a jump, IV→I is gently sitting down. Both arrive at home, but one is more forceful, the other more peaceful.",
+            examples: ["The 'Amen' at the end of hymns", "End of 'Let It Be' by The Beatles", "Often follows an authentic cadence for extra 'settling'"],
+            tip: "Use IV→I when you want a gentle, peaceful ending instead of a dramatic one."
+        },
+        'deceptive-cadence': {
+            title: 'Deceptive Cadence',
+            category: 'Cadences',
+            emoji: '🎉',
+            gradientClass: 'from-pink-500 to-rose-500',
+            explanation: "The Deceptive Cadence (V→vi) is a musical plot twist! When you expect V to resolve to I, it surprises you by going to vi instead. It's satisfying but unexpected.",
+            analogy: "It's like walking home and suddenly turning down a different street. You didn't go where expected, but it's still a nice destination.",
+            examples: ["Creates a 'not yet finished' feeling", "Common in romantic classical music", "Extends emotional passages"],
+            tip: "Use V→vi when you want to surprise the listener and keep the music going instead of ending."
+        },
+        'half-cadence': {
+            title: 'Half Cadence',
+            category: 'Cadences',
+            emoji: '❓',
+            gradientClass: 'from-amber-500 to-orange-500',
+            explanation: "A Half Cadence ends on the V chord - it's like a musical question mark. It creates suspense and the expectation of more music to come.",
+            analogy: "It's like ending a sentence with '...' - incomplete and expectant. The listener knows there's more coming.",
+            examples: ["Often used between sections of a piece", "Creates a pause without full resolution", "The listener waits for the answer"],
+            tip: "Use half cadences to create pauses and breathing points in the middle of your music."
+        },
+
+        // Borrowed Chords
+        'borrowed-bVI': {
+            title: 'Borrowed bVI Chord',
+            category: 'Borrowed Chords',
+            emoji: '🎭',
+            gradientClass: 'from-indigo-500 to-purple-500',
+            explanation: "The bVI chord is 'borrowed' from the parallel minor key. In C major, using Ab major instead of Am adds dramatic, cinematic color - think epic movie soundtracks!",
+            analogy: "It's like using a word from another language because it expresses something your native language doesn't have perfectly.",
+            examples: ["C → Ab → G → C (dramatic progression)", "Common in film scores", "The 'epic' sound of superhero movies"],
+            tip: "Use bVI when you want to add drama and emotion - it works especially well going to V or I."
+        },
+        'borrowed-bVII': {
+            title: 'Borrowed bVII Chord',
+            category: 'Borrowed Chords',
+            emoji: '🎸',
+            gradientClass: 'from-orange-500 to-red-500',
+            explanation: "The bVII chord has that classic rock and folk flavor. In C major, Bb major is borrowed from C Mixolydian mode and creates a laid-back, rootsy feel.",
+            analogy: "It's the sound of a guitarist who learned from classic rock rather than classical music - authentic and unpretentious.",
+            examples: ["C → Bb → F → C (rock progression)", "Sweet Home Alabama", "Free Fallin' by Tom Petty"],
+            tip: "Use bVII→IV→I for instant rock credibility. It's THE rock cadence."
+        },
+        'borrowed-iv': {
+            title: 'Minor iv Chord',
+            category: 'Borrowed Chords',
+            emoji: '😢',
+            gradientClass: 'from-blue-500 to-indigo-500',
+            explanation: "The minor iv (like Fm in C major) is borrowed from the parallel minor. It transforms the usually bright IV chord into something bittersweet and melancholic.",
+            analogy: "It's like a sunny day with a few clouds - still beautiful, but with a touch of sadness.",
+            examples: ["C → Fm → C (the 'creep' progression)", "Adds emotional depth to pop ballads", "Common in emotional climaxes"],
+            tip: "Use minor iv when you want to add a touch of sadness or yearning to an otherwise major-key song."
+        },
+
+        // Voice Leading
+        'smooth-voice-leading': {
+            title: 'Smooth Voice Leading',
+            category: 'Voice Leading',
+            emoji: '🌊',
+            gradientClass: 'from-cyan-500 to-blue-500',
+            explanation: "Smooth voice leading means each note moves as little as possible when changing chords. Small, stepwise movements create elegant, professional-sounding progressions.",
+            analogy: "Think of each note as a person walking. It's easier and smoother to take small steps than to keep jumping around!",
+            examples: ["Hold common tones (notes in both chords)", "Move other voices by step when possible", "Avoid big leaps in all voices at once"],
+            tip: "Try using chord inversions to create stepwise bass lines - this immediately improves voice leading."
+        },
+        'fix-parallel-fifths': {
+            title: 'Parallel Fifths',
+            category: 'Voice Leading',
+            emoji: '⚠️',
+            gradientClass: 'from-yellow-500 to-amber-500',
+            explanation: "When two voices move in parallel fifths (both moving the same direction, maintaining a fifth apart), they lose their independence and 'merge' into one perceived line.",
+            analogy: "It's like two people walking exactly in lockstep - they start to look like one entity instead of two individuals.",
+            examples: ["Common in rock and metal (intentional)", "Avoided in classical counterpoint", "Creates a 'hollow' or 'open' sound"],
+            tip: "In classical styles, fix parallel fifths using contrary motion. In rock? Keep them - they're part of the sound!"
+        },
+        'fix-parallel-octaves': {
+            title: 'Parallel Octaves',
+            category: 'Voice Leading',
+            emoji: '⚠️',
+            gradientClass: 'from-yellow-500 to-amber-500',
+            explanation: "When two voices move in parallel octaves, they're essentially playing the same note in different registers. This reduces the number of independent voices in your texture.",
+            analogy: "It's like two singers singing the same melody together - powerful for unison, but you lose the harmony.",
+            examples: ["Reduces textural richness", "Both voices sound like one", "Sometimes used intentionally for power"],
+            tip: "Move one voice in the opposite direction, or have one voice stay on a common tone while the other moves."
+        },
+        'fix-voice-crossing': {
+            title: 'Voice Crossing',
+            category: 'Voice Leading',
+            emoji: '🔀',
+            gradientClass: 'from-purple-500 to-pink-500',
+            explanation: "Voice crossing happens when a higher voice goes below a lower voice (or vice versa). This can create muddiness and confusion about which voice is which.",
+            analogy: "Imagine two dancers who keep bumping into each other because they're crossing paths - it looks messy!",
+            examples: ["Bass going above tenor", "Alto going below bass", "Creates registral confusion"],
+            tip: "Keep your voices in their own 'lanes' - soprano stays high, bass stays low, and inner voices stay in the middle."
+        },
+        'try-inversion': {
+            title: 'Chord Inversions',
+            category: 'Voice Leading',
+            emoji: '✨',
+            gradientClass: 'from-violet-500 to-purple-500',
+            explanation: "Instead of always playing chords in root position, try inversions! First inversion puts the 3rd in the bass, second inversion puts the 5th. This creates smooth, melodic bass lines.",
+            analogy: "It's like rearranging furniture in a room - same pieces, different arrangement, different feel.",
+            examples: ["C/E (first inversion, E in bass)", "C/G (second inversion, G in bass)", "Walking bass lines use lots of inversions"],
+            tip: "When your bass is making big jumps, see if an inversion of the next chord could create stepwise motion instead."
+        },
+
+        // Secondary Dominants
+        'secondary-dominant': {
+            title: 'Secondary Dominants',
+            category: 'Advanced Harmony',
+            emoji: '🔥',
+            gradientClass: 'from-red-500 to-orange-500',
+            explanation: "A secondary dominant is a chord that acts as the V of another chord (not just I). It 'points' to that chord, making its arrival feel more important and satisfying.",
+            analogy: "It's like giving someone a royal introduction: 'Ladies and gentlemen... JOHN!' instead of just 'Here's John.'",
+            examples: ["D7 → G in C major (V/V)", "A7 → Dm in C major (V/ii)", "E7 → Am in C major (V/vi)"],
+            tip: "To create a secondary dominant, play a major chord or dominant 7th a fifth above any diatonic chord."
+        },
+        'try-secondary-dominant': {
+            title: 'Secondary Dominants',
+            category: 'Advanced Harmony',
+            emoji: '🔥',
+            gradientClass: 'from-red-500 to-orange-500',
+            explanation: "Secondary dominants add chromatic interest and create stronger 'pulls' between chords. They're like turbo-charging your progressions!",
+            analogy: "Think of them as spotlights - they highlight and intensify the arrival at any chord, not just the tonic.",
+            examples: ["ii-V-I becomes ii-V/V-V-I", "Add A7 before Dm for extra drama", "Chain them: A7→D7→G7→C"],
+            tip: "Before any major or minor chord, try adding its V7 chord for instant sophistication."
+        },
+
+        // Tension Chord Resolutions
+        'resolve-sus4': {
+            title: 'Suspended 4th Resolution',
+            category: 'Resolution',
+            emoji: '🎯',
+            gradientClass: 'from-cyan-500 to-blue-500',
+            explanation: "A sus4 chord replaces the 3rd with a 4th, creating tension that wants to resolve. The 4th naturally falls down by step to the 3rd, completing the chord.",
+            analogy: "It's like holding your breath - the suspension creates expectation, and the resolution is the satisfying exhale.",
+            examples: ["Csus4 → C (the 4th F falls to E)", "Gsus4 → G (the 4th C falls to B)", "Very common in pop and rock"],
+            tip: "Use sus4 chords to add melodic interest. The suspension-resolution pattern is extremely satisfying to the ear."
+        },
+        'resolve-sus2': {
+            title: 'Suspended 2nd Resolution',
+            category: 'Resolution',
+            emoji: '🎯',
+            gradientClass: 'from-cyan-500 to-blue-500',
+            explanation: "A sus2 chord replaces the 3rd with a 2nd, creating an open, unresolved sound. The 2nd can rise up to the 3rd to complete the chord.",
+            analogy: "Sus2 chords sound more ambiguous than sus4 - they're asking a question rather than holding back an answer.",
+            examples: ["Csus2 → C (the 2nd D rises to E)", "Often used for dreamy, open textures", "Popular in alternative and indie rock"],
+            tip: "Sus2 chords don't demand resolution as strongly as sus4. You can leave them unresolved for an ethereal effect."
+        },
+        'resolve-diminished': {
+            title: 'Diminished Chord Resolution',
+            category: 'Resolution',
+            emoji: '⚡',
+            gradientClass: 'from-purple-500 to-pink-500',
+            explanation: "Diminished chords are highly unstable due to their tritone interval. They function like leading-tone chords and typically resolve up by half step.",
+            analogy: "A diminished chord is like standing on one foot on a slippery surface - it desperately wants to find stable ground.",
+            examples: ["B° → C (the root rises a half step)", "G#° → Am (common in classical music)", "Creates strong dramatic tension"],
+            tip: "Diminished 7th chords can resolve to ANY major or minor chord a half step above any of their notes - they're versatile!"
+        },
+        'resolve-augmented': {
+            title: 'Augmented Chord Resolution',
+            category: 'Resolution',
+            emoji: '✨',
+            gradientClass: 'from-pink-500 to-rose-500',
+            explanation: "Augmented chords have a raised 5th that creates an unstable, dreamlike quality. The raised 5th typically wants to continue rising by half step.",
+            analogy: "An augmented chord feels like being suspended in air - magical but unsustainable, needing to land somewhere.",
+            examples: ["C+ → F (common V+ → I in F major)", "Creates a chromatic line: G → G#(+) → A", "Used for dramatic effect"],
+            tip: "Augmented chords often function as altered dominants. Try V+ → I for a colorful resolution."
+        },
+        'resolve-dominant7': {
+            title: 'Dominant 7th Resolution',
+            category: 'Resolution',
+            emoji: '🔥',
+            gradientClass: 'from-orange-500 to-red-500',
+            explanation: "Dominant 7th chords contain a tritone (between the 3rd and 7th) that creates powerful tension. This tritone resolves inward: the 7th falls and the 3rd rises.",
+            analogy: "The tritone is like a rubber band stretched to its limit - it has to snap back to resolve.",
+            examples: ["G7 → C (the classic V7-I)", "The 7th (F) falls to E, the 3rd (B) rises to C", "Foundation of jazz harmony"],
+            tip: "Any dominant 7th chord wants to resolve down a 5th. This makes them perfect for creating chains: A7 → D7 → G7 → C."
+        },
+
+        // Sequences
+        'circle-of-fifths': {
+            title: 'Circle of Fifths Motion',
+            category: 'Sequences',
+            emoji: '🔄',
+            gradientClass: 'from-teal-500 to-cyan-500',
+            explanation: "When chords move in fifths (each chord is a fifth below the previous), they create one of music's most powerful patterns. Each chord 'points' to the next like dominoes falling.",
+            analogy: "It's like a chain reaction - each chord naturally leads to the next, creating unstoppable forward momentum.",
+            examples: ["Am → Dm → G → C", "Full cycle: I→IV→vii→iii→vi→ii→V→I", "Autumn Leaves uses this extensively"],
+            tip: "Start from vi and move through the cycle: vi→ii→V→I is one of the most common progressions in jazz and pop."
+        },
+        'harmonic-sequence': {
+            title: 'Harmonic Sequence',
+            category: 'Sequences',
+            emoji: '📐',
+            gradientClass: 'from-green-500 to-emerald-500',
+            explanation: "A harmonic sequence repeats a chord pattern at different pitch levels. This creates unity through repetition while also creating directional motion.",
+            analogy: "It's like climbing stairs - each step is the same motion, but you're constantly moving somewhere.",
+            examples: ["Descending thirds: C→Am→F→Dm", "Descending steps: C→Bm→Am→G", "Creates predictable, satisfying patterns"],
+            tip: "Once you establish a pattern, the listener expects it to continue - you can surprise them by breaking it at a strategic moment."
+        },
+
+        // Modal Patterns
+        'dorian-pattern': {
+            title: 'Dorian Mode',
+            category: 'Modal Patterns',
+            emoji: '🎷',
+            gradientClass: 'from-indigo-500 to-blue-500',
+            explanation: "The Dorian mode is like a minor scale with a raised 6th. This allows a major IV chord over a minor tonic - the distinctive sound of jazz, funk, and soul.",
+            analogy: "It's minor with a silver lining - sad but hopeful, dark but sophisticated.",
+            examples: ["i→IV (Dm→G in D Dorian)", "'So What' by Miles Davis", "Most funk and soul music"],
+            tip: "For instant Dorian flavor, play a minor chord with a major chord one whole step below it (like Am→G)."
+        },
+        'mixolydian-pattern': {
+            title: 'Mixolydian Mode',
+            category: 'Modal Patterns',
+            emoji: '🎸',
+            gradientClass: 'from-orange-500 to-amber-500',
+            explanation: "The Mixolydian mode is like a major scale with a lowered 7th. This creates the bVII chord that defines classic rock, blues, and folk music.",
+            analogy: "It's the sound of a guitarist who learned from classic rock records rather than classical music - authentic and earthy.",
+            examples: ["I→bVII (C→Bb in C Mixolydian)", "'Sweet Home Alabama'", "'Norwegian Wood' by The Beatles"],
+            tip: "For instant rock credibility, add the bVII chord to any major key progression."
+        },
+
+        // Chromatic Relationships
+        'chromatic-mediant': {
+            title: 'Chromatic Mediant',
+            category: 'Advanced Harmony',
+            emoji: '✨',
+            gradientClass: 'from-pink-500 to-purple-500',
+            explanation: "Chromatic mediants are chords a third apart with chromatic alterations. They create dramatic, colorful shifts common in film scores and romantic music.",
+            analogy: "It's like a sudden change of lighting in a movie - the scene is transformed without actually moving anywhere.",
+            examples: ["C major → E major", "C major → Ab major", "Common in Hans Zimmer scores"],
+            tip: "Try moving from any major chord to another major chord a major or minor third away for instant cinematic drama."
+        },
+
+        // Tension
+        'tension-climax': {
+            title: 'Tension Peak',
+            category: 'Form & Structure',
+            emoji: '📈',
+            gradientClass: 'from-red-500 to-pink-500',
+            explanation: "Great music builds to tension peaks and then releases them. A tension climax is the most intense moment in your progression - the top of the emotional arc.",
+            analogy: "It's like the peak of a rollercoaster - the maximum height before the thrilling release.",
+            examples: ["Dominant chords create tension", "Dissonance increases toward the peak", "Resolution follows the climax"],
+            tip: "Plan your progressions with tension arcs in mind - build up tension gradually, then release it satisfyingly."
+        },
+
+        // Rhythm
+        'vary-harmonic-rhythm': {
+            title: 'Harmonic Rhythm',
+            category: 'Rhythm & Pacing',
+            emoji: '⏱️',
+            gradientClass: 'from-blue-500 to-purple-500',
+            explanation: "Harmonic rhythm is how quickly the chords change. Varying it creates interest - faster changes for excitement, slower changes for stability.",
+            analogy: "It's like the pacing of a conversation - sometimes quick back-and-forth, sometimes pausing to let ideas sink in.",
+            examples: ["Slow at the start, fast at cadences", "One chord per bar vs. two chords per bar", "Longer chords on important moments"],
+            tip: "Speed up harmonic rhythm as you approach a cadence - it creates momentum and makes the resolution more satisfying."
+        },
+
+        // Opportunities
+        'no-borrowed-chords': {
+            title: 'Modal Interchange',
+            category: 'Advanced Harmony',
+            emoji: '🎨',
+            gradientClass: 'from-violet-500 to-indigo-500',
+            explanation: "Borrowed chords add color by using chords from parallel modes. They're like spices in cooking - a little goes a long way!",
+            analogy: "Imagine painting with only primary colors versus having the full rainbow available. Borrowed chords expand your palette.",
+            examples: ["bVII for rock flavor", "bVI for drama", "iv for melancholy"],
+            tip: "Try replacing IV with iv for instant emotional depth. Or use bVII→IV→I for a rock cadence."
+        },
+        'no-cadence': {
+            title: 'Cadential Patterns',
+            category: 'Form & Structure',
+            emoji: '🏁',
+            gradientClass: 'from-green-500 to-teal-500',
+            explanation: "Cadences are musical punctuation - they create sense of arrival and closure. Without them, music can feel like it's wandering without purpose.",
+            analogy: "Music without cadences is like a story without periods or chapter endings - the listener doesn't know when to breathe.",
+            examples: ["V→I (strongest ending)", "IV→I (gentle ending)", "V→vi (surprise continuation)"],
+            tip: "End phrases with V→I or IV→I. Even if the whole song is one phrase, it needs an ending!"
+        }
+    };
+
+    // Get content for this item, or generate a default
+    const content = contentMap[item.id];
+
+    if (content) {
+        return content;
     }
 
-    hideNudge();
+    // Generate default content based on the item's own message
+    const itemMessage = typeof item.message === 'object'
+        ? item.message[skillLevel] || item.message.simple
+        : item.message || '';
+
+    return {
+        title: item.title || 'Music Theory Concept',
+        category: formatCategory(item.category) || 'Theory',
+        emoji: item.emoji || '💡',
+        gradientClass: getCategoryGradient(item.category),
+        explanation: itemMessage || "This is an interesting pattern or technique in music theory. Experiment with it in your progressions!",
+        tip: "Listen carefully to how this pattern sounds. Try to identify it in music you already know and love."
+    };
+}
+
+/**
+ * Get gradient class for a category
+ * @param {string} category - Coach category
+ * @returns {string} Tailwind gradient class
+ */
+function getCategoryGradient(category) {
+    const gradients = {
+        [COACH_CATEGORIES.CADENCE]: 'from-emerald-500 to-teal-500',
+        [COACH_CATEGORIES.BORROWED_CHORD]: 'from-purple-500 to-indigo-500',
+        [COACH_CATEGORIES.SECONDARY_DOMINANT]: 'from-red-500 to-orange-500',
+        [COACH_CATEGORIES.SEQUENCE]: 'from-cyan-500 to-blue-500',
+        [COACH_CATEGORIES.MODAL_PATTERN]: 'from-indigo-500 to-purple-500',
+        [COACH_CATEGORIES.CHROMATIC_MEDIANT]: 'from-pink-500 to-purple-500',
+        [COACH_CATEGORIES.VOICE_LEADING]: 'from-blue-500 to-cyan-500',
+        [COACH_CATEGORIES.TENSION]: 'from-red-500 to-pink-500',
+        [COACH_CATEGORIES.INVERSION]: 'from-violet-500 to-purple-500',
+        [COACH_CATEGORIES.VOICE_LEADING_FIX]: 'from-yellow-500 to-amber-500',
+        [COACH_CATEGORIES.HARMONIC_ENRICHMENT]: 'from-green-500 to-emerald-500',
+        [COACH_CATEGORIES.RESOLUTION]: 'from-teal-500 to-cyan-500',
+        [COACH_CATEGORIES.RHYTHM]: 'from-blue-500 to-purple-500',
+        [COACH_CATEGORIES.MISSING_PATTERN]: 'from-amber-500 to-orange-500',
+        [COACH_CATEGORIES.VARIETY]: 'from-violet-500 to-indigo-500',
+        [COACH_CATEGORIES.STRUCTURE]: 'from-gray-500 to-slate-500'
+    };
+    return gradients[category] || 'from-indigo-500 to-purple-500';
 }
 
 // ============================================================================
@@ -599,9 +1491,14 @@ export function hideNudge(preserveLast = false, reason = 'dismiss') {
 
     const popup = document.getElementById('coach-nudge-popup');
     if (popup) {
-        popup.style.animation = 'coachSlideOut 0.2s ease-in forwards';
+        // Use fade animation if the nudge was opened with keepSummaryOpen, otherwise slide
+        const animation = keepCurrentNudgeOpen ? 'coachFadeOut 0.2s ease-in forwards' : 'coachSlideOut 0.2s ease-in forwards';
+        popup.style.animation = animation;
         setTimeout(() => popup.remove(), 200);
     }
+
+    // Reset the keepOpen flag
+    keepCurrentNudgeOpen = false;
 
     // Call appropriate callback
     if (currentNudgeCallbacks) {
@@ -689,6 +1586,39 @@ function addStyles() {
             }
         }
 
+        @keyframes coachFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes coachFadeOut {
+            from {
+                opacity: 1;
+                transform: scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+        }
+
+        @keyframes coachHighlightPulse {
+            0%, 100% {
+                box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.6),
+                            0 0 0 6px rgba(251, 191, 36, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.8),
+                            0 0 0 10px rgba(251, 191, 36, 0.4);
+            }
+        }
+
         #coach-nudge-popup {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
@@ -699,6 +1629,38 @@ function addStyles() {
 
         #coach-nudge-popup .coach-action-btn:active {
             transform: scale(0.95);
+        }
+
+        /* Highlight animation for chord cards */
+        .coach-highlight {
+            animation: coachHighlightPulse 1s ease-in-out infinite !important;
+            position: relative !important;
+            z-index: 100 !important;
+            outline: 3px solid #fbbf24 !important;
+            outline-offset: 2px !important;
+            border-radius: 12px !important;
+        }
+
+        .coach-highlight > * {
+            /* Add a golden tint to child elements */
+            background-blend-mode: overlay;
+        }
+
+        .coach-highlight::before {
+            content: '👆';
+            position: absolute;
+            top: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            animation: bounce 0.5s ease-in-out infinite;
+            z-index: 101;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-5px); }
         }
     `;
     document.head.appendChild(style);

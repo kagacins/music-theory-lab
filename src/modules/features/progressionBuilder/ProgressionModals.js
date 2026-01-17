@@ -582,8 +582,10 @@ export function showAddSectionMenu(event, containerId) {
     // Create menu
     const menu = document.createElement('div');
     // Use z-[9995] to appear above fullscreen overlay (z-[9990])
+    // CRITICAL: pointer-events: auto is required for clicks to work in fullscreen mode
     menu.className = 'section-type-menu fixed bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
     menu.style.zIndex = '9995';
+    menu.style.pointerEvents = 'auto';
 
     // Position near the button (getBoundingClientRect returns viewport-relative coords, use fixed positioning)
     const button = event.target.closest('button') || event.target;
@@ -839,8 +841,10 @@ export function showSectionMenu(event, sectionId) {
     // Create context menu
     const menu = document.createElement('div');
     // Use z-[9995] to appear above fullscreen overlay (z-[9990])
+    // CRITICAL: pointer-events: auto is required for clicks to work in fullscreen mode
     menu.className = 'section-context-menu fixed bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
     menu.style.zIndex = '9995';
+    menu.style.pointerEvents = 'auto';
 
     // Get button position (getBoundingClientRect returns viewport-relative coords)
     const button = event.target.closest('button') || event.target;
@@ -960,9 +964,11 @@ export function showChangeSectionTypeDialog(sectionId, currentType, compositionS
     };
 
     // Create overlay - use z-[9995] to appear above fullscreen overlay (z-[9990])
+    // CRITICAL: pointer-events: auto is required for clicks to work in fullscreen mode
     const overlay = document.createElement('div');
     overlay.className = 'change-section-type-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
     overlay.style.zIndex = '9995';
+    overlay.style.pointerEvents = 'auto';
 
     // Create dialog
     const dialog = document.createElement('div');
@@ -1120,9 +1126,11 @@ export function showDuplicateSectionDialog(sectionId, sectionLabel, compositionS
     if (existingDialog) existingDialog.remove();
 
     // Create overlay - use z-[9995] to appear above fullscreen overlay (z-[9990])
+    // CRITICAL: pointer-events: auto is required for clicks to work in fullscreen mode
     const overlay = document.createElement('div');
     overlay.className = 'duplicate-section-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
     overlay.style.zIndex = '9995';
+    overlay.style.pointerEvents = 'auto';
 
     // Create dialog
     const dialog = document.createElement('div');

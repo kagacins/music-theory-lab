@@ -70,6 +70,18 @@ const FUNCTION_LEGEND = {
         chords: '♭II, ♭III, ♯IV, ♭VI, ♭VII',
         description: 'This chord is "borrowed" or chromatic - outside the key for unexpected color.',
         simpleExplanation: 'Like a plot twist - unexpected but effective!'
+    },
+    neutral: {
+        color: '#6b7280', // gray-500
+        bgColor: 'bg-gray-100',
+        borderColor: 'border-gray-400',
+        textColor: 'text-gray-700',
+        icon: '⬜',
+        label: 'Neutral',
+        technicalTerm: 'Unassigned/Unknown',
+        chords: 'N.C., intervals, etc.',
+        description: 'This item has no harmonic function assigned - could be a rest, interval, or unknown chord.',
+        simpleExplanation: 'A placeholder or pause in the harmony.'
     }
 };
 
@@ -186,13 +198,6 @@ function createLegendHTML(compact = false) {
                     `).join('')}
                 </div>
 
-                <!-- Footer -->
-                <div class="px-4 py-2 bg-gray-50 border-t border-gray-200">
-                    <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
-                        <input type="checkbox" id="legend-dont-show" class="rounded text-indigo-600 focus:ring-indigo-500">
-                        <span>Don't show this again</span>
-                    </label>
-                </div>
             </div>
         </div>
     `;
@@ -260,12 +265,10 @@ function attachLegendEventListeners() {
     const closeBtn = document.getElementById('legend-close-btn');
     const expandBtn = document.getElementById('legend-expand-btn');
     const collapseBtn = document.getElementById('legend-collapse-btn');
-    const dontShowCheckbox = document.getElementById('legend-dont-show');
 
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
-            const remember = dontShowCheckbox?.checked || false;
-            hideLegend(remember);
+            hideLegend(false);
         });
     }
 

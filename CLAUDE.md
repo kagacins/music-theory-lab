@@ -4,6 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 🚨 CRITICAL: Composition Studio Modal is DEPRECATED
+
+**The FullScreenNotationEditor modal mode is DEPRECATED and has NO user access path.**
+
+When adding features to the Composition Studio (notation editor, Coach Engine, etc.):
+
+| ✅ DO add to | ❌ DO NOT add to |
+|-------------|-----------------|
+| `_generateTabModeHTML()` in FullScreenNotationEditor.js | `_generateModalHTML()` or modal event handlers |
+| Tab mode header (right section, before Metronome) | `open()`, `close()`, `toggle()` methods |
+| FullScreenBottomPanel.js for dock panels | index.html Staff Notation Card (that's classic mode) |
+
+**The app has THREE interfaces:**
+1. **Composition Studio (New)** - Tabbed fullscreen (`studio-new` tab) - **PRIMARY, use this**
+2. **Melody Composer (Classic)** - Collapsible cards (`melody` tab) - Still active
+3. **Composition Studio Modal** - `isOpen=true` mode - **DEPRECATED, no user access**
+
+---
+
 ## 📚 NAVIGATION DOCUMENTS (READ THESE FIRST!)
 
 **Before exploring the codebase, consult these guides to avoid unnecessary context usage:**

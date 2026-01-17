@@ -2699,6 +2699,74 @@ export function showNotationShortcuts() {
 }
 
 // ============================================================================
+// COACH HIGHLIGHT FUNCTIONS
+// ============================================================================
+
+/**
+ * Set coach highlights on chord indices and re-render notation
+ * Called by the Coach Engine to visually highlight analyzed areas
+ * @param {number[]} chordIndices - Array of chord indices to highlight
+ * @param {number} duration - Auto-clear duration in ms (default: 5000)
+ */
+export function setCoachHighlight(chordIndices, duration = 5000) {
+  const compositionState = notationComposer?.compositionState || window.getCompositionState?.();
+  if (!compositionState) {
+    console.warn('[notationInit] No compositionState available for coach highlight');
+    return;
+  }
+
+  // Set the highlight indices
+  compositionState.setCoachHighlightIndices(chordIndices, duration);
+
+  // Re-render to show the highlights
+  if (notationComposer) {
+    notationComposer.performRender();
+  }
+}
+
+/**
+ * Clear coach highlights from notation
+ */
+export function clearCoachHighlight() {
+  const compositionState = notationComposer?.compositionState || window.getCompositionState?.();
+  if (compositionState) {
+    compositionState.clearCoachHighlight();
+    if (notationComposer) {
+      notationComposer.performRender();
+    }
+  }
+}
+
+/**
+ * Highlight specific notes in the staff notation (for Coach Engine feedback)
+ * This is called by the floatingNudgePresenter when clicking on instances
+ * @param {string[]} notes - Array of note names (e.g., ['C4', 'E4', 'G4'])
+ * @param {number[]} chordIndices - Array of chord indices where these notes occur
+ */
+export function highlightNotesInStaff(notes, chordIndices) {
+  // Set coach highlight on the chord regions
+  if (chordIndices && chordIndices.length > 0) {
+    setCoachHighlight(chordIndices, 5000);
+  }
+
+  // Log for debugging
+  console.log('[notationInit] highlightNotesInStaff:', { notes, chordIndices });
+}
+
+/**
+ * Update measure coach items for the notation overlay icons
+ * Called after coach analysis runs to populate measure indicators
+ * @param {Array} coachItems - Array of coach items from the analysis
+ */
+export function updateMeasureCoachItems(coachItems) {
+  if (!notationComposer) {
+    console.warn('[notationInit] Cannot update measure coach items - notationComposer not initialized');
+    return;
+  }
+  notationComposer.updateMeasureCoachItems(coachItems);
+}
+
+// ============================================================================
 // WINDOW EXPORTS (for HTML event handlers)
 // ============================================================================
 
@@ -2720,6 +2788,11 @@ if (typeof window !== 'undefined') {
   window.getSuggestionManager = getSuggestionManager;
   window.isNotationInitialized = isNotationInitialized;
   window.showNotationShortcuts = showNotationShortcuts;
+  // Coach highlight functions
+  window.setCoachHighlight = setCoachHighlight;
+  window.clearCoachHighlight = clearCoachHighlight;
+  window.highlightNotesInStaff = highlightNotesInStaff;
+  window.updateMeasureCoachItems = updateMeasureCoachItems;
   // Export FeatureFlags for suggestion control
   window.FeatureFlags = FeatureFlags;
 }

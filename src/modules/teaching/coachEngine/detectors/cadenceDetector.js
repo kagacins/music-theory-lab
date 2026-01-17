@@ -57,7 +57,13 @@ export function detectCadences(context) {
                 data: {
                     from: prevRoman,
                     to: currRoman,
-                    measureIndex: i,
+                    startIndex: i - 1,
+                    endIndex: i,
+                    // Only show badge on resolution chord (the second chord)
+                    // This avoids cluttering UI with badges on both V and vi
+                    chordIndices: [i],
+                    chordIndex: i,
+                    chord: currChord,  // For "Hear It" button - play the resolution chord
                     fromChord: prevChord,
                     toChord: currChord
                 }
@@ -72,7 +78,12 @@ export function detectCadences(context) {
                 data: {
                     from: prevRoman,
                     to: currRoman,
-                    measureIndex: i,
+                    startIndex: i - 1,
+                    endIndex: i,
+                    // Only show badge on resolution chord (the I chord)
+                    chordIndices: [i],
+                    chordIndex: i,
+                    chord: currChord,  // For "Hear It" button - play the resolution chord
                     fromChord: prevChord,
                     toChord: currChord
                 }
@@ -80,22 +91,23 @@ export function detectCadences(context) {
         }
 
         // Perfect Authentic Cadence: V → I
-        // Show less frequently since it's common (handled by priority in types.js)
         if ((prevRoman === 'V' || prevRoman === 'V7') &&
             (currRoman === 'I' || currRoman === 'i')) {
-            // Only add sometimes (random chance based on priority)
-            if (Math.random() < 0.3) {
-                items.push({
-                    ...OBSERVATION_TYPES['perfect-cadence'],
-                    data: {
-                        from: prevRoman,
-                        to: currRoman,
-                        measureIndex: i,
-                        fromChord: prevChord,
-                        toChord: currChord
-                    }
-                });
-            }
+            items.push({
+                ...OBSERVATION_TYPES['perfect-cadence'],
+                data: {
+                    from: prevRoman,
+                    to: currRoman,
+                    startIndex: i - 1,
+                    endIndex: i,
+                    // Only show badge on resolution chord (the I chord)
+                    chordIndices: [i],
+                    chordIndex: i,
+                    chord: currChord,  // For "Hear It" button - play the resolution chord
+                    fromChord: prevChord,
+                    toChord: currChord
+                }
+            });
         }
 
         // Half Cadence: ends on V
@@ -106,7 +118,8 @@ export function detectCadences(context) {
                 ...OBSERVATION_TYPES['half-cadence'],
                 data: {
                     to: currRoman,
-                    measureIndex: i,
+                    chordIndex: i,
+                    chord: currChord,  // For "Hear It" button
                     toChord: currChord
                 }
             });

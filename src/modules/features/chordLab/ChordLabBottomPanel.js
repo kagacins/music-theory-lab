@@ -1236,24 +1236,6 @@ export class ChordLabBottomPanel {
                     </span>
                     <div class="flex items-center gap-1.5">
                         <!-- Action Buttons -->
-                        <button id="fs-cl-chords-add-section-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Select adjacent chords, then add to a section">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                            <span>+Section</span>
-                        </button>
-                        <button id="fs-cl-chords-play-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Play progression">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
-                            </svg>
-                            <span>Play</span>
-                        </button>
-                        <button id="fs-cl-chords-clear-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Clear all chords">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                            </svg>
-                            <span>Clear</span>
-                        </button>
                         <button id="fs-cl-chords-colors-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View color legend">
                             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
@@ -1306,38 +1288,6 @@ export class ChordLabBottomPanel {
                 this._saveToStorage(STORAGE_KEYS.VIEW_MODE, this.viewMode);
                 this._renderProgressionContent(container);
             });
-        });
-
-        // Attach +Add Section button handler
-        container.querySelector('#fs-cl-chords-add-section-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const selectedIndices = window.getSelectedIndicesArray ? window.getSelectedIndicesArray() : [];
-            if (selectedIndices.length === 0) {
-                if (window.toast) {
-                    window.toast.warning('Click on chord cards to select them first, then click +Section');
-                }
-                return;
-            }
-            if (window.showAddSectionMenu) {
-                window.showAddSectionMenu(e, 'fs-cl-chord-cards-container');
-            }
-        });
-
-        // Attach Play button handler
-        container.querySelector('#fs-cl-chords-play-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (window.playBuilderProgression) {
-                window.playBuilderProgression();
-            }
-        });
-
-        // Attach Clear button handler
-        container.querySelector('#fs-cl-chords-clear-btn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (window.clearProgression) {
-                window.clearProgression();
-                setTimeout(() => this._renderProgressionContent(container), 100);
-            }
         });
 
         // Attach Colors button handler

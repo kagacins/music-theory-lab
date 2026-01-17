@@ -60,6 +60,7 @@ export { detectCadences } from './cadenceDetector.js';
 export { detectBorrowedChords } from './borrowedChordDetector.js';
 export {
     detectCircleOfFifths,
+    detectHarmonicSequence,
     detectModalPatterns,
     detectSecondaryDominants,
     detectChromaticMediants,
@@ -70,5 +71,6 @@ export {
     detectPedalPoint,
     detectChromaticBassLine,
     detectParallelHarmony,
+    detectTensionClimax,
     detectAdvancedPatterns
 } from './advancedPatternDetector.js';

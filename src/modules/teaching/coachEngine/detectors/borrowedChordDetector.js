@@ -80,11 +80,18 @@ function identifyBorrowedChord(roman, mode) {
  * @returns {Array} Coach items for detected borrowed chords
  */
 export function detectBorrowedChords(context) {
-    const { progression, mode = 'major' } = context;
+    const { progression, key = 'C' } = context;
+    let { mode = 'major' } = context;
     const items = [];
 
     if (!progression || progression.length === 0) {
         return items;
+    }
+
+    // Check if key indicates minor (e.g., "Bbm", "Am", "F#m")
+    // Keys like "Bbm" end with 'm' but are not "dim" chords
+    if (key && key.endsWith('m') && key.length > 1 && !key.endsWith('dim')) {
+        mode = 'minor';
     }
 
     // Track which borrowed chords we've already reported in this analysis
