@@ -1733,6 +1733,20 @@ export function initEnhancedNotation(options = {}) {
       }
     };
 
+    // Handle arpeggio (rolled chord) application
+    notationComposer.toolbar.onArpeggioApply = (direction) => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.applyArpeggioToSelected(direction);
+      }
+    };
+
+    // Handle arpeggio removal
+    notationComposer.toolbar.onArpeggioRemove = () => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.removeArpeggioFromSelected();
+      }
+    };
+
     // Handle tempo marking application
     notationComposer.toolbar.onTempoMarkingApply = (tempoMarking) => {
       noteEditor.applyTempoMarking(tempoMarking);

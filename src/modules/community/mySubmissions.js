@@ -8,6 +8,7 @@ import { getAuthToken, getUserDisplayInfo } from './authService.js';
 import { getCompositionState } from '../state/compositionState.js';
 import { getSubmissionVersions, getSubmissionVersion, restoreSubmissionVersion } from '../admin/adminService.js';
 import { setLoadedSubmissionContext } from './loadedSubmissionContext.js';
+import { showConfirmModal } from '../ui/modals.js';
 
 let mySubmissionsModal = null;
 let currentSubmissions = [];
@@ -22,7 +23,8 @@ function initMySubmissionsModal() {
 
     mySubmissionsModal = document.createElement('div');
     mySubmissionsModal.id = 'my-submissions-modal';
-    mySubmissionsModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4';
+    mySubmissionsModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-4';
+    mySubmissionsModal.style.pointerEvents = 'auto';
     mySubmissionsModal.innerHTML = getModalHTML();
     document.body.appendChild(mySubmissionsModal);
 
@@ -468,7 +470,8 @@ export async function showVersionHistory(submissionId, title) {
     if (!versionModal) {
         versionModal = document.createElement('div');
         versionModal.id = 'version-history-modal';
-        versionModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4';
+        versionModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-4';
+        versionModal.style.pointerEvents = 'auto';
         document.body.appendChild(versionModal);
 
         // Close on backdrop click
@@ -655,9 +658,13 @@ export async function loadVersion(submissionId, versionId, versionNumber) {
     );
 
     if (hasContent) {
-        if (!confirm(`Load version ${versionNumber} into workspace?\n\nThis will replace your current work.`)) {
-            return;
-        }
+        const confirmed = await showConfirmModal({
+            title: 'Load Version',
+            message: `Load version ${versionNumber} into workspace?\n\nThis will replace your current work.`,
+            confirmText: 'Load',
+            danger: true
+        });
+        if (!confirmed) return;
     }
 
     try {
@@ -708,7 +715,7 @@ function showToast(message, type = 'success', duration = 3000) {
         ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>'
         : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>';
 
-    toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-xl z-[60] flex items-center gap-3`;
+    toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-xl z-[9999] flex items-center gap-3`;
     toast.innerHTML = `
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icon}</svg>
         <span class="font-semibold">${message}</span>

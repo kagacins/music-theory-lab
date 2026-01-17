@@ -150,7 +150,7 @@ import {
 
 // Community submission context (for edit flow)
 import { clearLoadedSubmissionContext } from '../../community/loadedSubmissionContext.js';
-import { showAlertModal } from '../../ui/modals.js';
+import { showAlertModal, showConfirmModal } from '../../ui/modals.js';
 
 // Section intent for position-based insertion
 import {
@@ -2537,14 +2537,18 @@ export function removeChordFromProgression(index) {
  * Delete selected chords with confirmation
  * @param {number[]} indices - Array of chord indices to delete
  */
-export function deleteSelectedChords(indices) {
+export async function deleteSelectedChords(indices) {
     if (indices.length === 0) return;
 
     // Confirm if deleting multiple
     if (indices.length > 1) {
-        if (!confirm(`Delete ${indices.length} selected chords?`)) {
-            return;
-        }
+        const confirmed = await showConfirmModal({
+            title: 'Delete Chords',
+            message: `Delete ${indices.length} selected chords?`,
+            confirmText: 'Delete',
+            danger: true
+        });
+        if (!confirmed) return;
     }
 
     const compositionState = getCompositionState();
@@ -2573,7 +2577,7 @@ export function deleteSelectedChords(indices) {
  * Shows confirmation dialog if progression has chords (unless skipConfirmation is true)
  * @param {boolean} skipConfirmation - If true, skip the confirmation dialog
  */
-export function clearProgression(skipConfirmation = false) {
+export async function clearProgression(skipConfirmation = false) {
     const trainerState = getTrainerState();
     const progressionData = getProgressionData();
 
@@ -2584,9 +2588,13 @@ export function clearProgression(skipConfirmation = false) {
             ? 'Are you sure you want to clear the progression? This will remove 1 chord.'
             : `Are you sure you want to clear the progression? This will remove ${chordCount} chords.`;
 
-        if (!confirm(message)) {
-            return; // User cancelled
-        }
+        const confirmed = await showConfirmModal({
+            title: 'Clear Progression',
+            message: message,
+            confirmText: 'Clear',
+            danger: true
+        });
+        if (!confirmed) return; // User cancelled
     }
 
     // Save state for undo before clearing
@@ -2607,6 +2615,7 @@ export function clearProgression(skipConfirmation = false) {
     setProgressionRomans([]);
     setCurrentIndex(0);
     setIsReady(false);
+    setSelectedChordIndex(-1); // Reset selected chord index since there are no chords
 
     // Clear highlights
     clearHighlights();
@@ -2636,6 +2645,11 @@ export function clearProgression(skipConfirmation = false) {
             key: trainerState.currentKey
         }
     }));
+
+    // Clear coach badges immediately (don't wait for async coach analysis)
+    if (window.updateMeasureCoachItems) {
+        window.updateMeasureCoachItems([]);
+    }
 
     // Sync cleared progression to compositionState, then refresh notation
     syncProgressionToMelodyComposer();

@@ -25,7 +25,8 @@ export async function showUserProfileModal(userId, username = null) {
     // Create modal with loading state
     const modal = document.createElement('div');
     modal.id = 'user-profile-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[75] flex items-center justify-center p-4';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
+    modal.style.pointerEvents = 'auto';
     modal.innerHTML = `
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div class="px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-between">

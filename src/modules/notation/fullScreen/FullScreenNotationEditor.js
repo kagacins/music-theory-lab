@@ -575,6 +575,7 @@ export class FullScreenNotationEditor {
                             <option value="fs-section-slurs">Slurs & Ties</option>
                             <option value="fs-section-hairpins">Hairpins</option>
                             <option value="fs-section-grace">Grace Notes</option>
+                            <option value="fs-section-arpeggios">Arpeggios</option>
                             <option value="fs-section-tempo">Tempo</option>
                             <option value="fs-section-repeat">Repeat Signs</option>
                             <option value="fs-section-endings">Endings</option>
@@ -811,6 +812,24 @@ export class FullScreenNotationEditor {
                             </div>
                         </div>
                         <button class="fs-grace-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove grace note from selected notes">Remove Grace</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Arpeggios (Rolled Chords) Section -->
+            <div id="fs-section-arpeggios" class="sidebar-section">
+                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                    <span class="font-medium text-slate-700 text-sm">Arpeggios</span>
+                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-section-content p-2 hidden">
+                    <div class="space-y-2">
+                        <button class="fs-arpeggio-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-arpeggio="up" title="Rolled chord ascending - notes play from lowest to highest">&#8593; Arpeggio Up</button>
+                        <button class="fs-arpeggio-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-arpeggio="down" title="Rolled chord descending - notes play from highest to lowest">&#8595; Arpeggio Down</button>
+                        <button class="fs-arpeggio-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove arpeggio from selected note(s)">Remove Arpeggio</button>
                     </div>
                 </div>
             </div>
@@ -1627,6 +1646,7 @@ export class FullScreenNotationEditor {
                                 <option value="fs-section-slurs">Slurs & Ties</option>
                                 <option value="fs-section-hairpins">Hairpins</option>
                                 <option value="fs-section-grace">Grace Notes</option>
+                                <option value="fs-section-arpeggios">Arpeggios</option>
                                 <option value="fs-section-tempo">Tempo</option>
                                 <option value="fs-section-repeat">Repeat Signs</option>
                                 <option value="fs-section-endings">Endings</option>
@@ -1850,6 +1870,24 @@ export class FullScreenNotationEditor {
                                             </div>
                                         </div>
                                         <button class="fs-grace-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove grace note from selected notes">Remove Grace</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Arpeggios (Rolled Chords) Section -->
+                            <div id="fs-section-arpeggios" class="sidebar-section">
+                                <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                    <span class="font-medium text-slate-700 text-sm">Arpeggios</span>
+                                    <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                                <div class="sidebar-section-content p-2 hidden">
+                                    <div class="space-y-2">
+                                        <button class="fs-arpeggio-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-arpeggio="up" title="Rolled chord ascending - notes play from lowest to highest">&#8593; Arpeggio Up</button>
+                                        <button class="fs-arpeggio-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm shadow-sm" data-arpeggio="down" title="Rolled chord descending - notes play from highest to lowest">&#8595; Arpeggio Down</button>
+                                        <button class="fs-arpeggio-remove-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs shadow-sm" title="Remove arpeggio from selected note(s)">Remove Arpeggio</button>
                                     </div>
                                 </div>
                             </div>
@@ -2474,10 +2512,13 @@ export class FullScreenNotationEditor {
     /**
      * Attach event handlers for sidebar tool buttons
      * These connect to the existing notation toolbar functionality
-     * Works for both modal and tab modes by using _getActiveContainer()
+     * TAB MODE ONLY - attaches handlers to the tabbed Composition Studio sidebar
      */
     _attachSidebarToolHandlers() {
-        const container = this._getActiveContainer();
+        // ONLY work with tab mode - ignore modal completely
+        if (!this.isTabMode || !this.tabContent) return;
+
+        const container = this.tabContent;
         const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
@@ -2728,6 +2769,26 @@ export class FullScreenNotationEditor {
                 if (!isNaN(halfSteps) && toolbar) {
                     toolbar.onGraceNoteTranspose?.(halfSteps);
                 }
+            });
+        });
+
+        // Arpeggio (rolled chord) buttons
+        container.querySelectorAll('.fs-arpeggio-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const arpeggioDirection = e.currentTarget.dataset.arpeggio;
+                const toolbar = getToolbar();
+                console.log('[FS Arpeggio] Button clicked:', { arpeggioDirection, hasToolbar: !!toolbar, hasCallback: !!toolbar?.onArpeggioApply });
+                if (arpeggioDirection && toolbar) {
+                    toolbar.onArpeggioApply?.(arpeggioDirection);
+                }
+            });
+        });
+
+        // Arpeggio remove button
+        container.querySelectorAll('.fs-arpeggio-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const toolbar = getToolbar();
+                toolbar?.onArpeggioRemove?.();
             });
         });
 
@@ -3106,6 +3167,15 @@ export class FullScreenNotationEditor {
             this._updateActiveOrnamentButton(null);
         }
 
+        // Update arpeggio buttons
+        if (hasSelection) {
+            if (toolbar.selectionArpeggio !== 'mixed') {
+                this._updateActiveArpeggioButton(toolbar.selectionArpeggio);
+            }
+        } else {
+            this._updateActiveArpeggioButton(null);
+        }
+
         // Update tuplet buttons (reflect selection state)
         if (hasSelection) {
             if (toolbar.selectionTuplet !== 'mixed') {
@@ -3424,6 +3494,24 @@ export class FullScreenNotationEditor {
     }
 
     /**
+     * Update active state of arpeggio buttons in sidebar
+     * @param {string|null} activeArpeggio - 'up', 'down', or null
+     */
+    _updateActiveArpeggioButton(activeArpeggio) {
+        const container = this._getActiveContainer();
+        const sidebar = container?.querySelector('#fullscreen-sidebar-content');
+        if (!sidebar) return;
+
+        sidebar.querySelectorAll('.fs-arpeggio-btn').forEach(btn => {
+            const isActive = btn.dataset.arpeggio === activeArpeggio;
+            btn.classList.toggle('bg-violet-100', isActive);
+            btn.classList.toggle('border-violet-400', isActive);
+            btn.classList.toggle('bg-white', !isActive);
+            btn.classList.toggle('border-slate-200', !isActive);
+        });
+    }
+
+    /**
      * Update pedal buttons to reflect the selected note's pedal state
      * Mirrors notationToolbar.updatePedalButtonsForSelection()
      */
@@ -3726,6 +3814,7 @@ export class FullScreenNotationEditor {
         this._updateActiveArticulationButton(toolbar.currentArticulation);
         this._updateActiveDynamicButton(toolbar.currentDynamic);
         this._updateActiveOrnamentButton(null);
+        this._updateActiveArpeggioButton(null);
         this._updatePedalButtons(toolbar.selectionPedal);
         this._updateVoltaButtons(toolbar.selectionMeasureIndices);
         this._updateRepeatButtons(toolbar.selectionMeasureIndices);
@@ -3811,9 +3900,13 @@ export class FullScreenNotationEditor {
         setButtonState('.fs-hairpin-remove-btn', toolbar.notesInHairpin);
         setButtonState('.fs-grace-remove-btn', toolbar.hasGraceNotes);
         setButtonState('.fs-grace-transpose-btn', toolbar.hasGraceNotes);
+        setButtonState('.fs-arpeggio-remove-btn', toolbar.hasArpeggio);
 
         // --- Grace note buttons (require 1+ notes) ---
         setButtonState('.fs-grace-btn', has1);
+
+        // --- Arpeggio buttons (require 1+ notes) ---
+        setButtonState('.fs-arpeggio-btn', has1);
 
         // --- Quick actions ---
         setButtonState('.fs-action-btn[data-action="copy"]', has1);

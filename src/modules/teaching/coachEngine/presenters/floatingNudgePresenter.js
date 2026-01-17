@@ -76,8 +76,6 @@ export function initFloatingNudgePresenter() {
 
     // Expose diagnostic function
     window.coachDiagnostics = runCoachDiagnostics;
-
-    console.log('[FloatingNudgePresenter] Initialized');
 }
 
 /**
@@ -198,7 +196,6 @@ function savePreferences() {
 export function toggleCoachNudges(forceState) {
     isEnabled = forceState !== undefined ? forceState : !isEnabled;
     savePreferences();
-    console.log('[FloatingNudgePresenter] Enabled:', isEnabled);
     return isEnabled;
 }
 
@@ -226,13 +223,11 @@ let keepCurrentNudgeOpen = false;
  */
 export function showNudge(item, position = null, options = {}) {
     if (!isEnabled || !item) {
-        console.log('[FloatingNudgePresenter] Nudge skipped (disabled or no item)');
         return;
     }
 
     // Don't show during tutorials
     if (window.isGuidedModeActive?.() || window.isTutorialSetupInProgress) {
-        console.log('[FloatingNudgePresenter] Skipping during tutorial');
         return;
     }
 
@@ -344,8 +339,6 @@ export function showNudge(item, position = null, options = {}) {
         const delay = AUTO_HIDE_DELAYS[item.type] || 10000;
         startAutoHideTimer(delay);
     }
-
-    console.log('[FloatingNudgePresenter] Showing nudge:', item.id, options.keepSummaryOpen ? '(manual close required)' : '');
 }
 
 /**

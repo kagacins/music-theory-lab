@@ -34,7 +34,8 @@ import { COACH_ITEM_TYPES } from '../../teaching/coachEngine/types.js';
 
 const STORAGE_KEYS = {
     ACTIVE_PANEL: 'fs-dock-active-panel',
-    VIEW_MODE: 'fs-dock-view-mode'
+    VIEW_MODE: 'fs-dock-view-mode',
+    DOCK_COLLAPSED: 'fs-dock-collapsed'
 };
 
 const DOCK_HEIGHT = 44; // Height of the dock bar
@@ -71,6 +72,9 @@ export class FullScreenBottomPanel {
         this.viewMode = this._loadFromStorage(STORAGE_KEYS.VIEW_MODE, 'scroll');
         this.selectedSectionIds = new Set();
         this._quickAddSelectedSectionIds = new Set();  // Separate tracking for Quick Add panel
+
+        // Collapse state - load from storage, default to expanded (false)
+        this.isCollapsed = this._loadFromStorage(STORAGE_KEYS.DOCK_COLLAPSED, 'false') === 'true';
 
         // Borrowed chords panel state
         this._selectedBorrowedChord = null;  // Currently selected borrowed chord object
@@ -127,6 +131,45 @@ export class FullScreenBottomPanel {
         this._updateUI();
     }
 
+    /**
+     * Toggle the collapsed state of the dock bar
+     */
+    toggleCollapse() {
+        this.isCollapsed = !this.isCollapsed;
+        this._saveToStorage(STORAGE_KEYS.DOCK_COLLAPSED, this.isCollapsed ? 'true' : 'false');
+
+        // Close any active panel when collapsing
+        if (this.isCollapsed && this.activePanel) {
+            this.activePanel = null;
+            this._saveToStorage(STORAGE_KEYS.ACTIVE_PANEL, '');
+        }
+
+        this._updateCollapseUI();
+    }
+
+    /**
+     * Update UI elements based on collapsed state
+     */
+    _updateCollapseUI() {
+        const dockBar = this.container.querySelector('#fs-dock-bar');
+        const collapsedPill = this.container.querySelector('#fs-dock-collapsed-pill');
+        const panel = this.container.querySelector('#fs-dock-panel');
+
+        if (this.isCollapsed) {
+            // Collapse: hide dock bar and panel, show pill
+            if (dockBar) dockBar.style.display = 'none';
+            if (panel) panel.style.display = 'none';
+            if (collapsedPill) collapsedPill.style.display = '';
+        } else {
+            // Expand: show dock bar, hide pill
+            if (dockBar) dockBar.style.display = '';
+            if (collapsedPill) collapsedPill.style.display = 'none';
+            if (panel) panel.style.display = '';
+            // Re-render panel if there was an active panel
+            this._updateUI();
+        }
+    }
+
     // ========================================================================
     // RENDERING
     // ========================================================================
@@ -150,16 +193,38 @@ export class FullScreenBottomPanel {
             <!-- Slide-up Panel (above dock) -->
             <div id="fs-dock-panel"
                  class="pointer-events-auto mb-2 w-[95%] max-w-5xl bg-white rounded-xl overflow-hidden transition-all duration-300 ease-out"
-                 style="max-height: 0; opacity: 0; box-shadow: 0 10px 40px -5px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.1); border: 2px solid rgba(100,100,120,0.2);">
+                 style="max-height: 0; opacity: 0; box-shadow: 0 10px 40px -5px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.1); border: 2px solid rgba(100,100,120,0.2); ${this.isCollapsed ? 'display: none;' : ''}">
                 <div id="fs-dock-panel-content">
                     <!-- Panel content rendered here -->
                 </div>
             </div>
 
-            <!-- Dock Bar -->
+            <!-- Expanded Dock Bar -->
             <div id="fs-dock-bar"
-                 class="pointer-events-auto flex items-center gap-1 px-2 py-1.5 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl border border-gray-700">
+                 class="pointer-events-auto flex items-center gap-1 px-2 py-1.5 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl border border-gray-700 transition-all duration-300"
+                 style="${this.isCollapsed ? 'display: none;' : ''}">
                 ${this._renderDockButtons()}
+                <!-- Collapse Button -->
+                <div class="w-px h-5 bg-gray-600 mx-1"></div>
+                <button id="fs-dock-collapse-btn"
+                        class="flex items-center justify-center w-7 h-7 rounded-full text-gray-400 hover:text-white hover:bg-white/15 transition-all duration-200"
+                        title="Collapse dock bar">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Collapsed Pill (shown when collapsed) -->
+            <div id="fs-dock-collapsed-pill"
+                 class="pointer-events-auto flex items-center gap-2 px-3 py-2 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl border border-gray-700 cursor-pointer hover:bg-gray-800/90 transition-all duration-300"
+                 style="${this.isCollapsed ? '' : 'display: none;'}"
+                 title="Expand dock bar">
+                <span class="text-sm">🎹</span>
+                <span class="text-xs text-gray-300 font-medium">Dock</span>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                </svg>
             </div>
         `;
 
@@ -253,6 +318,24 @@ export class FullScreenBottomPanel {
                 this.toggle(btn.dataset.panel);
             });
         });
+
+        // Collapse button click
+        const collapseBtn = this.container.querySelector('#fs-dock-collapse-btn');
+        if (collapseBtn) {
+            collapseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleCollapse();
+            });
+        }
+
+        // Collapsed pill click (to expand)
+        const collapsedPill = this.container.querySelector('#fs-dock-collapsed-pill');
+        if (collapsedPill) {
+            collapsedPill.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleCollapse();
+            });
+        }
 
         // Listen for chord selection changes to update Auto-Bass "Apply to Selected" button
         document.addEventListener('chordsSelectionChanged', () => {
@@ -3797,13 +3880,52 @@ export class FullScreenBottomPanel {
             const allSuggestions = generateAllSuggestions(context);
             const allOpportunities = scanAllOpportunities(context);
 
-            // Filter to progression-wide items (items without specific chord index,
-            // or items that are about the whole progression like tension-climax, smooth-voice-leading, vary-harmonic-rhythm)
-            const progressionWideIds = [
-                'tension-climax', 'smooth-voice-leading', 'harmonic-sequence',
-                'circle-of-fifths', 'vary-harmonic-rhythm',
+            // Filter to progression-wide items for Theory Panel display
+            //
+            // These are patterns that describe the OVERALL progression character,
+            // not just what happens at a specific chord. Chord-specific items
+            // (cadences, borrowed chords, secondary dominants, etc.) show on
+            // chord badges when clicked; these provide a summary view.
+            //
+            // OBSERVATIONS that describe progression-wide patterns:
+            const progressionWideObservations = [
+                // Sequences spanning multiple chords
+                'circle-of-fifths',       // e.g., Am → Dm → G → C
+                'harmonic-sequence',      // Repeated interval patterns
+                'ostinato-pattern',       // Repetition patterns
+                'palindromic-progression', // Symmetrical progressions
+                // Voice leading & texture assessments (overall quality)
+                'smooth-voice-leading',   // Overall VL quality score
+                'chromatic-bass-line',    // Bass line spanning multiple chords
+                'chromatic-voice-motion', // Voice motion across progression
+                'pedal-point',            // Sustained note across chords
+                // Tension arc (describes overall shape)
+                'tension-climax'          // Peak tension point
+                // NOTE: The following are CHORD-SPECIFIC and show on chord badges:
+                // - parallel-harmony (shows on chords involved in parallel motion)
+                // - retrogression (shows on the chord where backwards motion occurs)
+                // - dorian-pattern, mixolydian-pattern (shows on the modal chord pair)
+                // - chromatic-mediant (shows on the mediant chord)
+                // - tritone-substitution (shows on the substituted chord)
+                // - chromatic-dominant-approach (shows on the approaching chord)
+                // - harmonic-rhythm-change (shows on chord where rhythm changes)
+            ];
+
+            // SUGGESTIONS that apply to the whole progression:
+            const progressionWideSuggestions = [
+                'vary-harmonic-rhythm'
+            ];
+
+            // OPPORTUNITIES (all are progression-wide by nature):
+            const progressionWideOpportunities = [
                 'no-borrowed-chords', 'no-cadence', 'no-secondary-dominants',
                 'flat-tension', 'bass-always-root', 'no-extensions', 'function-imbalance'
+            ];
+
+            const progressionWideIds = [
+                ...progressionWideObservations,
+                ...progressionWideSuggestions,
+                ...progressionWideOpportunities
             ];
 
             const isProgressionWide = (item) => {

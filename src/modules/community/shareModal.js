@@ -44,7 +44,8 @@ export function initShareModal() {
 
     modalElement = document.createElement('div');
     modalElement.id = 'share-modal';
-    modalElement.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4';
+    modalElement.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-4';
+    modalElement.style.pointerEvents = 'auto';
     modalElement.innerHTML = getModalHTML();
     document.body.appendChild(modalElement);
 

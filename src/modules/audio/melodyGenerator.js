@@ -3637,7 +3637,8 @@ export function playInteractiveMelodyWithChords() {
                 pitch: note.pitch, // Legacy single pitch
                 pitches: note.pitches, // Polyphonic format
                 duration: note.duration,
-                ornament: note.ornament
+                ornament: note.ornament,
+                arpeggio: note.arpeggio
             }));
         console.log(`[playInteractiveMelodyWithChords] Got ${melodyNotesToPlay.length} melody notes from compositionState (after filtering ties)`);
     }
@@ -3680,8 +3681,38 @@ export function playInteractiveMelodyWithChords() {
                     if (keyEl) keyEl.classList.remove('active-melody-playback');
                 }, time + 0.4);
             });
+        } else if (noteData.arpeggio && noteData.arpeggio.direction && pitches.length > 1) {
+            // Arpeggio (rolled chord) - play notes sequentially
+            const arpeggioNotes = [...pitches];
+            if (noteData.arpeggio.direction === 'down') {
+                arpeggioNotes.reverse(); // High to low
+            }
+            // Otherwise 'up' is low to high (default order)
+
+            // Calculate timing: spread notes across first 1/4 of the note duration
+            const durationSeconds = Tone.Time(noteData.duration).toSeconds();
+            const arpeggioSpread = Math.min(durationSeconds * 0.25, 0.15); // Max 150ms spread
+            const noteSpacing = arpeggioSpread / arpeggioNotes.length;
+
+            arpeggioNotes.forEach((pitch, index) => {
+                const noteTime = time + (index * noteSpacing);
+                // All notes sustain for the remaining duration after their attack
+                const noteDuration = durationSeconds - (index * noteSpacing);
+                synth.triggerAttackRelease(pitch, noteDuration, noteTime);
+
+                // Visual feedback
+                Tone.Draw.schedule(() => {
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) keyEl.classList.add('active-melody-playback');
+                }, noteTime);
+
+                Tone.Draw.schedule(() => {
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) keyEl.classList.remove('active-melody-playback');
+                }, noteTime + 0.4);
+            });
         } else {
-            // No ornament - play normally
+            // No ornament or arpeggio - play normally
             pitches.forEach(pitch => {
                 synth.triggerAttackRelease(pitch, noteData.duration, time);
 
@@ -4141,8 +4172,32 @@ export async function playAllMelody(options = {}) {
             });
             // Track all notes (sustained + ornament pitches) for release
             currentlyPlayingMelodyNotes = [...sustainPitches, topPitch];
+        } else if (noteData.arpeggio && noteData.arpeggio.direction && notesToPlay.length > 1) {
+            // Arpeggio (rolled chord) - play notes sequentially
+            const arpeggioNotes = [...notesToPlay];
+            if (noteData.arpeggio.direction === 'down') {
+                arpeggioNotes.reverse(); // High to low
+            }
+            // Otherwise 'up' is low to high (default order)
+
+            // Calculate timing: spread notes across first 1/4 of the note duration, max 150ms
+            const durationSeconds = typeof noteData.duration === 'number'
+                ? noteData.duration
+                : Tone.Time(noteData.duration).toSeconds();
+            const arpeggioSpread = Math.min(durationSeconds * 0.25, 0.15);
+            const noteSpacing = arpeggioSpread / arpeggioNotes.length;
+
+            arpeggioNotes.forEach((pitch, index) => {
+                const noteTime = principalNoteTime + (index * noteSpacing);
+                // All notes sustain for the remaining duration after their attack
+                const noteDuration = durationSeconds - (index * noteSpacing);
+                synth.triggerAttack(pitch, noteTime);
+                synth.triggerRelease(pitch, noteTime + noteDuration);
+            });
+            // Track these notes for release
+            currentlyPlayingMelodyNotes = [...notesToPlay];
         } else {
-            // No ornament - play all pitches normally
+            // No ornament or arpeggio - play all pitches normally
             // Use triggerAttack + scheduled triggerRelease for precise duration control
             // This ensures notes stop EXACTLY at their duration end, not relying on
             // piano sample's natural decay which can be longer than intended
@@ -4371,6 +4426,7 @@ export async function playAllMelody(options = {}) {
                     dynamic: note.dynamic,      // Include stored dynamic (may be null if inherited)
                     graceNotes: note.graceNotes, // Grace notes to play before principal note
                     ornament: note.ornament,    // Ornament: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
+                    arpeggio: note.arpeggio,    // Arpeggio (rolled chord): { direction: 'up' | 'down' }
                     noteIndex: exportedIndex    // Index into this filtered/merged list
                 });
 
@@ -4513,8 +4569,27 @@ export async function playAllMelody(options = {}) {
                             piano.triggerAttackRelease(ornamentNote.pitch, ornamentNote.duration, ornamentTime);
                         }
                     });
+                } else if (bassNote.arpeggio && bassNote.arpeggio.direction && notesToPlay.length > 1) {
+                    // Arpeggio (rolled chord) - play notes sequentially
+                    const arpeggioNotes = [...notesToPlay];
+                    if (bassNote.arpeggio.direction === 'down') {
+                        arpeggioNotes.reverse(); // High to low
+                    }
+                    // Otherwise 'up' is low to high (default order)
+
+                    // Calculate timing: spread notes across first 1/4 of the note duration, max 150ms
+                    const arpeggioSpread = Math.min(totalDuration * 0.25, 0.15);
+                    const noteSpacing = arpeggioSpread / arpeggioNotes.length;
+
+                    arpeggioNotes.forEach((pitch, index) => {
+                        const noteTime = bassTime + (index * noteSpacing);
+                        // All notes sustain for the remaining duration after their attack
+                        const noteDuration = totalDuration - (index * noteSpacing);
+                        piano.triggerAttack(pitch, noteTime);
+                        piano.triggerRelease(pitch, noteTime + noteDuration);
+                    });
                 } else {
-                    // No ornament - play all pitches normally
+                    // No ornament or arpeggio - play all pitches normally
                     // Use triggerAttack + scheduled triggerRelease for precise duration control
                     // (triggerAttackRelease has natural decay that continues past the release time)
                     notesToPlay.forEach(pitch => {

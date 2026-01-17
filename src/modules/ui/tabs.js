@@ -206,9 +206,14 @@ export function switchTab(tabId, options = {}) {
             // Make wrapper full-width and add fixed positioning
             headerWrapper.classList.remove('max-w-7xl');
             headerWrapper.classList.add('studio-new-header-wrapper');
-            // Hide the info display panels (key sig, chord display) for cleaner look
+            // Hide the info display panels for Composition Studio and Scale Explorer
+            // but SHOW them for Chord Lab (New) to match classic Chord Lab
             if (headerDisplayPanels) {
-                headerDisplayPanels.classList.add('hidden');
+                if (tabId === 'chordlab-new') {
+                    headerDisplayPanels.classList.remove('hidden');
+                } else {
+                    headerDisplayPanels.classList.add('hidden');
+                }
             }
         } else {
             mainHeader.classList.remove('hidden');

@@ -122,8 +122,6 @@ class CoachEngine {
         // Expose global functions for debugging/testing
         window.coachEngine = this;
         window.triggerCoachAnalysis = () => this.analyzeCurrentComposition();
-
-        console.log('[CoachEngine] Initialized');
     }
 
     /**
@@ -146,8 +144,6 @@ class CoachEngine {
         // Save state
         this._savePreferences();
         this._saveHistory();
-
-        console.log('[CoachEngine] Destroyed');
     }
 
     /**
@@ -173,7 +169,6 @@ class CoachEngine {
     setEnabled(enabled) {
         this.enabled = enabled;
         this._savePreferences();
-        console.log('[CoachEngine] Enabled:', enabled);
     }
 
     /**
@@ -184,7 +179,6 @@ class CoachEngine {
         if (['simple', 'intermediate', 'advanced'].includes(level)) {
             this.skillLevel = level;
             this._savePreferences();
-            console.log('[CoachEngine] Skill level:', level);
         }
     }
 
@@ -195,7 +189,6 @@ class CoachEngine {
     dismissType(typeId) {
         this.dismissedTypes.add(typeId);
         this._savePreferences();
-        console.log('[CoachEngine] Dismissed type:', typeId);
     }
 
     /**
@@ -231,14 +224,16 @@ class CoachEngine {
         if (clearCooldowns) {
             this.cooldowns.clear();
             this._lastNudgeTime = 0;
-            console.log('[CoachEngine] Cooldowns cleared for manual analysis');
         }
 
         const context = this._buildContext();
         if (context) {
             this._runAnalysis(context);
         } else {
-            console.log('[CoachEngine] No context available for analysis (no progression?)');
+            // No context (e.g., progression cleared or < 2 chords) - clear badges
+            if (window.updateMeasureCoachItems) {
+                window.updateMeasureCoachItems([]);
+            }
         }
     }
 
@@ -280,7 +275,6 @@ class CoachEngine {
         this.cooldowns.clear();
         this._lastNudgeTime = 0;
         this._saveHistory();
-        console.log('[CoachEngine] Reset');
     }
 
     // ========================================================================
@@ -335,6 +329,11 @@ class CoachEngine {
             const context = this._buildContext(eventType, eventDetail);
             if (context) {
                 this._runAnalysis(context);
+            } else {
+                // No context (e.g., progression cleared or < 2 chords) - clear badges
+                if (window.updateMeasureCoachItems) {
+                    window.updateMeasureCoachItems([]);
+                }
             }
         }, TIMING.DEBOUNCE_AFTER_EDIT);
     }
@@ -382,11 +381,6 @@ class CoachEngine {
      * Run all detectors and process results
      */
     _runAnalysis(context) {
-        console.log('[CoachEngine] Running analysis...', {
-            chordCount: context.chordCount,
-            key: context.key
-        });
-
         const allItems = [];
 
         // Run registered detectors
@@ -405,12 +399,6 @@ class CoachEngine {
         const filtered = this._filterItems(allItems);
         const prioritized = this._prioritizeItems(filtered);
         this._queueItems(prioritized);
-
-        console.log('[CoachEngine] Analysis complete:', {
-            detected: allItems.length,
-            filtered: filtered.length,
-            queued: this.queue.length
-        });
 
         // Update measure coach items for notation overlay icons
         // Pass ALL detected items (not just filtered) so the icons show everything
@@ -579,7 +567,6 @@ class CoachEngine {
         // DISABLED: Automatic floating nudges
         // Coach insights are now accessed only through measure compass icons
         // The items are still tracked in history and displayed via the notation overlay
-        console.log('[CoachEngine] Nudge queued (auto-display disabled):', item.id, item.title);
         return;
 
         // Original code preserved for reference:
@@ -671,8 +658,6 @@ class CoachEngine {
     }
 
     _onNudgeAction(item, action) {
-        console.log('[CoachEngine] Nudge action:', action, item.id);
-
         switch (action) {
             case 'learnMore':
                 if (item.actions?.learnMore) {
@@ -740,14 +725,12 @@ class CoachEngine {
 
     _previewItem(item) {
         // Preview the suggestion (play audio)
-        console.log('[CoachEngine] Preview:', item.id);
         // Implementation depends on item type
         // Will be handled by specific suggestion handlers
     }
 
     _applyItem(item) {
         // Apply the suggestion
-        console.log('[CoachEngine] Apply:', item.id);
         // Implementation depends on item type
         // Will be handled by specific suggestion handlers
     }
@@ -861,7 +844,6 @@ export function initCoachEngine() {
     // Initialize engine (attach event listeners)
     engine.init();
 
-    console.log('[CoachEngine] Fully initialized with detectors and presenter');
     return engine;
 }
 

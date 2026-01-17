@@ -98,6 +98,9 @@ export function copyNoteWithAllProperties(note, voiceIndex = 0) {
     // Ornaments (trill, mordent, turn, etc.)
     ornament: note.ornament || null,
 
+    // Arpeggio (rolled chord): { direction: 'up' | 'down' }
+    arpeggio: note.arpeggio || null,
+
     // Fermata markings ('normal', 'short', 'long')
     fermata: note.fermata || null,
 
@@ -1032,6 +1035,7 @@ export class NotationComposer {
               lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
               pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
               beam: note.beam || null,  // Manual beam control { start, end, break }
+              arpeggio: note.arpeggio || null,  // Arpeggio (rolled chord) { direction: 'up' | 'down' }
             }))
           ),
           // MULTI-VOICE: Gather bass notes from ALL voices, not just voice 0
@@ -1064,6 +1068,7 @@ export class NotationComposer {
               lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
               pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
               beam: note.beam || null,  // Manual beam control { start, end, break }
+              arpeggio: note.arpeggio || null,  // Arpeggio (rolled chord) { direction: 'up' | 'down' }
             }))
           ),
           keySignature: m.keySignature || this.compositionState.metadata.key,
@@ -1421,6 +1426,7 @@ export class NotationComposer {
           lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
           pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
           beam: note.beam || null,  // Manual beam control { start, end, break }
+          arpeggio: note.arpeggio || null,  // Arpeggio (rolled chord) { direction: 'up' | 'down' }
         }))
       ),
       bassNotes: (m.notation.bass.voices || []).flatMap((voice, voiceIndex) =>
@@ -1452,6 +1458,7 @@ export class NotationComposer {
           lyric: note.lyric || null,  // Lyric syllable { text, syllabic }
           pedal: note.pedal || null,  // Pedal marking ('down', 'up', 'half', 'change')
           beam: note.beam || null,  // Manual beam control { start, end, break }
+          arpeggio: note.arpeggio || null,  // Arpeggio (rolled chord) { direction: 'up' | 'down' }
         }))
       ),
       keySignature: m.keySignature || this.compositionState.metadata.key,
@@ -3218,8 +3225,13 @@ export class NotationComposer {
    */
   updateMeasureCoachItems(coachItems) {
     this.measureCoachItems.clear();
+    this.chordCoachItems.clear();
 
-    if (!coachItems || coachItems.length === 0) return;
+    if (!coachItems || coachItems.length === 0) {
+      // Clear badges when there are no coach items (e.g., progression cleared)
+      this.updateChordLabelOverlays();
+      return;
+    }
 
     // Get chord segments to map chord indices to measures
     const chordSegments = this.compositionState?.getChordSegments() || [];
@@ -3267,10 +3279,8 @@ export class NotationComposer {
       }
     }
 
-    console.log('[NotationComposer] Updated measure coach items:', this.measureCoachItems.size, 'measures affected');
-
     // Also build chord-based mapping for chord label overlays
-    this.chordCoachItems.clear();
+    // (chordCoachItems was already cleared at the top of this function)
     for (const item of coachItems) {
       // Get all chord indices this item relates to
       // Priority: Use explicit chordIndex/chordIndices if provided

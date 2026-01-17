@@ -1032,9 +1032,10 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {Array|null} graceNotes - Array of grace notes: { pitch, duration, slash }
  * @param {Object|null} lyric - Lyric syllable: { text: string, syllabic: 'single'|'begin'|'middle'|'end' }
  * @param {string|null} pedal - Pedal marking: 'down', 'up', 'half', 'change'
+ * @param {Object|null} arpeggio - Arpeggio (rolled chord): { direction: 'up' | 'down' }
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null, dynamic = null, ornament = null, graceNotes = null, lyric = null, pedal = null) {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null, dynamic = null, ornament = null, graceNotes = null, lyric = null, pedal = null, arpeggio = null) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
@@ -1120,6 +1121,42 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
     if (vexArticulation) {
       // For chords, apply articulation to the top note (last index)
       staveNote.addModifier(new VF.Articulation(vexArticulation), pitches.length - 1);
+    }
+  }
+
+  // Add arpeggio (rolled chord) if specified
+  // The wavy line appears to the left of the chord, indicating notes should be played in sequence
+  if (arpeggio && arpeggio.direction && pitches.length > 1) {
+    try {
+      // VexFlow 5 uses Stroke class for arpeggio markings
+      if (VF.Stroke) {
+        // Stroke.Type: BRUSH_DOWN=1, BRUSH_UP=2, ROLL_DOWN=3, ROLL_UP=4
+        // VexFlow naming is counterintuitive:
+        // ROLL_DOWN (3) = arrow pointing UP (toward higher notes) = our "up" direction (play low to high)
+        // ROLL_UP (4) = arrow pointing DOWN (toward lower notes) = our "down" direction (play high to low)
+        const strokeType = arpeggio.direction === 'up'
+          ? (VF.Stroke.Type?.ROLL_DOWN ?? 3)  // Arrow points up (play low to high)
+          : (VF.Stroke.Type?.ROLL_UP ?? 4);   // Arrow points down (play high to low)
+
+        const stroke = new VF.Stroke(strokeType);
+        // VexFlow 5: use addModifier(modifier, index) - NOT addStroke
+        staveNote.addModifier(stroke, 0);
+      } else {
+        // Fallback: use annotation with arpeggio symbol
+        throw new Error('VF.Stroke not available');
+      }
+    } catch (error) {
+      // Fallback: use a text annotation with wavy/zigzag character
+      console.warn('[VexFlowRenderer] Stroke failed, using annotation fallback:', error.message);
+      try {
+        const arpeggioSymbol = arpeggio.direction === 'up' ? '⥮' : '⥯';
+        const annotation = new VF.Annotation(arpeggioSymbol)
+          .setFont('Arial', 20, 'normal')
+          .setVerticalJustification(VF.Annotation.VerticalJustify.CENTER);
+        staveNote.addModifier(annotation, 0);
+      } catch (fallbackError) {
+        console.warn('[VexFlowRenderer] Arpeggio annotation also failed:', fallbackError.message);
+      }
     }
   }
 

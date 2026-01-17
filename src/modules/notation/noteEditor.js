@@ -4672,6 +4672,110 @@ export class NoteEditor {
   }
 
   /**
+   * Apply an arpeggio (rolled chord) marking to all selected notes
+   * @param {string} direction - The arpeggio direction: 'up' or 'down'
+   */
+  applyArpeggioToSelected(direction) {
+    if (this.selectedNotes.size === 0) return;
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // IMPORTANT: Deduplicate by base note ID (without pitch index)
+    // When selecting individual pitches within a chord, they all point to the same note
+    // We want to apply arpeggio once per unique note, not once per selected pitch
+    const uniqueNotes = new Map(); // baseNoteId -> { measureIndex, staff, voiceIndex, noteIndex }
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const baseNoteId = `${measureIndex}-${staff}-${voiceIndex}-${noteIndex}`;
+
+      if (!uniqueNotes.has(baseNoteId)) {
+        uniqueNotes.set(baseNoteId, { measureIndex, staff, voiceIndex, noteIndex });
+      }
+    }
+
+    let changedCount = 0;
+
+    for (const [baseNoteId, { measureIndex, staff, voiceIndex, noteIndex }] of uniqueNotes) {
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Skip rests - arpeggios only apply to notes/chords
+      if (note.isRest) continue;
+
+      // Toggle arpeggio: if same direction already applied, remove it
+      if (note.arpeggio && note.arpeggio.direction === direction) {
+        note.arpeggio = null;
+      } else {
+        note.arpeggio = { direction };
+      }
+      changedCount++;
+    }
+
+    if (changedCount > 0) {
+      this.composerIntegration.render(true);
+      // Update toolbar to reflect the new arpeggio state
+      this.composerIntegration.updateToolbarSelectionState();
+    }
+  }
+
+  /**
+   * Remove arpeggio markings from all selected notes
+   */
+  removeArpeggioFromSelected() {
+    if (this.selectedNotes.size === 0) {
+      console.log('[removeArpeggioFromSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let removedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      if (note.arpeggio) {
+        note.arpeggio = null;
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`[removeArpeggioFromSelected] Removed arpeggio from ${removedCount} note(s)`);
+      this.composerIntegration.render(true);
+      // Update toolbar to reflect the cleared arpeggio state
+      this.composerIntegration.updateToolbarSelectionState();
+    }
+  }
+
+  /**
    * Add a grace note to selected notes
    * Grace notes are small notes preceding the main note
    * @param {string} graceType - 'acciaccatura' (slashed/crushed) or 'appoggiatura' (leaning)

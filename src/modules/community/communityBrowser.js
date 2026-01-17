@@ -81,7 +81,8 @@ export function initCommunityBrowser() {
 
     browserModal = document.createElement('div');
     browserModal.id = 'community-browser-modal';
-    browserModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4';
+    browserModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-4';
+    browserModal.style.pointerEvents = 'auto';
     browserModal.innerHTML = getBrowserHTML();
     document.body.appendChild(browserModal);
 
@@ -791,7 +792,8 @@ function showKeyPickerModal(submissionTitle, originalKey, options = {}) {
 
         const modal = document.createElement('div');
         modal.id = 'key-picker-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
+        modal.style.pointerEvents = 'auto';
 
         modal.innerHTML = `
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
@@ -2001,7 +2003,8 @@ export async function viewCommunitySubmission(submissionId) {
 
         // Create detail modal with notation preview and audio
         const detailModal = document.createElement('div');
-        detailModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
+        detailModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
+        detailModal.style.pointerEvents = 'auto';
         detailModal.innerHTML = `
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -2734,7 +2737,8 @@ export function showReportModal(submissionId, submissionTitle) {
     if (!reportModal) {
         reportModal = document.createElement('div');
         reportModal.id = 'report-modal';
-        reportModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4';
+        reportModal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-4';
+        reportModal.style.pointerEvents = 'auto';
         document.body.appendChild(reportModal);
 
         // Close on backdrop click

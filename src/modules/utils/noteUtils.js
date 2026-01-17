@@ -192,15 +192,47 @@ export function getNoteKeyId(note) {
     let noteName = note.slice(0, -1);
     let octaveNum = parseInt(note.slice(-1), 10);
 
+    // Handle double flats first (e.g., Bbb → A, Dbb → C, Fbb → Eb)
+    // Double flats lower a note by 2 semitones
+    if (noteName.endsWith('bb')) {
+        const baseLetter = noteName.charAt(0);
+        // Map double flats to their enharmonic equivalents
+        const doubleFlatMap = {
+            'C': 'Bb', 'D': 'C', 'E': 'D', 'F': 'Eb', 'G': 'F', 'A': 'G', 'B': 'A'
+        };
+        noteName = doubleFlatMap[baseLetter] || noteName;
+        // Handle octave boundary: Cbb → Bb of previous octave
+        if (baseLetter === 'C') {
+            octaveNum -= 1;
+        }
+    }
+    // Handle double sharps (e.g., Fx → G, Cx → D)
+    // Double sharps raise a note by 2 semitones
+    else if (noteName.endsWith('##') || noteName.endsWith('x')) {
+        const baseLetter = noteName.charAt(0);
+        // Map double sharps to their enharmonic equivalents
+        const doubleSharpMap = {
+            'C': 'D', 'D': 'E', 'E': 'F#', 'F': 'G', 'G': 'A', 'A': 'B', 'B': 'C#'
+        };
+        noteName = doubleSharpMap[baseLetter] || noteName;
+        // Handle octave boundary: Bx → C# of next octave
+        if (baseLetter === 'B') {
+            octaveNum += 1;
+        }
+    }
     // Handle Cb/B# octave boundaries when converting to keyboard key
     // Cb5 (the enharmonic display) → B4 (the physical key)
     // B#3 (the enharmonic display) → C4 (the physical key)
-    if (noteName === 'Cb') {
+    else if (noteName === 'Cb') {
         noteName = 'B';
         octaveNum -= 1;  // Cb5 → B4
     } else if (noteName === 'B#') {
         noteName = 'C';
         octaveNum += 1;  // B#3 → C4
+    } else if (noteName === 'E#') {
+        noteName = 'F';  // E#3 → F3 (same octave)
+    } else if (noteName === 'Fb') {
+        noteName = 'E';  // Fb3 → E3 (same octave)
     } else if (noteName.includes('b')) {
         noteName = ENHARMONIC_MAP[noteName] || noteName;
     }

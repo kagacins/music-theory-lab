@@ -346,6 +346,7 @@ export class NotationToolbar {
     this.hasMeasureSelection = false;   // Measure is selected (blue outline) for volta, repeats, etc.
     this.selectedMeasureIndex = -1;     // Which measure is selected (-1 = none)
     this.hasGraceNotes = false;         // Selected notes have grace notes (for remove/transpose grace)
+    this.hasArpeggio = false;           // Selected notes have arpeggio marking (for remove arpeggio)
     this.hasOrnaments = false;          // Selected notes have ornaments (for remove ornament)
     this.notesInSlur = false;           // Selected notes are in a slur (for remove slur)
     this.notesInHairpin = false;        // Selected notes are in a hairpin (for remove hairpin)
@@ -375,6 +376,8 @@ export class NotationToolbar {
     this.onGraceNoteAdd = options.onGraceNoteAdd || (() => {});  // Add grace note to selected note
     this.onGraceNoteRemove = options.onGraceNoteRemove || (() => {});  // Remove grace notes from selected note
     this.onGraceNoteTranspose = options.onGraceNoteTranspose || (() => {});  // Transpose grace notes by half steps
+    this.onArpeggioApply = options.onArpeggioApply || (() => {});  // Apply arpeggio (rolled chord) to selected notes
+    this.onArpeggioRemove = options.onArpeggioRemove || (() => {});  // Remove arpeggio from selected notes
     this.onTempoMarkingApply = options.onTempoMarkingApply || (() => {});  // Apply tempo marking at selected position
     this.onRepeatSignApply = options.onRepeatSignApply || (() => {});  // Apply repeat sign at selected measure
     this.onVoltaBracketApply = options.onVoltaBracketApply || (() => {});  // Apply volta bracket at selected measure
@@ -3271,6 +3274,8 @@ export class NotationToolbar {
       this.canSextuplet = false;
       this.hasNoteSelection = false;
       this.hasGraceNotes = false;
+      this.hasArpeggio = false;
+      this.selectionArpeggio = null;
       this.hasOrnaments = false;
       this.notesInSlur = false;
       this.notesInHairpin = false;
@@ -3555,11 +3560,24 @@ export class NotationToolbar {
     this.canSlur = count >= 2;
     this.canHairpin = count >= 2;
 
-    // Check for grace notes, ornaments, slurs, hairpins in selection
+    // Check for grace notes, ornaments, arpeggios, slurs, hairpins in selection
     this.hasGraceNotes = selectedNotes.some(n => n.graceNotes && n.graceNotes.length > 0);
+    this.hasArpeggio = selectedNotes.some(n => n.arpeggio && n.arpeggio.direction);
     this.hasOrnaments = selectedNotes.some(n => n.ornament && n.ornament !== 'none');
     this.notesInSlur = selectedNotes.some(n => n.slurStart || n.slurEnd || n.inSlur);
     this.notesInHairpin = selectedNotes.some(n => n.hairpin || n.inHairpin);
+
+    // Get arpeggio direction from selection (for highlighting active button)
+    const arpeggioDirections = selectedNotes
+      .filter(n => n.arpeggio && n.arpeggio.direction)
+      .map(n => n.arpeggio.direction);
+    if (arpeggioDirections.length === 0) {
+      this.selectionArpeggio = null;
+    } else if (arpeggioDirections.every(d => d === arpeggioDirections[0])) {
+      this.selectionArpeggio = arpeggioDirections[0]; // All same direction
+    } else {
+      this.selectionArpeggio = 'mixed'; // Different directions
+    }
 
     // Check if selected notes can be tied (2+ notes with at least one common pitch)
     this.canTie = false;

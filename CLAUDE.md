@@ -381,6 +381,49 @@ getNoteKeyId('Cb5')  // Returns 'key-B4'
 
 ---
 
+## CRITICAL: Double Flats and Double Sharps - Keyboard Highlighting
+
+**The `getNoteKeyId()` function handles double flats (bb) and double sharps (## or x) for keyboard highlighting.**
+
+### The Problem
+
+Certain chords in certain keys require double accidentals for correct enharmonic spelling:
+- **Gb Diminished 7th**: Gb, Bbb, Dbb, Fbb (double flats)
+- **F# Diminished 7th**: F#, A, C, Eb (simpler, but similar issues in other keys)
+- **G# Major in C# major context**: May use Fx (double sharp)
+
+The `ENHARMONIC_MAP` only handles single flats/sharps, so double accidentals need special handling.
+
+### How getNoteKeyId() Handles This
+
+```javascript
+// Double flats → enharmonic equivalent
+'Bbb' → 'A'   // Bbb3 → key-A3
+'Dbb' → 'C'   // Dbb4 → key-C4
+'Fbb' → 'Eb'  // Fbb4 → key-D#4 (via ENHARMONIC_MAP)
+'Cbb' → 'Bb'  // Cbb4 → key-Bb3 (octave boundary!)
+
+// Double sharps → enharmonic equivalent
+'Fx' or 'F##' → 'G'   // Fx4 → key-G4
+'Cx' or 'C##' → 'D'   // Cx4 → key-D4
+'Bx' or 'B##' → 'C#'  // Bx4 → key-Cs5 (octave boundary!)
+```
+
+### Octave Boundaries for Double Accidentals
+
+Just like Cb/B#, some double accidentals cross octave boundaries:
+- **Cbb** → Bb of the **previous** octave
+- **Bx** (B##) → C# of the **next** octave
+
+### When You Encounter This
+
+If keyboard highlighting is missing notes for chords with flat/sharp roots (Gb, F#, Db, etc.), check:
+1. Is the chord generating double accidentals? (Check console or chord display)
+2. Is `getNoteKeyId()` handling that accidental type?
+3. Are octave boundaries being respected?
+
+---
+
 ## Key Patterns
 
 ### Chord Data Structure

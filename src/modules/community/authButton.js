@@ -116,7 +116,7 @@ function renderSignedInState() {
             <button id="auth-avatar-btn" class="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-indigo-300 transition-all" title="${userInfo.displayName}">
                 ${avatarContent}
             </button>
-            <div id="auth-dropdown" class="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 hidden">
+            <div id="auth-dropdown" class="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[200] hidden" style="pointer-events: auto;">
                 <div class="px-4 py-2 border-b border-gray-100">
                     <p class="text-sm font-semibold text-gray-800 truncate">${userInfo.displayName}</p>
                     <p class="text-xs text-gray-500 truncate">${userInfo.email}</p>
@@ -281,7 +281,8 @@ async function showProfileSettingsModal() {
 
         modal = document.createElement('div');
         modal.id = 'profile-settings-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
+        modal.style.pointerEvents = 'auto';
         document.body.appendChild(modal);
 
         // Close on backdrop click

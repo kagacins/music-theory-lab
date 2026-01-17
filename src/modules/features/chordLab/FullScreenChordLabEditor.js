@@ -114,6 +114,7 @@ class FullScreenChordLabEditor {
         // Event handler bindings
         this._boundKeyHandler = this._handleKeyDown.bind(this);
         this._boundBuilderUpdateHandler = this._onBuilderUpdate.bind(this);
+        this._boundKeyChangedHandler = this._onKeyChanged.bind(this);
     }
 
     // ========================================================================
@@ -173,6 +174,7 @@ class FullScreenChordLabEditor {
         // Add event listeners
         document.addEventListener('keydown', this._boundKeyHandler);
         window.addEventListener('builderUpdated', this._boundBuilderUpdateHandler);
+        window.addEventListener('keyChanged', this._boundKeyChangedHandler);
 
         // Update keyboard labels (Roman numerals) if enabled
         // This ensures Roman numerals are shown when switching to chordlab-new tab
@@ -192,6 +194,7 @@ class FullScreenChordLabEditor {
         // Remove event listeners
         document.removeEventListener('keydown', this._boundKeyHandler);
         window.removeEventListener('builderUpdated', this._boundBuilderUpdateHandler);
+        window.removeEventListener('keyChanged', this._boundKeyChangedHandler);
 
         // Restore keyboard to original location
         this._restoreKeyboard();
@@ -328,10 +331,22 @@ class FullScreenChordLabEditor {
                 </div>
             </div>
 
-            <!-- Center: Key display -->
-            <div class="flex items-center gap-2">
-                <span class="text-white/80 text-sm">Key:</span>
-                <span id="fs-chordlab-key" class="text-white font-semibold">${currentKey}</span>
+            <!-- Center: Key Signature Display (matching classic Chord Lab) -->
+            <div id="fs-chordlab-key-signature" class="flex items-center gap-2 bg-white/15 rounded-lg px-3 py-1.5 backdrop-blur-sm">
+                <!-- Key signature image -->
+                <div class="relative flex-shrink-0 w-8 h-8 bg-white/90 rounded">
+                    <img id="fs-chordlab-treble-img" src="/key_signatures/treble_0.svg" alt="Key Signature"
+                         class="h-8 w-8 object-contain" onerror="this.style.opacity='0.3'">
+                    <span id="fs-chordlab-enharmonic-label" class="absolute -bottom-0.5 -right-0.5 text-[7px] leading-none font-bold bg-gray-800 text-white px-0.5 rounded hidden"></span>
+                </div>
+                <!-- Key text and relative minor -->
+                <div class="flex flex-col">
+                    <span id="fs-chordlab-key-text" class="text-[11px] font-semibold text-white leading-tight">${currentKey}</span>
+                    <span class="text-[9px] text-white/70 leading-tight">
+                        <span class="text-white/50">rel:</span>
+                        <span id="fs-chordlab-relative" class="font-medium text-white/90">Am</span>
+                    </span>
+                </div>
             </div>
 
             <!-- Right: Action buttons -->
@@ -781,6 +796,13 @@ class FullScreenChordLabEditor {
         this.bottomPanel?.updateButtonHighlighting();
     }
 
+    _onKeyChanged() {
+        // Update key signature display when key changes
+        this._updateKeySignatureDisplay();
+        // Also refresh bottom panel to update diatonic chord filtering
+        this.bottomPanel?.refresh();
+    }
+
     // ========================================================================
     // UI UPDATES
     // ========================================================================
@@ -829,6 +851,106 @@ class FullScreenChordLabEditor {
 
         // Update voicing checkboxes
         this._updateVoicingCheckboxes();
+
+        // Update key signature display
+        this._updateKeySignatureDisplay();
+    }
+
+    /**
+     * Update the key signature display in the header
+     * Shows key signature image, key text, and relative minor/major
+     */
+    _updateKeySignatureDisplay() {
+        const trainerState = getTrainerState();
+        const currentKey = trainerState?.currentKey || 'C Major';
+
+        // Parse key (e.g., "C Major" -> "C", "G Minor" -> "Gm")
+        const parts = currentKey.split(' ');
+        const keyRoot = parts[0];
+        const mode = parts[1]?.toLowerCase() || 'major';
+        const isMinor = mode === 'minor';
+        const key = isMinor ? `${keyRoot}m` : keyRoot;
+
+        // Get global constants
+        const KEY_SIGNATURE_TEXT = window.KEY_SIGNATURE_TEXT;
+        const KEY_SIGNATURE_IMAGES = window.KEY_SIGNATURE_IMAGES;
+        const ENHARMONIC_MAP = window.ENHARMONIC_MAP;
+        const RELATIVE_MINOR_MAP = window.RELATIVE_MINOR_MAP;
+
+        if (!KEY_SIGNATURE_TEXT || !KEY_SIGNATURE_IMAGES) {
+            console.warn('[FullScreenChordLabEditor] Key signature constants not loaded');
+            return;
+        }
+
+        // Relative major map for minor keys
+        const RELATIVE_MAJOR_MAP = {
+            'Am': 'C', 'Em': 'G', 'Bm': 'D', 'F#m': 'A', 'C#m': 'E', 'G#m': 'B', 'D#m': 'F#', 'A#m': 'C#',
+            'Dm': 'F', 'Gm': 'Bb', 'Cm': 'Eb', 'Fm': 'Ab', 'Bbm': 'Db', 'Ebm': 'Gb', 'Abm': 'Cb'
+        };
+
+        const lookupKey = isMinor ? RELATIVE_MAJOR_MAP[key] : keyRoot;
+        const text = KEY_SIGNATURE_TEXT[lookupKey] || KEY_SIGNATURE_TEXT[keyRoot] || 'no ♯/♭';
+
+        // Update key text
+        const keyTextEl = this.tabContent?.querySelector('#fs-chordlab-key-text');
+        if (keyTextEl) {
+            keyTextEl.textContent = isMinor
+                ? `${keyRoot} Minor (${text})`
+                : `${keyRoot} Major (${text})`;
+        }
+
+        // Update key signature image
+        const trebleImg = this.tabContent?.querySelector('#fs-chordlab-treble-img');
+        const enharmonicLabel = this.tabContent?.querySelector('#fs-chordlab-enharmonic-label');
+
+        if (trebleImg) {
+            const imageKey = isMinor ? RELATIVE_MAJOR_MAP[key] : keyRoot;
+            let enharmonicKeyUsed = null;
+            let imageInfo = KEY_SIGNATURE_IMAGES[imageKey];
+
+            // Check for enharmonic equivalent if no direct match
+            if (!imageInfo && ENHARMONIC_MAP) {
+                const enharmonicKey = ENHARMONIC_MAP[imageKey];
+                if (enharmonicKey) {
+                    imageInfo = KEY_SIGNATURE_IMAGES[enharmonicKey];
+                    enharmonicKeyUsed = enharmonicKey;
+                }
+            }
+
+            if (imageInfo) {
+                const newSrc = `/key_signatures/${imageInfo.treble}`;
+                if (!trebleImg.src.endsWith(imageInfo.treble)) {
+                    trebleImg.style.opacity = '0.3';
+                    trebleImg.onload = () => { trebleImg.style.opacity = '1'; };
+                    trebleImg.onerror = () => { trebleImg.style.opacity = '0.3'; };
+                    trebleImg.src = newSrc;
+                }
+            }
+
+            // Show enharmonic label if needed
+            if (enharmonicLabel) {
+                enharmonicLabel.textContent = enharmonicKeyUsed || '';
+                enharmonicLabel.classList.toggle('hidden', !enharmonicKeyUsed);
+            }
+        }
+
+        // Update relative minor/major display
+        const relativeEl = this.tabContent?.querySelector('#fs-chordlab-relative');
+        if (relativeEl) {
+            if (isMinor) {
+                const relativeMajor = RELATIVE_MAJOR_MAP[key];
+                if (relativeMajor) {
+                    relativeEl.textContent = `${relativeMajor} Major`;
+                    relativeEl.title = `Relative major of ${keyRoot} Minor`;
+                }
+            } else if (RELATIVE_MINOR_MAP) {
+                const relativeMinor = RELATIVE_MINOR_MAP[keyRoot];
+                if (relativeMinor) {
+                    relativeEl.textContent = relativeMinor;
+                    relativeEl.title = `Relative minor of ${keyRoot} Major`;
+                }
+            }
+        }
     }
 
     _updateChordDisplay() {

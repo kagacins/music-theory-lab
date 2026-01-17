@@ -228,7 +228,7 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups, timeSignature = '4/4')
 export const GRAND_STAFF_DEFAULTS = {
   measureWidth: 252,           // Width of each measure (balanced for 16 sixteenth notes and standard screens)
   staffSpacing: 80,            // Vertical space between staves
-  systemMarginTop: 45,         // Top margin for each system (volta brackets + chord symbols + title spacing)
+  systemMarginTop: 55,         // Top margin for each system (volta brackets + chord symbols + title spacing + high note clearance)
   systemMarginBottom: 80,      // Bottom margin (bass ledger lines + chord bracket labels with Roman numerals)
   braceWidth: 30,              // Width for the brace (includes left margin)
   measurePadding: 10,          // Padding within measures
@@ -3389,8 +3389,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const renderedChordLabelPositions = [];
 
   if (isBlockStart && chordStartsInfo.length > 0) {
-    // Position chord symbols immediately above treble staff top line
-    const chordY = trebleY + 20;
+    // Position chord symbols above treble staff with clearance for high notes and coach badges
+    const chordY = trebleY + 10;
 
     // Fallback: use linear calculation if no note positions available
     const noteStartX = trebleStave.getNoteStartX();
@@ -3434,7 +3434,6 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
               xSource = `linear(noteStartX=${noteStartX}, beatFrac=${beatFraction.toFixed(2)})`;
             }
           }
-          console.log(`[grandStaff] Drawing chord "${chordSymbol}" (segment ${segmentIndex}) at x=${Math.round(chordX)}, y=${Math.round(chordY)}, beatOffset=${beatOffset}, source=${xSource}`);
           context.fillText(chordSymbol, chordX, chordY);
 
           // Capture the exact rendered position for coach badge overlays
@@ -3457,7 +3456,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     const chordSymbol = measureData.metadata.chordSymbol;
     const noteStartX = trebleStave.getNoteStartX();
     const chordX = noteStartX + 7; // Shift right 7px to align with note heads
-    const chordY = trebleY + 20;
+    const chordY = trebleY + 10; // Same offset as main chord symbols
 
     const VF = getVF();
     if (VF && context) {
@@ -3747,7 +3746,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
         accidentalTracker.getAccidentalForNote(pitch, keySignature)
       );
       // Use computed measure-aware accidentals (overrides any provided accidentals for correct notation)
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection, note.dynamic || null, note.ornament || null, note.graceNotes || null, note.lyric || null, note.pedal || null);
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection, note.dynamic || null, note.ornament || null, note.graceNotes || null, note.lyric || null, note.pedal || null, note.arpeggio || null);
       if (!chordNote) {
         console.warn('[createNotesForStaff] createChordNote returned null for note:', JSON.stringify(note), 'adjustedPitches:', adjustedPitches);
         continue;
@@ -4962,7 +4961,6 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     const compositionState = window.getCompositionState();
     const segments = compositionState?.getChordSegments?.() || [];
 
-    console.log('[grandStaff] Processing', segments.length, 'segments for chord labels, beatsPerMeasure:', beatsPerMeasureForSymbols);
     segments.forEach((segment, segmentIndex) => {
       // Calculate the measure index where this building block starts
       const startMeasure = Math.floor(segment.startBeat / beatsPerMeasureForSymbols);
@@ -4978,7 +4976,6 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           ? `${segment.chord.root} ${segment.chord.simpleName || segment.chord.type}`
           : `${segment.chord.root}${getChordTypeSuffix(segment.chord.type)}`;
       }
-      console.log('[grandStaff] Segment', segmentIndex, ':', segment.chord?.root, 'startBeat:', segment.startBeat, '-> measure', startMeasure, ', beat', beatInMeasure, ', symbol:', chordSymbol);
       // Get existing array for this measure or create new one
       if (!chordStartsInMeasure.has(startMeasure)) {
         chordStartsInMeasure.set(startMeasure, []);
@@ -4993,8 +4990,6 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
 
   // If no segments found, fall back to showing chord symbol on every measure
   const hasSegments = buildingBlockStartMeasures.size > 0;
-  console.log('[grandStaff] chordStartsInMeasure map:', Array.from(chordStartsInMeasure.entries()));
-  console.log('[grandStaff] measures.length:', measures.length, ', hasSegments:', hasSegments);
 
   // Render each measure
   const renderedMeasures = [];
@@ -5127,8 +5122,6 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       }
     }
   }
-  console.log('[grandStaff] chordSymbolRegions collected from rendered measures:', chordSymbolRegions.length, 'regions',
-    chordSymbolRegions.map(r => ({ chordIndex: r.chordIndex, symbol: r.chordSymbol, x: Math.round(r.x), y: Math.round(r.y) })));
 
   // Draw chord span shading and brackets - alternating colors for consecutive chords
   // Uses beat-based positioning with actual VexFlow note positions for accurate alignment
