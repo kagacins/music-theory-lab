@@ -1421,6 +1421,151 @@ function getEducationalContent(item) {
             analogy: "Music without cadences is like a story without periods or chapter endings - the listener doesn't know when to breathe.",
             examples: ["V→I (strongest ending)", "IV→I (gentle ending)", "V→vi (surprise continuation)"],
             tip: "End phrases with V→I or IV→I. Even if the whole song is one phrase, it needs an ending!"
+        },
+
+        // New comprehensive patterns
+
+        'harmonic-rhythm-change': {
+            title: 'Harmonic Rhythm Shift',
+            category: 'Rhythm & Pacing',
+            emoji: '⏱️',
+            gradientClass: 'from-blue-500 to-purple-500',
+            explanation: "Harmonic rhythm is the rate at which chords change. When the pace speeds up or slows down, it creates dramatic effect - like a movie scene building to a climax or settling into calm.",
+            analogy: "It's like your heartbeat - it quickens during exciting moments and slows when you're relaxed. Music does the same!",
+            examples: ["Speeding up before a cadence", "Slowing down for emphasis", "Half-note chords becoming quarter-note chords"],
+            tip: "Use faster harmonic rhythm to build excitement toward important moments, and slower rhythm for weight and emphasis."
+        },
+
+        'leading-tone-resolution': {
+            title: 'Leading Tone Resolution',
+            category: 'Voice Leading',
+            emoji: '🎯',
+            gradientClass: 'from-emerald-500 to-teal-500',
+            explanation: "The leading tone is the 7th scale degree - it's called that because it 'leads' strongly to the tonic. This half-step pull (like B→C in C major) is the most powerful melodic tendency in tonal music.",
+            analogy: "The leading tone is like a homing pigeon - it always wants to fly home to the tonic. The closer it gets (just a half step away), the stronger the pull.",
+            examples: ["B→C in C major", "F#→G in G major", "Always resolves up by half step"],
+            tip: "When you hear V→I, listen for the leading tone resolving up to the tonic - it's what makes the resolution so satisfying!"
+        },
+
+        'tritone-usage': {
+            title: 'Tritone - The Devil\'s Interval',
+            category: 'Tension',
+            emoji: '😈',
+            gradientClass: 'from-red-500 to-purple-500',
+            explanation: "The tritone (augmented 4th / diminished 5th) divides the octave exactly in half. Medieval musicians called it 'diabolus in musica' (the devil in music) because of its extreme dissonance and instability.",
+            analogy: "The tritone is like a cat on a fence - it can't stay there long and must jump one way or the other. It resolves inward to a third or outward to a sixth.",
+            examples: ["B and F in C major", "Found in every dominant 7th chord", "Creates the 'pull' in V7→I"],
+            tip: "The tritone is your friend for creating tension! It's what makes dominant chords want to resolve so badly."
+        },
+
+        'cadential-64': {
+            title: 'Cadential 6/4',
+            category: 'Cadences',
+            emoji: '👑',
+            gradientClass: 'from-amber-500 to-yellow-500',
+            explanation: "The cadential 6/4 is when a I chord appears in second inversion (with the 5th in the bass) right before V. Despite being spelled as I, it actually functions as an embellishment of V - the 6th and 4th resolve down to the 5th and 3rd.",
+            analogy: "It's like a dramatic pause before the hero's entrance - the I⁶₄ builds anticipation for the V that follows.",
+            examples: ["I⁶₄ → V → I is the strongest cadence", "The bass stays on scale degree 5", "Found at the end of Classical pieces"],
+            tip: "Use the cadential 6/4 for extra-strong endings. The I⁶₄ → V⁷ → I sequence is the gold standard of Classical cadences."
+        },
+
+        'augmented-sixth': {
+            title: 'Augmented 6th Chords',
+            category: 'Advanced Harmony',
+            emoji: '🎻',
+            gradientClass: 'from-purple-500 to-pink-500',
+            explanation: "Augmented 6th chords contain the interval of an augmented 6th (usually between ♭6 and ♯4). This distinctive interval expands outward by half steps to an octave on the dominant. There are three types: Italian (3 notes), French (4 notes with #2), and German (4 notes with b3).",
+            analogy: "Think of an augmented 6th as two arrows pointing outward - both notes want to spread apart by half step, landing perfectly on the dominant.",
+            examples: ["Italian: ♭6, 1, ♯4", "French: ♭6, 1, 2, ♯4", "German: ♭6, 1, ♭3, ♯4"],
+            tip: "Use augmented 6th chords to create dramatic chromatic approaches to the dominant. They're favorites of Romantic composers!"
+        },
+
+        'retrogression': {
+            title: 'Retrogression',
+            category: 'Harmonic Motion',
+            emoji: '⬅️',
+            gradientClass: 'from-orange-500 to-red-500',
+            explanation: "Normal functional harmony moves T→S→D→T (tonic to subdominant to dominant to tonic). A retrogression reverses this, like D→S (dominant back to subdominant). It's unexpected but can create interesting effects.",
+            analogy: "It's like walking backwards - unusual and attention-getting, but sometimes exactly what you want for dramatic effect.",
+            examples: ["V→IV (dominant to subdominant)", "Common in rock and blues", "Creates a sense of 'going back'"],
+            tip: "Retrogressions aren't wrong - they just break expectations. Use them intentionally for surprise or a modal/rock flavor."
+        },
+
+        'palindromic-progression': {
+            title: 'Palindromic Progression',
+            category: 'Form & Structure',
+            emoji: '🔁',
+            gradientClass: 'from-cyan-500 to-blue-500',
+            explanation: "A palindrome reads the same forwards and backwards. In music, a palindromic progression creates beautiful arch-form symmetry - the chords mirror around a center point.",
+            analogy: "Like the word 'RACECAR' or 'A MAN A PLAN A CANAL PANAMA' - the same both ways. Your progression creates musical symmetry!",
+            examples: ["I-IV-V-IV-I", "Am-G-F-G-Am", "Creates sense of 'returning home'"],
+            tip: "Palindromic progressions are great for verses that feel complete and balanced. The symmetry is deeply satisfying."
+        },
+
+        'suspension-resolution': {
+            title: 'Suspension Resolution',
+            category: 'Voice Leading',
+            emoji: '🎵',
+            gradientClass: 'from-teal-500 to-cyan-500',
+            explanation: "A suspension occurs when a note from the previous chord is held over, creating temporary dissonance that then resolves. Sus4 chords (4th instead of 3rd) resolve the 4th down to 3rd; sus2 chords can resolve the 2nd up to 3rd.",
+            analogy: "It's like holding your breath and then exhaling - the suspension creates tension, and the resolution brings relief.",
+            examples: ["Csus4 → C (F resolves to E)", "Gsus4 → G (C resolves to B)", "Classic rock and pop sound"],
+            tip: "Suspensions add melodic interest to chord changes. Try Dsus4→D for that classic acoustic guitar moment!"
+        },
+
+        'ostinato-pattern': {
+            title: 'Ostinato (Repeating Pattern)',
+            category: 'Form & Structure',
+            emoji: '🔄',
+            gradientClass: 'from-green-500 to-teal-500',
+            explanation: "An ostinato is a short musical pattern that repeats throughout a piece. Rather than being monotonous, repetition creates groove, hypnotic effect, and allows melodies to shine over a stable foundation.",
+            analogy: "It's like the heartbeat of your music - steady, reliable, and grounding. Think of how a drum loop lets a rapper flow freely.",
+            examples: ["Am-F-C-G (repeated throughout)", "Pachelbel's Canon bass line", "Most EDM and pop songs"],
+            tip: "Embrace repetition! A strong ostinato lets listeners lock in while you layer melodies, builds, and variations on top."
+        },
+
+        'chromatic-voice-motion': {
+            title: 'Chromatic Voice Motion',
+            category: 'Voice Leading',
+            emoji: '🌈',
+            gradientClass: 'from-pink-500 to-rose-500',
+            explanation: "Chromatic voice motion occurs when inner voices (not just bass) move by half steps between chords. This creates smooth, expressive connections and can add color without changing the overall harmony dramatically.",
+            analogy: "It's like a painter blending colors gradually rather than jumping from one to another - the transition is smooth and beautiful.",
+            examples: ["C-E-G → C-E♭-G (major to minor)", "Inner voice descending chromatically", "Common in jazz and romantic music"],
+            tip: "Listen to your inner voices! Small chromatic motions can transform ordinary progressions into something magical."
+        },
+
+        'voice-range-extreme': {
+            title: 'Register Extreme',
+            category: 'Voice Leading',
+            emoji: '📊',
+            gradientClass: 'from-indigo-500 to-violet-500',
+            explanation: "When voices reach extreme high or low registers, it creates dramatic effect. High notes feel climactic and intense; low notes feel deep and powerful. Range expansion adds emotional weight.",
+            analogy: "It's like raising your voice in excitement or lowering it for gravitas - the register conveys emotion.",
+            examples: ["Soprano reaching high C", "Bass dropping to low E", "Climactic moments use range extremes"],
+            tip: "Use register extremes sparingly for maximum impact. Save your highest and lowest notes for the most important moments."
+        },
+
+        'pedal-point': {
+            title: 'Pedal Point',
+            category: 'Advanced Harmony',
+            emoji: '🎹',
+            gradientClass: 'from-amber-500 to-orange-500',
+            explanation: "A pedal point is a sustained or repeated note (usually in the bass) that continues while the harmonies above it change. It creates tension as dissonances occur, then resolution when the harmonies finally align.",
+            analogy: "It's like standing firm while the world moves around you - the pedal is the anchor while chords float above.",
+            examples: ["Tonic pedal at endings", "Dominant pedal building tension", "Bach used them extensively"],
+            tip: "Try a tonic pedal under changing chords for a grounded, climactic ending. Or use a dominant pedal to build suspense!"
+        },
+
+        'tritone-substitution': {
+            title: 'Tritone Substitution',
+            category: 'Advanced Harmony',
+            emoji: '🔄',
+            gradientClass: 'from-violet-500 to-purple-500',
+            explanation: "A tritone substitution replaces a dominant chord with another dominant chord a tritone away. G7 can become D♭7 because they share the same tritone (B and F). This creates chromatic bass motion.",
+            analogy: "It's like a secret twin - the two chords share the same dissonant core (the tritone) but approach from different directions.",
+            examples: ["G7 → C becomes D♭7 → C", "Creates chromatic bass: D♭→C", "Essential in jazz harmony"],
+            tip: "Try replacing V7 with ♭II7 for instant jazz sophistication. The chromatic bass line sounds incredibly smooth."
         }
     };
 

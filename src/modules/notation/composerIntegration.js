@@ -3590,7 +3590,7 @@ export class NotationComposer {
 
         // If nudge would go off right edge, position to left of popup instead
         if (nudgeX + nudgeWidth > viewportWidth - margin) {
-          nudgeX = popupRect.left - nudgeWidth - margin;
+          nudgeX = popupRect.left - nudgeWidth - margin - 12;  // Extra 12px gap when on left
         }
 
         // If still off screen (left edge), clamp to left edge
@@ -3957,7 +3957,7 @@ export class NotationComposer {
         let nudgeY = popupRect.top;
 
         if (nudgeX + nudgeWidth > viewportWidth - margin) {
-          nudgeX = popupRect.left - nudgeWidth - margin;
+          nudgeX = popupRect.left - nudgeWidth - margin - 12;  // Extra 12px gap when on left
         }
         if (nudgeX < margin) {
           nudgeX = margin;

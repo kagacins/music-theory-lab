@@ -8,6 +8,7 @@ import { detectCadences } from './cadenceDetector.js';
 import { detectBorrowedChords } from './borrowedChordDetector.js';
 import { detectSequencesAndPatterns } from './sequenceDetector.js';
 import { detectAdvancedPatterns } from './advancedPatternDetector.js';
+import { detectComprehensivePatterns } from './comprehensivePatternDetector.js';
 
 // ============================================================================
 // COMBINED DETECTOR
@@ -49,6 +50,14 @@ export function detectAllObservations(context) {
         console.warn('[Detectors] Advanced pattern detection error:', e);
     }
 
+    try {
+        // Comprehensive patterns (harmonic rhythm, leading tone, tritone, cadential 6-4,
+        // augmented 6th, retrogression, palindrome, suspension, ostinato, chromatic voice, range)
+        items.push(...detectComprehensivePatterns(context));
+    } catch (e) {
+        console.warn('[Detectors] Comprehensive pattern detection error:', e);
+    }
+
     return items;
 }
 
@@ -74,3 +83,17 @@ export {
     detectTensionClimax,
     detectAdvancedPatterns
 } from './advancedPatternDetector.js';
+export {
+    detectHarmonicRhythmChange,
+    detectLeadingToneResolution,
+    detectTritoneUsage,
+    detectCadential64,
+    detectAugmentedSixth,
+    detectRetrogression,
+    detectPalindromicProgression,
+    detectSuspensionResolution,
+    detectOstinatoPattern,
+    detectChromaticVoiceMotion,
+    detectVoiceRangeExtreme,
+    detectComprehensivePatterns
+} from './comprehensivePatternDetector.js';

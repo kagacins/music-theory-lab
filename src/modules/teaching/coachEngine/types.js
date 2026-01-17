@@ -430,6 +430,216 @@ export const OBSERVATION_TYPES = {
             deepDive: { tab: 'chord', intent: 'optimize' }
         },
         cooldown: 90000
+    },
+
+    // Harmonic Rhythm
+    'harmonic-rhythm-change': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.RHYTHM,
+        id: 'harmonic-rhythm-change',
+        priority: 55,
+        emoji: '⏱️',
+        title: 'Harmonic Rhythm Shift',
+        message: {
+            simple: "Nice! Your chords started moving {{direction}} here - that adds energy!",
+            intermediate: "Harmonic rhythm {{direction}} at chord {{chordIndex}}: from {{fromRate}} to {{toRate}} chords per measure.",
+            advanced: "Harmonic rhythm acceleration toward cadences or deceleration for prolongation creates formal articulation and dramatic effect."
+        },
+        actions: {
+            deepDive: { tab: 'chord', intent: 'optimize' }
+        },
+        cooldown: 120000
+    },
+
+    // Leading Tone Resolution
+    'leading-tone-resolution': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'leading-tone-resolution',
+        priority: 70,
+        emoji: '🎯',
+        title: 'Leading Tone Resolution',
+        message: {
+            simple: "Perfect! The leading tone ({{leadingTone}}) resolved up to the tonic ({{tonic}}).",
+            intermediate: "Strong leading tone resolution: {{leadingTone}} → {{tonic}}. This half-step pull is the strongest melodic tendency in tonal music.",
+            advanced: "Ti-Do resolution ({{leadingTone}}→{{tonic}}) provides definitive tonal confirmation. The tritone between ^4 and ^7 resolves inward."
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 90000
+    },
+
+    // Tritone Usage (explicit tritone intervals in chord or between voices)
+    'tritone-usage': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.TENSION,
+        id: 'tritone-usage',
+        priority: 75,
+        emoji: '😈',
+        title: 'Tritone Detected',
+        message: {
+            simple: "Spicy! That {{chord}} has a tritone - the most tense interval in music!",
+            intermediate: "Tritone interval ({{notes}}) in {{chord}} creates maximum harmonic tension. It's called 'diabolus in musica' (devil in music)!",
+            advanced: "The tritone (augmented 4th/diminished 5th) in {{chord}} creates instability that traditionally resolves inward to a third or outward to a sixth."
+        },
+        actions: {
+            deepDive: true
+        },
+        cooldown: 60000
+    },
+
+    // Cadential 6-4
+    'cadential-64': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.CADENCE,
+        id: 'cadential-64',
+        priority: 80,
+        emoji: '👑',
+        title: 'Cadential 6/4',
+        message: {
+            simple: "Classic! That I chord in second inversion before V is a 'cadential 6/4' - super classy!",
+            intermediate: "Cadential 6/4: I⁶₄ → V creates a powerful pre-dominant effect. The 6th and 4th resolve down to the 5th and 3rd of V.",
+            advanced: "The cadential 6/4 (I⁶₄→V) functions as dominant prolongation with double appoggiatura. 6→5 and 4→3 resolutions strengthen the cadence."
+        },
+        actions: {
+            learnMore: 'lesson-cadences',
+            explorePanel: 'theory'
+        },
+        cooldown: 90000
+    },
+
+    // Augmented 6th Chords
+    'augmented-sixth': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.CHROMATIC_MEDIANT,
+        id: 'augmented-sixth',
+        priority: 85,
+        emoji: '🎻',
+        title: 'Augmented 6th Chord',
+        message: {
+            simple: "Fancy! That's an augmented 6th chord - it has a dramatic pull to V!",
+            intermediate: "{{type}} augmented 6th chord! The augmented 6th interval ({{interval}}) expands outward to an octave on V.",
+            advanced: "{{type}} ({{notes}}) provides chromatic approach to dominant via voice exchange: ♭6→5 and ♯4→5 resolve in contrary motion to the octave."
+        },
+        actions: {
+            deepDive: true
+        },
+        cooldown: 60000
+    },
+
+    // Retrogression (backwards functional motion)
+    'retrogression': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.SEQUENCE,
+        id: 'retrogression',
+        priority: 65,
+        emoji: '⬅️',
+        title: 'Retrogression',
+        message: {
+            simple: "Interesting! Going from {{from}} to {{to}} is 'backwards' - unexpected but it works!",
+            intermediate: "Retrogression: {{from}}→{{to}} reverses typical functional motion (T→S→D→T). Creates surprise or modal flavor.",
+            advanced: "{{from}}→{{to}} is retrograde functional motion. While atypical in common practice, it's effective for modal progressions and phrase extensions."
+        },
+        actions: {
+            deepDive: true
+        },
+        cooldown: 120000
+    },
+
+    // Palindromic Progression
+    'palindromic-progression': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.SEQUENCE,
+        id: 'palindromic-progression',
+        priority: 70,
+        emoji: '🔁',
+        title: 'Palindrome Pattern',
+        message: {
+            simple: "Cool symmetry! Your chords read the same forwards and backwards: {{pattern}}",
+            intermediate: "Palindromic progression detected: {{pattern}}. This creates arch-form symmetry around the center.",
+            advanced: "Palindromic structure ({{pattern}}) creates formal balance through retrograde symmetry. Common in classical development sections."
+        },
+        actions: {
+            deepDive: true
+        },
+        cooldown: 180000
+    },
+
+    // Suspension Resolution (when sus chord resolves to major/minor)
+    'suspension-resolution': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'suspension-resolution',
+        priority: 72,
+        emoji: '🎵',
+        title: 'Suspension Resolved',
+        message: {
+            simple: "Beautiful! That {{susChord}} resolved to {{resolvedChord}} - the tension melted away!",
+            intermediate: "Classic suspension resolution: {{susChord}}→{{resolvedChord}}. The {{suspendedNote}} resolved to the {{resolvedNote}}.",
+            advanced: "Suspension figure: preparation ({{prep}}), suspension ({{susChord}}), resolution ({{resolvedChord}}). The {{suspendedNote}}→{{resolvedNote}} is a textbook example."
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 60000
+    },
+
+    // Ostinato Pattern (celebrating repetition)
+    'ostinato-pattern': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.MOTIF,
+        id: 'ostinato-pattern',
+        priority: 60,
+        emoji: '🔄',
+        title: 'Ostinato Pattern',
+        message: {
+            simple: "Nice groove! You're repeating {{pattern}} - this hypnotic repetition is called an ostinato!",
+            intermediate: "Ostinato detected: {{pattern}} repeats {{count}} times. This creates a hypnotic, grounding effect.",
+            advanced: "Harmonic ostinato ({{pattern}} × {{count}}) provides structural foundation while creating rhythmic/harmonic groove through strategic repetition."
+        },
+        actions: {
+            deepDive: true
+        },
+        cooldown: 120000
+    },
+
+    // Chromatic Voice Motion
+    'chromatic-voice-motion': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'chromatic-voice-motion',
+        priority: 68,
+        emoji: '🌈',
+        title: 'Chromatic Voice Motion',
+        message: {
+            simple: "Smooth! One of your voices is moving in half steps - very expressive!",
+            intermediate: "Chromatic line detected: {{notes}}. Half-step motion creates expressive tension and smooth voice leading.",
+            advanced: "Chromatic linear motion ({{notes}}) provides voice-leading intensification through semitone inflection. Creates maximum melodic tension."
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 90000
+    },
+
+    // Voice Range Achievement (when voices stay in good ranges)
+    'voice-range-extreme': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'voice-range-extreme',
+        priority: 50,
+        emoji: '📊',
+        title: 'Register Expansion',
+        message: {
+            simple: "Wide range! Your {{voice}} voice is reaching {{direction}} - adds drama!",
+            intermediate: "{{voice}} voice reaches {{extreme}} ({{note}}). This register {{direction === 'high' ? 'climax' : 'depth'}} adds emotional weight.",
+            advanced: "Register extreme in {{voice}} ({{note}}) creates textural expansion. Consider this as a dramatic high/low point in your voicing."
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 180000
     }
 };
 

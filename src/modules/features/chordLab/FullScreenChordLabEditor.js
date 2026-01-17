@@ -429,12 +429,12 @@ class FullScreenChordLabEditor {
         const maxInversion = chordDef ? Math.min(chordDef.intervals.length - 1, 4) : 2;
 
         return `
-        <div id="fs-chordlab-sidebar" class="w-48 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-xs" style="min-width: 180px;">
-            <div class="p-2 space-y-2">
+        <div id="fs-chordlab-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm" style="min-width: 200px;">
+            <div class="p-2.5 space-y-2.5">
                 <!-- Root Note -->
-                <div class="bg-gray-50 rounded p-2">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-gray-700 font-semibold">Root</span>
+                <div class="bg-gray-50 rounded p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-gray-700 font-semibold text-sm">Root</span>
                         <label class="flex items-center gap-0.5 cursor-pointer" title="Sharp/Flat">
                             <span class="${enhPref === 'sharp' ? 'text-amber-600 font-bold' : 'text-gray-400'}">♯</span>
                             <div class="relative">
@@ -448,13 +448,13 @@ class FullScreenChordLabEditor {
                             <span class="${enhPref === 'flat' ? 'text-amber-600 font-bold' : 'text-gray-400'}">♭</span>
                         </label>
                     </div>
-                    <div id="fs-root-buttons" class="grid grid-cols-4 gap-0.5">
+                    <div id="fs-root-buttons" class="grid grid-cols-4 gap-1">
                         ${notes.map((note, i) => `
                             <button data-root="${i}"
                                     onmousedown="window.fsChordLabSelectRoot && window.fsChordLabSelectRoot(${i})"
                                     onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
                                     onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
-                                    class="px-1 py-1 text-[10px] font-semibold rounded ${i === rootIndex ? 'bg-amber-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
+                                    class="px-1.5 py-1.5 text-xs font-semibold rounded ${i === rootIndex ? 'bg-amber-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
                                 ${note}
                             </button>
                         `).join('')}
@@ -462,9 +462,9 @@ class FullScreenChordLabEditor {
                 </div>
 
                 <!-- Inversion -->
-                <div class="bg-gray-50 rounded p-2">
-                    <span class="text-gray-700 font-semibold block mb-1">Inversion</span>
-                    <div id="fs-inversion-buttons" class="grid grid-cols-5 gap-0.5">
+                <div class="bg-gray-50 rounded p-2.5">
+                    <span class="text-gray-700 font-semibold block mb-1.5 text-sm">Inversion</span>
+                    <div id="fs-inversion-buttons" class="grid grid-cols-5 gap-1">
                         ${[0, 1, 2, 3, 4].map(inv => {
                             const labels = ['R', '1', '2', '3', '4'];
                             const disabled = inv > maxInversion;
@@ -474,7 +474,7 @@ class FullScreenChordLabEditor {
                                         onmousedown="window.fsChordLabSelectInversion && window.fsChordLabSelectInversion(${inv})"
                                         onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
                                         onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
-                                        class="px-1 py-1 text-[10px] font-semibold rounded ${active ? 'bg-amber-500 text-white' : disabled ? 'bg-gray-100 text-gray-300' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}"
+                                        class="px-1.5 py-1.5 text-xs font-semibold rounded ${active ? 'bg-amber-500 text-white' : disabled ? 'bg-gray-100 text-gray-300' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}"
                                         ${disabled ? 'disabled' : ''}>
                                     ${labels[inv]}
                                 </button>
@@ -484,72 +484,39 @@ class FullScreenChordLabEditor {
                 </div>
 
                 <!-- RH Octave -->
-                <div class="bg-gray-50 rounded p-2">
-                    <span class="text-gray-700 font-semibold block mb-1">RH Octave</span>
-                    <div class="flex items-center justify-center gap-1">
+                <div class="bg-gray-50 rounded p-2.5">
+                    <span class="text-gray-700 font-semibold block mb-1.5 text-sm">RH Octave</span>
+                    <div class="flex items-center justify-center gap-1.5">
                         <button onmousedown="window.changeBuilderOctave && window.changeBuilderOctave(-1)"
                                 onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
                                 onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
-                                class="w-6 h-6 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200">-</button>
-                        <span id="fs-rh-octave" class="w-8 text-center text-gray-800 font-semibold">${octaveShift >= 0 ? '+' : ''}${octaveShift}</span>
+                                class="w-7 h-7 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200 text-sm">-</button>
+                        <span id="fs-rh-octave" class="w-10 text-center text-gray-800 font-semibold text-sm">${octaveShift >= 0 ? '+' : ''}${octaveShift}</span>
                         <button onmousedown="window.changeBuilderOctave && window.changeBuilderOctave(1)"
                                 onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
                                 onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
-                                class="w-6 h-6 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200">+</button>
+                                class="w-7 h-7 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200 text-sm">+</button>
                     </div>
                 </div>
 
                 <!-- Include Notes (RH Voicing) -->
-                <div class="bg-gray-50 rounded p-2">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-gray-700 font-semibold text-[10px]">Include Notes</span>
+                <div class="bg-gray-50 rounded p-2.5">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <span class="text-gray-700 font-semibold text-xs">Include Notes</span>
                         <div id="fs-rh-voicing-buttons" class="flex gap-1">
                             <button onclick="window.fsChordLabSelectAllNotes && window.fsChordLabSelectAllNotes()"
-                                    class="px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors"
+                                    class="px-2 py-0.5 text-xs font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors"
                                     title="Select all notes">All</button>
                             <button onclick="window.fsChordLabSelectNoneNotes && window.fsChordLabSelectNoneNotes()"
-                                    class="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-400 hover:bg-gray-500 text-white rounded transition-colors"
+                                    class="px-2 py-0.5 text-xs font-semibold bg-gray-400 hover:bg-gray-500 text-white rounded transition-colors"
                                     title="Deselect all notes">None</button>
                         </div>
                     </div>
-                    <div id="fs-voicing-checkboxes" class="flex flex-wrap gap-x-2 gap-y-0.5 items-center px-1 py-0.5 rounded bg-white border border-gray-200">
+                    <div id="fs-voicing-checkboxes" class="flex flex-wrap gap-x-2 gap-y-1 items-center px-1.5 py-1 rounded bg-white border border-gray-200">
                         <!-- Checkboxes populated dynamically -->
                     </div>
                 </div>
 
-                <!-- Left Hand -->
-                <div class="bg-gray-50 rounded p-2">
-                    <span class="text-gray-700 font-semibold block mb-1">Left Hand</span>
-                    <select id="fs-lh-type"
-                            onchange="window.fsChordLabSetLHType && window.fsChordLabSetLHType(this.value)"
-                            class="w-full px-1 py-1 bg-white text-gray-700 rounded border border-gray-300 text-[10px] mb-1">
-                        ${lhTypeOptions}
-                    </select>
-                    <div class="flex gap-1">
-                        <select id="fs-lh-inversion"
-                                onchange="window.fsChordLabSetLHInversion && window.fsChordLabSetLHInversion(parseInt(this.value))"
-                                class="flex-1 px-1 py-0.5 bg-white text-gray-700 rounded border border-gray-300 text-[9px]">
-                            <option value="0" ${lhInversion === 0 ? 'selected' : ''}>Root</option>
-                            <option value="1" ${lhInversion === 1 ? 'selected' : ''}>1st</option>
-                            <option value="2" ${lhInversion === 2 ? 'selected' : ''}>2nd</option>
-                        </select>
-                        <select id="fs-lh-octave"
-                                onchange="window.fsChordLabSetLHOctave && window.fsChordLabSetLHOctave(parseInt(this.value))"
-                                class="flex-1 px-1 py-0.5 bg-white text-gray-700 rounded border border-gray-300 text-[9px]">
-                            <option value="0" ${lhOctave === 0 ? 'selected' : ''}>0</option>
-                            <option value="-12" ${lhOctave === -12 ? 'selected' : ''}>-1</option>
-                            <option value="-24" ${lhOctave === -24 ? 'selected' : ''}>-2</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Notes Display -->
-                <div class="bg-amber-50 border border-amber-200 rounded p-2">
-                    <span class="text-amber-700 font-semibold block mb-1">Notes</span>
-                    <div id="fs-sidebar-notes" class="text-amber-800 text-[10px] font-mono">
-                        C4 - E4 - G4
-                    </div>
-                </div>
             </div>
         </div>
         `;
@@ -834,7 +801,7 @@ class FullScreenChordLabEditor {
         rootButtons.forEach((btn, i) => {
             btn.textContent = notes[i];
             // Reset classes first
-            btn.className = 'px-1 py-1 text-[10px] font-semibold rounded';
+            btn.className = 'px-1.5 py-1.5 text-xs font-semibold rounded';
             if (i === rootIndex) {
                 btn.classList.add('bg-amber-500', 'text-white');
             } else {
@@ -906,12 +873,6 @@ class FullScreenChordLabEditor {
         if (symbolEl) {
             symbolEl.textContent = `${rootNote}${symbol}`;
         }
-
-        // Also update sidebar notes display
-        const sidebarNotes = this.tabContent?.querySelector('#fs-sidebar-notes');
-        if (sidebarNotes) {
-            sidebarNotes.textContent = chordNotes.length > 0 ? chordNotes.join(' - ') : 'Select a chord';
-        }
     }
 
     _updateVoicingCheckboxes() {
@@ -944,16 +905,16 @@ class FullScreenChordLabEditor {
             const omitted = getBuilderOmittedNotes?.() || [];
 
             if (notes.length === 0) {
-                rhContainer.innerHTML = '<span class="text-gray-400 text-[10px]">Select a chord</span>';
+                rhContainer.innerHTML = '<span class="text-gray-400 text-xs">Select a chord</span>';
             } else {
                 rhContainer.innerHTML = notes.map(note => {
                     const isOmitted = omitted.includes(note);
                     return `
-                        <label class="flex items-center gap-1 text-gray-700 text-[10px] cursor-pointer hover:text-gray-900">
+                        <label class="flex items-center gap-1.5 text-gray-700 text-xs cursor-pointer hover:text-gray-900">
                             <input type="checkbox" data-note="${note}"
                                    ${!isOmitted ? 'checked' : ''}
                                    onchange="window.toggleBuilderNote && window.toggleBuilderNote('${note}')"
-                                   class="w-3 h-3 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500">
+                                   class="w-3.5 h-3.5 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500">
                             ${note}
                         </label>
                     `;
@@ -976,16 +937,16 @@ class FullScreenChordLabEditor {
             const lhOmitted = getBuilderLHOmittedNotes?.() || [];
 
             if (lhNotes.length === 0) {
-                lhContainer.innerHTML = '<span class="text-gray-400 text-[10px]">No LH notes</span>';
+                lhContainer.innerHTML = '<span class="text-gray-400 text-xs">No LH notes</span>';
             } else {
                 lhContainer.innerHTML = lhNotes.map(note => {
                     const isOmitted = lhOmitted.includes(note);
                     return `
-                        <label class="flex items-center gap-1 text-gray-600 text-[10px] cursor-pointer hover:text-gray-800">
+                        <label class="flex items-center gap-1.5 text-gray-600 text-xs cursor-pointer hover:text-gray-800">
                             <input type="checkbox" data-note="${note}"
                                    ${!isOmitted ? 'checked' : ''}
                                    onchange="window.toggleBuilderLHNote && window.toggleBuilderLHNote('${note}')"
-                                   class="w-3 h-3 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500">
+                                   class="w-3.5 h-3.5 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500">
                             ${note}
                         </label>
                     `;
@@ -1122,7 +1083,7 @@ class FullScreenChordLabEditor {
             btn.disabled = disabled;
 
             // Reset classes
-            btn.className = 'px-1 py-1 text-[10px] font-semibold rounded';
+            btn.className = 'px-1.5 py-1.5 text-xs font-semibold rounded';
 
             if (active) {
                 btn.classList.add('bg-amber-500', 'text-white');

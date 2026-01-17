@@ -3258,6 +3258,7 @@ export class NotationToolbar {
       this.selectionHasHairpin = null;
       this.selectionGraceNote = null;
       this.selectionDynamic = null;
+      this.selectionVoice = null; // Track selected notes' voice(s)
 
       // Reset all contextual validation flags
       this.canBeamSelected = false;
@@ -3327,6 +3328,7 @@ export class NotationToolbar {
     const slurStates = new Set();
     const hairpinStates = new Set();
     const graceStates = new Set();
+    const voiceStates = new Set(); // Track which voices are selected
 
     selectedNotes.forEach(note => {
       if (note.duration) {
@@ -3374,6 +3376,9 @@ export class NotationToolbar {
 
       // Track lyric state
       lyricStates.add(note.lyric ? 'has-lyric' : 'none');
+
+      // Track voice state (voiceIndex is 0-based, convert to 1-based for display)
+      voiceStates.add((note.voiceIndex || 0) + 1);
 
       // Track ornament state
       ornamentStates.add(note.ornament || 'none');
@@ -3469,6 +3474,10 @@ export class NotationToolbar {
     this.selectionHasSlur = slurStates.size === 1 && [...slurStates][0] === 'has-slur';
     this.selectionHasHairpin = hairpinStates.size === 1 ? ([...hairpinStates][0] === 'none' ? null : [...hairpinStates][0]) : 'mixed';
     this.selectionGraceNote = graceStates.size === 1 ? ([...graceStates][0] === 'none' ? null : [...graceStates][0]) : 'mixed';
+
+    // Set voice selection state (1-based voice numbers)
+    // 'mixed' means notes from different voices are selected
+    this.selectionVoice = voiceStates.size === 1 ? [...voiceStates][0] : 'mixed';
 
     // CRITICAL FIX: Sync internal state to match what's being shown visually
     // This ensures that if the user adds a new note while something is selected,

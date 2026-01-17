@@ -2233,6 +2233,9 @@ export class FullScreenBottomPanel {
                     <button id="fs-bass-apply-selected" class="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-400 text-white text-xs font-medium rounded-lg hover:from-amber-500 hover:to-orange-500 transition-all shadow" style="opacity: 0.5;" disabled title="Shift+click chord cards to multi-select, then apply pattern to selected chords only">
                         Apply to Selected
                     </button>
+                    <button id="fs-bass-revert-selected" class="px-2 py-1.5 bg-gradient-to-r from-orange-300 to-amber-300 text-orange-800 text-xs font-medium rounded-lg hover:from-orange-400 hover:to-amber-400 transition-all shadow" style="opacity: 0.5;" disabled title="Revert selected chord(s) to their chord card voicings">
+                        Revert Selected
+                    </button>
                     <button id="fs-bass-revert" class="px-2 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-lg transition-all">
                         Revert All
                     </button>
@@ -2358,9 +2361,18 @@ export class FullScreenBottomPanel {
             }
         });
 
-        // Update Apply to Selected button state based on current selection
+        // Update Apply to Selected and Revert Selected button states based on current selection
         // Use timeout to ensure DOM is ready
         setTimeout(() => this._updateApplyToSelectedButton(), 300);
+
+        // Revert Selected button - reverts selected chord(s) to their chord card voicings
+        container.querySelector('#fs-bass-revert-selected')?.addEventListener('click', () => {
+            if (window.revertBassToChordVoicing) {
+                window.revertBassToChordVoicing();
+            }
+            // Refresh the panel
+            this._renderAutoBassPanel(container);
+        });
 
         // Revert All button
         container.querySelector('#fs-bass-revert')?.addEventListener('click', () => {
@@ -2554,24 +2566,33 @@ export class FullScreenBottomPanel {
     }
 
     /**
-     * Update Apply to Selected button visibility/state
+     * Update Apply to Selected and Revert Selected button visibility/state
      * Checks if any chord card anywhere in the document has visual selection
      */
     _updateApplyToSelectedButton() {
-        // Try multiple selectors to find the button
-        let btn = this.container?.querySelector('#fs-bass-apply-selected');
-        if (!btn) {
-            btn = document.querySelector('#fs-bass-apply-selected');
+        // Check if any chord card anywhere has data-selected="true"
+        // The main app sets this on cards in the progression visualization
+        const selectedCard = document.querySelector('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
+        const hasVisualSelection = selectedCard !== null;
+
+        // Update Apply to Selected button
+        let applyBtn = this.container?.querySelector('#fs-bass-apply-selected');
+        if (!applyBtn) {
+            applyBtn = document.querySelector('#fs-bass-apply-selected');
+        }
+        if (applyBtn) {
+            applyBtn.disabled = !hasVisualSelection;
+            applyBtn.style.opacity = hasVisualSelection ? '1' : '0.5';
         }
 
-        if (btn) {
-            // Check if any chord card anywhere has data-selected="true"
-            // The main app sets this on cards in the progression visualization
-            const selectedCard = document.querySelector('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
-            const hasVisualSelection = selectedCard !== null;
-
-            btn.disabled = !hasVisualSelection;
-            btn.style.opacity = hasVisualSelection ? '1' : '0.5';
+        // Update Revert Selected button
+        let revertBtn = this.container?.querySelector('#fs-bass-revert-selected');
+        if (!revertBtn) {
+            revertBtn = document.querySelector('#fs-bass-revert-selected');
+        }
+        if (revertBtn) {
+            revertBtn.disabled = !hasVisualSelection;
+            revertBtn.style.opacity = hasVisualSelection ? '1' : '0.5';
         }
     }
 

@@ -39,9 +39,17 @@ function getVF() {
   return window.VexFlow || (window.Vex ? window.Vex.Flow : null);
 }
 
-const VOICE_STEM_DIRECTIONS = {
-  primary: 1,
-  secondary: -1,
+// Stem directions for multi-voice notation
+// Treble clef: V1 (melody) on top with stems UP, V2 (harmony) below with stems DOWN
+// Bass clef: V1 (bass line) on bottom with stems DOWN, V2 (harmony/texture) above with stems UP
+const TREBLE_VOICE_STEM_DIRECTIONS = {
+  primary: 1,      // Voice 0: stems UP (melody on top)
+  secondary: -1,   // Voice 1: stems DOWN (harmony below)
+};
+
+const BASS_VOICE_STEM_DIRECTIONS = {
+  primary: -1,     // Voice 0: stems DOWN (bass line on bottom)
+  secondary: 1,    // Voice 1: stems UP (harmony/texture above)
 };
 
 // ============================================================================
@@ -284,18 +292,18 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
     return isDotted ? beats * 1.5 : beats;
   };
 
-  // Beats to duration string mapping
-  const beatsToDuration = (beats) => {
-    if (beats >= 4) return '1n';
-    if (beats >= 3) return '2nd'; // dotted half
-    if (beats >= 2) return '2n';
-    if (beats >= 1.5) return '4nd'; // dotted quarter
-    if (beats >= 1) return '4n';
-    if (beats >= 0.75) return '8nd'; // dotted eighth
-    if (beats >= 0.5) return '8n';
-    if (beats >= 0.25) return '16n';
-    if (beats >= 0.125) return '32n';
-    return '4n';
+  // Beats to duration object mapping (returns { duration, dotted } for canonical format)
+  const beatsToDurationObj = (beats) => {
+    if (beats >= 4) return { duration: '1n', dotted: false };
+    if (beats >= 3) return { duration: '2n', dotted: true };   // dotted half
+    if (beats >= 2) return { duration: '2n', dotted: false };
+    if (beats >= 1.5) return { duration: '4n', dotted: true }; // dotted quarter
+    if (beats >= 1) return { duration: '4n', dotted: false };
+    if (beats >= 0.75) return { duration: '8n', dotted: true }; // dotted eighth
+    if (beats >= 0.5) return { duration: '8n', dotted: false };
+    if (beats >= 0.25) return { duration: '16n', dotted: false };
+    if (beats >= 0.125) return { duration: '32n', dotted: false };
+    return { duration: '4n', dotted: false };
   };
 
   // Build a map of occupied beat ranges
@@ -322,12 +330,13 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
 
       while (gapStart < gapEnd) {
         const gapDuration = gapEnd - gapStart;
-        const restDuration = beatsToDuration(gapDuration);
-        const restBeats = durationToBeats(restDuration);
+        const { duration: restDuration, dotted: restDotted } = beatsToDurationObj(gapDuration);
+        const restBeats = durationToBeats(restDuration, restDotted);
 
         rests.push({
           beat: gapStart,
           duration: restDuration,
+          dotted: restDotted,
           isRest: true,
           type: 'rest',
           pitch: clef === 'bass' ? 'D3' : 'B4',
@@ -344,12 +353,13 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
   // Fill any remaining gap at the end of the measure
   while (currentBeat < totalBeats) {
     const remainingBeats = totalBeats - currentBeat;
-    const restDuration = beatsToDuration(remainingBeats);
-    const restBeats = durationToBeats(restDuration);
+    const { duration: restDuration, dotted: restDotted } = beatsToDurationObj(remainingBeats);
+    const restBeats = durationToBeats(restDuration, restDotted);
 
     rests.push({
       beat: currentBeat,
       duration: restDuration,
+      dotted: restDotted,
       isRest: true,
       type: 'rest',
       pitch: clef === 'bass' ? 'D3' : 'B4',
@@ -2663,7 +2673,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // Only pass stemDirection when we have multiple voices in this measure
   const trebleResult = hasMultipleVoicesInMeasure
     ? createNotesForStaff(primaryTrebleVoiceNotes, keySignature, 'treble', timeSignature, {
-        stemDirection: VOICE_STEM_DIRECTIONS.primary,
+        stemDirection: TREBLE_VOICE_STEM_DIRECTIONS.primary,
         voiceIndex: 0,
       })
     : createNotesForStaff(primaryTrebleVoiceNotes, keySignature, 'treble', timeSignature); // No options = auto stems
@@ -2681,7 +2691,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   let trebleOttavaBrackets2 = [];
   if (hasMultipleVoicesInMeasure) {
     const trebleResult2 = createNotesForStaff(secondaryTrebleVoiceNotes, keySignature, 'treble', timeSignature, {
-      stemDirection: VOICE_STEM_DIRECTIONS.secondary,
+      stemDirection: TREBLE_VOICE_STEM_DIRECTIONS.secondary,
       voiceIndex: 1,
     });
     vexTrebleNotes2 = trebleResult2.notes;
@@ -2726,9 +2736,10 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   }
 
   // Create notes for bass voice 0 (primary voice)
+  // Bass clef uses opposite stem directions: V1 stems DOWN (bass on bottom), V2 stems UP (harmony above)
   const bassResult = hasBassMultipleVoicesInMeasure
     ? createNotesForStaff(primaryBassVoiceNotes, keySignature, 'bass', timeSignature, {
-        stemDirection: VOICE_STEM_DIRECTIONS.primary,
+        stemDirection: BASS_VOICE_STEM_DIRECTIONS.primary,
         voiceIndex: 0,
       })
     : createNotesForStaff(primaryBassVoiceNotes, keySignature, 'bass', timeSignature);
@@ -2745,7 +2756,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   let bassOttavaBrackets2 = [];
   if (hasBassMultipleVoicesInMeasure) {
     const bassResult2 = createNotesForStaff(secondaryBassVoiceNotes, keySignature, 'bass', timeSignature, {
-      stemDirection: VOICE_STEM_DIRECTIONS.secondary,
+      stemDirection: BASS_VOICE_STEM_DIRECTIONS.secondary,
       voiceIndex: 1,
     });
     vexBassNotes2 = bassResult2.notes;

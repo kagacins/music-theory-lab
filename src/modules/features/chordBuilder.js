@@ -1875,6 +1875,15 @@ export function playChordPreview(root, type, inversion = 0) {
         chordPreviewNotes.forEach(note => {
             piano.triggerAttack(note, Tone.now());
         });
+
+        // Highlight notes on virtual keyboard
+        chordPreviewNotes.forEach(note => {
+            const keyId = getNoteKeyId(note);
+            const keyElement = document.getElementById(keyId);
+            if (keyElement) {
+                keyElement.classList.add('active-builder-playback');
+            }
+        });
     }
 }
 
@@ -1895,6 +1904,16 @@ export function stopChordPreview() {
             }
         });
     }
+
+    // Clear keyboard highlighting
+    chordPreviewNotes.forEach(note => {
+        const keyId = getNoteKeyId(note);
+        const keyElement = document.getElementById(keyId);
+        if (keyElement) {
+            keyElement.classList.remove('active-builder-playback');
+        }
+    });
+
     chordPreviewNotes = [];
 }
 

@@ -2934,20 +2934,35 @@ export class FullScreenNotationEditor {
 
     /**
      * Update voice toggle buttons to reflect active voice
+     * @param {number|string} activeVoice - 1, 2, or 'mixed' (when notes from different voices are selected)
      */
     _updateVoiceButtons(activeVoice) {
         const container = this._getActiveContainer();
         const sidebar = container?.querySelector('#fullscreen-sidebar-content');
         if (!sidebar) return;
 
+        const isMixed = activeVoice === 'mixed';
+
         sidebar.querySelectorAll('.fs-voice-btn').forEach(btn => {
-            const isActive = parseInt(btn.dataset.voice) === activeVoice;
-            btn.classList.toggle('bg-indigo-100', isActive);
-            btn.classList.toggle('border-indigo-500', isActive);
-            btn.classList.toggle('text-indigo-700', isActive);
-            btn.classList.toggle('font-medium', isActive);
-            btn.classList.toggle('bg-white', !isActive);
-            btn.classList.toggle('border-slate-200', !isActive);
+            const btnVoice = parseInt(btn.dataset.voice);
+            const isActive = !isMixed && btnVoice === activeVoice;
+
+            // Clear all states first
+            btn.classList.remove('bg-indigo-100', 'border-indigo-500', 'text-indigo-700',
+                                 'bg-white', 'border-slate-200', 'bg-amber-100',
+                                 'border-amber-400', 'text-amber-700');
+
+            if (isMixed) {
+                // Mixed state: show amber/warning color on both buttons
+                btn.classList.add('bg-amber-100', 'border-amber-400', 'text-amber-700', 'font-medium');
+            } else if (isActive) {
+                // Active state: indigo
+                btn.classList.add('bg-indigo-100', 'border-indigo-500', 'text-indigo-700', 'font-medium');
+            } else {
+                // Inactive state: white/slate
+                btn.classList.add('bg-white', 'border-slate-200');
+                btn.classList.remove('font-medium');
+            }
         });
     }
 
@@ -3157,6 +3172,16 @@ export class FullScreenNotationEditor {
 
         // Update chord buttons (placeholder for future)
         this._updateChordButtons();
+
+        // Update voice buttons to reflect the selected notes' voice(s)
+        // When notes from multiple voices are selected, show 'mixed' state
+        // When notes from same voice are selected, show that voice
+        // When no selection, show the current input voice
+        if (hasSelection && toolbar.selectionVoice) {
+            this._updateVoiceButtons(toolbar.selectionVoice);
+        } else {
+            this._updateVoiceButtons(toolbar.voiceNumber || 1);
+        }
 
         // Update selection info
         this._updateSelectionInfo(toolbar.selectedNotesCount);
