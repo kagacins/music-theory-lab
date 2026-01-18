@@ -342,12 +342,14 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-[10000] hidden" onclick="window.toggleSidebar && window.toggleSidebar()"></div>
 
     <!-- Landing Page -->
-    <div id="landing-page" class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white relative overflow-hidden">
+    <div id="landing-page" class="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 text-white relative overflow-hidden">
+        <!-- Subtle grain texture overlay -->
+        <div class="absolute inset-0 opacity-[0.015] pointer-events-none" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E');"></div>
         <!-- Animated background elements -->
         <div class="absolute inset-0 overflow-hidden pointer-events-none">
-            <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
-            <div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
-            <div class="absolute top-1/2 right-1/3 w-64 h-64 bg-rose-500/15 rounded-full blur-3xl animate-pulse" style="animation-delay: 2s;"></div>
+            <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl animate-pulse" style="animation-duration: 4s;"></div>
+            <div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl animate-pulse" style="animation-duration: 5s; animation-delay: 1s;"></div>
+            <div class="absolute top-1/2 right-1/3 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style="animation-duration: 6s; animation-delay: 2s;"></div>
             <!-- Musical note decorations -->
             <svg class="absolute top-20 left-10 w-16 h-16 text-white/10 animate-bounce" style="animation-duration: 3s;" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
             <svg class="absolute bottom-32 right-20 w-12 h-12 text-white/10 animate-bounce" style="animation-duration: 4s; animation-delay: 0.5s;" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
@@ -356,10 +358,10 @@
         <div class="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:py-12">
             <!-- Hero Section -->
             <header class="text-center mb-12 sm:mb-16">
-                <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent">
+                <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold mb-4" style="color: #42a4f5;">
                     Interactive Music Theory Lab
                 </h1>
-                <p class="text-lg sm:text-xl text-purple-200 mb-8 max-w-2xl mx-auto">
+                <p class="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
                     Learn music theory through hands-on creation. Build chords, craft progressions, compose melodies, and understand <em>why</em> music sounds good.
                 </p>
 
@@ -371,7 +373,7 @@
                     </a>
                     <!-- Let It Be Tutorial + About & Support stacked -->
                     <div class="flex flex-col items-center gap-2">
-                        <button onclick="window.startLetItBeTutorial && window.startLetItBeTutorial()" class="group px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:shadow-emerald-500/25 transition-all transform hover:scale-105 flex items-center gap-3">
+                        <button onclick="window.startLetItBeTutorial && window.startLetItBeTutorial()" class="group px-8 py-4 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 flex items-center gap-3" style="background: linear-gradient(to right, #42a4f5, #2d8bd8); box-shadow: 0 10px 15px -3px rgba(66, 164, 245, 0.25);" onmouseover="this.style.background='linear-gradient(to right, #5bb3f7, #42a4f5)'" onmouseout="this.style.background='linear-gradient(to right, #42a4f5, #2d8bd8)'">
                             <span class="text-2xl">🎸</span>
                             <span class="flex flex-col items-start leading-tight">
                                 <span class="text-xs font-normal opacity-90">Interactive Tutorial</span>
@@ -404,7 +406,7 @@
                             <p class="text-teal-300 text-sm font-medium">Create Full Songs</p>
                         </div>
                     </div>
-                    <ul class="space-y-2 text-purple-100 text-sm">
+                    <ul class="space-y-2 text-slate-300 text-sm">
                         <li class="flex items-start gap-2">
                             <svg class="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
                             <span>Build chord progressions with drag-and-drop</span>
@@ -442,7 +444,7 @@
                             <p class="text-amber-300 text-sm font-medium">Build & Explore Chords</p>
                         </div>
                     </div>
-                    <ul class="space-y-2 text-purple-100 text-sm">
+                    <ul class="space-y-2 text-slate-300 text-sm">
                         <li class="flex items-start gap-2">
                             <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
                             <span>Interactive chord builder with real-time audio playback</span>
@@ -476,7 +478,7 @@
                             <p class="text-lime-300 text-sm font-medium">Discover Scales & Modes</p>
                         </div>
                     </div>
-                    <ul class="space-y-2 text-purple-100 text-sm">
+                    <ul class="space-y-2 text-slate-300 text-sm">
                         <li class="flex items-start gap-2">
                             <svg class="w-4 h-4 text-lime-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
                             <span>100+ scales: major, minor, modes, jazz, world music</span>
@@ -510,7 +512,7 @@
                             <p class="text-indigo-300 text-sm font-medium">Learn By Doing</p>
                         </div>
                     </div>
-                    <ul class="space-y-2 text-purple-100 text-sm">
+                    <ul class="space-y-2 text-slate-300 text-sm">
                         <li class="flex items-start gap-2">
                             <svg class="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
                             <span>Interactive lessons with hands-on exercises</span>
@@ -539,34 +541,34 @@
                 <h3 class="text-lg font-bold mb-4 text-center" style="color: #ffffff; -webkit-text-fill-color: #ffffff; background: none;">Plus More Features</h3>
                 <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm" style="color: #ffffff;">
                     <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                        <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
                         <span style="color: #ffffff;">Music theory-driven chord, melody & harmonization recommendations</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"></path></svg>
+                        <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"></path></svg>
                         <span style="color: #ffffff;">Progression preset library</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                        <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                         <span style="color: #ffffff;">MIDI & PDF export</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"></path></svg>
+                        <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"></path></svg>
                         <span style="color: #ffffff;">Audio chord detection</span>
                     </div>
                 </div>
             </div>
 
             <!-- Footer -->
-            <footer class="text-center text-purple-300 text-sm">
+            <footer class="text-center text-slate-400 text-sm">
                 <p class="mb-2">Built for musicians who want to understand the "why" behind the music.</p>
-                <p class="text-purple-400 text-xs mb-4">Free to use. No account required.</p>
+                <p class="text-amber-400/70 text-xs mb-4">Free to use. No account required.</p>
                 <div class="flex flex-wrap justify-center gap-3">
-                    <a href="https://github.com/kagacins/music-theory-lab/discussions/categories/ideas" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500/30 to-indigo-500/30 hover:from-purple-500/50 hover:to-indigo-500/50 text-purple-100 hover:text-white text-sm font-medium rounded-lg border border-purple-400/30 hover:border-purple-400/50 transition-all">
+                    <a href="https://github.com/kagacins/music-theory-lab/discussions/categories/ideas" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 hover:from-blue-500/50 hover:to-cyan-500/50 text-slate-200 hover:text-white text-sm font-medium rounded-lg border border-blue-400/30 hover:border-blue-400/50 transition-all">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"></path></svg>
                         Request Feature
                     </a>
-                    <a href="https://github.com/kagacins/music-theory-lab/issues/new?template=bug_report.md" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-purple-200 hover:text-white text-sm font-medium rounded-lg border border-white/20 hover:border-white/40 transition-all">
+                    <a href="https://github.com/kagacins/music-theory-lab/issues/new?template=bug_report.md" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-sm font-medium rounded-lg border border-white/20 hover:border-white/40 transition-all">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6.56 1.14a.75.75 0 01.177 1.045 3.989 3.989 0 00-.464.86c.185.17.382.329.59.473A3.993 3.993 0 0110 2c1.272 0 2.405.594 3.137 1.518.208-.144.405-.302.59-.473a3.989 3.989 0 00-.464-.86.75.75 0 011.222-.869c.369.519.65 1.105.822 1.736a.75.75 0 01-.174.707 7.03 7.03 0 01-1.299 1.098A4 4 0 0114 6c0 .52-.301.963-.723 1.187a6.961 6.961 0 01-1.158.486c.13.208.231.436.296.679a1.527 1.527 0 00.426-.201.75.75 0 01.75 1.3 3.02 3.02 0 01-1.085.452c.012.076.019.154.019.234 0 .439-.044.867-.126 1.278a.75.75 0 11-1.473-.295c.058-.29.099-.6.099-.983 0-.178-.017-.35-.049-.514a6.958 6.958 0 01-1.951 0A3.97 3.97 0 019 10.863c0 .384.04.694.099.983a.75.75 0 01-1.473.295A6.465 6.465 0 017.5 10.863c0-.08.007-.158.02-.234a3.02 3.02 0 01-1.086-.452.75.75 0 01.75-1.3c.136.079.278.146.426.2.065-.242.166-.47.296-.679a6.961 6.961 0 01-1.158-.486A1.252 1.252 0 016 6a4 4 0 01.166-1.143 7.032 7.032 0 01-1.299-1.098.75.75 0 01-.174-.707c.172-.63.453-1.217.822-1.736a.75.75 0 011.046-.177zM10 4a2 2 0 100 4 2 2 0 000-4z" clip-rule="evenodd"></path></svg>
                         Report Bug
                     </a>
