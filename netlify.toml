@@ -17,6 +17,9 @@
 [build.environment]
   # Increase Node heap size to prevent out-of-memory during Vite build
   NODE_OPTIONS = "--max_old_space_size=4096"
+  # Allow Supabase anon key in build output (it's designed to be public, protected by RLS)
+  # and Google Search keys which are only used server-side in Netlify Functions
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,SUPABASE_URL,GOOGLE_SEARCH_API_KEY,GOOGLE_SEARCH_ENGINE_ID"
 
 [functions]
   # Directory containing Netlify Functions
