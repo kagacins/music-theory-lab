@@ -44,7 +44,8 @@ export async function showAdminDashboard() {
     // Create modal
     modalElement = document.createElement('div');
     modalElement.id = 'admin-dashboard-modal';
-    modalElement.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+    // Use high z-index to appear above fullscreen tabs (z-[100]) and other modals
+    modalElement.className = 'fixed inset-0 bg-black bg-opacity-50 z-[10000] flex items-center justify-center p-4';
 
     modalElement.innerHTML = `
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -761,7 +762,7 @@ window.viewFlagSubmission = async (submissionId) => {
         toast.error('Submission not found');
         return;
     }
-    // Keep admin dashboard open - the submission modal has z-[60] and appears on top of admin dashboard z-50
+    // Keep admin dashboard open - the submission modal appears on top of admin dashboard
     if (window.viewCommunitySubmission) {
         window.viewCommunitySubmission(submissionId);
     }
@@ -1469,7 +1470,8 @@ function showBulkDeleteConfirmation() {
 
     const confirmModal = document.createElement('div');
     confirmModal.id = 'bulk-delete-modal';
-    confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
+    // Use higher z-index than admin dashboard (z-[10000])
+    confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[10001] flex items-center justify-center p-4';
     confirmModal.innerHTML = `
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md">
             <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-red-500 to-red-600 rounded-t-xl">
@@ -1609,7 +1611,8 @@ window.editSubmission = async (id) => {
     // Create edit modal
     const editModal = document.createElement('div');
     editModal.id = 'admin-edit-modal';
-    editModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4';
+    // Use higher z-index than admin dashboard (z-[10000])
+    editModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[10001] flex items-center justify-center p-4';
     editModal.innerHTML = `
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg">
             <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-t-xl">
@@ -1695,7 +1698,8 @@ window.editSubmission = async (id) => {
 function showAdminToast(message, type = 'success') {
     const toast = document.createElement('div');
     const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-    toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-xl z-[70] flex items-center gap-3`;
+    // Use higher z-index than admin modals (z-[10001])
+    toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-xl z-[10002] flex items-center gap-3`;
     toast.innerHTML = `
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

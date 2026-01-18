@@ -120,7 +120,7 @@ import {
 import { markDirty as markAutoSaveDirty } from '../../storage/autoSave.js';
 
 // CompositionState for treble transposition
-import { getCompositionState } from '../../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../../state/compositionState.js';
 
 // Note/chord utilities
 import {
@@ -2833,14 +2833,26 @@ export function selectChordCard(index) {
     highlightTensionPointForSelection(index);
 
     // Sync measure selection with chord card selection (legacy system)
+    // Calculate the correct measure index based on chord's actual position (startBeat)
+    // This handles cases where chord durations vary (e.g., 2-beat chords, 8-beat chords)
+    let measureIndex = index; // Default fallback: assume 1:1 mapping
+    const compositionState = getCompositionState();
+    const chordSegment = compositionState?.getChordSegment?.(index);
+    if (chordSegment) {
+        const timeSignature = compositionState.getSettings?.()?.timeSignature || { num: 4, denom: 4 };
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+        measureIndex = Math.floor(chordSegment.startBeat / beatsPerMeasure);
+    }
+
     if (window.setSelectedMeasureIndex) {
-        window.setSelectedMeasureIndex(index);
+        window.setSelectedMeasureIndex(measureIndex);
     }
 
     // Fire event for new notation system bi-directional sync
+    // Include both chordIndex (for chord-related listeners) and measureIndex (for notation highlighting)
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('chordCardSelected', {
-            detail: { index }
+            detail: { index, chordIndex: index, measureIndex }
         }));
     }
 }

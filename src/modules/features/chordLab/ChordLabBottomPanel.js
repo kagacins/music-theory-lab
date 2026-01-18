@@ -278,8 +278,8 @@ export class ChordLabBottomPanel {
         container.innerHTML = `
             <div class="h-full flex flex-col">
                 <!-- Library controls bar -->
-                <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 flex-shrink-0">
-                    <span class="text-white font-semibold text-sm">${headerText}</span>
+                <div class="flex items-center px-3 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 flex-shrink-0">
+                    <span class="text-white font-semibold text-sm mr-4">${headerText}</span>
                     <div class="flex items-center gap-3">
                         <!-- Chromatic/Diatonic toggle (wider, matches classic style) -->
                         <div class="flex items-center gap-1.5 px-2 py-1 bg-white/20 rounded-full" title="Toggle: Chromatic (all chords) ↔ Diatonic (scale chords)">
@@ -306,16 +306,16 @@ export class ChordLabBottomPanel {
                             </select>
                         </div>
 
-                        <!-- Tooltips toggle -->
+                        <!-- Details toggle (styled like Chromatic/Diatonic) -->
                         <div class="flex items-center gap-1.5 px-2 py-1 bg-white/20 rounded-full" title="Show/hide chord details">
-                            <span class="text-[10px] font-semibold text-white/80">Details</span>
+                            <span class="text-[10px] font-semibold ${!this.tooltipsEnabled ? 'text-white' : 'text-white/60'}" id="fs-details-off-label">Details Off</span>
                             <label class="relative inline-flex items-center cursor-pointer mx-1">
                                 <input type="checkbox" id="fs-library-tooltips"
                                        ${this.tooltipsEnabled ? 'checked' : ''}
                                        class="sr-only peer">
                                 <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-400"></div>
                             </label>
-                            <span class="text-[10px] font-semibold ${this.tooltipsEnabled ? 'text-white' : 'text-white/60'}" id="fs-tooltips-status">${this.tooltipsEnabled ? 'On' : 'Off'}</span>
+                            <span class="text-[10px] font-semibold ${this.tooltipsEnabled ? 'text-white' : 'text-white/60'}" id="fs-details-on-label">Details On</span>
                         </div>
                     </div>
                 </div>
@@ -355,10 +355,14 @@ export class ChordLabBottomPanel {
         if (tooltipsToggle) {
             tooltipsToggle.addEventListener('change', (e) => {
                 this.tooltipsEnabled = e.target.checked;
-                const statusEl = document.getElementById('fs-tooltips-status');
-                if (statusEl) {
-                    statusEl.textContent = this.tooltipsEnabled ? 'On' : 'Off';
-                    statusEl.className = `text-[10px] ${this.tooltipsEnabled ? 'text-teal-600 font-semibold' : 'text-gray-400'}`;
+                // Update label colors to match Chromatic/Diatonic toggle style
+                const offLabel = document.getElementById('fs-details-off-label');
+                const onLabel = document.getElementById('fs-details-on-label');
+                if (offLabel) {
+                    offLabel.className = `text-[10px] font-semibold ${!this.tooltipsEnabled ? 'text-white' : 'text-white/60'}`;
+                }
+                if (onLabel) {
+                    onLabel.className = `text-[10px] font-semibold ${this.tooltipsEnabled ? 'text-white' : 'text-white/60'}`;
                 }
                 // Hide any open tooltip when disabled
                 if (!this.tooltipsEnabled) {

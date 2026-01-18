@@ -355,6 +355,21 @@ export async function exportNotationToPDF(options = {}) {
         // Show loading indicator
         const loadingToast = showLoadingToast('Generating PDF...');
 
+        // Store original render options and set export mode
+        const originalOptions = notationComposer.exportOptions || {};
+        notationComposer.exportOptions = {
+            isExporting: true,
+            includeBrackets,
+            includeChordLabels,
+            includeSectionColoring
+        };
+
+        // Re-render with export options (hides UI hints, respects checkbox options)
+        notationComposer.render(true);
+
+        // Small delay to allow render to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         // Create PDF (Letter size, portrait)
         const doc = new jsPDF({
             orientation: 'portrait',
@@ -439,8 +454,22 @@ export async function exportNotationToPDF(options = {}) {
                 const scaledHeight = canvasHeight * scale;
                 const xOffset = (pageWidth - scaledWidth) / 2;
 
+                // Create a temporary canvas with white background
+                // (The original canvas has transparent background which becomes black in JPEG)
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvasWidth;
+                tempCanvas.height = canvasHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                // Fill with white background
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+                // Draw the original canvas content on top
+                tempCtx.drawImage(canvas, 0, 0);
+
                 // Convert canvas to image and add to PDF (JPEG for smaller file size)
-                const imgData = canvas.toDataURL('image/jpeg', 0.92);
+                const imgData = tempCanvas.toDataURL('image/jpeg', 0.92);
                 doc.addImage(imgData, 'JPEG', xOffset, yPos, scaledWidth, scaledHeight);
             }
         }
@@ -455,6 +484,10 @@ export async function exportNotationToPDF(options = {}) {
         const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_notation.pdf`;
         doc.save(filename);
 
+        // Restore normal render options and re-render
+        notationComposer.exportOptions = originalOptions;
+        notationComposer.render(true);
+
         // Remove loading indicator
         removeLoadingToast(loadingToast);
         showToast('PDF exported successfully!');
@@ -462,6 +495,12 @@ export async function exportNotationToPDF(options = {}) {
 
     } catch (error) {
         console.error('[Export] Notation PDF export error:', error);
+        // Restore normal render on error too
+        const notationComposer = window.getNotationComposer?.();
+        if (notationComposer) {
+            notationComposer.exportOptions = {};
+            notationComposer.render(true);
+        }
         toast.error('Error exporting PDF. Please try again.');
     }
 }
@@ -704,11 +743,25 @@ async function addCanvasToPDF(doc, canvas, x, y, maxWidth, maxHeight, options = 
     const scaledWidth = canvasWidth * scale;
     const scaledHeight = canvasHeight * scale;
 
+    // Create a temporary canvas with white background
+    // (The original canvas has transparent background which becomes black in JPEG)
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvasWidth;
+    tempCanvas.height = canvasHeight;
+    const tempCtx = tempCanvas.getContext('2d');
+
+    // Fill with white background
+    tempCtx.fillStyle = '#ffffff';
+    tempCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw the original canvas content on top
+    tempCtx.drawImage(canvas, 0, 0);
+
     // Use JPEG with compression for much smaller file sizes
     // Quality 0.92 provides good balance of quality vs size (reduces ~10-20x vs PNG)
     // For music notation with clean lines, JPEG compression artifacts are minimal
     const quality = options.quality ?? 0.92;
-    const imgData = canvas.toDataURL('image/jpeg', quality);
+    const imgData = tempCanvas.toDataURL('image/jpeg', quality);
     doc.addImage(imgData, 'JPEG', x, y, scaledWidth, scaledHeight);
 }
 
@@ -2202,7 +2255,7 @@ export function showPDFExportDialog() {
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 10000;
+        z-index: 100000;
     `;
 
     modal.innerHTML = `
@@ -2223,18 +2276,18 @@ export function showPDFExportDialog() {
             <div style="margin-bottom: 16px;">
                 <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">Export Content</label>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; transition: border-color 0.2s;" id="export-type-lead-sheet-label">
-                        <input type="radio" name="export-type" value="lead-sheet" checked style="accent-color: #2563eb;">
-                        <div>
-                            <div style="font-size: 14px; color: #374151;">Lead Sheet Only</div>
-                            <div style="font-size: 12px; color: #6b7280;">Chord symbols in a grid layout</div>
-                        </div>
-                    </label>
                     <label style="display: flex; align-items: center; gap: 8px; cursor: ${hasNotation ? 'pointer' : 'not-allowed'}; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; transition: border-color 0.2s; opacity: ${hasNotation ? 1 : 0.5};" id="export-type-notation-label">
-                        <input type="radio" name="export-type" value="notation" ${hasNotation ? '' : 'disabled'} style="accent-color: #2563eb;">
+                        <input type="radio" name="export-type" value="notation" ${hasNotation ? 'checked' : 'disabled'} style="accent-color: #2563eb;">
                         <div>
                             <div style="font-size: 14px; color: #374151;">Musical Notation Only</div>
                             <div style="font-size: 12px; color: #6b7280;">${hasNotation ? 'Staff notation with notes' : 'No notation content available'}</div>
+                        </div>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; transition: border-color 0.2s;" id="export-type-lead-sheet-label">
+                        <input type="radio" name="export-type" value="lead-sheet" ${hasNotation ? '' : 'checked'} style="accent-color: #2563eb;">
+                        <div>
+                            <div style="font-size: 14px; color: #374151;">Lead Sheet Only</div>
+                            <div style="font-size: 12px; color: #6b7280;">Chord symbols in a grid layout</div>
                         </div>
                     </label>
                     <label style="display: flex; align-items: center; gap: 8px; cursor: ${hasNotation ? 'pointer' : 'not-allowed'}; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; transition: border-color 0.2s; opacity: ${hasNotation ? 1 : 0.5};" id="export-type-both-label">
@@ -2248,7 +2301,7 @@ export function showPDFExportDialog() {
             </div>
 
             <!-- Lead Sheet Options (shown when lead sheet is selected) -->
-            <div id="lead-sheet-options" style="margin-bottom: 16px; padding: 12px; background: #f9fafb; border-radius: 8px;">
+            <div id="lead-sheet-options" style="margin-bottom: 16px; padding: 12px; background: #f9fafb; border-radius: 8px; display: none;">
                 <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 8px;">Lead Sheet Options</label>
                 <div style="margin-bottom: 8px;">
                     <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px;">Chords per line</label>
@@ -2315,6 +2368,9 @@ export function showPDFExportDialog() {
     document.querySelectorAll('input[name="export-type"]').forEach(radio => {
         radio.addEventListener('change', updateOptionsVisibility);
     });
+
+    // Set initial visibility based on default selection
+    updateOptionsVisibility();
 
     // Handle cancel
     document.getElementById('pdf-cancel-btn').addEventListener('click', () => {

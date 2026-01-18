@@ -519,6 +519,13 @@ export function switchTab(tabId, options = {}) {
             window.initStudioNewTab();
         }
 
+        // Refresh admin FAB buttons after tab initialization (for admin users)
+        setTimeout(() => {
+            if (window.refreshFullscreenAdminButtons) {
+                window.refreshFullscreenAdminButtons();
+            }
+        }, 100);
+
         // Trigger coach analysis when entering Composition Studio (New)
         // Use a small delay to ensure everything is initialized
         setTimeout(() => {
@@ -531,6 +538,13 @@ export function switchTab(tabId, options = {}) {
         if (window.initChordLabNewTab) {
             window.initChordLabNewTab();
         }
+
+        // Refresh admin FAB buttons after tab initialization (for admin users)
+        setTimeout(() => {
+            if (window.refreshFullscreenAdminButtons) {
+                window.refreshFullscreenAdminButtons();
+            }
+        }, 100);
     } else if (tabId === 'scaleexplorer-new') {
         // Initialize Scale Explorer (New) - the new full-screen scale explorer experience as a tab
         if (window.initScaleExplorerNewTab) {

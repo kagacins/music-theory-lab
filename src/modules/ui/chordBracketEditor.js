@@ -111,8 +111,8 @@ function getChordTypeOptions(currentType) {
 
 /**
  * Generate duration options HTML with visual emphasis on whole and half beats
- * Whole beats: background color + extra bold
- * Half beats: bold only
+ * Whole beats: light purple background + bold
+ * Half beats: light purple background only (no bold)
  * Other beats: normal styling
  */
 function getDurationOptions(currentBeats) {
@@ -136,14 +136,14 @@ function getDurationOptions(currentBeats) {
                 label = whole === 0 ? '¾' : `${whole}¾`;
             }
 
-            // Styling: whole beats get background + extra bold, half beats get bold
+            // Styling: whole beats get background + bold, half beats get background only
             let style = '';
             if (frac === 0) {
-                // Whole beats: most emphasis - background color + extra bold
-                style = 'background-color: #4f46e5; color: white; font-weight: 800;';
-            } else if (frac === 0.5) {
-                // Half beats: some emphasis - bold with subtle background
+                // Whole beats: light purple background + bold
                 style = 'background-color: #e0e7ff; font-weight: 700;';
+            } else if (frac === 0.5) {
+                // Half beats: light purple background only (no bold)
+                style = 'background-color: #e0e7ff;';
             }
             // Quarter beats (0.25, 0.75) get no special styling
 
@@ -256,9 +256,9 @@ function createEditorHTML(chord, index, key) {
                             ${getChordTypeOptions(chord.type)}
                         </select>
                     </div>
-                    <div class="w-12">
+                    <div class="w-14">
                         <label class="block text-[10px] font-semibold text-gray-600 mb-0.5">Beats</label>
-                        <select class="duration-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[11px]">
+                        <select class="duration-select w-full px-1 py-1 bg-white border border-gray-300 rounded text-[11px]" style="min-width: 56px;">
                             ${getDurationOptions(chord.beats || 4)}
                         </select>
                     </div>

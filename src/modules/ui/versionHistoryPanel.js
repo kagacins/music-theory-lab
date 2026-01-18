@@ -18,11 +18,70 @@ import {
 } from '../storage/versionHistory.js';
 
 import { getAutoSaveStatus } from '../storage/autoSave.js';
-import { showPromptModal, showAlertModal } from './modals.js';
+import { showPromptModal, showAlertModal, showConfirmModal } from './modals.js';
 import { toast } from './toastNotifications.js';
 
 // Module state
 let onRestoreCallback = null;
+
+/**
+ * Default restore mechanism when no callback is provided
+ * Uses window-exposed functions to restore a project snapshot
+ * @param {Object} projectData - The project snapshot to restore
+ * @returns {boolean} Whether the restore was successful
+ */
+function restoreProjectFromSnapshot(projectData) {
+    try {
+        // Get required state objects
+        const compositionState = window.getCompositionState?.();
+        const trainerState = window.getTrainerState?.();
+
+        if (!compositionState) {
+            console.error('[versionHistoryPanel] Cannot restore: compositionState not available');
+            return false;
+        }
+
+        // Use the applyProjectToState function if available
+        if (window.applyProjectToState) {
+            const result = window.applyProjectToState(projectData, compositionState, trainerState, {
+                onProgressionLoaded: (progression) => {
+                    // Update chord cards
+                    if (window.renderChordCards) {
+                        window.renderChordCards();
+                    }
+                },
+                onNotationRefresh: () => {
+                    // Refresh notation display
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
+                    }
+                }
+            });
+
+            if (result?.success !== false) {
+                // Sync and refresh UI
+                if (window.syncProgressionToMelodyComposer) {
+                    window.syncProgressionToMelodyComposer();
+                }
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                }
+                if (window.renderChordCards) {
+                    window.renderChordCards();
+                }
+
+                toast.success('Version restored successfully');
+                return true;
+            }
+        }
+
+        console.error('[versionHistoryPanel] applyProjectToState not available');
+        return false;
+    } catch (error) {
+        console.error('[versionHistoryPanel] Error restoring project:', error);
+        return false;
+    }
+}
 let selectedVersionId = null;
 let compareMode = false;
 let compareVersionIds = [];
@@ -80,7 +139,9 @@ export function hideVersionHistoryPanel() {
 function createVersionHistoryModal() {
     const modal = document.createElement('div');
     modal.id = 'version-history-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    // Use high z-index to appear above fullscreen composition studio (which uses z-[500])
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4';
+    modal.style.zIndex = '100000'; // Very high to ensure visibility in all contexts
 
     modal.innerHTML = `
         <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -558,20 +619,32 @@ function attachDetailEventListeners() {
     });
 
     // Restore
-    document.getElementById('restore-version-btn')?.addEventListener('click', () => {
+    document.getElementById('restore-version-btn')?.addEventListener('click', async () => {
         if (!selectedVersionId) return;
 
-        if (confirm('Are you sure you want to restore this version? Your current work will be replaced.')) {
+        const confirmed = await showConfirmModal({
+            title: 'Restore Version',
+            message: 'Are you sure you want to restore this version? Your current work will be replaced.',
+            confirmText: 'Restore',
+            danger: true
+        });
+
+        if (confirmed) {
             const result = getVersionSnapshot(selectedVersionId);
 
             if (result.success) {
                 // IMPORTANT: Save callback reference BEFORE hiding panel (which clears it)
                 const callback = onRestoreCallback;
                 hideVersionHistoryPanel();
+
                 if (callback) {
                     callback(result.project);
                 } else {
-                    toast.error('Restore callback not available. Please try again.');
+                    // Use default restore mechanism via window functions
+                    const restored = restoreProjectFromSnapshot(result.project);
+                    if (!restored) {
+                        toast.error('Failed to restore version. Please try again.');
+                    }
                 }
             } else {
                 toast.error(result.error || 'Failed to load version');
@@ -580,10 +653,17 @@ function attachDetailEventListeners() {
     });
 
     // Delete
-    document.getElementById('delete-version-btn')?.addEventListener('click', () => {
+    document.getElementById('delete-version-btn')?.addEventListener('click', async () => {
         if (!selectedVersionId) return;
 
-        if (confirm('Are you sure you want to delete this version? This cannot be undone.')) {
+        const confirmed = await showConfirmModal({
+            title: 'Delete Version',
+            message: 'Are you sure you want to delete this version? This cannot be undone.',
+            confirmText: 'Delete',
+            danger: true
+        });
+
+        if (confirmed) {
             const result = deleteVersion(selectedVersionId);
             if (result.success) {
                 selectedVersionId = null;

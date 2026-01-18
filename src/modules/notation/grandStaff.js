@@ -3928,6 +3928,10 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     playbackCursor = null,       // { measureIndex, beat } for vertical cursor line
     enableHarmonicColoring = false, // Enable chord tone coloring
     showChordSpans = true,       // Show chord span shading and brackets
+    // Export-specific options for controlling individual chord span elements
+    showChordSpanShading = true, // Show background shading for chord spans (when showChordSpans is true)
+    showChordBrackets = true,    // Show bracket lines under bass clef (when showChordSpans is true)
+    showChordLabels = true,      // Show chord labels in brackets (when showChordSpans is true)
     // Multi-voice rest display options
     restDisplayMode = 'clean',      // 'clean' (smart omission) or 'explicit' (show all)
     // Multi-page support: offset for global measure index (0-based)
@@ -3947,6 +3951,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     repeatSigns = [],            // Array of repeat sign objects from compositionState
     // Volta brackets (1st/2nd endings)
     voltaBrackets = [],          // Array of volta bracket objects from compositionState
+    // Export mode - hides UI hints like "Hold Alt/Option..."
+    isExporting = false,
   } = options;
 
   // Calculate dimensions
@@ -4208,7 +4214,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // @param {string} color - Bracket color
   // @param {Object} chordData - Full chord data for click handling
   // @param {number} chordIndex - Index of this chord in the progression
-  function drawChordBracket(startBeat, endBeat, chordName, color, chordData = null, chordIndex = -1) {
+  // @param {boolean} showBracketLine - Whether to draw the bracket lines (true by default)
+  function drawChordBracket(startBeat, endBeat, chordName, color, chordData = null, chordIndex = -1, showBracketLine = true) {
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
     // Convert global beat positions to global measure indices
@@ -4334,38 +4341,42 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.setAttribute('class', 'chord-bracket-group' + (isActiveBlock ? ' active-block' : ''));
 
-        // Horizontal line
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', span.startX);
-        line.setAttribute('y1', bracketY);
-        line.setAttribute('x2', span.endX);
-        line.setAttribute('y2', bracketY);
-        line.setAttribute('stroke', bracketColor);
-        line.setAttribute('stroke-width', strokeWidth);
-        group.appendChild(line);
+        // Draw bracket lines only if showBracketLine is true
+        if (showBracketLine) {
+          // Horizontal line
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', span.startX);
+          line.setAttribute('y1', bracketY);
+          line.setAttribute('x2', span.endX);
+          line.setAttribute('y2', bracketY);
+          line.setAttribute('stroke', bracketColor);
+          line.setAttribute('stroke-width', strokeWidth);
+          group.appendChild(line);
 
-        // Left vertical tick
-        const leftTick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        leftTick.setAttribute('x1', span.startX);
-        leftTick.setAttribute('y1', bracketY - bracketHeight / 2);
-        leftTick.setAttribute('x2', span.startX);
-        leftTick.setAttribute('y2', bracketY + bracketHeight / 2);
-        leftTick.setAttribute('stroke', bracketColor);
-        leftTick.setAttribute('stroke-width', strokeWidth);
-        group.appendChild(leftTick);
+          // Left vertical tick
+          const leftTick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          leftTick.setAttribute('x1', span.startX);
+          leftTick.setAttribute('y1', bracketY - bracketHeight / 2);
+          leftTick.setAttribute('x2', span.startX);
+          leftTick.setAttribute('y2', bracketY + bracketHeight / 2);
+          leftTick.setAttribute('stroke', bracketColor);
+          leftTick.setAttribute('stroke-width', strokeWidth);
+          group.appendChild(leftTick);
 
-        // Right vertical tick
-        const rightTick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        rightTick.setAttribute('x1', span.endX);
-        rightTick.setAttribute('y1', bracketY - bracketHeight / 2);
-        rightTick.setAttribute('x2', span.endX);
-        rightTick.setAttribute('y2', bracketY + bracketHeight / 2);
-        rightTick.setAttribute('stroke', bracketColor);
-        rightTick.setAttribute('stroke-width', strokeWidth);
-        group.appendChild(rightTick);
+          // Right vertical tick
+          const rightTick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          rightTick.setAttribute('x1', span.endX);
+          rightTick.setAttribute('y1', bracketY - bracketHeight / 2);
+          rightTick.setAttribute('x2', span.endX);
+          rightTick.setAttribute('y2', bracketY + bracketHeight / 2);
+          rightTick.setAttribute('stroke', bracketColor);
+          rightTick.setAttribute('stroke-width', strokeWidth);
+          group.appendChild(rightTick);
+        }
 
         // Chord name text (only on the first span or if it's the only span)
-        if (index === 0) {
+        // Skip rendering if chordName is empty (happens when showChordLabels is false)
+        if (index === 0 && chordName && chordName.length > 0) {
           const textX = span.startX + (span.width / 2);
           const textY = bracketY + 25;
           const estimatedTextWidth = chordName.length * 8;
@@ -4444,26 +4455,30 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         ctx.strokeStyle = bracketColor;
         ctx.lineWidth = isActiveBlock ? 3 : 2;
 
-        // Horizontal line
-        ctx.beginPath();
-        ctx.moveTo(span.startX, bracketY);
-        ctx.lineTo(span.endX, bracketY);
-        ctx.stroke();
+        // Draw bracket lines only if showBracketLine is true
+        if (showBracketLine) {
+          // Horizontal line
+          ctx.beginPath();
+          ctx.moveTo(span.startX, bracketY);
+          ctx.lineTo(span.endX, bracketY);
+          ctx.stroke();
 
-        // Left vertical tick
-        ctx.beginPath();
-        ctx.moveTo(span.startX, bracketY - bracketHeight / 2);
-        ctx.lineTo(span.startX, bracketY + bracketHeight / 2);
-        ctx.stroke();
+          // Left vertical tick
+          ctx.beginPath();
+          ctx.moveTo(span.startX, bracketY - bracketHeight / 2);
+          ctx.lineTo(span.startX, bracketY + bracketHeight / 2);
+          ctx.stroke();
 
-        // Right vertical tick
-        ctx.beginPath();
-        ctx.moveTo(span.endX, bracketY - bracketHeight / 2);
-        ctx.lineTo(span.endX, bracketY + bracketHeight / 2);
-        ctx.stroke();
+          // Right vertical tick
+          ctx.beginPath();
+          ctx.moveTo(span.endX, bracketY - bracketHeight / 2);
+          ctx.lineTo(span.endX, bracketY + bracketHeight / 2);
+          ctx.stroke();
+        }
 
         // Chord name text (only on the first span or if it's the only span)
-        if (index === 0) {
+        // Skip rendering if chordName is empty (happens when showChordLabels is false)
+        if (index === 0 && chordName && chordName.length > 0) {
           const textX = span.startX + (span.width / 2);
           const textY = bracketY + 5;
           const estimatedTextWidth = chordName.length * 8;
@@ -4508,28 +4523,30 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
             ctx.fillStyle = isActiveBlock ? 'rgba(255,255,255,0.85)' : '#666';
             ctx.fillText(romanNumeral, textX, textY + 15);  // 15px below chord name
           }
+        }
 
-          // Register click region for the chord bracket label
-          if (chordData && chordIndex >= 0) {
-            // Estimate text width based on character count (approximate)
-            const estimatedTextWidth = chordName.length * 8;
-            // Expand height to include Roman numeral
-            const regionHeight = romanNumeral ? 40 : 25;
-            chordBracketRegions.push({
-              type: 'chordBracket',
-              x: textX - estimatedTextWidth / 2 - 5,
-              y: textY - 5,
-              width: estimatedTextWidth + 10,
-              height: regionHeight,
-              chordIndex,
-              chordData,
-              chordName,
-              startBeat,
-              endBeat,
-              durationBeats: endBeat - startBeat,
-              systemIndex: span.systemIndex,
-            });
-          }
+        // Register click region for the chord bracket label (always, even if not showing label)
+        if (index === 0 && chordData && chordIndex >= 0) {
+          const regionTextX = span.startX + (span.width / 2);
+          const regionTextY = bracketY + 5;
+          // Estimate text width based on character count (approximate) or use default if no label
+          const regionTextWidth = chordName && chordName.length > 0 ? chordName.length * 8 : 40;
+          // Expand height to include Roman numeral
+          const regionHeight = chordData?.roman ? 40 : 25;
+          chordBracketRegions.push({
+            type: 'chordBracket',
+            x: regionTextX - regionTextWidth / 2 - 5,
+            y: regionTextY - 5,
+            width: regionTextWidth + 10,
+            height: regionHeight,
+            chordIndex,
+            chordData,
+            chordName,
+            startBeat,
+            endBeat,
+            durationBeats: endBeat - startBeat,
+            systemIndex: span.systemIndex,
+          });
         }
 
         ctx.restore();
@@ -5163,79 +5180,30 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           const endBeat = segment.startBeat + segment.durationBeats;
           const chord = segment.chord || {};
 
-          // Draw the background shading for this chord
-          // Use slightly different color if bass has been edited
-          let bgColor = chordSpanColors[index % chordSpanColors.length];
-          if (segment.isEdited) {
-            // Add subtle indicator that this segment has edited bass
-            bgColor = bgColor.replace('0.15', '0.2'); // Slightly more opaque
-          }
-
-          drawChordSpanHighlight(
-            startBeat,
-            endBeat,
-            bgColor
-          );
-
-          // Draw the bracket with chord name beneath bass clef
-          // Use displayNameOverride if user has manually set a chord name, otherwise format automatically
-          let chordName;
-          if (chord.displayNameOverride) {
-            chordName = chord.displayNameOverride;
-          } else {
-            // Format chord name with inversion using helper function
-            chordName = formatChordNameForDisplay(chord);
-
-            // Add inversion indicator only for non-root inversions
-            const inversion = chord.inversion || 0;
-            if (inversion === 1) {
-              chordName += ' (1st)';
-            } else if (inversion === 2) {
-              chordName += ' (2nd)';
-            } else if (inversion === 3) {
-              chordName += ' (3rd)';
+          // Draw the background shading for this chord (if enabled)
+          if (showChordSpanShading) {
+            // Use slightly different color if bass has been edited
+            let bgColor = chordSpanColors[index % chordSpanColors.length];
+            if (segment.isEdited) {
+              // Add subtle indicator that this segment has edited bass
+              bgColor = bgColor.replace('0.15', '0.2'); // Slightly more opaque
             }
-          }
 
-          // Add edited indicator for bass notes
-          if (segment.isEdited) {
-            chordName += ' ✎';
-          }
-
-          drawChordBracket(
-            startBeat,
-            endBeat,
-            chordName,
-            chordBracketColors[index % chordBracketColors.length],
-            chord,  // Pass full chord data for click handling
-            index   // Pass chord index
-          );
-        });
-      } else {
-        // Fallback to original chord-based approach
-        const chords = compositionState.getChords();
-
-        if (chords && chords.length > 0) {
-          let beatOffset = 0;
-          chords.forEach((chord, index) => {
-            const chordBeats = chord.beats !== undefined ? chord.beats : 4;
-            const startBeat = beatOffset;
-            const endBeat = beatOffset + chordBeats;
-
-            // Draw the background shading for this chord
             drawChordSpanHighlight(
               startBeat,
               endBeat,
-              chordSpanColors[index % chordSpanColors.length]
+              bgColor
             );
+          }
 
-            // Draw the bracket with chord name beneath bass clef
+          // Draw the bracket with chord name beneath bass clef (if enabled)
+          if (showChordBrackets || showChordLabels) {
             // Use displayNameOverride if user has manually set a chord name, otherwise format automatically
             let chordName;
             if (chord.displayNameOverride) {
               chordName = chord.displayNameOverride;
             } else {
-              // Format chord name using helper function
+              // Format chord name with inversion using helper function
               chordName = formatChordNameForDisplay(chord);
 
               // Add inversion indicator only for non-root inversions
@@ -5249,14 +5217,73 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
               }
             }
 
+            // Add edited indicator for bass notes
+            if (segment.isEdited) {
+              chordName += ' ✎';
+            }
+
             drawChordBracket(
               startBeat,
               endBeat,
-              chordName,
+              showChordLabels ? chordName : '',  // Only show label if enabled
               chordBracketColors[index % chordBracketColors.length],
               chord,  // Pass full chord data for click handling
-              index   // Pass chord index
+              index,  // Pass chord index
+              showChordBrackets  // Pass flag to control bracket line drawing
             );
+          }
+        });
+      } else {
+        // Fallback to original chord-based approach
+        const chords = compositionState.getChords();
+
+        if (chords && chords.length > 0) {
+          let beatOffset = 0;
+          chords.forEach((chord, index) => {
+            const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+            const startBeat = beatOffset;
+            const endBeat = beatOffset + chordBeats;
+
+            // Draw the background shading for this chord (if enabled)
+            if (showChordSpanShading) {
+              drawChordSpanHighlight(
+                startBeat,
+                endBeat,
+                chordSpanColors[index % chordSpanColors.length]
+              );
+            }
+
+            // Draw the bracket with chord name beneath bass clef (if enabled)
+            if (showChordBrackets || showChordLabels) {
+              // Use displayNameOverride if user has manually set a chord name, otherwise format automatically
+              let chordName;
+              if (chord.displayNameOverride) {
+                chordName = chord.displayNameOverride;
+              } else {
+                // Format chord name using helper function
+                chordName = formatChordNameForDisplay(chord);
+
+                // Add inversion indicator only for non-root inversions
+                const inversion = chord.inversion || 0;
+                if (inversion === 1) {
+                  chordName += ' (1st)';
+                } else if (inversion === 2) {
+                  chordName += ' (2nd)';
+                } else if (inversion === 3) {
+                  chordName += ' (3rd)';
+                }
+              }
+
+              drawChordBracket(
+                startBeat,
+                endBeat,
+                showChordLabels ? chordName : '',  // Only show label if enabled
+                chordBracketColors[index % chordBracketColors.length],
+                chord,  // Pass full chord data for click handling
+                index,  // Pass chord index
+                showChordBrackets  // Pass flag to control bracket line drawing
+              );
+            }
 
             beatOffset += chordBeats;
           });
@@ -5970,46 +5997,48 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   });
 
   // ==========================================================================
-  // NOTE ENTRY HINT (upper left corner)
+  // NOTE ENTRY HINT (upper left corner) - Skip when exporting
   // ==========================================================================
-  // Show hints for how to enter notes and select multiple
-  const hintLine1 = 'Hold Alt/Option + click to enter notes';
-  const hintLine2 = 'Hold Shift + click to select multiple notes';
-  const hintX = 10;
-  const hintY1 = 12;
-  const hintY2 = 26;
+  if (!isExporting) {
+    // Show hints for how to enter notes and select multiple
+    const hintLine1 = 'Hold Alt/Option + click to enter notes';
+    const hintLine2 = 'Hold Shift + click to select multiple notes';
+    const hintX = 10;
+    const hintY1 = 12;
+    const hintY2 = 26;
 
-  // Get canvas context if available
-  const ctx = context.context2D || (renderer.getContext && renderer.getContext().context2D);
-  if (ctx) {
-    ctx.save();
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillStyle = '#6b7280';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(hintLine1, hintX, hintY1);
-    ctx.fillText(hintLine2, hintX, hintY2);
-    ctx.restore();
-  } else if (context.svg) {
-    const hintTextEl1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    hintTextEl1.setAttribute('x', hintX);
-    hintTextEl1.setAttribute('y', hintY1);
-    hintTextEl1.setAttribute('text-anchor', 'start');
-    hintTextEl1.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
-    hintTextEl1.setAttribute('font-size', '12px');
-    hintTextEl1.setAttribute('fill', '#6b7280');
-    hintTextEl1.textContent = hintLine1;
-    context.svg.appendChild(hintTextEl1);
+    // Get canvas context if available
+    const ctx = context.context2D || (renderer.getContext && renderer.getContext().context2D);
+    if (ctx) {
+      ctx.save();
+      ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillStyle = '#6b7280';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(hintLine1, hintX, hintY1);
+      ctx.fillText(hintLine2, hintX, hintY2);
+      ctx.restore();
+    } else if (context.svg) {
+      const hintTextEl1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      hintTextEl1.setAttribute('x', hintX);
+      hintTextEl1.setAttribute('y', hintY1);
+      hintTextEl1.setAttribute('text-anchor', 'start');
+      hintTextEl1.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+      hintTextEl1.setAttribute('font-size', '12px');
+      hintTextEl1.setAttribute('fill', '#6b7280');
+      hintTextEl1.textContent = hintLine1;
+      context.svg.appendChild(hintTextEl1);
 
-    const hintTextEl2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    hintTextEl2.setAttribute('x', hintX);
-    hintTextEl2.setAttribute('y', hintY2);
-    hintTextEl2.setAttribute('text-anchor', 'start');
-    hintTextEl2.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
-    hintTextEl2.setAttribute('font-size', '12px');
-    hintTextEl2.setAttribute('fill', '#6b7280');
-    hintTextEl2.textContent = hintLine2;
-    context.svg.appendChild(hintTextEl2);
+      const hintTextEl2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      hintTextEl2.setAttribute('x', hintX);
+      hintTextEl2.setAttribute('y', hintY2);
+      hintTextEl2.setAttribute('text-anchor', 'start');
+      hintTextEl2.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+      hintTextEl2.setAttribute('font-size', '12px');
+      hintTextEl2.setAttribute('fill', '#6b7280');
+      hintTextEl2.textContent = hintLine2;
+      context.svg.appendChild(hintTextEl2);
+    }
   }
 
   return {

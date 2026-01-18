@@ -9,6 +9,7 @@
 
 import { dispatchBuilderEvent } from './lessonGuidedMode.js';
 import { toggleMetronome } from '../audio/audioEngine.js';
+import { showPromptModal } from './modals.js';
 
 // Guard to prevent double initialization (stored globally to persist across module reloads)
 let fabInitialized = window.__fabInitialized || false;
@@ -482,16 +483,22 @@ export function initMobileFab() {
                 if (loadBtn) loadBtn.click();
                 break;
             case 'export-midi':
-                const midiBtn = document.getElementById('action-export-midi');
-                if (midiBtn) midiBtn.click();
+                if (window.showMIDIExportDialog) {
+                    window.showMIDIExportDialog();
+                }
                 break;
             case 'export-pdf':
-                const pdfBtn = document.getElementById('action-export-pdf');
-                if (pdfBtn) pdfBtn.click();
+                if (window.showPDFExportDialog) {
+                    window.showPDFExportDialog();
+                }
                 break;
             case 'share-link':
-                const shareBtn = document.getElementById('action-copy-link');
-                if (shareBtn) shareBtn.click();
+                if (window.showShareLinkDialog) {
+                    window.showShareLinkDialog();
+                } else {
+                    const shareBtn = document.getElementById('action-copy-link');
+                    if (shareBtn) shareBtn.click();
+                }
                 break;
             case 'new-song':
                 if (window.showSongBuilderModal) {
@@ -499,30 +506,33 @@ export function initMobileFab() {
                 }
                 break;
             case 'version-history':
-                if (window.showVersionHistory) {
-                    window.showVersionHistory();
+                if (window.showVersionHistoryPanel) {
+                    window.showVersionHistoryPanel();
                 }
                 break;
             case 'create-checkpoint':
-                if (window.createCheckpoint) {
-                    window.createCheckpoint();
-                }
+                // Prompt for checkpoint name before creating
+                promptAndCreateCheckpoint();
                 break;
             case 'import-midi':
-                const importMidiBtn = document.getElementById('action-import-midi');
-                if (importMidiBtn) importMidiBtn.click();
+                if (window.showMIDIImportDialog) {
+                    window.showMIDIImportDialog();
+                }
                 break;
             case 'export-audio':
-                const exportAudioBtn = document.getElementById('action-export-audio');
-                if (exportAudioBtn) exportAudioBtn.click();
+                if (window.showAudioExportDialog) {
+                    window.showAudioExportDialog();
+                }
                 break;
             case 'export-musicxml':
-                const exportMusicXMLBtn = document.getElementById('action-export-musicxml');
-                if (exportMusicXMLBtn) exportMusicXMLBtn.click();
+                if (window.showMusicXMLExportDialog) {
+                    window.showMusicXMLExportDialog();
+                }
                 break;
             case 'import-musicxml':
-                const importMusicXMLBtn = document.getElementById('action-import-musicxml');
-                if (importMusicXMLBtn) importMusicXMLBtn.click();
+                if (window.showMusicXMLImportDialog) {
+                    window.showMusicXMLImportDialog();
+                }
                 break;
 
             // Help actions
@@ -761,5 +771,35 @@ function initFabSettingsPanel() {
             if (actionHighlightToggle) actionHighlightToggle.checked = highlight;
             if (window.setHighlightNotes) window.setHighlightNotes(highlight);
         });
+    }
+}
+
+/**
+ * Prompt for checkpoint name and create a checkpoint
+ * Used by FAB action handler
+ */
+async function promptAndCreateCheckpoint() {
+    const name = await showPromptModal({
+        title: 'Create Checkpoint',
+        message: 'Enter a name for this checkpoint:',
+        placeholder: 'e.g., Before refactoring, Working version...',
+        confirmText: 'Create',
+    });
+
+    if (name && name.trim()) {
+        if (window.createCheckpoint) {
+            const result = window.createCheckpoint(name.trim());
+            if (result && result.success) {
+                // Show success feedback using toast if available
+                if (window.toast?.success) {
+                    window.toast.success(`Checkpoint "${name.trim()}" created`);
+                }
+            } else {
+                // Show error feedback
+                if (window.toast?.error) {
+                    window.toast.error(result?.error || 'Failed to create checkpoint');
+                }
+            }
+        }
     }
 }

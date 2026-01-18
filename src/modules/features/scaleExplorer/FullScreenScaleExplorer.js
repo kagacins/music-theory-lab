@@ -73,11 +73,11 @@ class FullScreenScaleExplorer {
         // State
         this.sidebarCollapsed = this._loadFromStorage(STORAGE_KEYS.SIDEBAR_COLLAPSED, false);
         // Category filters - array for multi-select, empty array means "all"
-        const storedFilters = this._loadFromStorage(STORAGE_KEYS.CATEGORY_FILTER, []);
-        this.categoryFilters = Array.isArray(storedFilters) ? storedFilters : [];
+        // Always start with "All" selected on page load (don't persist filter state)
+        this.categoryFilters = [];
         // Difficulty filters - array for multi-select, empty array means "all"
-        const storedDifficultyFilters = this._loadFromStorage(STORAGE_KEYS.DIFFICULTY_FILTER, []);
-        this.difficultyFilters = Array.isArray(storedDifficultyFilters) ? storedDifficultyFilters : [];
+        // Always start with "All" selected on page load (don't persist filter state)
+        this.difficultyFilters = [];
         this.tooltipsEnabled = this._loadFromStorage(STORAGE_KEYS.TOOLTIPS_ENABLED, true);
 
         // Event handler bindings

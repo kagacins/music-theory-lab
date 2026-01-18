@@ -39,9 +39,10 @@
  * - Shared code between modes uses _getActiveContainer() for queries
  */
 
-import { getCompositionState } from '../../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../../state/compositionState.js';
 import { getGlobalState } from '../../state/globalState.js';
 import { FullScreenBottomPanel } from './FullScreenBottomPanel.js';
+import { showPromptModal } from '../../ui/modals.js';
 
 // Force clear any existing singleton on module reload (for HMR)
 if (typeof window !== 'undefined') {
@@ -60,7 +61,8 @@ const STORAGE_KEYS = {
     SIDEBAR: 'fullscreen-notation-sidebar',
     MEASURES_PER_SYSTEM: 'fullscreen-notation-measures-per-system',
     BOTTOM_PANEL: 'fullscreen-notation-bottom-panel',
-    FS_VIEW_MODE: 'fullscreen-notation-view-mode'
+    FS_VIEW_MODE: 'fullscreen-notation-view-mode',
+    SIDEBAR_SECTIONS: 'fullscreen-notation-sidebar-sections'
 };
 
 const DEFAULT_ZOOM = 100;
@@ -510,6 +512,19 @@ export class FullScreenNotationEditor {
                             </div>
                         </div>
 
+                        <!-- Help Link Overlay (positioned near canvas hint text, excluded from PDF export) -->
+                        <div id="fs-help-link-overlay" class="absolute pointer-events-none" style="top: 14px; left: 22px; z-index: 10;">
+                            <button id="fs-see-more-help-btn"
+                                    class="pointer-events-auto text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors flex items-center gap-1"
+                                    style="margin-top: 30px;"
+                                    title="Learn how to use the Composition Studio">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                See More
+                            </button>
+                        </div>
+
                         <!-- Full FAB Menu (Composition Studio style) -->
                         ${this._generateFullFAB()}
                     </div>
@@ -638,13 +653,13 @@ export class FullScreenNotationEditor {
             <!-- Accidentals Section -->
             <div id="fs-section-accidentals" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Accidentals</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </div>
-                <div class="sidebar-section-content p-2">
+                <div class="sidebar-section-content p-2 hidden">
                     <div class="flex gap-1">
                         <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="#" title="Sharp - Raise pitch by half step. Click again to toggle off.">♯</button>
                         <button class="fs-accidental-btn flex-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-lg shadow-sm leading-tight" data-accidental="b" title="Flat - Lower pitch by half step. Click again to toggle off.">♭</button>
@@ -656,7 +671,7 @@ export class FullScreenNotationEditor {
             <!-- Articulations Section -->
             <div id="fs-section-articulations" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Articulations</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -675,7 +690,7 @@ export class FullScreenNotationEditor {
             <!-- Dynamics Section -->
             <div id="fs-section-dynamics" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Dynamics</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -698,7 +713,7 @@ export class FullScreenNotationEditor {
             <!-- Ornaments Section -->
             <div id="fs-section-ornaments" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Ornaments</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -718,7 +733,7 @@ export class FullScreenNotationEditor {
             <!-- Tuplets Section -->
             <div id="fs-section-tuplets" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Tuplets</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -737,7 +752,7 @@ export class FullScreenNotationEditor {
             <!-- Beams Section -->
             <div id="fs-section-beams" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Beams</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -757,7 +772,7 @@ export class FullScreenNotationEditor {
             <!-- Slurs & Ties Section -->
             <div id="fs-section-slurs" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Slurs & Ties</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -774,7 +789,7 @@ export class FullScreenNotationEditor {
             <!-- Hairpins Section (Crescendo/Decrescendo) -->
             <div id="fs-section-hairpins" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Hairpins</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -792,7 +807,7 @@ export class FullScreenNotationEditor {
             <!-- Grace Notes Section -->
             <div id="fs-section-grace" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Grace Notes</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -819,7 +834,7 @@ export class FullScreenNotationEditor {
             <!-- Arpeggios (Rolled Chords) Section -->
             <div id="fs-section-arpeggios" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Arpeggios</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -837,7 +852,7 @@ export class FullScreenNotationEditor {
             <!-- Tempo Markings Section -->
             <div id="fs-section-tempo" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Tempo</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -863,7 +878,7 @@ export class FullScreenNotationEditor {
             <!-- Repeat Signs Section -->
             <div id="fs-section-repeat" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Repeat Signs</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -881,7 +896,7 @@ export class FullScreenNotationEditor {
             <!-- Endings (Volta Brackets) Section -->
             <div id="fs-section-endings" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Endings</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -911,7 +926,7 @@ export class FullScreenNotationEditor {
             <!-- Chord Labels Section -->
             <div id="fs-section-chord" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Chord Labels</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -928,7 +943,7 @@ export class FullScreenNotationEditor {
             <!-- Lyrics Section -->
             <div id="fs-section-lyrics" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Lyrics</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -951,7 +966,7 @@ export class FullScreenNotationEditor {
             <!-- Pedal Section -->
             <div id="fs-section-pedal" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Pedal</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -970,13 +985,13 @@ export class FullScreenNotationEditor {
             <!-- Voicing Section -->
             <div id="fs-section-voicing" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Voicing</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </div>
-                <div class="sidebar-section-content p-2">
+                <div class="sidebar-section-content p-2 hidden">
                     <div class="space-y-3">
                         <!-- Voice Toggle -->
                         <div>
@@ -1001,13 +1016,13 @@ export class FullScreenNotationEditor {
             <!-- Quick Actions Section -->
             <div id="fs-section-actions" class="sidebar-section">
                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                     <span class="font-medium text-slate-700 text-sm">Quick Actions</span>
                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </div>
-                <div class="sidebar-section-content p-2">
+                <div class="sidebar-section-content p-2 hidden">
                     <div class="space-y-2">
                         <div class="flex gap-2">
                             <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="undo" title="Undo (Ctrl+Z)">
@@ -1347,6 +1362,16 @@ export class FullScreenNotationEditor {
         const canvasContainer = this.tabContent.querySelector('#fullscreen-canvas-container');
         if (canvasContainer) {
             canvasContainer.addEventListener('wheel', this._boundWheelHandler, { passive: false });
+        }
+
+        // "See More" help link
+        const seeMoreBtn = this.tabContent.querySelector('#fs-see-more-help-btn');
+        if (seeMoreBtn) {
+            seeMoreBtn.addEventListener('click', () => {
+                if (window.showCompositionStudioHelp) {
+                    window.showCompositionStudioHelp();
+                }
+            });
         }
 
         // === SHARED HANDLERS ===
@@ -1700,7 +1725,7 @@ export class FullScreenNotationEditor {
                             <!-- Accidentals Section -->
                             <div id="fs-section-accidentals" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Accidentals</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1718,7 +1743,7 @@ export class FullScreenNotationEditor {
                             <!-- Articulations Section -->
                             <div id="fs-section-articulations" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Articulations</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1737,7 +1762,7 @@ export class FullScreenNotationEditor {
                             <!-- Dynamics Section -->
                             <div id="fs-section-dynamics" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Dynamics</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1760,7 +1785,7 @@ export class FullScreenNotationEditor {
                             <!-- Ornaments Section -->
                             <div id="fs-section-ornaments" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Ornaments</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1780,7 +1805,7 @@ export class FullScreenNotationEditor {
                             <!-- Tuplets Section -->
                             <div id="fs-section-tuplets" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Tuplets</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1799,7 +1824,7 @@ export class FullScreenNotationEditor {
                             <!-- Beams Section -->
                             <div id="fs-section-beams" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Beams</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1819,7 +1844,7 @@ export class FullScreenNotationEditor {
                             <!-- Slurs & Ties Section -->
                             <div id="fs-section-slurs" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Slurs & Ties</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1836,7 +1861,7 @@ export class FullScreenNotationEditor {
                             <!-- Hairpins Section (Crescendo/Decrescendo) -->
                             <div id="fs-section-hairpins" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Hairpins</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1854,7 +1879,7 @@ export class FullScreenNotationEditor {
                             <!-- Grace Notes Section -->
                             <div id="fs-section-grace" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Grace Notes</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1881,7 +1906,7 @@ export class FullScreenNotationEditor {
                             <!-- Arpeggios (Rolled Chords) Section -->
                             <div id="fs-section-arpeggios" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Arpeggios</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1899,7 +1924,7 @@ export class FullScreenNotationEditor {
                             <!-- Tempo Markings Section -->
                             <div id="fs-section-tempo" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Tempo</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1925,7 +1950,7 @@ export class FullScreenNotationEditor {
                             <!-- Repeat Signs Section -->
                             <div id="fs-section-repeat" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Repeat Signs</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1943,7 +1968,7 @@ export class FullScreenNotationEditor {
                             <!-- Endings (Volta Brackets) Section -->
                             <div id="fs-section-endings" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Endings</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1973,7 +1998,7 @@ export class FullScreenNotationEditor {
                             <!-- Chord Labels Section -->
                             <div id="fs-section-chord" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Chord Labels</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1990,7 +2015,7 @@ export class FullScreenNotationEditor {
                             <!-- Lyrics Section -->
                             <div id="fs-section-lyrics" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Lyrics</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -2013,7 +2038,7 @@ export class FullScreenNotationEditor {
                             <!-- Pedal Section -->
                             <div id="fs-section-pedal" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Pedal</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -2032,7 +2057,7 @@ export class FullScreenNotationEditor {
                             <!-- Voicing Section -->
                             <div id="fs-section-voicing" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Voicing</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -2063,7 +2088,7 @@ export class FullScreenNotationEditor {
                             <!-- Quick Actions Section -->
                             <div id="fs-section-actions" class="sidebar-section">
                                 <div class="sidebar-section-header flex items-center justify-between cursor-pointer p-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180');">
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180'); window._fsSaveSidebarSectionState && window._fsSaveSidebarSectionState();">
                                     <span class="font-medium text-slate-700 text-sm">Quick Actions</span>
                                     <svg class="chevron w-4 h-4 text-slate-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -2477,22 +2502,22 @@ export class FullScreenNotationEditor {
                 window.loadProject?.();
                 break;
             case 'version-history':
-                window.showVersionHistory?.();
+                window.showVersionHistoryPanel?.();
                 break;
             case 'create-checkpoint':
-                window.createCheckpoint?.();
+                this._promptAndCreateCheckpoint();
                 break;
             case 'import-midi':
-                window.importMIDI?.();
+                window.showMIDIImportDialog?.();
                 break;
             case 'export-midi':
-                window.exportMIDI?.();
+                window.showMIDIExportDialog?.();
                 break;
             case 'export-pdf':
-                window.exportPDF?.();
+                window.showPDFExportDialog?.();
                 break;
             case 'export-audio':
-                window.exportAudio?.();
+                window.showAudioExportDialog?.();
                 break;
 
             // Suggestions actions
@@ -2514,6 +2539,36 @@ export class FullScreenNotationEditor {
                 this.closeTabMode();
                 window.switchTab?.('melody');
                 break;
+        }
+    }
+
+    /**
+     * Prompt for checkpoint name and create a checkpoint
+     * Used by FAB action handler
+     */
+    async _promptAndCreateCheckpoint() {
+        const name = await showPromptModal({
+            title: 'Create Checkpoint',
+            message: 'Enter a name for this checkpoint:',
+            placeholder: 'e.g., Before refactoring, Working version...',
+            confirmText: 'Create',
+        });
+
+        if (name && name.trim()) {
+            if (window.createCheckpoint) {
+                const result = window.createCheckpoint(name.trim());
+                if (result && result.success) {
+                    // Show success feedback using toast if available
+                    if (window.toast?.success) {
+                        window.toast.success(`Checkpoint "${name.trim()}" created`);
+                    }
+                } else {
+                    // Show error feedback
+                    if (window.toast?.error) {
+                        window.toast.error(result?.error || 'Failed to create checkpoint');
+                    }
+                }
+            }
         }
     }
 
@@ -4238,6 +4293,67 @@ export class FullScreenNotationEditor {
 
         // Adjust bottom panel width to account for sidebar
         this._adjustBottomPanelForSidebar();
+
+        // Apply saved sidebar section states
+        this._applySidebarSectionStates();
+    }
+
+    /**
+     * Save sidebar section collapsed/expanded states to localStorage
+     */
+    _saveSidebarSectionStates() {
+        const container = this._getActiveContainer();
+        if (!container) return;
+
+        const sections = container.querySelectorAll('.sidebar-section');
+        const states = {};
+
+        sections.forEach(section => {
+            const id = section.id;
+            if (id) {
+                const content = section.querySelector('.sidebar-section-content');
+                states[id] = content ? !content.classList.contains('hidden') : true;
+            }
+        });
+
+        this._saveToStorage(STORAGE_KEYS.SIDEBAR_SECTIONS, states);
+    }
+
+    /**
+     * Apply saved sidebar section states from localStorage
+     */
+    _applySidebarSectionStates() {
+        const container = this._getActiveContainer();
+        if (!container) return;
+
+        const savedStates = this._loadFromStorage(STORAGE_KEYS.SIDEBAR_SECTIONS, null);
+        if (!savedStates) return;
+
+        const sections = container.querySelectorAll('.sidebar-section');
+        sections.forEach(section => {
+            const id = section.id;
+            if (id && savedStates.hasOwnProperty(id)) {
+                const content = section.querySelector('.sidebar-section-content');
+                const chevron = section.querySelector('.chevron');
+                const isExpanded = savedStates[id];
+
+                if (content) {
+                    if (isExpanded) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                }
+
+                if (chevron) {
+                    if (isExpanded) {
+                        chevron.classList.add('rotate-180');
+                    } else {
+                        chevron.classList.remove('rotate-180');
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -4863,13 +4979,23 @@ export class FullScreenNotationEditor {
 
     /**
      * Select and highlight a measure when clicking a chord card
+     * Calculates the correct measure index based on chord's actual position (startBeat)
      */
     _selectMeasureFromCard(chordIndex) {
         // Get the NotationComposer instance
         const composer = window.getNotationComposer?.();
         if (composer) {
+            // Calculate the correct measure index from the chord's startBeat
+            const compositionState = getCompositionState();
+            const chordSegment = compositionState?.getChordSegment?.(chordIndex);
+            let measureIndex = chordIndex; // Default fallback
+            if (chordSegment) {
+                const timeSignature = compositionState.getSettings?.()?.timeSignature || { num: 4, denom: 4 };
+                const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+                measureIndex = Math.floor(chordSegment.startBeat / beatsPerMeasure);
+            }
             // Select the measure in the notation
-            composer.setSelectedMeasure(chordIndex);
+            composer.setSelectedMeasure(measureIndex);
         }
 
         // Also highlight the card visually
@@ -5332,6 +5458,8 @@ if (import.meta.hot) {
 export function getFullScreenNotationEditor() {
     if (!_instance) {
         _instance = new FullScreenNotationEditor();
+        // Expose save method for inline onclick handlers
+        window._fsSaveSidebarSectionState = () => _instance._saveSidebarSectionStates();
     }
     return _instance;
 }

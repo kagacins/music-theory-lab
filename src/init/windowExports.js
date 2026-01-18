@@ -25,6 +25,7 @@ import { openManualChordEntryModal, closeManualChordEntryModal } from '../module
 import { showAutoHarmonizeModal } from '../modules/ui/autoHarmonizeModal.js';
 import { showTensionOptimizerModal } from '../modules/ui/tensionOptimizerModal.js';
 import { toast, showToast } from '../modules/ui/toastNotifications.js';
+import { showCompositionStudioHelp, closeCompositionStudioHelp } from '../modules/ui/compositionStudioHelp.js';
 import {
     quickAddChordFromForm,
     updateQuickAddChordTypes,
@@ -1323,6 +1324,8 @@ export function setupWindowExports() {
     window.showModalHTML = showModalHTML;
     window.showAboutModal = showAboutModal;
     window.hideAboutModal = hideAboutModal;
+    window.showCompositionStudioHelp = showCompositionStudioHelp;
+    window.closeCompositionStudioHelp = closeCompositionStudioHelp;
 
     // Sidebar functions
     window.toggleSidebar = toggleSidebar;

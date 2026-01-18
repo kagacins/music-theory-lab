@@ -341,6 +341,11 @@ function createCompositionDataForSharing(compositionState, submissionType) {
         // Full measures data (preserves multi-voice notation - Voice 1 & Voice 2)
         measures: measuresData,
 
+        // BASS PRESERVATION: Store bass data keyed by chord ID
+        // This enables bass edits to survive chord reordering across save/load cycles
+        bassDataByChordId: compositionState.bassDataByChordId ?
+            Object.fromEntries(compositionState.bassDataByChordId) : {},
+
         // Additional notation data
         tempoMarkings: compositionState.tempoMarkings ? [...compositionState.tempoMarkings] : [],
         repeatSigns: compositionState.repeatSigns ? [...compositionState.repeatSigns] : [],

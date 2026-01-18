@@ -9,7 +9,7 @@
  * - Harmonic Tone Analyzer (coloring)
  */
 
-import { getCompositionState } from '../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
 import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
@@ -535,9 +535,12 @@ export class NotationComposer {
     // Listen for chord progression card clicks
     if (typeof window !== 'undefined') {
       window.addEventListener('chordCardSelected', (e) => {
-        const { index } = e.detail || {};
-        if (typeof index === 'number' && index !== this.selectedMeasureIndex) {
-          this.selectedMeasureIndex = index;
+        // Use measureIndex if available (correct position accounting for chord durations)
+        // Fall back to index for backwards compatibility
+        const { measureIndex, index } = e.detail || {};
+        const targetMeasure = typeof measureIndex === 'number' ? measureIndex : index;
+        if (typeof targetMeasure === 'number' && targetMeasure !== this.selectedMeasureIndex) {
+          this.selectedMeasureIndex = targetMeasure;
           this.render();
         }
       });
@@ -1141,6 +1144,10 @@ export class NotationComposer {
       const settings = compositionState ? compositionState.getSettings() : {};
       const showChordSpans = settings.showChordSpans !== false; // Default to true
 
+      // Check for export mode options
+      const exportOpts = this.exportOptions || {};
+      const isExporting = exportOpts.isExporting || false;
+
       this.renderedSystem = renderGrandStaffSystem(this.config.container, measures, {
         measuresPerLine: this.config.measuresPerLine,
         keySignature: key,
@@ -1152,8 +1159,12 @@ export class NotationComposer {
         activeNotes: this.activeNotes,
         playbackCursor: this.playbackCursor,
         enableHarmonicColoring: this.config.enableHarmonicColoring,
-        // Chord span settings
-        showChordSpans: showChordSpans,
+        // Chord span settings - respect export options
+        showChordSpans: isExporting ? (exportOpts.includeSectionColoring !== false || exportOpts.includeBrackets !== false || exportOpts.includeChordLabels !== false) : showChordSpans,
+        // Individual chord span element controls (for export)
+        showChordSpanShading: isExporting ? (exportOpts.includeSectionColoring !== false) : true,
+        showChordBrackets: isExporting ? (exportOpts.includeBrackets !== false) : true,
+        showChordLabels: isExporting ? (exportOpts.includeChordLabels !== false) : true,
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
         // Phase 2 Bass Block Isolation: active block highlighting
@@ -1171,6 +1182,8 @@ export class NotationComposer {
         repeatSigns: compositionState ? compositionState.repeatSigns : [],
         // Volta brackets (1st/2nd endings)
         voltaBrackets: compositionState ? compositionState.voltaBrackets : [],
+        // Export mode - hides UI hints like "Hold Alt/Option..."
+        isExporting: isExporting,
       });
     }
 
@@ -1506,6 +1519,10 @@ export class NotationComposer {
       }
     }
 
+    // Check for export mode options
+    const exportOpts = this.exportOptions || {};
+    const isExporting = exportOpts.isExporting || false;
+
     // Render options with measure offset for correct numbering
     const renderOptions = {
       measuresPerLine: this.config.measuresPerLine || 4,
@@ -1526,6 +1543,8 @@ export class NotationComposer {
       slurs: this.compositionState ? this.compositionState.slurs : [],
       // Tempo markings
       tempoMarkings: this.compositionState ? this.compositionState.tempoMarkings : [],
+      // Export mode - hides UI hints
+      isExporting: isExporting,
     };
 
     // Use multi-page or single canvas rendering
@@ -1724,6 +1743,10 @@ export class NotationComposer {
 
       // Render this page's measures
       const compositionState = getCompositionState();
+      // Check for export mode options
+      const exportOpts = this.exportOptions || {};
+      const isExporting = exportOpts.isExporting || false;
+
       const renderedPage = renderGrandStaffSystem(page.canvas, pageMeasures, {
         measuresPerLine: this.config.measuresPerLine,
         keySignature: key,
@@ -1740,8 +1763,12 @@ export class NotationComposer {
           ? { measureIndex: basePlaybackCursor.measureIndex - startMeasure, beat: basePlaybackCursor.beat }
           : null,
         enableHarmonicColoring: this.config.enableHarmonicColoring,
-        // Chord span settings
-        showChordSpans: settings.showChordSpans !== false, // Default to true
+        // Chord span settings - respect export options
+        showChordSpans: isExporting ? (exportOpts.includeSectionColoring !== false || exportOpts.includeBrackets !== false || exportOpts.includeChordLabels !== false) : (settings.showChordSpans !== false),
+        // Individual chord span element controls (for export)
+        showChordSpanShading: isExporting ? (exportOpts.includeSectionColoring !== false) : true,
+        showChordBrackets: isExporting ? (exportOpts.includeBrackets !== false) : true,
+        showChordLabels: isExporting ? (exportOpts.includeChordLabels !== false) : true,
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
         // Phase 2 Bass Block Isolation: active block highlighting
@@ -1759,6 +1786,8 @@ export class NotationComposer {
         repeatSigns: compositionState ? compositionState.repeatSigns : [],
         // Volta brackets (1st/2nd endings)
         voltaBrackets: compositionState ? compositionState.voltaBrackets : [],
+        // Export mode - hides UI hints
+        isExporting: isExporting,
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1962,6 +1991,9 @@ export class NotationComposer {
     // Get settings for chord spans
     const compositionState = getCompositionState();
     const settings = compositionState ? compositionState.getSettings() : {};
+    // Check for export mode options
+    const exportOpts = this.exportOptions || {};
+    const isExporting = exportOpts.isExporting || false;
 
     // Calculate measure number offset for display
     // In section view mode: globalOffset is section start, startMeasure is page offset within section
@@ -1982,8 +2014,12 @@ export class NotationComposer {
       activeNotes: pageLocalActiveNotes, // CRITICAL: Use page-local note IDs
       playbackCursor: localPlaybackCursor,
       enableHarmonicColoring: this.config.enableHarmonicColoring,
-      // Chord span settings
-      showChordSpans: settings.showChordSpans !== false, // Default to true
+      // Chord span settings - respect export options
+      showChordSpans: isExporting ? (exportOpts.includeSectionColoring !== false || exportOpts.includeBrackets !== false || exportOpts.includeChordLabels !== false) : (settings.showChordSpans !== false),
+      // Individual chord span element controls (for export)
+      showChordSpanShading: isExporting ? (exportOpts.includeSectionColoring !== false) : true,
+      showChordBrackets: isExporting ? (exportOpts.includeBrackets !== false) : true,
+      showChordLabels: isExporting ? (exportOpts.includeChordLabels !== false) : true,
       // Multi-voice rest display settings
       restDisplayMode: settings.restDisplayMode || 'clean',
       // Phase 2 Bass Block Isolation: active block highlighting
@@ -2001,6 +2037,8 @@ export class NotationComposer {
       repeatSigns: compositionState ? compositionState.repeatSigns : [],
       // Volta brackets (1st/2nd endings)
       voltaBrackets: compositionState ? compositionState.voltaBrackets : [],
+      // Export mode - hides UI hints
+      isExporting: isExporting,
     });
 
     const allRenderedMeasures = [];
@@ -2159,6 +2197,10 @@ export class NotationComposer {
         }
       }
 
+      // Check for export mode options
+      const exportOpts = this.exportOptions || {};
+      const isExporting = exportOpts.isExporting || false;
+
       // Render the page using the same function as renderWithPagination
       const renderResult = renderGrandStaffSystem(page.canvas, pageMeasures, {
         key,
@@ -2166,12 +2208,17 @@ export class NotationComposer {
         selectedMeasureIndex: localSelectedIndex,
         activeMeasureIndex: localActiveIndex,
         activeNotes: pageLocalActiveNotes,
-        showChordSpans: settings.showChordSpans,
+        showChordSpans: isExporting ? (exportOpts.includeSectionColoring !== false || exportOpts.includeBrackets !== false || exportOpts.includeChordLabels !== false) : settings.showChordSpans,
+        // Individual chord span element controls (for export)
+        showChordSpanShading: isExporting ? (exportOpts.includeSectionColoring !== false) : true,
+        showChordBrackets: isExporting ? (exportOpts.includeBrackets !== false) : true,
+        showChordLabels: isExporting ? (exportOpts.includeChordLabels !== false) : true,
         chordSegments: compositionState?.getChordSegments() || [],
         chordSpanStartOffset: startMeasure,
         pageIndex: pageIndex,
         startMeasureOffset: startMeasure,
         measuresPerSystem: this.config.measuresPerSystem || 4,
+        isExporting: isExporting,
       });
 
       // Accumulate results with global measure indices
@@ -2479,7 +2526,28 @@ export class NotationComposer {
       }));
 
       // Also update the chord progression card highlight
-      if (window.setSelectedChordIndex) {
+      // Need to find which chord occupies this measure (accounting for varying chord durations)
+      if (window.setSelectedChordIndex && index >= 0) {
+        const compositionState = getCompositionState();
+        const chordSegments = compositionState?.getChordSegments?.() || [];
+        const timeSignature = compositionState?.getSettings?.()?.timeSignature || { num: 4, denom: 4 };
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+
+        // Calculate the beat position for the start of this measure
+        const measureStartBeat = index * beatsPerMeasure;
+
+        // Find the chord segment that contains this beat
+        let chordIndex = index; // Default fallback
+        for (const segment of chordSegments) {
+          const segmentEndBeat = segment.startBeat + segment.durationBeats;
+          if (measureStartBeat >= segment.startBeat && measureStartBeat < segmentEndBeat) {
+            chordIndex = segment.chordIndex;
+            break;
+          }
+        }
+
+        window.setSelectedChordIndex(chordIndex);
+      } else if (window.setSelectedChordIndex) {
         window.setSelectedChordIndex(index);
       }
     }

@@ -84,6 +84,23 @@ function getCurrentZoomLevel() {
   return 100; // No zoom adjustment for non-fullscreen modes
 }
 
+/**
+ * Get the available viewport height, accounting for the bottom dock panel
+ * This ensures popups don't appear behind the dock panel
+ * @returns {number} Available height in pixels
+ */
+function getAvailableViewportHeight() {
+  // Check for the Composition Studio bottom dock panel
+  const dockPanel = document.querySelector('#fs-bottom-panel-container');
+  if (dockPanel && !dockPanel.classList.contains('hidden')) {
+    const dockRect = dockPanel.getBoundingClientRect();
+    // Return the top of the dock panel as the max usable height
+    return dockRect.top;
+  }
+  // Fallback to full viewport height
+  return window.innerHeight;
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -10496,15 +10513,16 @@ export class NoteEditor {
     document.body.appendChild(popup);
 
     const popupRect = popup.getBoundingClientRect();
+    const availableHeight = getAvailableViewportHeight();
     let left = screenX + 25;  // Offset farther right from the note
     let top = screenY - 10;
 
-    // Keep popup on screen
+    // Keep popup on screen (accounting for bottom dock panel)
     if (left + popupRect.width > window.innerWidth - 10) {
       left = screenX - popupRect.width - 25;  // Offset farther left when flipped
     }
-    if (top + popupRect.height > window.innerHeight - 10) {
-      top = window.innerHeight - popupRect.height - 10;
+    if (top + popupRect.height > availableHeight - 10) {
+      top = availableHeight - popupRect.height - 10;
     }
     if (top < 10) top = 10;
     if (left < 10) left = 10;
@@ -11259,10 +11277,11 @@ export class NoteEditor {
       let newLeft = initialLeft + deltaX;
       let newTop = initialTop + deltaY;
 
-      // Keep popup within viewport bounds
+      // Keep popup within viewport bounds (accounting for bottom dock panel)
       const popupRect = popup.getBoundingClientRect();
+      const availableHeight = getAvailableViewportHeight();
       const maxLeft = window.innerWidth - popupRect.width - 10;
-      const maxTop = window.innerHeight - popupRect.height - 10;
+      const maxTop = availableHeight - popupRect.height - 10;
 
       newLeft = Math.max(10, Math.min(newLeft, maxLeft));
       newTop = Math.max(10, Math.min(newTop, maxTop));
@@ -11617,16 +11636,17 @@ export class NoteEditor {
 
     document.body.appendChild(selector);
 
-    // Position near click, adjust to stay on screen
+    // Position near click, adjust to stay on screen (accounting for bottom dock panel)
     const rect = selector.getBoundingClientRect();
+    const availableHeight = getAvailableViewportHeight();
     let left = screenX + 30;
     let top = screenY - 15;
 
     if (left + rect.width > window.innerWidth - 10) {
       left = screenX - rect.width - 30;
     }
-    if (top + rect.height > window.innerHeight - 10) {
-      top = window.innerHeight - rect.height - 10;
+    if (top + rect.height > availableHeight - 10) {
+      top = availableHeight - rect.height - 10;
     }
     if (top < 10) top = 10;
     if (left < 10) left = 10;

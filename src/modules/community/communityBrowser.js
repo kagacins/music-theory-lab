@@ -2721,6 +2721,13 @@ async function loadFullComposition(compositionState, compositionData, title) {
         compositionState._nextVoltaId = maxVoltaId + 1;
     }
 
+    // 13. BASS PRESERVATION: Restore bass data by chord ID
+    // This enables bass edits to survive chord reordering across save/load cycles
+    if (compositionData.bassDataByChordId && typeof compositionData.bassDataByChordId === 'object') {
+        console.log('[Community Load] Restoring bassDataByChordId:', Object.keys(compositionData.bassDataByChordId).length, 'entries');
+        compositionState.bassDataByChordId = new Map(Object.entries(compositionData.bassDataByChordId));
+    }
+
     console.log('[Community Load] Full composition loaded successfully');
 }
 

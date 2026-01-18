@@ -447,7 +447,7 @@ class FullScreenChordLabEditor {
         <div id="fs-chordlab-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm" style="min-width: 200px;">
             <div class="p-2.5 space-y-2.5">
                 <!-- Root Note -->
-                <div class="bg-gray-50 rounded p-2.5">
+                <div class="bg-gray-100 rounded p-2.5">
                     <div class="flex items-center justify-between mb-1.5">
                         <span class="text-gray-700 font-semibold text-sm">Root</span>
                         <label class="flex items-center gap-0.5 cursor-pointer" title="Sharp/Flat">
@@ -477,7 +477,7 @@ class FullScreenChordLabEditor {
                 </div>
 
                 <!-- Inversion -->
-                <div class="bg-gray-50 rounded p-2.5">
+                <div class="bg-gray-100 rounded p-2.5">
                     <span class="text-gray-700 font-semibold block mb-1.5 text-sm">Inversion</span>
                     <div id="fs-inversion-buttons" class="grid grid-cols-5 gap-1">
                         ${[0, 1, 2, 3, 4].map(inv => {
@@ -498,24 +498,26 @@ class FullScreenChordLabEditor {
                     </div>
                 </div>
 
-                <!-- RH Octave -->
-                <div class="bg-gray-50 rounded p-2.5">
-                    <span class="text-gray-700 font-semibold block mb-1.5 text-sm">RH Octave</span>
-                    <div class="flex items-center justify-center gap-1.5">
-                        <button onmousedown="window.changeBuilderOctave && window.changeBuilderOctave(-1)"
-                                onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
-                                onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
-                                class="w-7 h-7 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200 text-sm">-</button>
-                        <span id="fs-rh-octave" class="w-10 text-center text-gray-800 font-semibold text-sm">${octaveShift >= 0 ? '+' : ''}${octaveShift}</span>
-                        <button onmousedown="window.changeBuilderOctave && window.changeBuilderOctave(1)"
-                                onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
-                                onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
-                                class="w-7 h-7 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200 text-sm">+</button>
+                <!-- Octave -->
+                <div class="bg-gray-100 rounded p-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-700 font-semibold text-sm">Octave</span>
+                        <div class="flex items-center gap-1.5">
+                            <button onmousedown="window.changeBuilderOctave && window.changeBuilderOctave(-1)"
+                                    onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
+                                    onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
+                                    class="w-7 h-7 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200 text-sm">-</button>
+                            <span id="fs-rh-octave" class="w-10 text-center text-gray-800 font-semibold text-sm">${octaveShift >= 0 ? '+' : ''}${octaveShift}</span>
+                            <button onmousedown="window.changeBuilderOctave && window.changeBuilderOctave(1)"
+                                    onmouseup="window.stopBuilderChord && window.stopBuilderChord()"
+                                    onmouseleave="window.stopBuilderChord && window.stopBuilderChord()"
+                                    class="w-7 h-7 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded border border-gray-200 text-sm">+</button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Include Notes (RH Voicing) -->
-                <div class="bg-gray-50 rounded p-2.5">
+                <div class="bg-gray-100 rounded p-2.5">
                     <div class="flex items-center gap-2 mb-1.5">
                         <span class="text-gray-700 font-semibold text-xs">Include Notes</span>
                         <div id="fs-rh-voicing-buttons" class="flex gap-1">
