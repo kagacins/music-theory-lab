@@ -2381,8 +2381,8 @@ export class NotationToolbar {
       this.onDelete(shiftDelete);
     }
 
-    // Tie (T)
-    if (!hasModifier && (e.key === 't' || e.key === 'T')) {
+    // Tie (T) - lowercase 't' only, Shift+T is for tenuto articulation
+    if (!hasModifier && !e.shiftKey && e.key === 't') {
       e.preventDefault();
       this.onTie();
     }

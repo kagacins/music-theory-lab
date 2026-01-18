@@ -670,14 +670,28 @@ export function scoreExtendedHarmonicRelationships(currentChord, nextChord, key,
     }
 
     // 1. Secondary Dominant Detection
+    // Secondary dominants (V/ii, V/V, V/vi, etc.) are extremely common in all styles
+    // and should be rewarded significantly when they resolve properly
     const secondaryDom = detectSecondaryDominant(currentChord, nextChord, key);
     if (secondaryDom.isSecondaryDominant) {
-        breakdown.secondaryDominant = 25;
-        totalScore += 25;
+        // Strong bonus for resolving secondary dominants - this is idiomatic harmony
+        // V/V (the most common) gets highest score, others get slightly less
+        let secDomScore = 35; // Base score for secondary dominants (increased from 25)
+        if (secondaryDom.label === 'V/V') {
+            secDomScore = 40; // V/V is THE most common secondary dominant
+        } else if (secondaryDom.label === 'V/vi') {
+            secDomScore = 35; // V/vi also very common (leads to relative minor)
+        } else if (secondaryDom.label === 'V/ii') {
+            secDomScore = 32; // V/ii common in jazz and classical
+        }
+        breakdown.secondaryDominant = secDomScore;
+        totalScore += secDomScore;
         relationships.push(`${secondaryDom.label} → ${secondaryDom.target}`);
     } else if (secondaryDom.couldBeSecondaryDominant && !secondaryDom.resolves) {
-        breakdown.secondaryDominant = -8;
-        totalScore -= 8;
+        // Unresolved secondary dominant - small penalty but not severe
+        // It might resolve later, or it's just a color chord
+        breakdown.secondaryDominant = -5; // Reduced from -8
+        totalScore -= 5;
         relationships.push(`Unresolved ${secondaryDom.label}`);
     } else {
         breakdown.secondaryDominant = 0;

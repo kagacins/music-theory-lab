@@ -5969,6 +5969,49 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     }
   });
 
+  // ==========================================================================
+  // NOTE ENTRY HINT (upper left corner)
+  // ==========================================================================
+  // Show hints for how to enter notes and select multiple
+  const hintLine1 = 'Hold Alt/Option + click to enter notes';
+  const hintLine2 = 'Hold Shift + click to select multiple notes';
+  const hintX = 10;
+  const hintY1 = 12;
+  const hintY2 = 26;
+
+  // Get canvas context if available
+  const ctx = context.context2D || (renderer.getContext && renderer.getContext().context2D);
+  if (ctx) {
+    ctx.save();
+    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillStyle = '#6b7280';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(hintLine1, hintX, hintY1);
+    ctx.fillText(hintLine2, hintX, hintY2);
+    ctx.restore();
+  } else if (context.svg) {
+    const hintTextEl1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    hintTextEl1.setAttribute('x', hintX);
+    hintTextEl1.setAttribute('y', hintY1);
+    hintTextEl1.setAttribute('text-anchor', 'start');
+    hintTextEl1.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+    hintTextEl1.setAttribute('font-size', '12px');
+    hintTextEl1.setAttribute('fill', '#6b7280');
+    hintTextEl1.textContent = hintLine1;
+    context.svg.appendChild(hintTextEl1);
+
+    const hintTextEl2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    hintTextEl2.setAttribute('x', hintX);
+    hintTextEl2.setAttribute('y', hintY2);
+    hintTextEl2.setAttribute('text-anchor', 'start');
+    hintTextEl2.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+    hintTextEl2.setAttribute('font-size', '12px');
+    hintTextEl2.setAttribute('fill', '#6b7280');
+    hintTextEl2.textContent = hintLine2;
+    context.svg.appendChild(hintTextEl2);
+  }
+
   return {
     renderer,
     context,

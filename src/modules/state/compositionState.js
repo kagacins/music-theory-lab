@@ -6017,10 +6017,6 @@ export class CompositionState {
             notes: data.notes || [],
             userEdited: data.userEdited || false,
         });
-        console.log(`[setBassDataForChord] Stored bass data for chord ${chordId}:`, {
-            noteCount: (data.notes || []).length,
-            userEdited: data.userEdited || false
-        });
     }
 
     /**
@@ -6072,18 +6068,14 @@ export class CompositionState {
      * 3. For chords without user-edited bass, let auto-generation or default behavior apply
      */
     restoreBassFromChordIds() {
-        console.log(`%c[restoreBassFromChordIds] CALLED`, 'background: #2196f3; color: white; font-weight: bold');
         const progressionData = this.exportToProgressionData();
         if (!progressionData || progressionData.length === 0) {
-            console.log('[restoreBassFromChordIds] No progression data');
             return;
         }
 
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
-        console.log(`%c[restoreBassFromChordIds] Starting restore. ${this.bassDataByChordId.size} chords have stored bass data`, 'background: #2196f3; color: white');
 
         // Log all stored bass data
-        console.log('[restoreBassFromChordIds] All stored bass data:');
         for (const [chordId, bassData] of this.bassDataByChordId) {
             console.log(`  Chord ${chordId}: userEdited=${bassData.userEdited}, notes=${bassData.notes?.length || 0}`,
                 bassData.notes?.map(n => ({ isRest: n.isRest, duration: n.duration, beat: n.beat, pitches: n.pitches })));
@@ -6125,25 +6117,21 @@ export class CompositionState {
 
             const positionInfo = chordPositions.get(chordId);
             if (!positionInfo) {
-                console.log(`[restoreBassFromChordIds] Chord ${chordId} not found in progression - may have been deleted`);
                 continue;
             }
 
             // Handle user-edited bass - including empty/rest-only cases
             // If notes array is empty or missing, clear the bass for this chord (user intentionally emptied it)
             if (!bassData.notes || bassData.notes.length === 0) {
-                console.log(`[restoreBassFromChordIds] Chord ${chordId} has userEdited=true but no notes - clearing bass (intentional rest/silence)`);
                 this._clearBassNotesForChord(positionInfo, beatsPerMeasure);
                 continue;
             }
 
-            console.log(`[restoreBassFromChordIds] Restoring ${bassData.notes.length} notes for chord ${chordId} at position ${positionInfo.chordIndex}`);
 
             // Place the stored notes into the appropriate measures
             this._placeBassNotesForChord(bassData.notes, positionInfo, beatsPerMeasure);
         }
 
-        console.log('[restoreBassFromChordIds] Restore complete');
     }
 
     /**
@@ -6155,14 +6143,6 @@ export class CompositionState {
      */
     _placeBassNotesForChord(notes, positionInfo, beatsPerMeasure) {
         const { chordIndex, startBeat, measures } = positionInfo;
-
-        console.log(`%c[_placeBassNotesForChord] Placing ${notes.length} notes for chord at index ${chordIndex}`, 'background: #9c27b0; color: white');
-        console.log('[_placeBassNotesForChord] Notes to place:', notes.map(n => ({
-            isRest: n.isRest,
-            duration: n.duration,
-            beat: n.beat,
-            pitches: n.pitches
-        })));
 
         // Clear existing bass notes in the chord's measures first
         for (const measureIndex of measures) {
@@ -7111,7 +7091,6 @@ export class CompositionState {
      * @param {number} measureIndex - Index of the measure that was edited
      */
     saveEditedBassNotesForMeasure(measureIndex) {
-        console.log(`%c[saveEditedBassNotesForMeasure] Called for measureIndex: ${measureIndex}`, 'background: #ff9800; color: black; font-weight: bold');
 
         // Initialize editedBassNotes if it doesn't exist
         if (!this.editedBassNotes) {
@@ -7123,22 +7102,18 @@ export class CompositionState {
 
         const editedMeasure = this.measures[measureIndex];
         if (!editedMeasure || !editedMeasure.notation?.bass?.voices?.[0]) {
-            console.log(`[saveEditedBassNotesForMeasure] No valid measure found at index ${measureIndex}`);
             return;
         }
 
         // Find the chordIndex and chord ID for this measure
         const chordIndex = editedMeasure.chord?.chordIndex;
         const chordId = editedMeasure.chord?.id;
-        console.log(`[saveEditedBassNotesForMeasure] Found chordIndex: ${chordIndex}, chordId: ${chordId}, measure.chord:`, editedMeasure.chord);
 
         // Set userEdited flag on the BuildingBlock to prevent auto-regeneration
         // This is the key fix - any bass edit should mark the block as user-edited
         if (chordIndex !== undefined && this.bassBlockSequence?.blocks?.[chordIndex]) {
             this.bassBlockSequence.blocks[chordIndex].userEdited = true;
-            console.log(`[saveEditedBassNotesForMeasure] SUCCESS: Marked block ${chordIndex} as userEdited`);
         } else {
-            console.log(`[saveEditedBassNotesForMeasure] FAILED to mark block: chordIndex=${chordIndex}, blocks.length=${this.bassBlockSequence?.blocks?.length}`);
         }
 
         // Find ALL measures that belong to this chord/building block
@@ -7187,13 +7162,6 @@ export class CompositionState {
                 notes: allBassNotesForChord,
                 userEdited: true
             });
-            console.log(`%c[saveEditedBassNotesForMeasure] Stored ${allBassNotesForChord.length} bass notes for chord ID ${chordId}`, 'background: #4caf50; color: white; font-weight: bold');
-            console.log('[saveEditedBassNotesForMeasure] Notes saved:', allBassNotesForChord.map(n => ({
-                isRest: n.isRest,
-                duration: n.duration,
-                beat: n.beat,
-                pitches: n.pitches
-            })));
         }
 
         // Save all measures for this building block (legacy system - keep for now)

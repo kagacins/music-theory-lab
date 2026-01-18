@@ -1842,16 +1842,11 @@ export function updateChordAndRenderPreservingTrebleNotes(index, options = {}) {
         const chordId = chord.id || measure?.chord?.id;
         const hasUserEditedBass = chordId && compositionState.hasUserEditedBass && compositionState.hasUserEditedBass(chordId);
 
-        console.log(`%c[updateChordAndRenderPreservingTrebleNotes] Chord ${index}: chordId=${chordId}, hasUserEditedBass=${hasUserEditedBass}, autoGenerateBass=${autoGenerateBass}`,
-            hasUserEditedBass ? 'background: #ff9800; color: black' : 'background: #2196f3; color: white');
-
         if (hasUserEditedBass) {
             // User has manually edited bass for this chord - restore from Map instead of regenerating
-            console.log(`%c[updateChordAndRenderPreservingTrebleNotes] PRESERVING user-edited bass for chord ${index}`, 'background: #4caf50; color: white; font-weight: bold');
             compositionState.restoreBassFromChordIds();
         } else if (autoGenerateBass) {
             // Use building-block-aware regeneration that handles multi-measure chords
-            console.log(`%c[updateChordAndRenderPreservingTrebleNotes] REGENERATING bass for chord ${index}`, 'background: #f44336; color: white; font-weight: bold');
             compositionState.regenerateAutoBassByChordIndex(index);
         } else {
             // Create simple whole-note bass from chord notes

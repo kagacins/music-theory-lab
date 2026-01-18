@@ -146,33 +146,38 @@ export function calculateSequenceWeights(contextMode = false) {
  */
 const ROOT_FATIGUE_CONFIG = {
     // How many chords back to analyze for root fatigue
-    historyDepth: 8,
+    // Increased from 8 to 12 to catch song-level repetition patterns
+    // Typical section is 4-8 chords, so 12 covers ~1.5-3 sections
+    historyDepth: 12,
 
     // Base penalty per occurrence (escalates with count)
+    // Reduced base penalty since we're looking at more history
     // Occurrence 1: no penalty, 2: base, 3: base*2.5, 4+: base*4
-    basePenalty: 15,
+    basePenalty: 12, // Reduced from 15
 
     // Style-specific fatigue sensitivity multipliers
     // Higher = more sensitive to repetition (stricter)
     // Lower = more tolerant of same-root repetition
+    // ADJUSTED: Country/folk/pop should tolerate more repetition (I-IV-V loops are common)
     styleSensitivity: {
         'jazz': 0.5,       // Jazz tolerates quality shifts on same root
         'rnb': 0.6,
         'soul': 0.6,
         'gospel': 0.7,
         'blues': 0.6,
-        'classical': 0.9,
-        'balanced': 0.8,
-        'pop': 1.0,        // Pop strongly prefers root variety
-        'rock': 1.0,
-        'folk': 0.9,
-        'country': 0.9,
-        'indie': 0.85
+        'classical': 0.85, // Reduced from 0.9 - classical uses sequences
+        'balanced': 0.75,  // Reduced from 0.8
+        'pop': 0.8,        // Reduced from 1.0 - pop uses I-IV-V patterns
+        'rock': 0.85,      // Reduced from 1.0 - rock uses power chord patterns
+        'folk': 0.7,       // Reduced from 0.9 - folk is highly repetitive
+        'country': 0.65,   // Reduced from 0.9 - country is highly repetitive
+        'indie': 0.8       // Reduced from 0.85
     },
 
     // Position weighting: more recent roots are weighted more heavily
+    // Extended to 12 positions with gentler decay
     // Index 0 = most recent chord before the sequence
-    positionWeights: [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]
+    positionWeights: [1.0, 0.92, 0.84, 0.76, 0.68, 0.60, 0.52, 0.44, 0.36, 0.28, 0.22, 0.18]
 };
 
 /**
@@ -1738,7 +1743,7 @@ export function generateChordSequences(
         progressionData,
         true,
         lookbackDepth,
-        null,
+        getSavedWeights(true), // Use global saved weights
         true,
         sectionInfo
     );
@@ -1844,7 +1849,7 @@ function generateSequencesWithRootInternal(
         progressionData,
         true,
         lookbackDepth,
-        null,
+        getSavedWeights(true), // Use global saved weights
         true,
         sectionInfo
     );
@@ -1901,7 +1906,7 @@ function generateSequencesWithRootInternal(
                 tempProgression,
                 true,
                 lookbackDepth,
-                null,
+                getSavedWeights(true), // Use global saved weights
                 true,
                 sectionInfo
             );

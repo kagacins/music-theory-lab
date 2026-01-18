@@ -696,6 +696,14 @@ export function getRelevantChordTypes(context = {}) {
         if (tensionDirection === 'build' && profile.tensionLevel > 0.6) {
             score *= 1.15;
             reasons.push('Builds tension');
+        } else if (tensionDirection === 'final' && profile.contextRules?.resolvesTension) {
+            // FINAL mode: Even stronger preference for resolving chord types
+            score *= 1.35;
+            reasons.push('Perfect for final resolution');
+        } else if (tensionDirection === 'final' && profile.contextRules?.expectsResolution) {
+            // FINAL mode: Strongly penalize unresolved chord types
+            score *= 0.5;
+            reasons.push('Unresolved tension - not suitable for ending');
         } else if (tensionDirection === 'resolve' && profile.contextRules?.resolvesTension) {
             score *= 1.2;
             reasons.push('Provides resolution');

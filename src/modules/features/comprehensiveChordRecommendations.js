@@ -14,6 +14,88 @@
  * - Style preferences (pop, jazz, classical, rock, indie)
  * - Mood preferences (bright, dark, jazzy, tense, calm, energetic)
  * - Tension trajectory (whether to resolve, maintain, or build tension)
+ *
+ * ============================================================================
+ * SCORING CONSTANTS REFERENCE (hardcoded values with rationale)
+ * ============================================================================
+ *
+ * HARMONIC FUNCTION SCORING (scoreHarmonicFunction):
+ * - TENSION_DELTA = 12 points: Standardized bonus for "preferred" tension direction
+ *   Rationale: 12pts is ~15% of a typical 80-point base score, enough to influence
+ *   ranking without overwhelming voice leading or style scores.
+ *
+ * - Base scores by progression type:
+ *   - S→D (IV→V, ii→V): 88  - Most common tension-building pattern
+ *   - D→I (V→I authentic): 88  - Fundamental resolution, matches S→D importance
+ *   - T→S (I→IV, I→ii): 83  - Very common forward motion
+ *   - D→vi (deceptive): 78  - Common in pop/classical, not a "mistake"
+ *   - T→D (I→V direct): 78  - Acceptable but skips subdominant
+ *   - T→T (tonic motion): 72  - Within-function movement (I→vi)
+ *   - D→D (V→vii°): 68  - Building more tension, less common
+ *   - IV→vi, ii→vi: 68  - Valid but less common resolution
+ *   - S→S (ii→IV): 65  - Staying in subdominant function
+ *   - D→S retrogression: 60  - "Backwards" but used in rock/pop (V→IV)
+ *   - V→iii: 58  - Unusual resolution target
+ *   - I→I repeat: 55  - Avoid exact repetition unless maintain mode
+ *   - IV→iii, ii→iii: 55  - Unusual, low base
+ *
+ * VOICE LEADING SCORING (scoreVoiceLeading):
+ * - Bass movement: 0-25 points (25 - bassDiff semitones)
+ *   Rationale: Small bass intervals (steps) are preferred over leaps
+ * - Common tones: 8 points each, max 25
+ *   Rationale: Shared notes create smooth transitions
+ * - Total movement: 0-30 points (30 - totalMovement/2)
+ *   Rationale: Minimal overall voice movement is classical ideal
+ * - Voice range: 0-10 points based on distance from middle C
+ *   Rationale: Mid-range voicings sound balanced
+ * - Contrary motion: +10 points when bass and soprano move opposite
+ *   Rationale: Contrary motion is a fundamental voice leading principle
+ *
+ * LEADING TONE RESOLUTION (checkLeadingToneResolution):
+ * - Bonus: 15 points (increased by 1.5x to 22.5 in resolve mode)
+ *   Rationale: Leading tone → tonic is the most important melodic tendency
+ *   in Western tonal music. 15pts significantly boosts authentic cadences.
+ *
+ * REPETITION HANDLING (in main scoring loop):
+ * - gapsSinceLastAppearance <= 2: No penalty (return patterns like I-IV-I)
+ * - gapsSinceLastAppearance 3-4: Mild penalty (15%)
+ * - gapsSinceLastAppearance 5-6: Moderate penalty (25%)
+ * - gapsSinceLastAppearance 7+: Full penalty (40%)
+ * - Direct repeat (immediate): 35% penalty
+ *   Rationale: Return patterns are musical, only penalize true repetition
+ *
+ * STYLE-SPECIFIC CHORD SCORING (graduated tiers):
+ * - Perfect match: 95 (chord is signature for style)
+ * - Strong match: 88 (highly characteristic)
+ * - Good match: 78 (commonly used)
+ * - Acceptable: 68 (works but not characteristic)
+ * - Neutral: 58 (neither characteristic nor wrong)
+ * - Base: 50 (default for unmatched)
+ *   Rationale: Graduated scoring prevents cliff effects where small
+ *   differences in style fit cause large score jumps.
+ *
+ * SECTION BONUSES (in sectionTransitionAnalyzer.js):
+ * - MAX_SECTION_BONUS = 40 points
+ * - MAX_SECTION_PENALTY = -25 points
+ * - MAX_TRANSITION_BONUS = 30 points
+ *   Rationale: Caps prevent section context from overwhelming harmonic logic.
+ *   A "perfect" section fit shouldn't make a bad chord beat a good one.
+ *
+ * SECONDARY DOMINANT SCORING (in extendedHarmonicRelationships.js):
+ * - V/V: 40 points (most common secondary dominant)
+ * - V/vi: 35 points (very common, especially in minor key songs)
+ * - V/ii: 32 points (common in jazz and classical)
+ * - V/IV: 28 points (less common but valid)
+ * - V/iii: 25 points (rare)
+ *   Rationale: Reflects actual usage frequency in Western music corpus.
+ *
+ * ROOT FATIGUE (in chordSequences.js):
+ * - historyDepth: 12 chords (extended from 8)
+ * - basePenalty: 12 points (reduced from 15)
+ *   Rationale: Extended lookback catches longer patterns; reduced penalty
+ *   allows more variety without being punitive.
+ *
+ * ============================================================================
  */
 
 import { CHORD_DEFINITIONS, ALL_NOTES } from '../../data/music-data.js';
@@ -965,6 +1047,21 @@ export function generateComprehensiveRecommendations(
                     resolutionBonus = resolutionScore * 0.15; // Up to 15 point bonus
                 }
 
+                // Leading tone resolution bonus - THE most important voice leading rule
+                // Check if current chord has leading tone and next chord resolves it
+                const leadingToneCheck = checkLeadingToneResolution(currentMidi, nextMidi, key);
+                let leadingToneBonus = 0;
+                if (leadingToneCheck.resolved && tensionDirection === 'final') {
+                    // Maximum bonus in FINAL mode - leading tone resolution is critical for endings
+                    leadingToneBonus = leadingToneCheck.bonus * 2.0;
+                } else if (leadingToneCheck.resolved && tensionDirection === 'resolve') {
+                    // 1.5x bonus in resolve mode - this is what we want for approaching end
+                    leadingToneBonus = leadingToneCheck.bonus * 1.5;
+                } else if (leadingToneCheck.resolved) {
+                    // Regular bonus in other modes
+                    leadingToneBonus = leadingToneCheck.bonus;
+                }
+
                 // Phase 2: Section context adds/subtracts from score directly
                 // Section scores are absolute adjustments, not weighted
                 const sectionAdjustment = sectionScore || 0;
@@ -988,6 +1085,7 @@ export function generateComprehensiveRecommendations(
                         (contextScore * (weights.context || 0)) +
                         (modalInterchangeScore * (weights.modalInterchange || 0)) +
                         resolutionBonus +
+                        leadingToneBonus +    // Leading tone resolution (most important voice leading)
                         sectionAdjustment +   // Phase 2: Section-aware adjustment
                         tensionArcBonus +     // Phase 3: Tension arc alignment
                         forwardContextBonus;  // Phase 4: Forward context (leads well to next chord)
@@ -1000,88 +1098,132 @@ export function generateComprehensiveRecommendations(
                         (moodFit * weights.mood) +
                         (modalInterchangeScore * (weights.modalInterchange || 0)) +
                         resolutionBonus +
+                        leadingToneBonus +    // Leading tone resolution (most important voice leading)
                         sectionAdjustment +   // Phase 2: Section-aware adjustment
                         tensionArcBonus +     // Phase 3: Tension arc alignment
                         forwardContextBonus;  // Phase 4: Forward context (leads well to next chord)
                 }
 
-                // Apply penalty for recommending chords that have been repeated consecutively
-                // BEFORE the current chord position (small lookback window)
-                // This prevents suggesting the same chord when it's already been used multiple times in a row
-                let consecutiveRepetitions = 0;
-                const REPETITION_LOOKBACK = 3; // Only look back 3 chords max
+                // =========================================================================
+                // REPETITION HANDLING: Allow common patterns like I-IV-I, I-V-I
+                // =========================================================================
+                // We want to:
+                // - Heavily penalize TRUE consecutive repetitions (A-A, A-A-A)
+                // - ALLOW return patterns (A-B-A, I-IV-I, I-V-I) which are musically valid
+                // - Lightly discourage excessive reuse over longer spans
+                // =========================================================================
 
-                // Get the current chord's position in the progression
                 const currentChordIdx = sectionInfo?.currentChordIndex ?? (progressionData.length - 1);
+                let repetitionPenalty = 1.0; // No penalty by default
 
                 if (progressionData && progressionData.length > 0 && currentChordIdx >= 0) {
-                    // Look backwards from current position (inclusive) within the lookback window
-                    const startIdx = Math.max(0, currentChordIdx - REPETITION_LOOKBACK + 1);
-                    for (let i = currentChordIdx; i >= startIdx; i--) {
-                        const historyChord = progressionData[i];
-                        if (historyChord &&
-                            historyChord.root === nextRoot &&
-                            historyChord.type === nextType) {
-                            consecutiveRepetitions++;
+                    // Check for TRUE consecutive repetition (same chord immediately before)
+                    const immediatelyPrevious = progressionData[currentChordIdx];
+                    const isImmediateRepeat = immediatelyPrevious &&
+                        immediatelyPrevious.root === nextRoot &&
+                        immediatelyPrevious.type === nextType;
+
+                    if (isImmediateRepeat) {
+                        // Count how many times in a row this chord appears
+                        let consecutiveCount = 1;
+                        for (let i = currentChordIdx - 1; i >= 0; i--) {
+                            const historyChord = progressionData[i];
+                            if (historyChord &&
+                                historyChord.root === nextRoot &&
+                                historyChord.type === nextType) {
+                                consecutiveCount++;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        // Penalties for true consecutive repetition
+                        // 1 in a row (would make 2): 0.4 multiplier (60% penalty) - reduced from 70%
+                        // 2 in a row (would make 3): 0.15 multiplier (85% penalty)
+                        // 3+ in a row: 0.05 multiplier (95% penalty)
+                        if (consecutiveCount === 1) {
+                            repetitionPenalty = 0.4;  // Less harsh - 2 in a row can happen
+                        } else if (consecutiveCount === 2) {
+                            repetitionPenalty = 0.15;
                         } else {
-                            break; // Stop at first non-matching chord
+                            repetitionPenalty = 0.05;
                         }
-                    }
-                }
-
-                // Apply increasingly sharp penalty based on consecutive repetitions
-                // 1 repetition (same as current): 0.3 multiplier (70% penalty)
-                // 2 consecutive: 0.15 multiplier (85% penalty)
-                // 3 consecutive: 0.05 multiplier (95% penalty) - almost never suggest
-                if (consecutiveRepetitions > 0) {
-                    let repetitionPenalty;
-                    if (consecutiveRepetitions === 1) {
-                        repetitionPenalty = 0.3;  // Same as before for single repetition
-                    } else if (consecutiveRepetitions === 2) {
-                        repetitionPenalty = 0.15; // Much stronger for 2 in a row
                     } else {
-                        repetitionPenalty = 0.05; // Nearly eliminate for 3+ in a row
-                    }
-                    totalScore *= repetitionPenalty;
-                }
+                        // NOT an immediate repeat - check for valid return patterns
+                        // Return patterns like I-IV-I, I-V-I should NOT be penalized
+                        // Only apply light variety penalty for excessive reuse
 
-                // Apply lighter "recent usage" penalty for non-consecutive appearances
-                // This encourages variety without blocking valid musical choices
-                // Only applies if we didn't already apply the consecutive penalty
-                if (consecutiveRepetitions === 0 && progressionData && progressionData.length > 0) {
-                    const VARIETY_LOOKBACK = 4; // Look back 4 chords for variety
-                    let recentAppearances = 0;
-                    const startIdx = Math.max(0, currentChordIdx - VARIETY_LOOKBACK + 1);
+                        const VARIETY_LOOKBACK = 6; // Increased from 4 to 6 for better pattern detection
+                        let recentAppearances = 0;
+                        let gapsSinceLastAppearance = 0;
+                        let foundAppearance = false;
 
-                    for (let i = currentChordIdx; i >= startIdx; i--) {
-                        const historyChord = progressionData[i];
-                        if (historyChord &&
-                            historyChord.root === nextRoot &&
-                            historyChord.type === nextType) {
-                            recentAppearances++;
+                        const startIdx = Math.max(0, currentChordIdx - VARIETY_LOOKBACK + 1);
+                        for (let i = currentChordIdx; i >= startIdx; i--) {
+                            const historyChord = progressionData[i];
+                            if (historyChord &&
+                                historyChord.root === nextRoot &&
+                                historyChord.type === nextType) {
+                                recentAppearances++;
+                                if (!foundAppearance) {
+                                    gapsSinceLastAppearance = currentChordIdx - i;
+                                    foundAppearance = true;
+                                }
+                            }
+                        }
+
+                        // Very light penalty for non-consecutive appearances
+                        // Key change: if there's a 1-2 chord gap, this is a RETURN pattern (I-IV-I)
+                        // Don't penalize return patterns at all!
+                        if (recentAppearances > 0) {
+                            if (gapsSinceLastAppearance <= 2) {
+                                // Return pattern (1-2 chords between) - NO PENALTY
+                                // This allows I-IV-I, I-V-I, I-ii-V-I patterns
+                                repetitionPenalty = 1.0;
+                            } else {
+                                // Longer gap - apply light variety nudge (8% per appearance, max 25%)
+                                // Reduced from 15% per appearance
+                                repetitionPenalty = Math.max(0.75, 1 - (recentAppearances * 0.08));
+                            }
                         }
                     }
-
-                    // Light penalty: 15% per appearance, max 40% total penalty
-                    // This nudges toward variety but doesn't crush valid musical choices
-                    if (recentAppearances > 0) {
-                        const varietyPenalty = Math.max(0.6, 1 - (recentAppearances * 0.15));
-                        totalScore *= varietyPenalty;
-                    }
                 }
+
+                totalScore *= repetitionPenalty;
 
                 // Apply tension-aware scoring for suspended chords
                 // Sus4 and Sus2 chords have inherent unresolved tension (the suspended note wants to resolve)
-                // Goal: sus chords should appear occasionally but not dominate any context
+                // IMPORTANT: Sus chords on V resolving to I is a CLASSIC cadential pattern (V-sus4-I)
+                // We should NOT heavily penalize sus chords in resolve mode if they're on dominant
                 const isSuspendedChord = nextType === 'Sus4' || nextType === 'Sus2';
                 if (isSuspendedChord) {
-                    if (tensionDirection === 'resolve') {
-                        // Moderate penalty: sus chords can work as passing chords but shouldn't be primary choices
-                        totalScore *= 0.55; // 45% penalty - allows some sus chords but prefers resolved options
+                    if (tensionDirection === 'final') {
+                        // FINAL mode: Sus chords are NOT endings - they leave unresolved tension
+                        // Strong penalty - you don't end on a suspended chord
+                        totalScore *= 0.45; // 55% penalty - sus chords are not final chords
+                    } else if (tensionDirection === 'resolve') {
+                        // Check if this is a dominant-function sus chord (common cadential pattern)
+                        const susChordFunction = nextFunction; // Already calculated above
+
+                        if (susChordFunction === 'dominant') {
+                            // V-sus4 is a CLASSIC pre-resolution chord
+                            // Light penalty only - this is good voice leading to I
+                            totalScore *= 0.85; // Only 15% penalty for dominant sus
+                        } else if (susChordFunction === 'subdominant') {
+                            // IV-sus4 is also valid in plagal cadences
+                            totalScore *= 0.78; // 22% penalty
+                        } else {
+                            // Other sus chords in resolve context are less common
+                            totalScore *= 0.65; // 35% penalty (reduced from 45%)
+                        }
                     } else if (tensionDirection === 'build') {
-                        // No bonus for build - sus chords are already competitive without artificial boost
-                        // They naturally score well due to their harmonic function
-                        // This prevents sus chord dominance in build contexts
+                        // Sus chords are good for building tension
+                        // Give a small bonus for dominant sus in build mode
+                        const susChordFunction = nextFunction;
+                        if (susChordFunction === 'dominant') {
+                            totalScore *= 1.08; // 8% bonus for V-sus4 building tension
+                        }
+                        // Other sus chords: no adjustment (they naturally score well)
                     }
                     // 'maintain' direction: no adjustment, suspended chords are neutral
                 }
@@ -1261,7 +1403,23 @@ export function generateComprehensiveRecommendations(
  * @returns {number} Score 0-100
  */
 function scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection, currentDegree = null, nextDegree = null) {
-    let score = 50; // Base score
+    // =========================================================================
+    // HARMONIC FUNCTION SCORING - Standardized Deltas
+    // =========================================================================
+    // Base philosophy:
+    // - "Preferred" direction bonus: +12 points (standardized delta)
+    // - Base scores represent musical commonality
+    // - V→vi (deceptive) is musically valid and common - don't over-penalize
+    // - I/iii/vi are distinguished by nextDegree parameter
+    //
+    // tensionDirection values:
+    // - 'build': Continue building tension (BUILDING mode)
+    // - 'resolve': Approaching resolution (CONCLUDING mode) - prepares for cadence
+    // - 'final': Last chord (FINAL mode) - should strongly favor actual resolution
+    // - 'maintain': Sustain current level
+    // =========================================================================
+
+    let score = 50; // Base score for unhandled cases
 
     // Handle borrowed chords (chords outside the key)
     // These have null function and should NOT be treated as TONIC
@@ -1271,50 +1429,194 @@ function scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection, 
         return 50; // Neutral - let modal interchange score decide
     }
 
+    // Standardized delta: 12 points for being in "preferred" tension direction
+    const TENSION_DELTA = 12;
+    // FINAL mode gets even stronger preference for resolution
+    const FINAL_DELTA = 18;
+
     // Common harmonic progressions (music theory fundamentals)
     if (currentFunction === HARMONIC_FUNCTIONS.TONIC) {
         if (nextFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {
-            score = tensionDirection === 'build' ? 95 : 85;
+            // T→S: Natural forward motion, builds toward dominant
+            // Base: 83 (very common), Build bonus: +12
+            // FINAL mode: Should stay on tonic, not move to subdominant
+            const base = 83;
+            if (tensionDirection === 'final') {
+                score = base - 15; // Penalty - final chord should be tonic, not moving away
+            } else if (tensionDirection === 'build') {
+                score = base + TENSION_DELTA;
+            } else {
+                score = base;
+            }
         } else if (nextFunction === HARMONIC_FUNCTIONS.DOMINANT) {
-            score = tensionDirection === 'build' ? 90 : 80;
+            // T→D: Skipping subdominant - acceptable but less common than T→S→D
+            // Base: 78, Build bonus: +12
+            // FINAL mode: Should stay on tonic, not move to dominant
+            const base = 78;
+            if (tensionDirection === 'final') {
+                score = base - 20; // Strong penalty - going to V when should resolve
+            } else if (tensionDirection === 'build') {
+                score = base + TENSION_DELTA;
+            } else {
+                score = base;
+            }
         } else if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
-            score = tensionDirection === 'maintain' ? 80 : 60;
+            // T→T: Staying in tonic function - works for maintain
+            // Distinguish I→vi, I→iii vs I→I
+            if (nextDegree === 1 && currentDegree === 1) {
+                // I→I: Repeating exact same chord - good for FINAL (staying on tonic)
+                const base = 55;
+                if (tensionDirection === 'final') {
+                    score = base + FINAL_DELTA; // Good - staying on tonic for final
+                } else if (tensionDirection === 'maintain') {
+                    score = base + TENSION_DELTA;
+                } else {
+                    score = base;
+                }
+            } else {
+                // I→vi or I→iii or vice versa: Moving within tonic function
+                // FINAL mode: Moving away from I is not ideal for ending
+                const base = 72;
+                if (tensionDirection === 'final') {
+                    score = base - 10; // Penalty - should stay on I for final
+                } else if (tensionDirection === 'maintain') {
+                    score = base + TENSION_DELTA;
+                } else {
+                    score = base;
+                }
+            }
         }
     } else if (currentFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {
         if (nextFunction === HARMONIC_FUNCTIONS.DOMINANT) {
-            score = tensionDirection === 'build' ? 100 : 90;
+            // S→D: Classic tension building (IV→V or ii→V)
+            // Base: 88 (extremely common), Build bonus: +12 = 100
+            // FINAL mode: Should resolve to tonic, not build more tension
+            const base = 88;
+            if (tensionDirection === 'final') {
+                score = base - 15; // Penalty - final should resolve, not build tension
+            } else if (tensionDirection === 'build') {
+                score = base + TENSION_DELTA;
+            } else {
+                score = base;
+            }
         } else if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
+            // S→T: Resolution paths (plagal cadence or deceptive)
             // Distinguish between actual tonic (I) vs other tonic-function chords (iii, vi)
             if (nextDegree === 1) {
-                // IV → I (plagal cadence) - very strong, common resolution
-                score = tensionDirection === 'resolve' ? 85 : 70;
+                // IV→I or ii→I (plagal motion) - very strong, common resolution
+                // Base: 80, Resolve bonus: +12 = 92, Final bonus: +18 = 98
+                const base = 80;
+                if (tensionDirection === 'final') {
+                    score = base + FINAL_DELTA; // Strongest preference for I in FINAL mode
+                } else if (tensionDirection === 'resolve') {
+                    score = base + TENSION_DELTA;
+                } else {
+                    score = base;
+                }
             } else if (nextDegree === 6) {
-                // IV → vi - less common but acceptable
-                score = tensionDirection === 'resolve' ? 70 : 55;
+                // IV→vi or ii→vi - less common but musically valid
+                // Base: 68, Resolve bonus: +12 = 80
+                // FINAL mode: vi is NOT a true ending - don't give bonus
+                const base = 68;
+                if (tensionDirection === 'final') {
+                    score = base - 5; // Slight penalty - vi is not a true ending chord
+                } else if (tensionDirection === 'resolve') {
+                    score = base + TENSION_DELTA;
+                } else {
+                    score = base;
+                }
             } else {
-                // IV → iii - unusual, lower score
-                score = tensionDirection === 'resolve' ? 60 : 45;
+                // IV→iii or ii→iii - unusual, lower base score
+                // Base: 55, Resolve bonus: +12 = 67
+                // FINAL mode: iii is NOT an ending chord
+                const base = 55;
+                if (tensionDirection === 'final') {
+                    score = base - 10; // Penalty - iii is not an ending chord
+                } else if (tensionDirection === 'resolve') {
+                    score = base + TENSION_DELTA;
+                } else {
+                    score = base;
+                }
             }
         } else if (nextFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {
-            score = tensionDirection === 'maintain' ? 75 : 60;
+            // S→S: ii→IV or IV→ii, staying in subdominant
+            // Base: 65, Maintain bonus: +12 = 77
+            // FINAL mode: Should resolve to tonic, not stay on subdominant
+            const base = 65;
+            if (tensionDirection === 'final') {
+                score = base - 15; // Penalty - final should resolve to tonic
+            } else if (tensionDirection === 'maintain') {
+                score = base + TENSION_DELTA;
+            } else {
+                score = base;
+            }
         }
     } else if (currentFunction === HARMONIC_FUNCTIONS.DOMINANT) {
         if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
+            // D→T: Resolution - the most fundamental progression in tonal music
             // Distinguish between actual tonic (I) vs other tonic-function chords
             if (nextDegree === 1) {
-                // V → I (authentic cadence) - strongest resolution in music
-                score = tensionDirection === 'resolve' ? 100 : 85;
+                // V→I or vii°→I (authentic cadence) - strongest resolution
+                // Base: 88, Resolve bonus: +12 = 100, Final bonus: +18 = 106 (capped to 100)
+                const base = 88;
+                if (tensionDirection === 'final') {
+                    score = Math.min(100, base + FINAL_DELTA); // STRONGEST preference for authentic cadence
+                } else if (tensionDirection === 'resolve') {
+                    score = base + TENSION_DELTA;
+                } else {
+                    score = base;
+                }
             } else if (nextDegree === 6) {
-                // V → vi (deceptive cadence) - common surprise resolution
-                score = tensionDirection === 'resolve' ? 70 : 60;
+                // V→vi (deceptive cadence) - COMMON and musically valid!
+                // Used extensively in pop, classical, and jazz
+                // Base: 78, Resolve bonus: +12 = 90
+                // FINAL mode: Deceptive cadence is NOT a true ending - penalize
+                const base = 78;
+                if (tensionDirection === 'final') {
+                    score = base - 8; // Deceptive cadence doesn't work as FINAL chord
+                } else if (tensionDirection === 'resolve') {
+                    score = base + TENSION_DELTA; // Good for CONCLUDING - surprise before real ending
+                } else {
+                    score = base;
+                }
             } else {
-                // V → iii - very unusual, much lower score
-                score = tensionDirection === 'resolve' ? 55 : 45;
+                // V→iii - unusual resolution target
+                // Base: 58, Resolve bonus: +12 = 70
+                // FINAL mode: iii is NOT an ending chord
+                const base = 58;
+                if (tensionDirection === 'final') {
+                    score = base - 15; // Strong penalty - iii is never a final chord
+                } else if (tensionDirection === 'resolve') {
+                    score = base + TENSION_DELTA;
+                } else {
+                    score = base;
+                }
             }
         } else if (nextFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {
-            score = tensionDirection === 'maintain' ? 70 : 55;
+            // D→S: Retrogression - moving "backwards" in functional harmony
+            // Less common but used in rock/pop (V→IV)
+            // Base: 60, Maintain bonus: +12 = 72
+            // FINAL mode: Going backward is NOT resolving
+            const base = 60;
+            if (tensionDirection === 'final') {
+                score = base - 15; // Strong penalty - should resolve, not regress
+            } else if (tensionDirection === 'maintain') {
+                score = base + TENSION_DELTA;
+            } else {
+                score = base;
+            }
         } else if (nextFunction === HARMONIC_FUNCTIONS.DOMINANT) {
-            score = tensionDirection === 'build' ? 80 : 65;
+            // D→D: V→vii° or staying on dominant - building more tension
+            // Base: 68, Build bonus: +12 = 80
+            // FINAL mode: Should resolve, not continue building
+            const base = 68;
+            if (tensionDirection === 'final') {
+                score = base - 20; // Strong penalty - final chord should resolve!
+            } else if (tensionDirection === 'build') {
+                score = base + TENSION_DELTA;
+            } else {
+                score = base;
+            }
         }
     }
 
@@ -1382,39 +1684,151 @@ function scoreVoiceLeading(currentMidi, nextMidi, nextInversion) {
 }
 
 /**
- * Score how well a chord type fits a musical style
- * Returns 0-100 score
+ * Check if a chord transition resolves the leading tone (7th scale degree to tonic)
+ * This is the most important voice leading rule in tonal music
+ * Returns bonus score if leading tone resolves properly
+ *
+ * @param {Array} currentMidi - Current chord MIDI values
+ * @param {Array} nextMidi - Next chord MIDI values
+ * @param {string} key - Musical key
+ * @returns {Object} { resolved: boolean, bonus: number, reason: string }
  */
-function scoreStyleFit(chordType, style) {
-    let score = 50; // Base score
-
-    if (style === 'pop') {
-        if (['Major', 'Minor', 'Dominant 7th'].includes(chordType)) score = 95;
-        else if (['Sus4', 'Add9'].includes(chordType)) score = 80;
-        else if (chordType.includes('9th') || chordType.includes('13th')) score = 30;
-        else score = 60;
-    } else if (style === 'jazz') {
-        if (chordType.includes('7th') || chordType.includes('9th')) score = 95;
-        else if (chordType.includes('6th') || chordType.includes('Add')) score = 85;
-        else if (['Major', 'Minor'].includes(chordType)) score = 60;
-        else score = 75;
-    } else if (style === 'classical') {
-        if (['Major', 'Minor', 'Dominant 7th', 'Diminished'].includes(chordType)) score = 95;
-        else if (['Major 7th', 'Minor 7th'].includes(chordType)) score = 80;
-        else score = 50;
-    } else if (style === 'rock') {
-        if (['Major', 'Minor', 'Dominant 7th'].includes(chordType)) score = 95;
-        else if (['Sus4', 'Power 5th'].includes(chordType)) score = 90;
-        else score = 60;
-    } else if (style === 'indie') {
-        if (chordType.includes('Add') || chordType.includes('6th')) score = 95;
-        else if (chordType.includes('Suspended') || chordType === 'Augmented') score = 90;
-        else score = 70;
-    } else { // balanced
-        score = 75; // All chord types equally valid
+function checkLeadingToneResolution(currentMidi, nextMidi, key) {
+    if (!key || !currentMidi || !nextMidi || currentMidi.length === 0 || nextMidi.length === 0) {
+        return { resolved: false, bonus: 0, reason: null };
     }
 
-    return score;
+    // Get the leading tone (7th degree) of the key
+    const keyIndex = ALL_NOTES.indexOf(key);
+    if (keyIndex === -1) return { resolved: false, bonus: 0, reason: null };
+
+    // Leading tone is 11 semitones above tonic (B in C major)
+    const leadingTonePc = (keyIndex + 11) % 12;
+    const tonicPc = keyIndex;
+
+    // Check if current chord contains the leading tone
+    let hasLeadingTone = false;
+    let leadingToneMidi = null;
+
+    for (const midi of currentMidi) {
+        if (midi % 12 === leadingTonePc) {
+            hasLeadingTone = true;
+            leadingToneMidi = midi;
+            break;
+        }
+    }
+
+    if (!hasLeadingTone) {
+        return { resolved: false, bonus: 0, reason: null };
+    }
+
+    // Check if next chord contains the tonic in appropriate voice (should step up)
+    // Leading tone should resolve UP by half step to tonic
+    const expectedResolution = leadingToneMidi + 1;
+
+    for (const midi of nextMidi) {
+        if (midi === expectedResolution || (midi % 12 === tonicPc && Math.abs(midi - leadingToneMidi) <= 2)) {
+            // Leading tone resolved properly!
+            return {
+                resolved: true,
+                bonus: 15, // Significant bonus for proper resolution
+                reason: 'Leading tone resolves to tonic'
+            };
+        }
+    }
+
+    // Leading tone present but didn't resolve to tonic - this is acceptable but not ideal
+    // Don't penalize, but don't reward either
+    return { resolved: false, bonus: 0, reason: null };
+}
+
+/**
+ * Score how well a chord type fits a musical style
+ * Returns 0-100 score
+ *
+ * IMPROVED: Uses gradual scoring tiers instead of binary jumps
+ * This creates more nuanced recommendations with better variety
+ */
+function scoreStyleFit(chordType, style) {
+    // Define chord complexity/rarity tiers for each style
+    // Each style has its own preference curve
+
+    const styleProfiles = {
+        pop: {
+            // Pop favors simple, familiar chords
+            tier1: ['Major', 'Minor'],                                           // 95: core pop chords
+            tier2: ['Dominant 7th', 'Sus4'],                                     // 88: common additions
+            tier3: ['Add9', 'Major 7th', 'Sus2'],                               // 78: acceptable color
+            tier4: ['Minor 7th', 'Major 6th'],                                  // 68: occasional use
+            tier5: ['Dominant 9th', 'Minor 6th', 'Augmented'],                  // 55: rare in pop
+            base: 45  // Everything else
+        },
+        jazz: {
+            // Jazz favors extensions and alterations
+            tier1: ['Major 7th', 'Minor 7th', 'Dominant 7th'],                  // 95: jazz staples
+            tier2: ['Dominant 9th', 'Minor 9th', 'Major 9th', 'Half Diminished 7th'], // 90: common extensions
+            tier3: ['Major 6th', 'Minor 6th', 'Add9', 'Diminished 7th'],        // 82: good variety
+            tier4: ['Sus4', 'Augmented', 'Dominant 11th', 'Dominant 13th'],     // 75: acceptable
+            tier5: ['Major', 'Minor'],                                           // 65: triads less common
+            base: 58
+        },
+        classical: {
+            // Classical favors traditional harmony
+            tier1: ['Major', 'Minor', 'Dominant 7th'],                          // 95: period-appropriate
+            tier2: ['Diminished', 'Diminished 7th', 'Major 7th'],               // 85: Romantic era
+            tier3: ['Minor 7th', 'Half Diminished 7th'],                        // 72: occasional
+            tier4: ['Augmented', 'Sus4'],                                        // 60: rare but used
+            tier5: [],                                                           // n/a
+            base: 48
+        },
+        rock: {
+            // Rock favors power and directness
+            tier1: ['Major', 'Minor', 'Power Chord'],                           // 95: rock essentials
+            tier2: ['Dominant 7th', 'Sus4'],                                    // 88: classic rock sounds
+            tier3: ['Sus2', 'Add9', 'Major 7th'],                               // 75: modern rock
+            tier4: ['Minor 7th', 'Augmented', 'Diminished'],                    // 62: progressive rock
+            tier5: [],
+            base: 52
+        },
+        indie: {
+            // Indie favors color and quirk
+            tier1: ['Add9', 'Major 7th', 'Minor 7th'],                          // 95: indie favorites
+            tier2: ['Major', 'Minor', 'Sus4', 'Sus2'],                          // 88: foundation
+            tier3: ['Major 6th', 'Minor 6th', 'Augmented'],                     // 80: color chords
+            tier4: ['Dominant 7th', 'Diminished', 'Half Diminished 7th'],       // 70: dramatic moments
+            tier5: [],
+            base: 62
+        },
+        balanced: {
+            // Balanced gives slight preference to common chords
+            tier1: ['Major', 'Minor', 'Dominant 7th'],                          // 85
+            tier2: ['Major 7th', 'Minor 7th', 'Sus4'],                          // 80
+            tier3: ['Add9', 'Sus2', 'Diminished'],                              // 75
+            tier4: ['Augmented', 'Diminished 7th', 'Half Diminished 7th'],      // 70
+            tier5: [],
+            base: 65
+        }
+    };
+
+    const profile = styleProfiles[style] || styleProfiles.balanced;
+
+    // Check each tier
+    if (profile.tier1.includes(chordType)) return 95;
+    if (profile.tier2.includes(chordType)) return 88;
+    if (profile.tier3.includes(chordType)) return 78;
+    if (profile.tier4.includes(chordType)) return 68;
+    if (profile.tier5.includes(chordType)) return 58;
+
+    // Check for partial matches (e.g., "Major 9th" contains "9th")
+    // Apply a small bonus if chord type is related to preferred types
+    if (style === 'jazz' && (chordType.includes('9th') || chordType.includes('11th') || chordType.includes('13th'))) {
+        return 82;
+    }
+    if (style === 'indie' && chordType.includes('Add')) {
+        return 85;
+    }
+
+    return profile.base;
 }
 
 /**
@@ -1574,10 +1988,14 @@ function generateReason(
 
     // Harmonic function reason
     if (functionScore >= 90) {
-        if (nextFunction === HARMONIC_FUNCTIONS.TONIC && tensionDirection === 'resolve') {
+        if (nextFunction === HARMONIC_FUNCTIONS.TONIC && (tensionDirection === 'resolve' || tensionDirection === 'final')) {
             // Only say "Strong resolution to tonic" if it's actually the I chord (degree 1)
             if (nextDegree === 1) {
-                reasons.push('Strong resolution to tonic');
+                if (tensionDirection === 'final') {
+                    reasons.push('Perfect final cadence to tonic');
+                } else {
+                    reasons.push('Strong resolution to tonic');
+                }
             } else {
                 // For iii or vi (also tonic function but not degree 1)
                 reasons.push('Resolution to tonic-function chord');
@@ -1811,7 +2229,13 @@ function calculateChordDurationAdjustment(
     // 1. Cadential chord adjustments
     // V chord (dominant) often has specific rhythmic treatment
     if (scaleDegree === 5 && harmonicFunction === HARMONIC_FUNCTIONS.DOMINANT) {
-        if (tensionDirection === 'resolve') {
+        if (tensionDirection === 'final') {
+            // FINAL mode on dominant? This is unusual - keep it short to rush to resolution
+            adjustedDuration = Math.max(1, baseDuration * 0.5);
+            adjustedDuration = roundToMusicalDuration(adjustedDuration);
+            reason = 'Dominant at section end - should resolve quickly';
+            adjustedConfidence = Math.min(80, baseConfidence);
+        } else if (tensionDirection === 'resolve') {
             // Pre-resolution dominant - typically shorter to create forward motion
             adjustedDuration = Math.max(1, baseDuration * 0.75);
             adjustedDuration = roundToMusicalDuration(adjustedDuration);
@@ -1829,7 +2253,13 @@ function calculateChordDurationAdjustment(
     // 2. Tonic resolution adjustments
     // I chord (tonic) at resolution points often gets longer duration
     if (scaleDegree === 1 && harmonicFunction === HARMONIC_FUNCTIONS.TONIC) {
-        if (tensionDirection === 'resolve') {
+        if (tensionDirection === 'final') {
+            // FINAL tonic - give it maximum weight, this is THE ending
+            adjustedDuration = Math.min(8, baseDuration * 1.5);
+            adjustedDuration = roundToMusicalDuration(adjustedDuration);
+            reason = 'Final tonic - satisfying conclusion';
+            adjustedConfidence = Math.min(95, baseConfidence + 15);
+        } else if (tensionDirection === 'resolve') {
             // Resolution to tonic - give it weight
             adjustedDuration = Math.min(8, baseDuration * 1.25);
             adjustedDuration = roundToMusicalDuration(adjustedDuration);

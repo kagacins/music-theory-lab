@@ -62,6 +62,9 @@ import {
 import { getTensionArcPlanner, TensionArcPlanner, TENSION_ARC_TEMPLATES } from '../../../analysis/TensionArcPlanner.js';
 import { analyzeRhythmicContext } from '../../../features/rhythmicContextAnalyzer.js';
 
+// Config - global recommendation weights
+import { getSavedWeights } from '../../../config/weightPresets.js';
+
 // User preference learning
 import { getUserPreferenceLearner } from '../../../recommendations/coordination/UserPreferenceLearner.js';
 
@@ -1544,7 +1547,7 @@ function renderCompareIntent(container) {
         progressionData,             // progressionData
         true,                        // contextMode - enable context awareness
         modalState.lookbackDepth,    // lookbackDepth
-        modalState.customWeights,    // customWeights from sliders
+        getSavedWeights(true),       // customWeights - use global saved weights
         true,                        // useEnhancedScoring
         compareSectionInfo,          // sectionInfo - context-aware
         null,                        // tensionArcInfo
@@ -4068,28 +4071,21 @@ function renderQuickSuggestionsView(container) {
     const currentSectionType = effectiveContext?.currentSectionType || 'custom';
 
     // Override tension direction based on section intent subMode
-    // SECTION-AWARE FINAL LOGIC:
-    // - Sections that typically END with resolution (chorus, outro): resolve to tonic
-    // - Sections that typically END with tension (verse, prechorus, bridge): maintain tension for momentum
+    // CRITICAL: tensionDirection must be DIFFERENT for each subMode so downstream scoring
+    // can distinguish between them. The three modes are:
+    // - 'build': Continue building, maintain or increase tension
+    // - 'resolve': Approaching end (CONCLUDING), prepare for resolution but don't fully resolve
+    // - 'final': Last chord (FINAL), should actually resolve to tonic
     if (intent.mode === INTENT_MODES.CONTINUE) {
         if (intent.subMode === CONTINUE_SUBMODES.FINAL) {
-            // Final chord behavior depends on section type
-            // Sections that typically resolve at the end:
-            const resolvingSections = ['chorus', 'outro', 'intro'];
-            // Sections that typically maintain tension to lead into next section:
-            const tensionSections = ['verse', 'prechorus', 'bridge'];
-
-            if (resolvingSections.includes(currentSectionType)) {
-                tensionDirection = 'resolve'; // End on tonic for closure
-            } else if (tensionSections.includes(currentSectionType)) {
-                tensionDirection = 'maintain'; // End on V or IV for forward momentum
-            } else {
-                tensionDirection = 'resolve'; // Default to resolve for unknown sections
-            }
+            // FINAL mode: This IS the last chord - use 'final' as distinct value
+            tensionDirection = 'final';
         } else if (intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
-            tensionDirection = 'resolve'; // Approaching end, should resolve
+            // CONCLUDING mode: Approaching end but not there yet - use 'resolve'
+            tensionDirection = 'resolve';
         } else if (intent.subMode === CONTINUE_SUBMODES.BUILDING) {
-            tensionDirection = 'build'; // Building section, maintain or build tension
+            // BUILDING mode: Continue building the section
+            tensionDirection = 'build';
         }
     } else if (intent.mode === INTENT_MODES.NEW_SECTION) {
         // Starting new section - depends on section type
@@ -4133,7 +4129,7 @@ function renderQuickSuggestionsView(container) {
         progressionData,             // progressionData
         true,                        // contextMode - enable context awareness
         modalState.lookbackDepth,    // lookbackDepth
-        null,                        // customWeights
+        getSavedWeights(true),       // customWeights - use global saved weights
         true,                        // useEnhancedScoring
         sectionInfo                  // sectionInfo - pass section intent!
     );
@@ -5386,8 +5382,11 @@ function renderExplorerView(container) {
     }
 
     // Override tension direction based on section intent subMode
+    // CRITICAL: Each subMode must produce a DIFFERENT tensionDirection value
     if (intent.mode === INTENT_MODES.CONTINUE) {
-        if (intent.subMode === CONTINUE_SUBMODES.FINAL || intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
+        if (intent.subMode === CONTINUE_SUBMODES.FINAL) {
+            tensionDirection = 'final'; // Distinct from 'resolve'
+        } else if (intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
             tensionDirection = 'resolve';
         } else if (intent.subMode === CONTINUE_SUBMODES.BUILDING) {
             tensionDirection = 'build';
@@ -5425,7 +5424,7 @@ function renderExplorerView(container) {
         progressionData,             // progressionData
         true,                        // contextMode - enable context awareness
         modalState.lookbackDepth,    // lookbackDepth
-        null,                        // customWeights
+        getSavedWeights(true),       // customWeights - use global saved weights
         true,                        // useEnhancedScoring
         sectionInfo                  // sectionInfo - pass section intent!
     );
@@ -6175,20 +6174,10 @@ function renderSequencesView(container) {
         const seqSectionType = seqEffectiveContext?.currentSectionType || 'custom';
 
         // Override tension direction based on section intent subMode
-        // Uses same section-aware logic as Suggest intent
+        // CRITICAL: Each subMode must produce a DIFFERENT tensionDirection value
         if (intent.mode === INTENT_MODES.CONTINUE) {
             if (intent.subMode === CONTINUE_SUBMODES.FINAL) {
-                // Final chord behavior depends on section type
-                const resolvingSections = ['chorus', 'outro', 'intro'];
-                const tensionSections = ['verse', 'prechorus', 'bridge'];
-
-                if (resolvingSections.includes(seqSectionType)) {
-                    tensionDirection = 'resolve';
-                } else if (tensionSections.includes(seqSectionType)) {
-                    tensionDirection = 'maintain';
-                } else {
-                    tensionDirection = 'resolve';
-                }
+                tensionDirection = 'final'; // Distinct from 'resolve'
             } else if (intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
                 tensionDirection = 'resolve';
             } else if (intent.subMode === CONTINUE_SUBMODES.BUILDING) {

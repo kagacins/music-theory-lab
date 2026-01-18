@@ -379,10 +379,12 @@ export function getAdaptiveWeights(context, style = 'balanced', options = {}) {
         const positionProfile = determinePositionProfile(context);
         const positionWeights = POSITION_PROFILES[positionProfile];
         if (positionWeights) {
-            // Blend position profile with current weights (60% position, 40% style-adjusted)
+            // Blend position profile with current weights
+            // CRITICAL: User's saved weights should dominate (70%), position profile is secondary (30%)
+            // This ensures user slider preferences are actually respected
             for (const key in weights) {
                 if (positionWeights[key] !== undefined) {
-                    weights[key] = weights[key] * 0.4 + positionWeights[key] * 0.6;
+                    weights[key] = weights[key] * 0.7 + positionWeights[key] * 0.3;
                 }
             }
         }

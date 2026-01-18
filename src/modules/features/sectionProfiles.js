@@ -45,7 +45,11 @@ export const SECTION_PROFILES = {
             end: {
                 dominantBonus: 25,
                 suspensionBonus: 15,
-                tonicPenalty: -10
+                tonicPenalty: -10,
+                // CONCLUDING vs FINAL differentiation:
+                // Intro endings should build anticipation
+                approachingEndBonus: 10,      // For CONCLUDING: building anticipation
+                finalBuildBonus: 15           // For FINAL: set up first verse/chorus
             }
         },
         transitionRules: {
@@ -85,7 +89,11 @@ export const SECTION_PROFILES = {
             end: {
                 dominantBonus: 25,           // Strong V for verse endings
                 tensionBonus: 20,            // Build toward next section
-                suspensionBonus: 15          // Sus chords create anticipation
+                suspensionBonus: 15,         // Sus chords create anticipation
+                // CONCLUDING vs FINAL differentiation:
+                // Verse endings typically maintain tension for momentum
+                approachingEndBonus: 10,     // For CONCLUDING: reward pre-cadential chords
+                finalMomentumBonus: 15       // For FINAL: reward chords that push forward
             }
         },
         transitionRules: {
@@ -125,7 +133,11 @@ export const SECTION_PROFILES = {
             end: {
                 dominantBonus: 30,             // Strong dominant for chorus entry
                 suspensionBonus: 20,
-                tonicPenalty: -20              // Don't resolve yet!
+                tonicPenalty: -20,             // Don't resolve yet!
+                // CONCLUDING vs FINAL differentiation:
+                // Pre-chorus almost never resolves - always builds to chorus
+                approachingEndBonus: 15,       // For CONCLUDING: build tension
+                finalBuildBonus: 25            // For FINAL: maximum lift into chorus
             }
         },
         transitionRules: {
@@ -163,7 +175,12 @@ export const SECTION_PROFILES = {
             end: {
                 dominantBonus: 20,            // Prepare for repeat/transition
                 cadenceBonus: 25,             // Cadential movement
-                tensionBonus: 15              // Build for what's next
+                tensionBonus: 15,             // Build for what's next
+                // CONCLUDING vs FINAL differentiation:
+                // Chorus endings can resolve OR build depending on what follows
+                approachingEndBonus: 10,      // For CONCLUDING: cadential preparation
+                resolutionBonus: 20,          // For FINAL: strong tonic resolution allowed
+                finalCadenceBonus: 15         // For FINAL: authentic cadence reward
             }
         },
         transitionRules: {
@@ -205,7 +222,12 @@ export const SECTION_PROFILES = {
             end: {
                 dominantBonus: 35,            // Build to return
                 tensionBonus: 25,
-                preparationBonus: 20
+                preparationBonus: 20,
+                // CONCLUDING vs FINAL differentiation:
+                // Bridge endings almost always build dramatically back to chorus
+                approachingEndBonus: 15,      // For CONCLUDING: sustained exploration
+                finalBuildBonus: 30,          // For FINAL: dramatic return setup
+                dramaticLiftBonus: 20         // For FINAL: reward V7 and sus4 for lift
             }
         },
         transitionRules: {
@@ -240,7 +262,10 @@ export const SECTION_PROFILES = {
                 sustainBonus: 15
             },
             end: {
-                transitionBonus: 20
+                transitionBonus: 20,
+                // CONCLUDING vs FINAL for interlude
+                approachingEndBonus: 8,
+                finalCadenceBonus: 12
             }
         },
         transitionRules: {
@@ -276,7 +301,10 @@ export const SECTION_PROFILES = {
             },
             end: {
                 cadenceBonus: 20,
-                resolutionBonus: 15
+                resolutionBonus: 15,
+                // CONCLUDING vs FINAL for solo sections
+                approachingEndBonus: 10,
+                finalCadenceBonus: 15
             }
         },
         transitionRules: {
@@ -312,7 +340,10 @@ export const SECTION_PROFILES = {
             },
             end: {
                 buildBonus: 25,               // Start building back
-                dominantBonus: 20
+                dominantBonus: 20,
+                // CONCLUDING vs FINAL for breakdown
+                approachingEndBonus: 12,
+                finalBuildBonus: 20           // Build back dramatically
             }
         },
         transitionRules: {
@@ -349,7 +380,12 @@ export const SECTION_PROFILES = {
             end: {
                 tonicBonus: 40,               // End on tonic!
                 finalCadenceBonus: 30,
-                stabilityBonus: 25
+                stabilityBonus: 25,
+                // CONCLUDING vs FINAL differentiation:
+                // Outro should definitely resolve on the final chord
+                approachingEndBonus: 10,      // For CONCLUDING: wind down gently
+                resolutionBonus: 25,          // For FINAL: must resolve
+                perfectCadenceBonus: 35       // For FINAL: reward I chord strongly
             }
         },
         transitionRules: {
@@ -387,7 +423,11 @@ export const SECTION_PROFILES = {
                 transitionBonus: 20,        // Prepare for what's next
                 dominantBonus: 25,          // V chord creates expectation
                 tensionBonus: 15,           // Tension chords work well at ends
-                suspensionBonus: 15         // Sus chords create forward motion
+                suspensionBonus: 15,        // Sus chords create forward motion
+                // CONCLUDING vs FINAL differentiation for custom sections:
+                approachingEndBonus: 10,    // For CONCLUDING: pre-cadential movement
+                resolutionBonus: 15,        // For FINAL: allow resolution
+                finalCadenceBonus: 10       // For FINAL: cadential reward
             }
         },
         transitionRules: {

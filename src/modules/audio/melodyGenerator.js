@@ -4360,17 +4360,24 @@ export async function playAllMelody(options = {}) {
                 const prev = i > 0 ? allMelodyNotes[i - 1] : null;
 
                 // Determine if this note is a continuation of a tie group
-                // (Only within the same playback position to handle repeats correctly)
+                // Cross-measure ties: check if this is beat 0 of the next measure and isTied=true
+                const isAdjacentMeasure = prev && (note.playbackPosition === prev.playbackPosition + 1);
+                const isCrossMeasureTie = isAdjacentMeasure && (note.beat || 0) === 0 && note.isTied && samePitches(note, prev);
+
                 const isContinuation =
                     prev &&
-                    prev.playbackPosition === note.playbackPosition &&
                     (
-                        // New-style ties: this note is marked as a continuation or end
-                        ((note.tie === 'continue' || note.tie === 'end') && samePitches(note, prev)) ||
-                        // Legacy ties: previous note has tied=true and same pitch
-                        (prev.tied && samePitches(note, prev)) ||
-                        // isTied flag: this note is a continuation from a previous tied note
-                        (note.isTied && samePitches(note, prev))
+                        // Cross-measure ties: continuation note at beat 0 of next measure with isTied=true
+                        isCrossMeasureTie ||
+                        // Same-measure ties (within same playback position)
+                        (prev.playbackPosition === note.playbackPosition && (
+                            // New-style ties: this note is marked as a continuation or end
+                            ((note.tie === 'continue' || note.tie === 'end') && samePitches(note, prev)) ||
+                            // Legacy ties: previous note has tied=true and same pitch
+                            (prev.tied && samePitches(note, prev)) ||
+                            // isTied flag: this note is a continuation from a previous tied note
+                            (note.isTied && samePitches(note, prev))
+                        ))
                     );
 
                 // Skip pure continuation notes – their duration will be merged into the start note
@@ -4387,26 +4394,37 @@ export async function playAllMelody(options = {}) {
                 let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tupletType || note.tuplet, note.dotted);
 
                 // Look ahead to merge durations of tied continuation notes
-                // (Only within the same playback position)
+                // Supports both same-measure ties and cross-measure ties
                 let j = i + 1;
+                let lastPlaybackPosition = note.playbackPosition;
                 while (j < allMelodyNotes.length) {
                     const next = allMelodyNotes[j];
                     if (!next || next.type !== 'note') break;
-                    if (next.playbackPosition !== note.playbackPosition) break; // Don't merge across repeats
 
                     const prevInChain = allMelodyNotes[j - 1];
 
-                    const nextIsContinuation =
+                    // Check for cross-measure tie (next measure, beat 0, isTied=true)
+                    const isNextAdjacentMeasure = next.playbackPosition === lastPlaybackPosition + 1;
+                    const isCrossMeasureTie = isNextAdjacentMeasure && (next.beat || 0) === 0 && next.isTied && samePitches(next, prevInChain);
+
+                    // Check for same-measure continuation
+                    const isSameMeasureContinuation = next.playbackPosition === lastPlaybackPosition && (
                         // New-style ties: continue/end and same pitch
                         ((next.tie === 'continue' || next.tie === 'end') && samePitches(next, prevInChain)) ||
                         // Legacy ties: previous note in chain has tied=true and same pitch
                         (prevInChain && prevInChain.tied && samePitches(next, prevInChain)) ||
                         // isTied flag: this note is a continuation from a previous tied note
-                        (next.isTied && samePitches(next, prevInChain));
+                        (next.isTied && samePitches(next, prevInChain))
+                    );
+
+                    const nextIsContinuation = isCrossMeasureTie || isSameMeasureContinuation;
 
                     if (!nextIsContinuation) {
                         break;
                     }
+
+                    // Update lastPlaybackPosition for cross-measure chains
+                    lastPlaybackPosition = next.playbackPosition;
 
                     // Merge this continuation note's duration into the total
                     // Pass tupletType (string) OR tuplet (object) - function handles both formats

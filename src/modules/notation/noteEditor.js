@@ -872,13 +872,7 @@ export class NoteEditor {
       }
     }
 
-    // Tie toggle (T key, when notes are selected)
-    if (this.selectedNotes.size > 0 && !e.shiftKey) {
-      if (e.key === 't' || e.key === 'T') {
-        e.preventDefault();
-        this.toggleTieOnSelected();
-      }
-    }
+    // Tie toggle handled by notationToolbar.js - don't duplicate here
 
     // Tuplet creation from selection (Shift + 3/5/6)
     // Use e.code to check physical key since Shift changes e.key (e.g., Shift+3 = '#')
@@ -3860,13 +3854,11 @@ export class NoteEditor {
     }
 
     if (changedCount > 0) {
-      console.log('[DEBUG applyDurationChangePreserveDotted] About to render, changedCount:', changedCount);
       // Log current state of the note we just changed
       if (noteIds.length > 0) {
         const [mi, st, vi, ni] = this.parseNoteId(noteIds[0]);
         const m = compositionState?.measures[mi];
         const v = m?.notation?.[st]?.voices?.[vi];
-        console.log('[DEBUG applyDurationChangePreserveDotted] Note state BEFORE render:', v?.notes?.[ni]);
       }
       this.composerIntegration.render(true);
       // Log state AFTER render
@@ -3874,7 +3866,6 @@ export class NoteEditor {
         const [mi, st, vi, ni] = this.parseNoteId(noteIds[0]);
         const m = compositionState?.measures[mi];
         const v = m?.notation?.[st]?.voices?.[vi];
-        console.log('[DEBUG applyDurationChangePreserveDotted] Note state AFTER render:', v?.notes?.[ni]);
       }
 
       setTimeout(() => {
@@ -3884,7 +3875,6 @@ export class NoteEditor {
           const [mi, st, vi, ni] = this.parseNoteId(noteIds[0]);
           const m = compositionState?.measures[mi];
           const v = m?.notation?.[st]?.voices?.[vi];
-          console.log('[DEBUG applyDurationChangePreserveDotted] Note state AFTER overlay:', v?.notes?.[ni]);
         }
       }, 50);
     }
@@ -5285,9 +5275,10 @@ export class NoteEditor {
   // ============================================================================
 
   /**
-   * Toggle tie on all selected notes
-   * When multiple notes are selected, only toggle tie on the FIRST note of each pair,
-   * to prevent unwanted cascading ties.
+   * Toggle tie on selected notes
+   * When exactly 2 notes are selected, tie the first to the second (if same pitch)
+   * When 1 note is selected, toggle its tie to the next note in sequence
+   * For 3+ notes, tie consecutive SELECTED pairs: A→B, B→C, etc.
    */
   toggleTieOnSelected() {
     if (this.selectedNotes.size === 0) return;
@@ -5300,8 +5291,6 @@ export class NoteEditor {
     let changedCount = 0;
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return;
-
-    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     // Parse and sort selected notes by position (measure, then beat)
     const parsedNotes = [];
@@ -5332,45 +5321,52 @@ export class NoteEditor {
       return a.beat - b.beat;
     });
 
-    // Track which notes have been targeted by a tie from a previous selected note
-    // so we don't create a cascading tie from them
-    const tieTiedNotes = new Set();
+    // CASE 1: Multiple notes selected - tie between consecutive SELECTED notes
+    if (parsedNotes.length >= 2) {
+      for (let i = 0; i < parsedNotes.length - 1; i++) {
+        const first = parsedNotes[i];
+        const second = parsedNotes[i + 1];
 
-    for (const parsed of parsedNotes) {
-      const { measureIndex, staff, voiceIndex, noteIndex, note, voice, voiceKey } = parsed;
+        // Get pitches
+        const firstPitches = first.note.pitches || (first.note.pitch ? [first.note.pitch] : []);
+        const secondPitches = second.note.pitches || (second.note.pitch ? [second.note.pitch] : []);
 
-      // If this note was just tied FROM a previous selected note, skip toggling its tie
-      // This prevents cascading: if user selects A,B,C, clicking tie should only tie A→B,
-      // not also B→C
-      const noteIdForCheck = `${measureIndex}-${staff}-${voiceIndex}-${noteIndex}`;
-      if (tieTiedNotes.has(noteIdForCheck)) {
-        continue;
+        // Check if pitches match
+        if (!this.pitchArraysMatch(firstPitches, secondPitches)) {
+          if (window.toast?.warning) {
+            window.toast.warning("Can't tie notes of different pitch");
+          }
+          continue;
+        }
+
+        // Toggle the tie - if first note is already tied, remove it; otherwise add it
+        const newTiedState = !first.note.tied;
+        first.note.tied = newTiedState;
+        second.note.isTied = newTiedState;
+        changedCount++;
       }
+    }
+    // CASE 2: Single note selected - tie to sequential next note in voice
+    else if (parsedNotes.length === 1) {
+      const parsed = parsedNotes[0];
+      const { measureIndex, staff, voiceIndex, noteIndex, note, voice, voiceKey } = parsed;
 
       // Check if this note is part of a tie (either as source or target)
       const hasTiedToNext = note.tied === true;
       const isTiedFromPrev = note.isTied === true;
 
-      // Determine new state based on current state
-      let newTiedState;
-
       if (isTiedFromPrev && !hasTiedToNext) {
-        // This note is the TARGET of a tie (has isTied but not tied)
-        // User wants to remove the tie - we need to clear isTied on this note
-        // and clear tied on the PREVIOUS note
+        // This note is the TARGET of a tie - remove it
         note.isTied = false;
         changedCount++;
 
         // Find and update the previous note that ties to this one
         let prevNote = null;
-        let prevMeasureIdx = measureIndex;
-        let prevNoteIdx = noteIndex - 1;
-
-        if (prevNoteIdx >= 0) {
-          prevNote = voice.notes[prevNoteIdx];
+        if (noteIndex > 0) {
+          prevNote = voice.notes[noteIndex - 1];
         } else {
           // Check previous measure
-          prevMeasureIdx = measureIndex - 1;
+          const prevMeasureIdx = measureIndex - 1;
           if (prevMeasureIdx >= 0) {
             const prevMeasure = compositionState.measures[prevMeasureIdx];
             const prevVoice = prevMeasure?.notation[voiceKey]?.voices?.[voiceIndex];
@@ -5383,63 +5379,50 @@ export class NoteEditor {
         if (prevNote && prevNote.tied) {
           prevNote.tied = false;
         }
-
-        continue; // Don't process further - we handled the untie
-      }
-
-      // Normal toggle: this note either has tied=true (remove it) or no tie (add one)
-      newTiedState = !hasTiedToNext;
-
-      // CRITICAL: Also update isTied on the next note to keep tie state consistent
-      // This prevents sync from incorrectly merging notes after tie is removed
-      let nextNote = null;
-      let nextMeasureIdx = measureIndex;
-      let nextNoteIdx = noteIndex + 1;
-      let nextVoiceForLookup = voice;
-
-      // Check if next note is in this measure
-      if (nextNoteIdx < voice.notes.length) {
-        nextNote = voice.notes[nextNoteIdx];
       } else {
-        // Check the next measure for continuation
-        nextMeasureIdx = measureIndex + 1;
-        if (nextMeasureIdx < compositionState.measures.length) {
-          const nextMeasure = compositionState.measures[nextMeasureIdx];
-          const nextVoice = nextMeasure.notation[voiceKey]?.voices?.[voiceIndex];
-          if (nextVoice && nextVoice.notes && nextVoice.notes.length > 0) {
-            nextNote = nextVoice.notes[0];
-            nextVoiceForLookup = nextVoice;
-            nextNoteIdx = 0;
+        // Normal toggle: tie to next sequential note
+        const newTiedState = !hasTiedToNext;
+
+        let nextNote = null;
+        let nextMeasureIdx = measureIndex;
+        let nextNoteIdx = noteIndex + 1;
+
+        // Check if next note is in this measure
+        if (nextNoteIdx < voice.notes.length) {
+          nextNote = voice.notes[nextNoteIdx];
+        } else {
+          // Check next measure
+          nextMeasureIdx = measureIndex + 1;
+          if (nextMeasureIdx < compositionState.measures.length) {
+            const nextMeasure = compositionState.measures[nextMeasureIdx];
+            const nextVoice = nextMeasure.notation[voiceKey]?.voices?.[voiceIndex];
+            if (nextVoice && nextVoice.notes && nextVoice.notes.length > 0) {
+              nextNote = nextVoice.notes[0];
+              nextNoteIdx = 0;
+            }
           }
         }
-      }
 
-      // Check if pitches match before creating a tie
-      const samePitches = nextNote && this.pitchArraysMatch(
-        note.pitches || (note.pitch ? [note.pitch] : []),
-        nextNote.pitches || (nextNote.pitch ? [nextNote.pitch] : [])
-      );
+        // Check pitches match
+        const notePitches = note.pitches || (note.pitch ? [note.pitch] : []);
+        const nextNotePitches = nextNote ? (nextNote.pitches || (nextNote.pitch ? [nextNote.pitch] : [])) : [];
+        const samePitches = nextNote && this.pitchArraysMatch(notePitches, nextNotePitches);
 
-      // Only allow tie creation if pitches match (or if we're removing a tie)
-      if (newTiedState && !samePitches) {
-        // User is trying to create a tie to a note with different pitch - show toast and skip
-        if (window.toast?.warning) {
-          window.toast.warning("Can't tie notes of different pitch - ties combine notes of the same pitch");
+        if (newTiedState && !samePitches) {
+          if (!nextNote) {
+            return; // Can't tie to nothing
+          }
+          if (window.toast?.warning) {
+            window.toast.warning("Can't tie notes of different pitch");
+          }
+          return;
         }
-        continue; // Skip this note - don't set tied=true
-      }
 
-      // Now safe to set the tie
-      note.tied = newTiedState;
-      changedCount++;
+        note.tied = newTiedState;
+        changedCount++;
 
-      // If the next note exists and has the same pitches, update its isTied
-      if (nextNote && samePitches) {
-        nextNote.isTied = newTiedState;
-        // Mark this next note as having been tied-to, so we don't toggle its tie
-        if (newTiedState) {
-          const nextNoteIdForCheck = `${nextMeasureIdx}-${staff}-${voiceIndex}-${nextNoteIdx}`;
-          tieTiedNotes.add(nextNoteIdForCheck);
+        if (nextNote && samePitches) {
+          nextNote.isTied = newTiedState;
         }
       }
     }
@@ -10479,20 +10462,6 @@ export class NoteEditor {
       ? pitches[pitchIndex]
       : (pitches[0] || 'C4');
 
-    // Debug: Log note selection details
-    console.log('[QuickActions] Selected note details:', {
-      noteId: firstNoteId,
-      measureIndex,
-      staff,
-      voiceIndex,
-      noteIndex,
-      pitchIndex,
-      notePitches: note.pitches,
-      notePitch: note.pitch,
-      currentPitch,
-      noteObject: note
-    });
-
     // Store the selected pitch for interval/triad addition (so we can use the CLICKED pitch, not just the first pitch)
     this._quickActionsSelectedPitch = currentPitch;
 
@@ -10504,7 +10473,6 @@ export class NoteEditor {
     const chordRoot = this._getChordRootForPosition(measureIndex, noteBeat);
 
     // Debug: Log chord root
-    console.log('[QuickActions] Chord root for position:', { measureIndex, noteBeat, chordRoot });
 
     // Create popup element
     // CRITICAL: Use extremely high z-index and pointer-events to ensure popup captures clicks
@@ -10559,41 +10527,25 @@ export class NoteEditor {
         e.clientX >= popupRect.left && e.clientX <= popupRect.right &&
         e.clientY >= popupRect.top && e.clientY <= popupRect.bottom;
 
-      console.log('[QuickActions] click-outside handler fired:', {
-        target: e.target?.tagName + ' ' + (e.target?.id || ''),
-        clientX: e.clientX,
-        clientY: e.clientY,
-        popupExists: !!popupElement,
-        popupRect: popupRect ? `${popupRect.left},${popupRect.top} - ${popupRect.right},${popupRect.bottom}` : 'N/A',
-        clickInPopupBounds,
-        containsTarget: popup.contains(e.target)
-      });
-
       // Skip if we're ignoring this click (happens when popup is being re-opened)
       if (this._quickActionsIgnoreNextOutsideClick) {
-        console.log('[QuickActions] click-outside: ignoring (flag set)');
         this._quickActionsIgnoreNextOutsideClick = false;
         return;
       }
 
       // Use geometric check as fallback - if click is within popup bounds, don't close
       if (clickInPopupBounds) {
-        console.log('[QuickActions] click-outside: click IS within popup bounds, keeping open');
         return;
       }
 
       if (!popup.contains(e.target)) {
-        console.log('[QuickActions] click-outside: target NOT in popup, closing');
         this.hideQuickActionsPopup();
-      } else {
-        console.log('[QuickActions] click-outside: target IS in popup, keeping open');
       }
     };
     // Use a longer delay and reset the ignore flag after event loop completes
     setTimeout(() => {
       this._quickActionsIgnoreNextOutsideClick = false;
       document.addEventListener('click', this._quickActionsClickOutsideHandler);
-      console.log('[QuickActions] click-outside handler registered on document');
     }, 100);
   }
 
@@ -10883,7 +10835,6 @@ export class NoteEditor {
    * @private
    */
   _attachQuickActionsHandlers(popup) {
-    console.log('[QuickActions] Attaching handlers to popup');
 
     // CRITICAL: We need to stop events from reaching the canvas/document handlers
     // BUT we must NOT use capture phase handlers that call stopPropagation, as that
@@ -10892,15 +10843,12 @@ export class NoteEditor {
     // Solution: Use BUBBLE phase handlers on the popup itself, which fire AFTER
     // button handlers but BEFORE document handlers.
     popup.addEventListener('mousedown', (e) => {
-      console.log('[QuickActions] popup mousedown (bubble) - stopping propagation');
       e.stopPropagation();
     }, false); // Bubble phase - fires AFTER button handlers
     popup.addEventListener('mouseup', (e) => {
-      console.log('[QuickActions] popup mouseup (bubble) - stopping propagation');
       e.stopPropagation();
     }, false);
     popup.addEventListener('click', (e) => {
-      console.log('[QuickActions] popup click (bubble) - stopping propagation');
       e.stopPropagation();
     }, false);
 
@@ -10909,7 +10857,6 @@ export class NoteEditor {
 
     // Close button
     popup.querySelector('#qa-close')?.addEventListener('click', (e) => {
-      console.log('[QuickActions] Close button clicked');
       e.stopPropagation();
       this.hideQuickActionsPopup();
     });
@@ -10917,31 +10864,26 @@ export class NoteEditor {
     // Duration buttons
     popup.querySelectorAll('[data-qa-duration]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        console.log('[QuickActions] Duration button clicked:', btn.dataset.qaDuration);
         e.stopPropagation();
         const duration = btn.dataset.qaDuration;
         this.changeDurationOfSelected(duration);
         this._updateQuickActionsDurationState(popup, duration);
-        console.log('[QuickActions] Duration change complete, popup should stay open');
       });
     });
 
     // Dotted toggle
     popup.querySelector('[data-qa-dotted]')?.addEventListener('click', (e) => {
-      console.log('[QuickActions] Dotted button clicked');
       e.stopPropagation();
       this.toggleDottedOnSelected();
       // Wait for potential overflow dialog and state update, then sync button state
       setTimeout(() => {
         this._updateQuickActionsDottedState(popup);
       }, 150);
-      console.log('[QuickActions] Dotted toggle complete');
     });
 
     // Accidental buttons - use toolbar's setAccidental for proper toggle logic
     popup.querySelectorAll('[data-qa-accidental]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        console.log('[QuickActions] Accidental button clicked:', btn.dataset.qaAccidental);
         e.stopPropagation();
         const accidental = btn.dataset.qaAccidental;
         // Use the toolbar's setAccidental method for proper toggle behavior
@@ -10957,18 +10899,15 @@ export class NoteEditor {
           // Fallback if no toolbar - apply directly
           this.changeAccidentalOnSelected(accidental);
         }
-        console.log('[QuickActions] Accidental change complete');
       });
     });
 
     // Interval buttons (add harmony) - keep popup open, close on second click or elsewhere
     popup.querySelectorAll('[data-qa-interval]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        console.log('[QuickActions] Interval button clicked:', btn.dataset.qaInterval);
         e.stopPropagation();
         const semitones = parseInt(btn.dataset.qaInterval);
         this._addIntervalToSelected(semitones);
-        console.log('[QuickActions] Interval add complete, popup stays open');
         // Keep popup open so user can add more intervals
       });
     });
@@ -10976,7 +10915,6 @@ export class NoteEditor {
     // Triad buttons - close after adding since triad is complete
     popup.querySelectorAll('[data-qa-triad]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        console.log('[QuickActions] Triad button clicked:', btn.dataset.qaTriad);
         e.stopPropagation();
         const intervalsStr = btn.dataset.intervals;
         const intervals = intervalsStr.split(',').map(n => parseInt(n));
@@ -10988,7 +10926,6 @@ export class NoteEditor {
     // Interval mode toggle buttons (note vs chord root)
     popup.querySelectorAll('[data-qa-interval-mode]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        console.log('[QuickActions] Interval mode button clicked:', btn.dataset.qaIntervalMode);
         e.stopPropagation();
         const mode = btn.dataset.qaIntervalMode;
         const isChordMode = mode === 'chord';
@@ -11068,14 +11005,12 @@ export class NoteEditor {
         const triadLabel = popup.querySelector('.text-purple-600');
         if (triadLabel) triadLabel.textContent = `Build triad above ${fromLabel}`;
 
-        console.log('[QuickActions] Interval mode changed to:', isChordMode ? 'chord' : 'note');
       });
     });
 
     // Triad mode toggle buttons (note vs chord root) - keep in sync with interval mode
     popup.querySelectorAll('[data-qa-triad-mode]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        console.log('[QuickActions] Triad mode button clicked:', btn.dataset.qaTriadMode);
         e.stopPropagation();
         const mode = btn.dataset.qaTriadMode;
         const isChordMode = mode === 'chord';
@@ -11155,13 +11090,11 @@ export class NoteEditor {
         const triadLabel = popup.querySelector('.text-purple-600');
         if (triadLabel) triadLabel.textContent = `Build triad above ${fromLabel}`;
 
-        console.log('[QuickActions] Triad mode changed to:', isChordMode ? 'chord' : 'note');
       });
     });
 
     // Delete button
     popup.querySelector('#qa-delete')?.addEventListener('click', (e) => {
-      console.log('[QuickActions] Delete button clicked');
       e.stopPropagation();
       this.deleteSelectedNotes();
       this.hideQuickActionsPopup();
@@ -11187,7 +11120,6 @@ export class NoteEditor {
             chevron?.classList.remove('rotate-180');
           }
         }
-        console.log('[QuickActions] Section toggled:', sectionId);
       });
     });
 
@@ -11205,7 +11137,6 @@ export class NoteEditor {
       }
     });
 
-    console.log('[QuickActions] All handlers attached');
   }
 
   /**
@@ -11218,7 +11149,6 @@ export class NoteEditor {
     // Use selectionAccidental to show what the NOTE currently has (like the sidebar does)
     // This is different from currentAccidental which is what clicking would apply
     const selectionAccidental = this.composerIntegration?.toolbar?.selectionAccidental || null;
-    console.log('[QuickActions] Updating accidental state, selectionAccidental:', selectionAccidental);
     popup.querySelectorAll('[data-qa-accidental]').forEach(btn => {
       const isActive = selectionAccidental && btn.dataset.qaAccidental === selectionAccidental;
       // Update button styling
@@ -11346,7 +11276,6 @@ export class NoteEditor {
         isDragging = false;
         document.body.style.userSelect = '';
         popup.classList.remove('qa-dragging');
-        console.log('[QuickActions] Drag ended');
       }
     };
 
@@ -11488,6 +11417,15 @@ export class NoteEditor {
       if (!alreadyHasPitch) {
         note.pitches = [...pitches, newPitch].sort((a, b) => noteToMidi(a) - noteToMidi(b));
       }
+
+      // Save bass edits to preserve the building block (prevents loss on refresh)
+      if (staff === 'bass') {
+        const measure = compositionState.measures[measureIndex];
+        if (measure?.notation?.bass) {
+          measure.notation.bass.autoGenerated = false;
+        }
+        compositionState.saveEditedBassNotesForMeasure?.(measureIndex);
+      }
     }
 
     this.composerIntegration?.render(true);
@@ -11563,6 +11501,15 @@ export class NoteEditor {
       }
 
       note.pitches = newPitches.sort((a, b) => noteToMidi(a) - noteToMidi(b));
+
+      // Save bass edits to preserve the building block (prevents loss on refresh)
+      if (staff === 'bass') {
+        const measure = compositionState.measures[measureIndex];
+        if (measure?.notation?.bass) {
+          measure.notation.bass.autoGenerated = false;
+        }
+        compositionState.saveEditedBassNotesForMeasure?.(measureIndex);
+      }
     }
 
     this.composerIntegration?.render(true);
@@ -11573,7 +11520,6 @@ export class NoteEditor {
    */
   hideQuickActionsPopup() {
     if (this.quickActionsPopup) {
-      console.log('[QuickActions] hideQuickActionsPopup called');
       // Clean up drag handlers
       if (this.quickActionsPopup._dragCleanup) {
         this.quickActionsPopup._dragCleanup();

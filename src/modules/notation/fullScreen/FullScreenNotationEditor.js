@@ -1009,21 +1009,25 @@ export class FullScreenNotationEditor {
                 </div>
                 <div class="sidebar-section-content p-2">
                     <div class="space-y-2">
-                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="undo" title="Undo (Ctrl+Z)">
-                            <span>↩</span> Undo
-                        </button>
-                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="redo" title="Redo (Ctrl+Y)">
-                            <span>↪</span> Redo
-                        </button>
-                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="delete" title="Delete selected">
-                            <span>🗑</span> Delete
-                        </button>
-                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="copy" title="Copy selected (Ctrl+C)">
-                            <span>📋</span> Copy
-                        </button>
-                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="paste" title="Paste (Ctrl+V)">
-                            <span>📄</span> Paste
-                        </button>
+                        <div class="flex gap-2">
+                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="undo" title="Undo (Ctrl+Z)">
+                                <span>↩</span> Undo
+                            </button>
+                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="redo" title="Redo (Ctrl+Y)">
+                                <span>↪</span> Redo
+                            </button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="delete" title="Delete selected">
+                                <span>🗑</span> Del
+                            </button>
+                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="copy" title="Copy selected (Ctrl+C)">
+                                <span>📋</span> Copy
+                            </button>
+                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="paste" title="Paste (Ctrl+V)">
+                                <span>📄</span> Paste
+                            </button>
+                        </div>
                         <div class="flex gap-2">
                             <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="octave-up" title="Octave up (Shift+↑)">
                                 <span>↑</span> 8va
@@ -2067,21 +2071,25 @@ export class FullScreenNotationEditor {
                                 </div>
                                 <div class="sidebar-section-content p-2">
                                     <div class="space-y-2">
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="undo" title="Undo (Ctrl+Z)">
-                                            <span>↩</span> Undo
-                                        </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="redo" title="Redo (Ctrl+Y)">
-                                            <span>↪</span> Redo
-                                        </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="delete" title="Delete selected">
-                                            <span>🗑</span> Delete
-                                        </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="copy" title="Copy selected (Ctrl+C)">
-                                            <span>📋</span> Copy
-                                        </button>
-                                        <button class="fs-action-btn w-full p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-sm flex items-center justify-center gap-2 shadow-sm" data-action="paste" title="Paste (Ctrl+V)">
-                                            <span>📄</span> Paste
-                                        </button>
+                                        <div class="flex gap-2">
+                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="undo" title="Undo (Ctrl+Z)">
+                                                <span>↩</span> Undo
+                                            </button>
+                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="redo" title="Redo (Ctrl+Y)">
+                                                <span>↪</span> Redo
+                                            </button>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-red-50 hover:border-red-400 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="delete" title="Delete selected">
+                                                <span>🗑</span> Del
+                                            </button>
+                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="copy" title="Copy selected (Ctrl+C)">
+                                                <span>📋</span> Copy
+                                            </button>
+                                            <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="paste" title="Paste (Ctrl+V)">
+                                                <span>📄</span> Paste
+                                            </button>
+                                        </div>
                                         <div class="flex gap-2">
                                             <button class="fs-action-btn flex-1 p-2 rounded bg-white border border-slate-200 hover:bg-indigo-100 hover:border-indigo-500 transition-colors text-xs flex items-center justify-center gap-1 shadow-sm" data-action="octave-up" title="Octave up (Shift+↑)">
                                                 <span>↑</span> 8va
