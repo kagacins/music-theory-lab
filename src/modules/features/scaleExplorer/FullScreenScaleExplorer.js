@@ -36,6 +36,7 @@ const STORAGE_KEYS = {
     SIDEBAR_COLLAPSED: 'scaleexplorer-new-sidebar',
     LAST_PANEL: 'scaleexplorer-new-panel',
     CATEGORY_FILTER: 'scaleexplorer-new-category',
+    DIFFICULTY_FILTER: 'scaleexplorer-new-difficulty',
     TOOLTIPS_ENABLED: 'scaleexplorer-new-tooltips'
 };
 
@@ -74,6 +75,9 @@ class FullScreenScaleExplorer {
         // Category filters - array for multi-select, empty array means "all"
         const storedFilters = this._loadFromStorage(STORAGE_KEYS.CATEGORY_FILTER, []);
         this.categoryFilters = Array.isArray(storedFilters) ? storedFilters : [];
+        // Difficulty filters - array for multi-select, empty array means "all"
+        const storedDifficultyFilters = this._loadFromStorage(STORAGE_KEYS.DIFFICULTY_FILTER, []);
+        this.difficultyFilters = Array.isArray(storedDifficultyFilters) ? storedDifficultyFilters : [];
         this.tooltipsEnabled = this._loadFromStorage(STORAGE_KEYS.TOOLTIPS_ENABLED, true);
 
         // Event handler bindings
@@ -254,12 +258,12 @@ class FullScreenScaleExplorer {
         const rootIndex = getScaleRootIndex();
 
         return `
-        <div id="fs-scaleexplorer-sidebar" class="w-48 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-xs" style="min-width: 180px;">
+        <div id="fs-scaleexplorer-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm" style="min-width: 200px;">
             <div class="p-2 space-y-2">
                 <!-- Root Note -->
                 <div class="bg-gray-50 rounded p-2">
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-gray-700 font-semibold">Root</span>
+                        <span class="text-gray-700 font-semibold text-sm">Root</span>
                         <label class="flex items-center gap-0.5 cursor-pointer" title="Sharp/Flat">
                             <span class="${enhPref === 'sharp' ? 'text-lime-600 font-bold' : 'text-gray-400'}">&#9839;</span>
                             <div class="relative">
@@ -267,17 +271,17 @@ class FullScreenScaleExplorer {
                                        ${enhPref === 'flat' ? 'checked' : ''}
                                        onchange="window.fsScaleExplorerToggleEnharmonic && window.fsScaleExplorerToggleEnharmonic(this.checked)"
                                        class="sr-only peer">
-                                <div class="w-6 h-3 bg-gray-300 peer-checked:bg-lime-500 rounded-full"></div>
-                                <div class="absolute top-0.5 left-0.5 w-2 h-2 bg-white rounded-full transition-transform peer-checked:translate-x-3"></div>
+                                <div class="w-7 h-3.5 bg-gray-300 peer-checked:bg-lime-500 rounded-full"></div>
+                                <div class="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform peer-checked:translate-x-3.5"></div>
                             </div>
                             <span class="${enhPref === 'flat' ? 'text-lime-600 font-bold' : 'text-gray-400'}">&#9837;</span>
                         </label>
                     </div>
-                    <div id="fs-scale-root-buttons" class="grid grid-cols-4 gap-0.5">
+                    <div id="fs-scale-root-buttons" class="grid grid-cols-4 gap-1">
                         ${notes.map((note, i) => `
                             <button data-root="${i}"
                                     onclick="window.fsScaleExplorerSelectRoot && window.fsScaleExplorerSelectRoot(${i})"
-                                    class="px-1 py-1 text-[10px] font-semibold rounded ${i === rootIndex ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
+                                    class="px-1.5 py-1.5 text-xs font-semibold rounded ${i === rootIndex ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
                                 ${note}
                             </button>
                         `).join('')}
@@ -286,17 +290,17 @@ class FullScreenScaleExplorer {
 
                 <!-- Category Filters -->
                 <div class="bg-gray-50 rounded p-2">
-                    <span class="text-gray-700 font-semibold block mb-1">Category</span>
+                    <span class="text-gray-700 font-semibold text-sm block mb-1">Category</span>
                     <div id="fs-scale-category-buttons" class="flex flex-wrap gap-1">
                         <button data-category="all"
                                 onclick="window.fsScaleExplorerFilterCategory && window.fsScaleExplorerFilterCategory('all')"
-                                class="scale-category-btn px-2 py-1 text-[9px] font-medium rounded-lg transition-all ${this.categoryFilters.length === 0 ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}">
+                                class="scale-category-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.categoryFilters.length === 0 ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}">
                             All
                         </button>
                         ${Object.entries(SCALE_CATEGORIES).map(([id, cat]) => `
                             <button data-category="${id}"
                                     onclick="window.fsScaleExplorerFilterCategory && window.fsScaleExplorerFilterCategory('${id}')"
-                                    class="scale-category-btn px-2 py-1 text-[9px] font-medium rounded-lg transition-all ${this.categoryFilters.includes(id) ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}"
+                                    class="scale-category-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.categoryFilters.includes(id) ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}"
                                     title="${cat.description} (click to toggle)">
                                 ${cat.icon} ${cat.name}
                             </button>
@@ -304,10 +308,40 @@ class FullScreenScaleExplorer {
                     </div>
                 </div>
 
+                <!-- Difficulty Filters -->
+                <div class="bg-gray-50 rounded p-2">
+                    <span class="text-gray-700 font-semibold text-sm block mb-1">Difficulty</span>
+                    <div id="fs-scale-difficulty-buttons" class="flex flex-wrap gap-1">
+                        <button data-difficulty="all"
+                                onclick="window.fsScaleExplorerFilterDifficulty && window.fsScaleExplorerFilterDifficulty('all')"
+                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.length === 0 ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}">
+                            All
+                        </button>
+                        <button data-difficulty="beginner"
+                                onclick="window.fsScaleExplorerFilterDifficulty && window.fsScaleExplorerFilterDifficulty('beginner')"
+                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.includes('beginner') ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-green-100 border border-gray-200'}"
+                                title="Beginner scales (click to toggle)">
+                            🟢 Beginner
+                        </button>
+                        <button data-difficulty="intermediate"
+                                onclick="window.fsScaleExplorerFilterDifficulty && window.fsScaleExplorerFilterDifficulty('intermediate')"
+                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.includes('intermediate') ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100 border border-gray-200'}"
+                                title="Intermediate scales (click to toggle)">
+                            🟡 Intermediate
+                        </button>
+                        <button data-difficulty="advanced"
+                                onclick="window.fsScaleExplorerFilterDifficulty && window.fsScaleExplorerFilterDifficulty('advanced')"
+                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.includes('advanced') ? 'bg-red-500 text-white' : 'bg-white text-gray-700 hover:bg-red-100 border border-gray-200'}"
+                                title="Advanced scales (click to toggle)">
+                            🔴 Advanced
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Notes Display -->
                 <div class="bg-lime-50 border border-lime-200 rounded p-2">
-                    <span class="text-lime-700 font-semibold block mb-1">Scale Notes</span>
-                    <div id="fs-sidebar-scale-notes" class="text-lime-800 text-[10px] font-mono">
+                    <span class="text-lime-700 font-semibold text-sm block mb-1">Scale Notes</span>
+                    <div id="fs-sidebar-scale-notes" class="text-lime-800 text-xs font-mono">
                         C - D - E - F - G - A - B - C
                     </div>
                 </div>
@@ -539,6 +573,7 @@ class FullScreenScaleExplorer {
         window.fsScaleExplorerSelectRoot = (index) => this._selectRoot(index);
         window.fsScaleExplorerSelectScale = (type) => this._selectScale(type);
         window.fsScaleExplorerFilterCategory = (category) => this._filterCategory(category);
+        window.fsScaleExplorerFilterDifficulty = (difficulty) => this._filterDifficulty(difficulty);
         window.fsScaleExplorerChangeOctave = (amount) => this._changeOctave(amount);
         window.fsScaleExplorerChangeSpeed = (direction) => this._changeSpeed(direction);
         window.fsScaleExplorerPlay = (direction) => this._playScale(direction);
@@ -600,6 +635,50 @@ class FullScreenScaleExplorer {
         this._saveToStorage(STORAGE_KEYS.CATEGORY_FILTER, this.categoryFilters);
         this._updateCategoryButtons();
         this._renderScaleTypesGrid();
+    }
+
+    _filterDifficulty(difficulty) {
+        if (difficulty === 'all') {
+            // Clear all filters - show all difficulties
+            this.difficultyFilters = [];
+        } else {
+            // Toggle the difficulty in the array
+            const index = this.difficultyFilters.indexOf(difficulty);
+            if (index === -1) {
+                // Add difficulty
+                this.difficultyFilters.push(difficulty);
+            } else {
+                // Remove difficulty
+                this.difficultyFilters.splice(index, 1);
+            }
+        }
+        this._saveToStorage(STORAGE_KEYS.DIFFICULTY_FILTER, this.difficultyFilters);
+        this._updateDifficultyButtons();
+        this._renderScaleTypesGrid();
+    }
+
+    _updateDifficultyButtons() {
+        const container = this.tabContent?.querySelector('#fs-scale-difficulty-buttons');
+        if (!container) return;
+
+        container.querySelectorAll('.scale-difficulty-btn').forEach(btn => {
+            const difficulty = btn.dataset.difficulty;
+            if (difficulty === 'all') {
+                if (this.difficultyFilters.length === 0) {
+                    btn.className = 'scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all bg-lime-500 text-white';
+                } else {
+                    btn.className = 'scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all bg-white text-gray-700 hover:bg-lime-100 border border-gray-200';
+                }
+            } else {
+                const isActive = this.difficultyFilters.includes(difficulty);
+                const colorMap = {
+                    'beginner': isActive ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-green-100 border border-gray-200',
+                    'intermediate': isActive ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100 border border-gray-200',
+                    'advanced': isActive ? 'bg-red-500 text-white' : 'bg-white text-gray-700 hover:bg-red-100 border border-gray-200'
+                };
+                btn.className = `scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${colorMap[difficulty] || ''}`;
+            }
+        });
     }
 
     _changeOctave(amount) {
@@ -713,7 +792,7 @@ class FullScreenScaleExplorer {
         const rootButtons = this.tabContent.querySelectorAll('#fs-scale-root-buttons button');
         rootButtons.forEach((btn, i) => {
             btn.textContent = notes[i];
-            btn.className = 'px-1 py-1 text-[10px] font-semibold rounded';
+            btn.className = 'px-1.5 py-1.5 text-xs font-semibold rounded';
             if (i === rootIndex) {
                 btn.classList.add('bg-lime-500', 'text-white');
             } else {
@@ -767,7 +846,7 @@ class FullScreenScaleExplorer {
 
         buttons.forEach(btn => {
             const category = btn.dataset.category;
-            btn.className = 'scale-category-btn px-2 py-1 text-[9px] font-medium rounded-lg transition-all';
+            btn.className = 'scale-category-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all';
             const isSelected = category === 'all'
                 ? this.categoryFilters.length === 0
                 : this.categoryFilters.includes(category);
@@ -788,8 +867,11 @@ class FullScreenScaleExplorer {
         // Group scales by category
         const groupedScales = {};
         Object.entries(SCALE_DEFINITIONS).forEach(([type, scale]) => {
-            // If filters are set, only include scales from selected categories
+            // If category filters are set, only include scales from selected categories
             if (this.categoryFilters.length > 0 && !this.categoryFilters.includes(scale.category)) return;
+
+            // If difficulty filters are set, only include scales with selected difficulties
+            if (this.difficultyFilters.length > 0 && !this.difficultyFilters.includes(scale.difficulty)) return;
 
             const category = scale.category || 'other';
             if (!groupedScales[category]) {
@@ -805,12 +887,12 @@ class FullScreenScaleExplorer {
             const categoryInfo = SCALE_CATEGORIES[categoryId] || { name: categoryId, icon: '🎵' };
 
             html += `
-                <div class="bg-white rounded-lg shadow-sm p-2">
-                    <div class="flex items-center gap-1.5 mb-1.5">
-                        <span class="text-xs">${categoryInfo.icon}</span>
-                        <span class="text-gray-600 text-[10px] font-semibold uppercase tracking-wide">${categoryInfo.name}</span>
+                <div class="bg-white rounded-lg shadow-sm p-2.5">
+                    <div class="flex items-center gap-1.5 mb-2">
+                        <span class="text-sm">${categoryInfo.icon}</span>
+                        <span class="text-gray-600 text-xs font-semibold uppercase tracking-wide">${categoryInfo.name}</span>
                     </div>
-                    <div class="flex flex-wrap gap-1">
+                    <div class="flex flex-wrap gap-1.5">
             `;
 
             scales.forEach(({ type, scale }) => {
@@ -821,7 +903,7 @@ class FullScreenScaleExplorer {
 
                 html += `
                     <button onclick="window.fsScaleExplorerSelectScale && window.fsScaleExplorerSelectScale('${type}')"
-                            class="px-2.5 py-1 text-[11px] font-medium rounded-full border transition-colors ${selectedClass}"
+                            class="px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${selectedClass}"
                             title="${scale.description || type}">
                         ${type}
                     </button>
@@ -843,9 +925,9 @@ class FullScreenScaleExplorer {
 
     _getDifficultyBadge(difficulty) {
         const badges = {
-            'beginner': '<span class="text-[9px] px-1 py-0.5 bg-green-100 text-green-700 rounded">Beginner</span>',
-            'intermediate': '<span class="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded">Intermediate</span>',
-            'advanced': '<span class="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded">Advanced</span>'
+            'beginner': '<span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded font-medium">Beginner</span>',
+            'intermediate': '<span class="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium">Intermediate</span>',
+            'advanced': '<span class="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded font-medium">Advanced</span>'
         };
         return badges[difficulty] || '';
     }
@@ -863,19 +945,19 @@ class FullScreenScaleExplorer {
         const rootNote = notes[getScaleRootIndex()];
         const scaleNotes = this._getScaleNotes(rootNote, currentType, getScaleOctaveShift());
 
-        // Compact horizontal info bar
+        // Compact horizontal info bar with larger fonts
         infoPanel.innerHTML = `
             <div class="flex items-center gap-3 flex-wrap">
-                <span class="font-bold text-lime-800 text-base">${rootNote} ${currentType}</span>
+                <span class="font-bold text-lime-800 text-lg">${rootNote} ${currentType}</span>
                 ${this._getDifficultyBadge(scale.difficulty)}
-                <span class="text-gray-500 text-xs">|</span>
-                <span class="text-gray-600 text-xs font-mono">${scaleNotes.map(n => n.slice(0, -1)).join(' - ')}</span>
+                <span class="text-gray-500 text-sm">|</span>
+                <span class="text-gray-600 text-sm font-mono">${scaleNotes.map(n => n.slice(0, -1)).join(' - ')}</span>
                 ${scale.description ? `
-                    <span class="text-gray-500 text-xs">|</span>
-                    <span class="text-gray-500 text-xs italic truncate max-w-xs">${scale.description}</span>
+                    <span class="text-gray-500 text-sm">|</span>
+                    <span class="text-gray-500 text-sm italic truncate max-w-md">${scale.description}</span>
                 ` : ''}
                 ${scale.aliases && scale.aliases.length ? `
-                    <span class="text-gray-400 text-[10px]">(${scale.aliases[0]})</span>
+                    <span class="text-gray-400 text-xs">(${scale.aliases[0]})</span>
                 ` : ''}
             </div>
         `;
@@ -886,10 +968,10 @@ class FullScreenScaleExplorer {
         if (sidebar) {
             if (this.sidebarCollapsed) {
                 sidebar.classList.add('w-0', 'min-w-0', 'overflow-hidden', 'p-0');
-                sidebar.classList.remove('w-48');
+                sidebar.classList.remove('w-52');
             } else {
                 sidebar.classList.remove('w-0', 'min-w-0', 'overflow-hidden', 'p-0');
-                sidebar.classList.add('w-48');
+                sidebar.classList.add('w-52');
             }
         }
     }

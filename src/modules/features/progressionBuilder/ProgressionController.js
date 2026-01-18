@@ -3376,18 +3376,73 @@ export function loadProgression() {
             baseRoman = roman.substring(1); // Remove accidental prefix
         }
 
+        // Parse chord quality from roman numeral suffix (7, 9, 11, 13, maj7, etc.)
+        // This must happen BEFORE looking up in ROMAN_MAP_BASE
+        let chordQuality = null;
+        let isDiminished = baseRoman.includes('°') || baseRoman.toLowerCase().includes('dim');
+
+        // Check for chord suffixes (in order of specificity - longer patterns first)
+        if (baseRoman.includes('maj13')) {
+            baseRoman = baseRoman.replace('maj13', '');
+            chordQuality = 'Major 13th';
+        } else if (baseRoman.includes('maj11')) {
+            baseRoman = baseRoman.replace('maj11', '');
+            chordQuality = 'Major 11th';
+        } else if (baseRoman.includes('maj9')) {
+            baseRoman = baseRoman.replace('maj9', '');
+            chordQuality = 'Major 9th';
+        } else if (baseRoman.includes('maj7')) {
+            baseRoman = baseRoman.replace('maj7', '');
+            chordQuality = 'Major 7th';
+        } else if (baseRoman.includes('dim7') || baseRoman.includes('°7')) {
+            baseRoman = baseRoman.replace('dim7', '').replace('°7', '');
+            chordQuality = 'Diminished 7th';
+        } else if (baseRoman.includes('13')) {
+            baseRoman = baseRoman.replace('13', '');
+            chordQuality = 'Dominant 13th';
+        } else if (baseRoman.includes('11')) {
+            baseRoman = baseRoman.replace('11', '');
+            chordQuality = 'Dominant 11th';
+        } else if (baseRoman.includes('9')) {
+            baseRoman = baseRoman.replace('9', '');
+            if (isDiminished) {
+                chordQuality = 'Diminished 9th';
+            } else if (baseRoman.toLowerCase().includes('i') && baseRoman.toLowerCase() === baseRoman) {
+                chordQuality = 'Minor 9th';
+            } else {
+                chordQuality = 'Dominant 9th';
+            }
+        } else if (baseRoman.includes('7')) {
+            baseRoman = baseRoman.replace('7', '');
+            if (isDiminished) {
+                chordQuality = 'Half-Diminished 7th';
+            } else if (baseRoman === baseRoman.toUpperCase() || baseRoman === 'V' || baseRoman === 'VII') {
+                chordQuality = 'Dominant 7th';
+            } else {
+                chordQuality = 'Minor 7th';
+            }
+        }
+
         // Try to find the base roman numeral in the map
         let baseInfo = ROMAN_MAP_BASE[roman] || ROMAN_MAP_BASE[baseRoman];
 
         // For borrowed chords (with accidental), default quality based on common patterns
         // bVII in rock is typically Major, #IV is typically Major, etc.
-        let chordType = 'Major'; // Default for borrowed chords
+        let defaultQuality = 'Major'; // Default for borrowed chords
         if (baseInfo) {
-            chordType = baseInfo.quality;
+            defaultQuality = baseInfo.quality;
         } else if (baseRoman === 'VII' || baseRoman === 'vii') {
             // VII (without degree) is typically Major when borrowed
-            chordType = 'Major';
+            defaultQuality = 'Major';
         }
+
+        // Override default quality if diminished symbol is present (for triads like vii° or ii°)
+        if (isDiminished && !chordQuality) {
+            defaultQuality = 'Diminished';
+        }
+
+        // Use explicit chord quality if found, otherwise use default from ROMAN_MAP_BASE
+        const chordType = chordQuality || defaultQuality;
 
         // Get key without 'm' suffix for calculation
         const keyForCalculation = isMinorKey ? currentKey.replace(/m$/, '') : currentKey;
@@ -4316,7 +4371,8 @@ export function handleUndo() {
         restoreProgressionState(previousState);
 
         // Re-render progression display in both tabs
-        renderProgressionDisplay('melody-progression-visualization', true);
+        // Pass skipNotationSync=true to prevent overwriting the restored notation state
+        renderProgressionDisplay('melody-progression-visualization', true, false, true);
 
         // Re-render VexFlow notation from the restored compositionState.measures
         // IMPORTANT: Do NOT call syncProgressionToMelodyComposer() here!
@@ -4372,7 +4428,8 @@ export function handleRedo() {
         restoreProgressionState(nextState);
 
         // Re-render progression display in both tabs
-        renderProgressionDisplay('melody-progression-visualization', true);
+        // Pass skipNotationSync=true to prevent overwriting the restored notation state
+        renderProgressionDisplay('melody-progression-visualization', true, false, true);
 
         // Re-render VexFlow notation from the restored compositionState.measures
         // IMPORTANT: Do NOT call syncProgressionToMelodyComposer() here!

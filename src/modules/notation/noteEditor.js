@@ -713,6 +713,8 @@ export class NoteEditor {
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (this.selectedNotes.size > 0) {
         e.preventDefault();
+        // Close the Editor Selector popup if open
+        this.hideEditorSelector();
         const shiftDelete = e.ctrlKey || e.metaKey;
         this.deleteSelectedNotes(shiftDelete);
       }

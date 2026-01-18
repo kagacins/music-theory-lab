@@ -451,7 +451,7 @@ export const OBSERVATION_TYPES = {
         cooldown: 120000
     },
 
-    // Leading Tone Resolution
+    // Leading Tone Resolution (proper upward resolution)
     'leading-tone-resolution': {
         type: COACH_ITEM_TYPES.OBSERVATION,
         category: COACH_CATEGORIES.VOICE_LEADING,
@@ -460,14 +460,33 @@ export const OBSERVATION_TYPES = {
         emoji: '🎯',
         title: 'Leading Tone Resolution',
         message: {
-            simple: "Perfect! The leading tone ({{leadingTone}}) resolved up to the tonic ({{tonic}}).",
-            intermediate: "Strong leading tone resolution: {{leadingTone}} → {{tonic}}. This half-step pull is the strongest melodic tendency in tonal music.",
-            advanced: "Ti-Do resolution ({{leadingTone}}→{{tonic}}) provides definitive tonal confirmation. The tritone between ^4 and ^7 resolves inward."
+            simple: "Nice! The leading tone ({{leadingToneNote}}) {{resolutionDescription}} the tonic ({{tonicNote}}).",
+            intermediate: "Leading tone resolution: {{leadingToneNote}} → {{tonicNote}}. This half-step pull is the strongest melodic tendency in tonal music.",
+            advanced: "Ti-Do resolution ({{leadingToneNote}}→{{tonicNote}}) provides tonal confirmation. The tritone between ^4 and ^7 resolves inward."
         },
         actions: {
             explorePanel: 'voice-leading'
         },
         cooldown: 90000
+    },
+
+    // Leading Tone Resolution - Octave Shift Suggestion
+    'leading-tone-octave-suggestion': {
+        type: COACH_ITEM_TYPES.SUGGESTION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'leading-tone-octave-suggestion',
+        priority: 65,
+        emoji: '🎹',
+        title: 'Octave Shift for Better Resolution',
+        message: {
+            simple: "The leading tone ({{leadingToneNote}}) goes {{actualDirection}} to the tonic. {{suggestion}} for a smoother half-step up resolution.",
+            intermediate: "Voice leading tip: {{leadingToneNote}} → {{tonicNote}} moves {{actualDirection}}. {{suggestion}} to get the classic Ti→Do half-step rise.",
+            advanced: "Current voicing has {{leadingToneNote}}→{{tonicNote}} ({{intervalDescription}}). {{suggestion}} for optimal leading tone resolution with minimal voice motion."
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 120000
     },
 
     // Tritone Usage (explicit tritone intervals in chord or between voices)

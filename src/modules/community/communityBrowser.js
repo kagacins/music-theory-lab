@@ -1818,15 +1818,22 @@ function createVexNoteFromStoredNote(note, clef, keyAccidentals, vf) {
     const accidentals = [];
 
     for (const pitch of pitches) {
-        const match = pitch.match(/^([A-G])([#b]?)(\d+)$/);
+        // Support double accidentals (##, x, bb) as well as single (#, b)
+        const match = pitch.match(/^([A-G])(##|x|bb|[#b]?)(\d+)$/);
         if (!match) continue;
 
-        const [, letter, accidental, octave] = match;
+        let [, letter, accidental, octave] = match;
+        // Normalize 'x' to '##' for consistency
+        if (accidental === 'x') accidental = '##';
         keys.push(`${letter.toLowerCase()}${accidental}/${octave}`);
 
         // Determine if we need to show an accidental
         let displayAccidental = null;
-        if (accidental === '#' && !keyAccidentals.sharps.has(letter)) {
+        if (accidental === '##') {
+            displayAccidental = '##';  // Double sharp always shown
+        } else if (accidental === 'bb') {
+            displayAccidental = 'bb';  // Double flat always shown
+        } else if (accidental === '#' && !keyAccidentals.sharps.has(letter)) {
             displayAccidental = '#';
         } else if (accidental === 'b' && !keyAccidentals.flats.has(letter)) {
             displayAccidental = 'b';
@@ -1926,15 +1933,22 @@ function getVexNotesForChordGrandStaff(chord, key, keyAccidentals) {
     }
 
     return notes.map(note => {
-        const match = note.match(/^([A-G])([#b]?)(\d+)$/);
+        // Support double accidentals (##, x, bb) as well as single (#, b)
+        const match = note.match(/^([A-G])(##|x|bb|[#b]?)(\d+)$/);
         if (!match) return null;
 
-        const [, letter, accidental, octave] = match;
+        let [, letter, accidental, octave] = match;
+        // Normalize 'x' to '##' for consistency
+        if (accidental === 'x') accidental = '##';
         const vexKey = `${letter.toLowerCase()}${accidental}/${octave}`;
 
         // Determine if we need to show an accidental
         let displayAccidental = null;
-        if (accidental === '#' && !keyAccidentals.sharps.has(letter)) {
+        if (accidental === '##') {
+            displayAccidental = '##';  // Double sharp always shown
+        } else if (accidental === 'bb') {
+            displayAccidental = 'bb';  // Double flat always shown
+        } else if (accidental === '#' && !keyAccidentals.sharps.has(letter)) {
             displayAccidental = '#';
         } else if (accidental === 'b' && !keyAccidentals.flats.has(letter)) {
             displayAccidental = 'b';

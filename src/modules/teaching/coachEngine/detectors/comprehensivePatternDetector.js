@@ -217,16 +217,117 @@ export function detectLeadingToneResolution(context) {
             (prevRoman === 'V' || prevRoman === 'v' || prevRoman === 'vii' || prevRoman === 'VII') &&
             (currRoman === 'I' || currRoman === 'i')) {
 
-            items.push({
-                ...OBSERVATION_TYPES['leading-tone-resolution'],
-                data: {
-                    chordIndex: i,
-                    leadingTone,
-                    tonic,
-                    fromChord: prevChord,
-                    toChord: currChord
+            // Find the actual leading tone note with octave from previous chord
+            const leadingToneNote = prevChord.notes.find(n => getNoteValue(n) === getNoteValue(leadingTone));
+            // Find the actual tonic note with octave from current chord
+            const tonicNote = currChord.notes.find(n => getNoteValue(n) === getNoteValue(tonic));
+
+            // Calculate resolution direction based on actual octaves
+            let resolutionDirection = 'to'; // default neutral
+            let resolutionDescription = 'resolved to';
+            let interval = 0;
+            let leadingToneOctave = 4;
+            let tonicOctave = 4;
+
+            if (leadingToneNote && tonicNote) {
+                leadingToneOctave = parseInt(leadingToneNote.match(/(\d+)$/)?.[1] || '4');
+                tonicOctave = parseInt(tonicNote.match(/(\d+)$/)?.[1] || '4');
+                const leadingTonePitch = getNoteValue(leadingTone) + (leadingToneOctave * 12);
+                const tonicPitch = getNoteValue(tonic) + (tonicOctave * 12);
+
+                interval = tonicPitch - leadingTonePitch;
+                if (interval === 1) {
+                    resolutionDirection = 'up';
+                    resolutionDescription = 'resolved up to';
+                } else if (interval === -11) {
+                    // Tonic is in lower octave (e.g., C#4 → D3 = down an octave + up a half step)
+                    resolutionDirection = 'down-octave';
+                    resolutionDescription = 'resolved down (octave displacement) to';
+                } else if (interval > 1) {
+                    resolutionDirection = 'up-leap';
+                    resolutionDescription = 'leaped up to';
+                } else if (interval < -11) {
+                    resolutionDirection = 'down-leap';
+                    resolutionDescription = 'leaped down to';
+                } else if (interval < 0) {
+                    resolutionDirection = 'down';
+                    resolutionDescription = 'moved down to';
                 }
-            });
+            }
+
+            // If it's a proper upward resolution, show the positive observation
+            if (resolutionDirection === 'up') {
+                items.push({
+                    ...OBSERVATION_TYPES['leading-tone-resolution'],
+                    data: {
+                        chordIndex: i,
+                        leadingTone,
+                        tonic,
+                        leadingToneNote,
+                        tonicNote,
+                        resolutionDirection,
+                        resolutionDescription,
+                        fromChord: prevChord,
+                        toChord: currChord
+                    }
+                });
+            } else if (leadingToneNote && tonicNote) {
+                // Not an ideal upward resolution - suggest an octave shift
+                // Calculate what octave shift would fix it
+                let suggestion = '';
+                let actualDirection = '';
+                let intervalDescription = '';
+
+                if (interval === -11) {
+                    // Tonic is octave below (e.g., C#4 → D3)
+                    // Suggest: raise the I chord OR lower the V chord
+                    actualDirection = 'down an octave';
+                    intervalDescription = `down 11 semitones`;
+                    const suggestedTonicOctave = leadingToneOctave + 1;
+                    suggestion = `Try shifting the ${currChord.root} chord up an octave (to octave ${suggestedTonicOctave})`;
+                } else if (interval < -11) {
+                    // Tonic is more than an octave below
+                    actualDirection = 'down more than an octave';
+                    intervalDescription = `down ${Math.abs(interval)} semitones`;
+                    const octavesDown = Math.floor(Math.abs(interval) / 12);
+                    suggestion = `Try shifting the ${currChord.root} chord up ${octavesDown} octave${octavesDown > 1 ? 's' : ''}`;
+                } else if (interval > 1 && interval <= 13) {
+                    // Tonic is above but more than a half step (leap up)
+                    actualDirection = 'up by a leap';
+                    intervalDescription = `up ${interval} semitones`;
+                    suggestion = `Try shifting the ${currChord.root} chord down an octave for smoother voice leading`;
+                } else if (interval > 13) {
+                    // Tonic is more than an octave above
+                    actualDirection = 'up more than an octave';
+                    intervalDescription = `up ${interval} semitones`;
+                    const octavesUp = Math.floor(interval / 12);
+                    suggestion = `Try shifting the ${currChord.root} chord down ${octavesUp} octave${octavesUp > 1 ? 's' : ''}`;
+                } else if (interval < 0 && interval > -11) {
+                    // Tonic is below but less than an octave (moved down)
+                    actualDirection = 'down';
+                    intervalDescription = `down ${Math.abs(interval)} semitones`;
+                    suggestion = `Try shifting the ${currChord.root} chord up an octave`;
+                }
+
+                if (suggestion) {
+                    items.push({
+                        ...OBSERVATION_TYPES['leading-tone-octave-suggestion'],
+                        data: {
+                            chordIndex: i,
+                            leadingTone,
+                            tonic,
+                            leadingToneNote,
+                            tonicNote,
+                            actualDirection,
+                            intervalDescription,
+                            suggestion,
+                            resolutionDirection,
+                            fromChord: prevChord,
+                            toChord: currChord
+                        }
+                    });
+                }
+            }
             break; // Only report first
         }
     }

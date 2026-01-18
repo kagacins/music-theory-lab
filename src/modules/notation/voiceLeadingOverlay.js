@@ -2336,12 +2336,21 @@ export class VoiceLeadingDiagram {
     pitchToMidi(pitch) {
         if (!pitch) return null;
         const noteMap = { 'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11 };
-        const match = pitch.match(/^([A-G])([#b]?)(\d+)$/);
+        // Match note letter, optional accidental (##, x, bb, #, b), and octave
+        const match = pitch.match(/^([A-G])(##|x|bb|[#b]?)(\d+)$/);
         if (!match) return null;
         const [, note, accidental, octave] = match;
         let midi = noteMap[note] + (parseInt(octave) + 1) * 12;
-        if (accidental === '#') midi += 1;
-        if (accidental === 'b') midi -= 1;
+        // Handle all accidental types
+        if (accidental === '##' || accidental === 'x') {
+            midi += 2;  // Double sharp
+        } else if (accidental === 'bb') {
+            midi -= 2;  // Double flat
+        } else if (accidental === '#') {
+            midi += 1;  // Single sharp
+        } else if (accidental === 'b') {
+            midi -= 1;  // Single flat
+        }
         return midi;
     }
 

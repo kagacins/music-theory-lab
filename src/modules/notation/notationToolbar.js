@@ -128,11 +128,21 @@ function getEffectiveAccidental(note, key) {
     if (!pitch || typeof pitch !== 'string') continue;
 
     // Parse pitch: e.g., "F#4" -> noteLetter="F", accInPitch="#", octave="4"
-    const match = pitch.match(/^([A-G])([#b]?)(\d+)$/i);
+    // Support double accidentals (##, x, bb) as well as single (#, b)
+    const match = pitch.match(/^([A-G])(##|x|bb|[#b]?)(\d+)$/i);
     if (!match) continue;
 
     const noteLetter = match[1].toUpperCase();
-    const accInPitch = match[2]; // '#', 'b', or '' (empty)
+    let accInPitch = match[2]; // '##', 'x', 'bb', '#', 'b', or '' (empty)
+    // Normalize 'x' to '##' for consistency
+    if (accInPitch === 'x') accInPitch = '##';
+
+    // Handle double accidentals first - these are always explicit overrides
+    if (accInPitch === '##') {
+      return '##';  // Double sharp
+    } else if (accInPitch === 'bb') {
+      return 'bb';  // Double flat
+    }
 
     // Check what the key signature expects for this note
     const keySigExpectsSharp = keyAccidentals.sharps.has(noteLetter);

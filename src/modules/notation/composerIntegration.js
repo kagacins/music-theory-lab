@@ -3629,12 +3629,20 @@ export class NotationComposer {
       popup.remove();
     });
 
-    // Close on outside click
+    // Close on outside click - but NOT if clicking inside the nudge popup
     const closeOnOutsideClick = (e) => {
-      if (!popup.contains(e.target)) {
-        popup.remove();
-        document.removeEventListener('click', closeOnOutsideClick);
+      // Check if click is inside this popup
+      if (popup.contains(e.target)) {
+        return;
       }
+      // Check if click is inside the coach nudge popup (opened from clicking an item)
+      const nudgePopup = document.getElementById('coach-nudge-popup');
+      if (nudgePopup && nudgePopup.contains(e.target)) {
+        return;
+      }
+      // Click was truly outside both popups - close this summary popup
+      popup.remove();
+      document.removeEventListener('click', closeOnOutsideClick);
     };
     setTimeout(() => {
       document.addEventListener('click', closeOnOutsideClick);
@@ -3992,12 +4000,20 @@ export class NotationComposer {
       popup.remove();
     });
 
-    // Close on outside click
+    // Close on outside click - but NOT if clicking inside the nudge popup
     const closeOnOutsideClick = (e) => {
-      if (!popup.contains(e.target)) {
-        popup.remove();
-        document.removeEventListener('click', closeOnOutsideClick);
+      // Check if click is inside this popup
+      if (popup.contains(e.target)) {
+        return;
       }
+      // Check if click is inside the coach nudge popup (opened from clicking an item)
+      const nudgePopup = document.getElementById('coach-nudge-popup');
+      if (nudgePopup && nudgePopup.contains(e.target)) {
+        return;
+      }
+      // Click was truly outside both popups - close this summary popup
+      popup.remove();
+      document.removeEventListener('click', closeOnOutsideClick);
     };
     setTimeout(() => {
       document.addEventListener('click', closeOnOutsideClick);

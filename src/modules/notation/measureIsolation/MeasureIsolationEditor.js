@@ -4210,20 +4210,20 @@ export class MeasureIsolationEditor {
 
         const results = [];
 
-        // Standard durations in descending order of slots (8 slots per beat)
-        // Dotted whole = 48 slots, Whole = 32 slots, Dotted half = 24 slots, etc.
+        // Standard durations in descending order of slots (48 slots per beat to match SLOTS_PER_BEAT)
+        // Dotted whole = 288 slots (6 beats), Whole = 192 slots (4 beats), etc.
         const standardDurations = [
-            { duration: '1n', dotted: true, slots: 48 },   // dotted whole (6 beats)
-            { duration: '1n', dotted: false, slots: 32 },  // whole (4 beats)
-            { duration: '2n', dotted: true, slots: 24 },   // dotted half (3 beats)
-            { duration: '2n', dotted: false, slots: 16 },  // half (2 beats)
-            { duration: '4n', dotted: true, slots: 12 },   // dotted quarter (1.5 beats)
-            { duration: '4n', dotted: false, slots: 8 },   // quarter (1 beat)
-            { duration: '8n', dotted: true, slots: 6 },    // dotted eighth (0.75 beats)
-            { duration: '8n', dotted: false, slots: 4 },   // eighth (0.5 beats)
-            { duration: '16n', dotted: true, slots: 3 },   // dotted sixteenth (0.375 beats)
-            { duration: '16n', dotted: false, slots: 2 },  // sixteenth (0.25 beats)
-            { duration: '32n', dotted: false, slots: 1 },  // thirty-second (0.125 beats)
+            { duration: '1n', dotted: true, slots: 288 },   // dotted whole (6 beats)
+            { duration: '1n', dotted: false, slots: 192 },  // whole (4 beats)
+            { duration: '2n', dotted: true, slots: 144 },   // dotted half (3 beats)
+            { duration: '2n', dotted: false, slots: 96 },   // half (2 beats)
+            { duration: '4n', dotted: true, slots: 72 },    // dotted quarter (1.5 beats)
+            { duration: '4n', dotted: false, slots: 48 },   // quarter (1 beat)
+            { duration: '8n', dotted: true, slots: 36 },    // dotted eighth (0.75 beats)
+            { duration: '8n', dotted: false, slots: 24 },   // eighth (0.5 beats)
+            { duration: '16n', dotted: true, slots: 18 },   // dotted sixteenth (0.375 beats)
+            { duration: '16n', dotted: false, slots: 12 },  // sixteenth (0.25 beats)
+            { duration: '32n', dotted: false, slots: 6 },   // thirty-second (0.125 beats)
         ];
 
         let remainingSlots = slots;

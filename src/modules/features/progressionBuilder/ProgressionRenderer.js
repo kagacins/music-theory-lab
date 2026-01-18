@@ -152,16 +152,19 @@ function executePendingRenders() {
     const hasMelodyViz = containers.includes('melody-progression-visualization');
     const hasBuilderViz = containers.includes('builder-progression-visualization');
 
+    // Check if any pending render wants to skip notation sync
+    const shouldSkipNotationSync = Array.from(toRender.values()).some(v => v.skipNotationSync);
+
     // Render each unique container once
     // Use syncBothTabs=false to prevent recursive renders
     if (hasProgViz) {
-        renderProgressionDisplayImmediate('progression-visualization', false);
+        renderProgressionDisplayImmediate('progression-visualization', false, shouldSkipNotationSync);
     }
     if (hasMelodyViz) {
-        renderProgressionDisplayImmediate('melody-progression-visualization', false);
+        renderProgressionDisplayImmediate('melody-progression-visualization', false, shouldSkipNotationSync);
     }
     if (hasBuilderViz) {
-        renderProgressionDisplayImmediate('builder-progression-visualization', false);
+        renderProgressionDisplayImmediate('builder-progression-visualization', false, shouldSkipNotationSync);
     }
 
     // Handle any other containers
@@ -169,7 +172,7 @@ function executePendingRenders() {
         if (containerId !== 'progression-visualization' &&
             containerId !== 'melody-progression-visualization' &&
             containerId !== 'builder-progression-visualization') {
-            renderProgressionDisplayImmediate(containerId, false);
+            renderProgressionDisplayImmediate(containerId, false, shouldSkipNotationSync);
         }
     });
 }
@@ -179,13 +182,15 @@ function executePendingRenders() {
  * Multiple rapid calls are coalesced into a single render
  * @param {string} containerId - Container to render
  * @param {boolean} syncBothTabs - Whether to sync both tabs (adds other container to queue)
+ * @param {boolean} skipNotationSync - If true, skip syncing notation (used by undo/redo)
  */
-function scheduleRender(containerId, syncBothTabs) {
+function scheduleRender(containerId, syncBothTabs, skipNotationSync = false) {
     const wasEmpty = pendingRenders.size === 0;
 
     // Add this container to pending renders
     pendingRenders.set(containerId, {
         syncBothTabs,
+        skipNotationSync,
         timestamp: Date.now()
     });
 
@@ -1994,14 +1999,15 @@ function getMaxInversionForLhType(lhType) {
  * @param {string} containerId - Container ID
  * @param {boolean} syncBothTabs - Whether to sync both tabs
  * @param {boolean} immediate - If true, bypass debouncing and render immediately
+ * @param {boolean} skipNotationSync - If true, skip syncing notation (used by undo/redo to preserve restored state)
  */
-export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true, immediate = false) {
+export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true, immediate = false, skipNotationSync = false) {
     if (immediate) {
         // Flush any pending renders first to avoid stale state
         flushPendingRenders();
-        renderProgressionDisplayImmediate(containerId, syncBothTabs);
+        renderProgressionDisplayImmediate(containerId, syncBothTabs, skipNotationSync);
     } else {
-        scheduleRender(containerId, syncBothTabs);
+        scheduleRender(containerId, syncBothTabs, skipNotationSync);
     }
 }
 
@@ -2010,8 +2016,9 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
  * This is the actual rendering implementation.
  * @param {string} containerId - Container ID
  * @param {boolean} syncBothTabs - Whether to sync both tabs
+ * @param {boolean} skipNotationSync - If true, skip syncing notation (used by undo/redo to preserve restored state)
  */
-function renderProgressionDisplayImmediate(containerId = 'progression-visualization', syncBothTabs = true) {
+function renderProgressionDisplayImmediate(containerId = 'progression-visualization', syncBothTabs = true, skipNotationSync = false) {
     // Render progression cards to the specified container
 
     // Capture staff notation states before clearing DOM (always capture from both tabs)
@@ -2267,8 +2274,9 @@ function renderProgressionDisplayImmediate(containerId = 'progression-visualizat
 
         container.appendChild(gridContainer);
 
-        // Also update the Composition Studio's notation
-        if (window.refreshNotationFromProgression) {
+        // Also update the Composition Studio's notation (unless skipNotationSync is true)
+        // skipNotationSync is used by undo/redo to preserve the restored notation state
+        if (window.refreshNotationFromProgression && !skipNotationSync) {
             // Use requestAnimationFrame to ensure system is ready
             requestAnimationFrame(() => {
                 // Sync progression to compositionState first

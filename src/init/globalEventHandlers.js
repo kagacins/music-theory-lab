@@ -207,6 +207,13 @@ function setupKeyboardShortcuts() {
         if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
             if (!isInputElement(e.target)) {
                 e.preventDefault();
+
+                // Close the Editor Selector popup if open
+                const noteEditor = window.getNoteEditor?.();
+                if (noteEditor) {
+                    noteEditor.hideEditorSelector();
+                }
+
                 const existingModal = document.getElementById('unified-recommendation-modal');
                 if (existingModal) {
                     window.closeUnifiedRecommendationModal && window.closeUnifiedRecommendationModal();
