@@ -1220,3 +1220,153 @@ button:active:not(.key) {
         transition: opacity 0.3s ease !important;
     }
 }
+
+/* ============================================================================
+   22. VISUAL FEEDBACK ON TOUCH
+   ============================================================================ */
+
+@media (pointer: coarse) {
+    /* Active state feedback for buttons - subtle press effect */
+    button:active,
+    .chord-card-wrapper:active,
+    .key-button-wrapper:active,
+    .tab-button:active {
+        opacity: 0.85;
+        transform: scale(0.98);
+    }
+
+    /* Active state for piano keys */
+    .white-key:active,
+    .black-key:active {
+        opacity: 0.9;
+    }
+
+    /* Active state for chord cards in progression */
+    .chord-card-wrapper:active .simplified-card,
+    .chord-card-wrapper:active .detailed-card {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    /* Subtle feedback on modal buttons */
+    .modal-actions button:active {
+        transform: scale(0.97);
+    }
+}
+
+/* ============================================================================
+   23. REDUCED ANIMATION COMPLEXITY (Mobile Performance)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Faster transitions for better perceived performance */
+    * {
+        transition-duration: 0.15s !important;
+    }
+
+    /* Exception: Keep sidebar slide animation smooth */
+    #fs-chordlab-sidebar,
+    #fs-scaleexplorer-sidebar,
+    #fullscreen-sidebar {
+        transition-duration: 0.25s !important;
+    }
+
+    /* Simpler shadows on mobile for better performance */
+    .shadow-lg {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .shadow-xl {
+        box-shadow: 0 6px 10px -2px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Reduce blur effects which are expensive on mobile */
+    .backdrop-blur-sm,
+    .backdrop-blur {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+
+    /* Disable hover animations on touch devices - they feel janky */
+    .hover\:scale-105:hover,
+    .hover\:scale-110:hover {
+        transform: none !important;
+    }
+}
+
+/* ============================================================================
+   24. TOUCH-FRIENDLY SCROLLING
+   ============================================================================ */
+
+@media (pointer: coarse) {
+    /* Smooth momentum scrolling for all scrollable areas */
+    .overflow-auto,
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-scroll {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+
+    /* Hide scrollbars on touch devices - they use swipe gestures */
+    .overflow-auto::-webkit-scrollbar,
+    .overflow-y-auto::-webkit-scrollbar,
+    .overflow-x-auto::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+
+    /* Thinner, less obtrusive scrollbar thumb */
+    .overflow-auto::-webkit-scrollbar-thumb,
+    .overflow-y-auto::-webkit-scrollbar-thumb,
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 2px;
+    }
+
+    /* Except for horizontal chord card scrolling - keep visible for discoverability */
+    #fs-chord-cards-container::-webkit-scrollbar,
+    #fs-quick-add-cards-container::-webkit-scrollbar {
+        height: 8px;
+    }
+}
+
+/* ============================================================================
+   25. MODAL IMPROVEMENTS (Mobile)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Full-width modals on small screens */
+    .modal-content,
+    [class*="modal"] > div:first-child {
+        max-width: 95vw !important;
+        margin: 10px !important;
+    }
+
+    /* Larger close buttons on modals */
+    .modal-close-btn,
+    [class*="modal"] button[aria-label="Close"],
+    [class*="modal"] button:has(svg[class*="close"]) {
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+
+    /* More padding in modal content for touch */
+    .modal-body,
+    [class*="modal"] .p-4,
+    [class*="modal"] .p-6 {
+        padding: 16px !important;
+    }
+
+    /* Stack modal action buttons on very small screens */
+    @media (max-width: 400px) {
+        .modal-actions {
+            flex-direction: column !important;
+            gap: 8px !important;
+        }
+
+        .modal-actions button {
+            width: 100% !important;
+        }
+    }
+}
