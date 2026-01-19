@@ -33,6 +33,7 @@ import {
 } from '../../state/trainerState.js';
 import { getNotationPreference, getCurrentTab, getExperienceMode } from '../../state/globalState.js';
 import { renderAmbientTensionStrip, removeAmbientTensionStrip } from '../../ui/AmbientTensionStrip.js';
+import { FUNCTION_LEGEND, shouldShowFunctionColors } from '../../ui/chordFunctionLegend.js';
 import {
     getKeyBasedEnharmonic,
     setKeyDropdownValue,
@@ -389,10 +390,12 @@ function getChordFunction(roman) {
         'IV': 'Subdominant',
         'iv': 'Subdominant',
         'ii': 'Subdominant',
+        'II': 'Subdominant',
         'iii': 'Tonic',
         'III': 'Tonic',
         'vi': 'Tonic',
         'VI': 'Tonic',
+        'vii': 'Dominant',
         'vii°': 'Dominant',
         'VII': 'Dominant'
     };
@@ -400,20 +403,30 @@ function getChordFunction(roman) {
     // Handle undefined/null roman numerals
     if (!roman) return null;
 
-    // Handle roman numerals with suffixes (like 'V7', 'ii7', etc.)
-    const baseRoman = roman.replace(/[0-9°]/g, '');
+    // Extract just the roman numeral part, removing ALL quality suffixes
+    // This handles: V7, ii7, Imaj7, IVmaj9, viim7b5, etc.
+    // Match: optional accidentals (♭♯b#) + roman numeral (IViv) + optional ° for diminished
+    const match = roman.match(/^([♭♯b#]?)([IViv]+)(°?)/);
+    if (!match) return null;
+
+    const baseRoman = match[2] + (match[3] || ''); // e.g., "vii°" or "IV"
     return functionMap[baseRoman] || null;
 }
 
 /**
  * Get color classes for roman numeral based on harmonic function
- * Per INTERACTIVE_LEARNING_PLAN.md Section 1.3:
+ * Per INTERACTIVE_LEARNING_PLAN.md Section 1.3 & Educational Enhancement Roadmap A2:
  *   🟢 GREEN = "Home Base" (Tonic) - I, vi, iii
  *   🔵 BLUE = "Journey" (Subdominant) - IV, ii
- *   🔴 RED = "Tension" (Dominant) - V, vii°
+ *   🟠 AMBER = "Tension" (Dominant) - V, vii°
  *   🟣 PURPLE = Borrowed/Modal Interchange
+ *   🔶 CORAL = Secondary Dominant
+ *
+ * A2 Enhancement: Includes cardBgStyle for subtle pastel background tints (15% opacity)
+ * Hidden in Focus mode
+ *
  * @param {string} roman - Roman numeral
- * @returns {object} Object with romanColor, functionColor, bgColor, borderColor, function, hexColor
+ * @returns {object} Object with romanColor, functionColor, bgColor, borderColor, function, hexColor, cardBgStyle
  */
 function getFunctionColors(roman) {
     const func = getChordFunction(roman);
@@ -422,6 +435,13 @@ function getFunctionColors(roman) {
     // Handles both unicode symbols (♭, ♯) and ASCII equivalents (b, #)
     const isBorrowed = roman && (roman.includes('♭') || roman.includes('♯') || roman.includes('#') || roman.startsWith('b'));
 
+    // Check for secondary dominant (V/x pattern)
+    const isSecondaryDom = roman && roman.includes('/');
+
+    // Check Experience Mode - no background tint in Focus mode
+    const showColors = shouldShowFunctionColors();
+
+    // A2 Color Scheme from FUNCTION_LEGEND
     const colorMap = {
         'Tonic': {
             function: 'Tonic',
@@ -429,35 +449,55 @@ function getFunctionColors(roman) {
             functionColor: 'text-emerald-500 dark:text-emerald-400',
             bgColor: 'bg-emerald-100 dark:bg-emerald-900/50',
             borderColor: 'border-emerald-400 dark:border-emerald-600',
-            hexColor: '#10b981' // emerald-500
+            hexColor: FUNCTION_LEGEND.tonic.hexColor,
+            // A2: Subtle background tint for chord cards
+            cardBgStyle: showColors ? FUNCTION_LEGEND.tonic.cardBgGradient : ''
         },
         'Dominant': {
             function: 'Dominant',
-            romanColor: 'text-red-600 dark:text-red-400',
-            functionColor: 'text-red-500 dark:text-red-400',
-            bgColor: 'bg-red-100 dark:bg-red-900/50',
-            borderColor: 'border-red-400 dark:border-red-600',
-            hexColor: '#ef4444' // red-500
+            romanColor: 'text-amber-600 dark:text-amber-400', // Changed from red to amber per A2
+            functionColor: 'text-amber-500 dark:text-amber-400',
+            bgColor: 'bg-amber-100 dark:bg-amber-900/50',
+            borderColor: 'border-amber-400 dark:border-amber-600',
+            hexColor: FUNCTION_LEGEND.dominant.hexColor,
+            // A2: Subtle background tint for chord cards
+            cardBgStyle: showColors ? FUNCTION_LEGEND.dominant.cardBgGradient : ''
         },
         'Subdominant': {
             function: 'Subdominant',
-            romanColor: 'text-blue-600 dark:text-blue-400',
-            functionColor: 'text-blue-500 dark:text-blue-400',
-            bgColor: 'bg-blue-100 dark:bg-blue-900/50',
-            borderColor: 'border-blue-400 dark:border-blue-600',
-            hexColor: '#3b82f6' // blue-500
+            romanColor: 'text-sky-600 dark:text-sky-400', // Changed to sky blue per A2
+            functionColor: 'text-sky-500 dark:text-sky-400',
+            bgColor: 'bg-sky-100 dark:bg-sky-900/50',
+            borderColor: 'border-sky-400 dark:border-sky-600',
+            hexColor: FUNCTION_LEGEND.subdominant.hexColor,
+            // A2: Subtle background tint for chord cards
+            cardBgStyle: showColors ? FUNCTION_LEGEND.subdominant.cardBgGradient : ''
         }
     };
 
-    // Borrowed/Modal interchange chords get purple
+    // Secondary dominant (V/V, V/ii, etc.) - Coral
+    if (isSecondaryDom) {
+        return {
+            function: 'Secondary Dominant',
+            romanColor: 'text-red-500 dark:text-red-400',
+            functionColor: 'text-red-400 dark:text-red-300',
+            bgColor: 'bg-red-100 dark:bg-red-900/50',
+            borderColor: 'border-red-300 dark:border-red-500',
+            hexColor: FUNCTION_LEGEND.secondaryDominant.hexColor,
+            cardBgStyle: showColors ? FUNCTION_LEGEND.secondaryDominant.cardBgGradient : ''
+        };
+    }
+
+    // Borrowed/Modal interchange chords get lavender
     if (isBorrowed) {
         return {
             function: 'Borrowed',
-            romanColor: 'text-purple-600 dark:text-purple-400',
-            functionColor: 'text-purple-500 dark:text-purple-400',
-            bgColor: 'bg-purple-100 dark:bg-purple-900/50',
-            borderColor: 'border-purple-400 dark:border-purple-600',
-            hexColor: '#8b5cf6' // purple-500
+            romanColor: 'text-violet-600 dark:text-violet-400', // Changed to violet per A2
+            functionColor: 'text-violet-500 dark:text-violet-400',
+            bgColor: 'bg-violet-100 dark:bg-violet-900/50',
+            borderColor: 'border-violet-400 dark:border-violet-600',
+            hexColor: FUNCTION_LEGEND.borrowed.hexColor,
+            cardBgStyle: showColors ? FUNCTION_LEGEND.borrowed.cardBgGradient : ''
         };
     }
 
@@ -467,7 +507,8 @@ function getFunctionColors(roman) {
         functionColor: 'text-gray-500 dark:text-gray-400',
         bgColor: 'bg-gray-100 dark:bg-gray-800',
         borderColor: 'border-gray-400 dark:border-gray-600',
-        hexColor: '#6b7280' // gray-500
+        hexColor: FUNCTION_LEGEND.neutral.hexColor,
+        cardBgStyle: '' // No tint for neutral/unknown
     };
 }
 
@@ -5855,9 +5896,15 @@ function createSimplifiedCardHTML(chord, index, key) {
     const wholeBeats = Math.floor(totalBeats);
     const fractionalBeats = totalBeats - wholeBeats;
 
-    // Get function-based border color
+    // Get function-based border color and background tint (A2 enhancement)
     const functionBorderStyle = colors.hexColor ? `border-color: ${colors.hexColor};` : '';
     const functionTopBorderStyle = colors.hexColor ? `background: linear-gradient(to right, ${colors.hexColor}, ${colors.hexColor});` : '';
+    // A2: Background tint - overlay on top of existing dark gradient
+    // ALWAYS include the dark gradient base, with optional function color tint on top
+    const darkGradientBase = 'linear-gradient(to bottom right, #1f2937, #111827)';
+    const functionBgStyle = colors.cardBgStyle
+        ? `background: ${colors.cardBgStyle}, ${darkGradientBase};`
+        : `background: ${darkGradientBase};`;
 
     // Generate duration dropdown options with emphasis
     // Whole beats: background color + bold, Half beats: bold only
@@ -5893,7 +5940,7 @@ function createSimplifiedCardHTML(chord, index, key) {
 
     return `
         <div class="relative border border-gray-300 rounded-xl p-1" style="width: 118px;">
-            <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-xl overflow-hidden hover:shadow-xl transition-all shadow-lg relative w-full" style="min-height: 70px; ${functionBorderStyle}">
+            <div class="simplified-card border-2 rounded-xl overflow-hidden hover:shadow-xl transition-all shadow-lg relative w-full" style="min-height: 70px; ${functionBorderStyle} ${functionBgStyle}">
                 <!-- Inversion indicator (top-left corner) -->
                 ${inversionText ? `<div class="absolute top-2 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
 

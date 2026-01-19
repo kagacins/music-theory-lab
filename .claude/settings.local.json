@@ -76,7 +76,8 @@
       "Bash(tasklist:*)",
       "Bash(timeout 15 npm run build-css:*)",
       "Bash(timeout:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(npx @anthropic-ai/mcp-server-playwright@latest:*)"
     ],
     "deny": [],
     "ask": []

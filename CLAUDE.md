@@ -54,12 +54,17 @@ Music Theory Lab is an interactive web application for music theory education an
 ## Build Commands
 
 ```bash
+# Start dev server (runs on http://localhost:8888)
+npm run dev
+
 # Build CSS (Tailwind)
 npm run build-css
 
 # Watch CSS during development
 npm run watch-css
 ```
+
+**Dev Server:** The Vite dev server runs on `http://localhost:8888` (configured in `vite.config.js`).
 
 This is a client-side web app with no backend. Open `index.html` directly in a browser or serve with any static file server.
 

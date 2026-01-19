@@ -97,17 +97,17 @@ export class AmbientTensionStrip {
             strip.className = 'ambient-tension-strip';
 
             // Smart insertion based on container type
-            // For fullscreen panel (fs-dock-panel-content), insert after header, before section picker
-            // For other containers, insert at the beginning
-            const sectionPicker = container.querySelector('#fs-section-picker');
-            const cardsContainer = container.querySelector('#fs-chord-cards-container');
+            // Look for section picker and cards container with various IDs used across panels
+            const sectionPicker = container.querySelector('#fs-section-picker, #fs-qa-section-picker, #fs-ab-section-picker');
+            const cardsContainer = container.querySelector('#fs-chord-cards-container, #fs-quick-add-cards-container, #fs-auto-bass-cards-container');
 
-            if (sectionPicker) {
-                // Fullscreen panel - insert before section picker (after header)
-                container.insertBefore(strip, sectionPicker);
-            } else if (cardsContainer) {
-                // Fullscreen panel without section picker - insert before cards
+            // Always insert BEFORE the cards container (which comes after section picker)
+            // This ensures the strip appears below header/controls/section picker but above cards
+            if (cardsContainer) {
                 container.insertBefore(strip, cardsContainer);
+            } else if (sectionPicker) {
+                // Fallback: insert after section picker if no cards container found
+                sectionPicker.insertAdjacentElement('afterend', strip);
             } else {
                 // Classic view - insert at beginning
                 const firstChild = container.firstElementChild;

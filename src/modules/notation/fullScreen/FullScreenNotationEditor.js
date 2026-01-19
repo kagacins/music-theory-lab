@@ -549,10 +549,10 @@ export class FullScreenNotationEditor {
                         </div>
 
                         <!-- Help Link Overlay (positioned near canvas hint text, excluded from PDF export) -->
-                        <div id="fs-help-link-overlay" class="absolute pointer-events-none" style="top: 14px; left: 22px; z-index: 10;">
+                        <!-- Position is adjusted dynamically by _applyZoom based on zoom level -->
+                        <div id="fs-help-link-overlay" class="absolute pointer-events-none" style="top: 52px; left: 22px; z-index: 10;">
                             <button id="fs-see-more-help-btn"
                                     class="pointer-events-auto text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors flex items-center gap-1"
-                                    style="margin-top: 30px;"
                                     title="Learn how to use the Composition Studio">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -1478,21 +1478,12 @@ export class FullScreenNotationEditor {
     }
 
     /**
-     * Apply zoom in tab mode
+     * Apply zoom in tab mode (delegates to shared _applyZoom method)
+     * @deprecated Use _applyZoom() instead which handles both modal and tab modes
      */
     _applyZoomTab() {
-        if (!this.tabContent) return;
-
-        const pagesContainer = this.tabContent.querySelector('#fullscreen-pages-container');
-        const zoomDisplay = this.tabContent.querySelector('#fullscreen-zoom-level');
-
-        if (pagesContainer) {
-            pagesContainer.style.transform = `scale(${this.zoomLevel / 100})`;
-            pagesContainer.style.transformOrigin = 'top center';
-        }
-        if (zoomDisplay) {
-            zoomDisplay.textContent = `${this.zoomLevel}%`;
-        }
+        // Delegate to shared method that handles all zoom-related updates
+        this._applyZoom();
     }
 
     /**
@@ -5240,6 +5231,7 @@ export class FullScreenNotationEditor {
         const container = this._getActiveContainer();
         const wrapper = container?.querySelector('#fullscreen-canvas-wrapper');
         const zoomLabel = container?.querySelector('#fullscreen-zoom-level');
+        const helpLinkOverlay = container?.querySelector('#fs-help-link-overlay');
 
         if (wrapper) {
             wrapper.style.transform = `scale(${this.zoomLevel / 100})`;
@@ -5247,6 +5239,34 @@ export class FullScreenNotationEditor {
 
         if (zoomLabel) {
             zoomLabel.textContent = `${this.zoomLevel}%`;
+        }
+
+        // Adjust help link position and size based on zoom level
+        // The canvas scales from top-left origin, so when zooming:
+        // - At 100%: link at base position below the canvas hint text
+        // - At higher zoom: canvas grows, link needs to scale with it
+        // - At lower zoom: canvas shrinks, link scales proportionally
+        // The link should appear at the same relative position ON the canvas (below hint text)
+        if (helpLinkOverlay) {
+            const scaleFactor = this.zoomLevel / 100;
+            // Base positions at 100% zoom - must clear the canvas hint text above
+            // The hint text takes about 40-45px at 100% zoom, so we position below it
+            const baseTop = 52;
+            const baseLeft = 22;
+            // At lower zoom levels (60-80%), the hint text above doesn't shrink as much
+            // relative to the link position, so we need a small extra offset to prevent clipping
+            // Vertical: adds ~4px at 60%, ~3px at 70%, ~2px at 80%, 0px at 100%+
+            // Horizontal: base offset of 4px at all zoom ≤100%, plus extra at lower zooms
+            const lowZoomExtraOffsetY = this.zoomLevel < 100 ? (100 - this.zoomLevel) * 0.1 : 0;
+            const lowZoomExtraOffsetX = this.zoomLevel <= 100 ? 4 + (100 - this.zoomLevel) * 0.1 : 0;
+            // Scale positions proportionally with the canvas, plus extra offset at low zoom
+            const adjustedTop = (baseTop * scaleFactor) + lowZoomExtraOffsetY;
+            const adjustedLeft = (baseLeft * scaleFactor) + lowZoomExtraOffsetX;
+            helpLinkOverlay.style.top = `${adjustedTop}px`;
+            helpLinkOverlay.style.left = `${adjustedLeft}px`;
+            // Also scale the link itself so font/icon size matches the canvas zoom
+            helpLinkOverlay.style.transform = `scale(${scaleFactor})`;
+            helpLinkOverlay.style.transformOrigin = 'top left';
         }
     }
 

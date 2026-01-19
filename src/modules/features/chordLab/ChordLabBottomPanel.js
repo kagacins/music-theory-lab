@@ -31,6 +31,7 @@ import {
 } from '../../state/builderState.js';
 import { SHARP_NOTES, FLAT_NOTES, CHORD_DEFINITIONS, CHORD_GROUPS, INTERVAL_DEFINITIONS, INTERVAL_GROUPS, SCALE_DEFINITIONS, SCALE_CATEGORIES, generateDiatonicChords, generateScaleDiatonicChords } from '../../../data/music-data.js';
 import { isChordInScale } from '../chordBuilder.js';
+import { FUNCTION_LEGEND, getHarmonicFunctionFromRoman, shouldShowFunctionColors } from '../../ui/chordFunctionLegend.js';
 
 // ============================================================================
 // CONSTANTS
@@ -1260,11 +1261,11 @@ export class ChordLabBottomPanel {
                     </span>
                     <div class="flex items-center gap-1.5">
                         <!-- Action Buttons -->
-                        <button id="fs-cl-chords-colors-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View color legend">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
-                            </svg>
-                            <span>Colors</span>
+                        <button id="fs-cl-chords-colors-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
+                            <span class="text-[8px]" style="-webkit-text-fill-color: #86efac;">●</span>
+                            <span class="text-[8px]" style="-webkit-text-fill-color: #7dd3fc;">●</span>
+                            <span class="text-[8px]" style="-webkit-text-fill-color: #fcd34d;">●</span>
+                            <span>Legend</span>
                         </button>
                         <!-- View Mode Toggle -->
                         <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
@@ -1634,6 +1635,18 @@ export class ChordLabBottomPanel {
         const invNum = parseInt(chord.inversion, 10) || 0;
         const invText = invNum === 1 ? '¹' : invNum === 2 ? '²' : invNum === 3 ? '³' : invNum === 4 ? '⁴' : '';
 
+        // A2: Get function colors for background tint
+        const roman = chord.roman || chord.romanNumeral || '';
+        const funcKey = getHarmonicFunctionFromRoman(roman);
+        const funcData = FUNCTION_LEGEND[funcKey] || FUNCTION_LEGEND.neutral;
+        const showColors = shouldShowFunctionColors();
+        const functionBgStyle = showColors && funcData.cardBgGradient && funcData.cardBgGradient !== 'none'
+            ? `background: ${funcData.cardBgGradient}, linear-gradient(to bottom right, #1f2937, #111827);`
+            : 'background: linear-gradient(to bottom right, #1f2937, #111827);';
+        const functionBorderStyle = showColors && funcData.hexColor
+            ? `border-color: ${funcData.hexColor};`
+            : 'border-color: #4b5563;';
+
         wrapper.innerHTML = `
             <div class="relative">
                 <div class="drag-handle absolute -top-1 left-1/2 transform -translate-x-1/2 cursor-grab active:cursor-grabbing z-10 opacity-50 hover:opacity-100 transition-opacity">
@@ -1641,7 +1654,7 @@ export class ChordLabBottomPanel {
                         <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm6-4a2 2 0 10.001-4.001A2 2 0 0013 4zm0 4a2 2 0 10.001 4.001A2 2 0 0013 8z"/>
                     </svg>
                 </div>
-                <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-600 rounded-xl p-2 hover:shadow-xl transition-all shadow-lg relative" style="min-height: 70px;">
+                <div class="simplified-card border-2 rounded-xl p-2 hover:shadow-xl transition-all shadow-lg relative" style="min-height: 70px; ${functionBgStyle} ${functionBorderStyle}">
                     ${invText ? `<div class="absolute top-1 left-1.5 text-lg text-red-400 font-bold" style="-webkit-text-fill-color: #f87171;">${invText}</div>` : ''}
                     <div class="text-center pt-1">
                         <div class="text-lg font-bold text-white" style="-webkit-text-fill-color: white;">${chordSymbol}</div>

@@ -42,9 +42,7 @@ import {
     initTheoryMoments
 } from '../modules/teaching/theoryMoments.js';
 
-import {
-    initTheoryOverlay
-} from '../modules/teaching/theoryOverlay.js';
+// Theory Overlay removed (A2 Educational Enhancement): Function colors are now built into chord cards
 
 import {
     initCompositionInsights
@@ -235,7 +233,7 @@ export async function initializeModules() {
     // ===========================
 
     initTheoryMoments();
-    initTheoryOverlay();
+    // Theory Overlay removed (A2): Function colors are now built into chord cards
     initCompositionInsights();
 
     // Coach Engine - Unified proactive observations and suggestions

@@ -121,16 +121,18 @@ Tension:  ╭──╮        ╭──────╮
 
 ---
 
-#### A2. Function Color Coding (Enhanced)
+#### A2. Function Color Coding (Enhanced) ✅ IMPLEMENTED
 
 **What:** Subtle background tint on chord cards indicating harmonic function.
 
-**Current State:** Theory Overlay exists but may be too subtle or not always on.
+**Status:** COMPLETE - Implemented 2025-01-19
 
-**Enhancement:**
-- Make it a core feature (not just an overlay)
-- Use very subtle pastel backgrounds that don't interfere with readability
-- Add tiny legend icon that expands on hover
+**Implementation Summary:**
+- Removed deprecated Theory Overlay module and toggle
+- Added pastel background tints (15% opacity) to chord cards built directly into rendering
+- Function colors now visible in Guided/Explore modes, hidden in Focus mode
+- Added "Legend" button to Composition Studio header with colored dots
+- Legend popup shows all function colors with descriptions
 
 **Color Scheme:**
 | Function | Color | Hex | Opacity |
@@ -142,10 +144,15 @@ Tension:  ╭──╮        ╭──────╮
 | Secondary Dom | Coral | #fca5a5 | 15% |
 
 **Layer:** 1 (Ambient)
-**Effort:** Low (enhance existing)
-**Files to modify:**
-- `src/modules/features/progressionBuilder/` - Chord card rendering
-- `src/styles/music.css` - Function color classes
+**Files modified:**
+- `src/modules/ui/chordFunctionLegend.js` - Centralized function colors + legend UI
+- `src/modules/features/progressionBuilder/ProgressionRenderer.js` - Card background tints
+- `src/modules/notation/fullScreen/FullScreenBottomPanel.js` - Composition Studio cards
+- `src/modules/features/chordLab/ChordLabBottomPanel.js` - Chord Lab cards
+- `src/modules/notation/fullScreen/FullScreenNotationEditor.js` - Legend button
+- `src/init/windowExports.js` - Removed theoryOverlay exports
+- `src/init/moduleInitialization.js` - Removed theoryOverlay init
+- `index.html` - Removed Overlay toggle from classic mode header
 
 ---
 

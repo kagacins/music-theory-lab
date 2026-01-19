@@ -43,7 +43,7 @@ import { startLetItBeTutorial } from '../modules/teaching/letItBeTutorial.js';
 // Tier 1: Teaching-Composition Integration
 import { initTheoryMoments, toggleTheoryMoments, recallTheoryMoment } from '../modules/teaching/theoryMoments.js';
 import { initWhyThisWorksEnhanced } from '../modules/teaching/whyThisWorksEnhanced.js';
-import { initTheoryOverlay, toggleTheoryOverlay } from '../modules/teaching/theoryOverlay.js';
+// Theory Overlay removed (A2 Educational Enhancement): Function colors are now built into chord cards
 import { initCompositionInsights, showInsightsDashboard, trackProgression } from '../modules/teaching/compositionInsights.js';
 import { getCoachEngine, initCoachEngine } from '../modules/teaching/coachEngine/index.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from '../modules/features/circleOfFifths.js';
@@ -1844,8 +1844,7 @@ export function setupWindowExports() {
     window.toggleTheoryMoments = toggleTheoryMoments;
     window.recallTheoryMoment = recallTheoryMoment;
     window.initWhyThisWorksEnhanced = initWhyThisWorksEnhanced;
-    window.initTheoryOverlay = initTheoryOverlay;
-    window.toggleTheoryOverlay = toggleTheoryOverlay;
+    // Theory Overlay removed (A2 Educational Enhancement): Function colors are now built into chord cards
     window.initCompositionInsights = initCompositionInsights;
     window.showInsightsDashboard = showInsightsDashboard;
     window.trackProgression = trackProgression;

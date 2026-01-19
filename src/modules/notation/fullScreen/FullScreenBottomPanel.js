@@ -28,6 +28,9 @@ import { generateAllSuggestions } from '../../teaching/coachEngine/generators/in
 import { scanAllOpportunities } from '../../teaching/coachEngine/scanners/opportunityScanner.js';
 import { COACH_ITEM_TYPES } from '../../teaching/coachEngine/types.js';
 import { renderAmbientTensionStrip } from '../../ui/AmbientTensionStrip.js';
+import { FUNCTION_LEGEND, getHarmonicFunctionFromRoman, shouldShowFunctionColors } from '../../ui/chordFunctionLegend.js';
+import { getExperienceMode } from '../../state/globalState.js';
+import { showConfirmModal } from '../../ui/modals.js';
 
 // ============================================================================
 // CONSTANTS
@@ -54,7 +57,7 @@ const DOCK_BUTTONS = [
     { id: 'workbench', label: 'Workbench', icon: '🧪', color: 'from-violet-500 to-indigo-500' },
     { id: 'chords', label: 'Chord Progression', icon: '🎵', color: 'from-purple-500 to-indigo-500' },
     { id: 'quick-add', label: 'Quick Add', icon: '➕', color: 'from-lime-700 to-lime-800' },
-    { id: 'auto-bass', label: 'Auto-Bass', icon: '🎸', color: 'from-amber-500 to-orange-500' },
+    { id: 'auto-bass', label: 'Auto-Bass', icon: '🎸', color: 'from-amber-700 to-amber-600' },
     { id: 'voice-leading', label: 'Voice Leading', icon: '📊', color: 'from-blue-500 to-cyan-500' },
     { id: 'borrowed', label: 'Borrowed Chords', icon: '🔄', color: 'from-slate-600 to-indigo-700' },
     { id: 'theory', label: 'Theory', icon: '💡', color: 'from-yellow-500 to-amber-500' }
@@ -553,11 +556,11 @@ export class FullScreenBottomPanel {
                         </svg>
                         <span>Clear</span>
                     </button>
-                    <button id="fs-chords-colors-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View color legend">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
-                        </svg>
-                        <span>Colors</span>
+                    <button id="fs-chords-colors-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #86efac;">●</span>
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #7dd3fc;">●</span>
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #fcd34d;">●</span>
+                        <span>Legend</span>
                     </button>
                     <!-- View Mode Toggle -->
                     <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
@@ -972,6 +975,18 @@ export class FullScreenBottomPanel {
         const invNum = parseInt(chord.inversion, 10) || 0;
         const invText = invNum === 1 ? '¹' : invNum === 2 ? '²' : invNum === 3 ? '³' : invNum === 4 ? '⁴' : '';
 
+        // A2: Get function colors for background tint
+        const roman = chord.roman || chord.romanNumeral || '';
+        const funcKey = getHarmonicFunctionFromRoman(roman);
+        const funcData = FUNCTION_LEGEND[funcKey] || FUNCTION_LEGEND.neutral;
+        const showColors = shouldShowFunctionColors();
+        const functionBgStyle = showColors && funcData.cardBgGradient && funcData.cardBgGradient !== 'none'
+            ? `background: ${funcData.cardBgGradient}, linear-gradient(to bottom right, #1f2937, #111827);`
+            : 'background: linear-gradient(to bottom right, #1f2937, #111827);';
+        const functionBorderStyle = showColors && funcData.hexColor
+            ? `border-color: ${funcData.hexColor};`
+            : 'border-color: #4b5563;';
+
         wrapper.innerHTML = `
             <div class="relative">
                 <div class="drag-handle absolute -top-1 left-1/2 transform -translate-x-1/2 cursor-grab active:cursor-grabbing z-10 opacity-50 hover:opacity-100 transition-opacity">
@@ -979,7 +994,7 @@ export class FullScreenBottomPanel {
                         <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm6-4a2 2 0 10.001-4.001A2 2 0 0013 4zm0 4a2 2 0 10.001 4.001A2 2 0 0013 8z"/>
                     </svg>
                 </div>
-                <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-600 rounded-xl p-2 hover:shadow-xl transition-all shadow-lg relative" style="min-height: 70px;">
+                <div class="simplified-card border-2 rounded-xl p-2 hover:shadow-xl transition-all shadow-lg relative" style="min-height: 70px; ${functionBgStyle} ${functionBorderStyle}">
                     ${invText ? `<div class="absolute top-1 left-1.5 text-lg text-red-400 font-bold" style="-webkit-text-fill-color: #f87171;">${invText}</div>` : ''}
                     <button class="edit-btn absolute top-1 right-1 p-1 bg-amber-500/80 hover:bg-amber-500 text-white rounded transition" title="Edit Chord">
                         <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -1408,6 +1423,13 @@ export class FullScreenBottomPanel {
                     </span>
                 </div>
                 <div class="flex items-center gap-2">
+                    <!-- Legend button -->
+                    <button id="fs-quickadd-legend-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #86efac;">●</span>
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #7dd3fc;">●</span>
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #fcd34d;">●</span>
+                        <span>Legend</span>
+                    </button>
                     <!-- View mode toggle -->
                     <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
                         <button class="fs-qa-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._quickAddViewMode === 'scroll' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
@@ -1512,6 +1534,16 @@ export class FullScreenBottomPanel {
             });
         });
 
+        // Attach Legend button handler
+        container.querySelector('#fs-quickadd-legend-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.toggleChordFunctionLegend === 'function') {
+                window.toggleChordFunctionLegend();
+            } else if (typeof window.showChordFunctionLegend === 'function') {
+                window.showChordFunctionLegend();
+            }
+        });
+
         // Render section picker if in section view
         if (this._quickAddViewMode === 'section' && hasSections) {
             this._renderQuickAddSectionPicker(container.querySelector('#fs-qa-section-picker'), sections);
@@ -1528,6 +1560,9 @@ export class FullScreenBottomPanel {
         } else if (cardsContainer) {
             cardsContainer.innerHTML = '<div class="text-gray-400 text-sm p-4">No chords yet. Add your first chord above!</div>';
         }
+
+        // Render ambient tension strip (respects Experience Mode internally)
+        renderAmbientTensionStrip(container, chords, key);
 
         // Root change handler
         container.querySelector('#fs-quick-root')?.addEventListener('change', () => {
@@ -2207,17 +2242,24 @@ export class FullScreenBottomPanel {
         const sel = (val) => bassPattern === val ? 'selected' : '';
 
         container.innerHTML = `
-            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 border-b border-amber-600">
+            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-amber-700 to-amber-600 border-b border-amber-800">
                 <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Auto-Bass Patterns</span>
                 <div class="flex items-center gap-2">
+                    <!-- Legend button -->
+                    <button id="fs-autobass-legend-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #86efac;">●</span>
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #7dd3fc;">●</span>
+                        <span class="text-[8px]" style="-webkit-text-fill-color: #fcd34d;">●</span>
+                        <span>Legend</span>
+                    </button>
                     <!-- View mode toggle -->
                     <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
                         <button class="fs-ab-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._autoBassViewMode === 'scroll' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
-                                data-mode="scroll" style="${this._autoBassViewMode === 'scroll' ? 'color: #d97706; -webkit-text-fill-color: #d97706;' : ''}">
+                                data-mode="scroll" style="${this._autoBassViewMode === 'scroll' ? 'color: #92400e; -webkit-text-fill-color: #92400e;' : ''}">
                             Scroll
                         </button>
                         <button class="fs-ab-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._autoBassViewMode === 'section' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
-                                data-mode="section" style="${this._autoBassViewMode === 'section' ? 'color: #d97706; -webkit-text-fill-color: #d97706;' : ''}">
+                                data-mode="section" style="${this._autoBassViewMode === 'section' ? 'color: #92400e; -webkit-text-fill-color: #92400e;' : ''}">
                             Section
                         </button>
                     </div>
@@ -2315,13 +2357,13 @@ export class FullScreenBottomPanel {
                         <input type="checkbox" id="fs-bass-follows-inv" class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
                         <span class="text-xs font-medium text-gray-700">Follow Inv</span>
                     </label>
-                    <button id="fs-bass-apply" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-medium rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all shadow">
+                    <button id="fs-bass-apply" class="px-3 py-1.5 bg-gradient-to-r from-amber-700 to-amber-600 text-white text-xs font-medium rounded-lg hover:from-amber-800 hover:to-amber-700 transition-all shadow">
                         Apply to All
                     </button>
-                    <button id="fs-bass-apply-selected" class="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-400 text-white text-xs font-medium rounded-lg hover:from-amber-500 hover:to-orange-500 transition-all shadow" style="opacity: 0.5;" disabled title="Shift+click chord cards to multi-select, then apply pattern to selected chords only">
+                    <button id="fs-bass-apply-selected" class="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 text-white text-xs font-medium rounded-lg hover:from-amber-700 hover:to-amber-600 transition-all shadow" style="opacity: 0.5;" disabled title="Shift+click chord cards to multi-select, then apply pattern to selected chords only">
                         Apply to Selected
                     </button>
-                    <button id="fs-bass-revert-selected" class="px-2 py-1.5 bg-gradient-to-r from-orange-300 to-amber-300 text-orange-800 text-xs font-medium rounded-lg hover:from-orange-400 hover:to-amber-400 transition-all shadow" style="opacity: 0.5;" disabled title="Revert selected chord(s) to their chord card voicings">
+                    <button id="fs-bass-revert-selected" class="px-2 py-1.5 bg-gradient-to-r from-amber-300 to-amber-200 text-amber-800 text-xs font-medium rounded-lg hover:from-amber-400 hover:to-amber-300 transition-all shadow" style="opacity: 0.5;" disabled title="Revert selected chord(s) to their chord card voicings">
                         Revert Selected
                     </button>
                     <button id="fs-bass-revert" class="px-2 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-lg transition-all">
@@ -2335,12 +2377,12 @@ export class FullScreenBottomPanel {
             <div id="fs-auto-bass-cards-container" class="flex flex-nowrap items-start gap-1 px-4 py-2" style="height: calc(100% - ${this._autoBassViewMode === 'section' && hasSections ? '133px' : '100px'}); overflow-x: auto; overflow-y: hidden;">
             </div>
             <style>
-                /* Scrollbar styling - amber/orange theme */
+                /* Scrollbar styling - muted amber/bronze theme */
                 #fs-auto-bass-cards-container::-webkit-scrollbar { height: 10px; }
                 #fs-auto-bass-cards-container::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; margin: 0 8px; }
-                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #f59e0b, #d97706); border-radius: 5px; border: 1px solid #b45309; }
-                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #d97706, #b45309); }
-                #fs-auto-bass-cards-container { scrollbar-width: auto; scrollbar-color: #f59e0b #e2e8f0; }
+                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #b45309, #92400e); border-radius: 5px; border: 1px solid #78350f; }
+                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #92400e, #78350f); }
+                #fs-auto-bass-cards-container { scrollbar-width: auto; scrollbar-color: #b45309 #e2e8f0; }
 
                 /* Selection styling - same as Quick Add */
                 #fs-auto-bass-cards-container .chord-card-wrapper {
@@ -2363,6 +2405,16 @@ export class FullScreenBottomPanel {
             });
         });
 
+        // Attach Legend button handler
+        container.querySelector('#fs-autobass-legend-btn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.toggleChordFunctionLegend === 'function') {
+                window.toggleChordFunctionLegend();
+            } else if (typeof window.showChordFunctionLegend === 'function') {
+                window.showChordFunctionLegend();
+            }
+        });
+
         // Render section picker if in section view
         if (this._autoBassViewMode === 'section' && hasSections) {
             this._renderAutoBassSectionPicker(container.querySelector('#fs-ab-section-picker'), sections);
@@ -2379,6 +2431,9 @@ export class FullScreenBottomPanel {
         } else if (cardsContainer) {
             cardsContainer.innerHTML = '<div class="text-gray-400 text-sm p-4">No chords yet. Add chords to generate bass patterns.</div>';
         }
+
+        // Render ambient tension strip (respects Experience Mode internally)
+        renderAmbientTensionStrip(container, chords, key);
 
         // Pattern change handler
         container.querySelector('#fs-bass-pattern')?.addEventListener('change', (e) => {
@@ -2410,6 +2465,14 @@ export class FullScreenBottomPanel {
 
         // Apply to All button
         container.querySelector('#fs-bass-apply')?.addEventListener('click', async () => {
+            const confirmed = await showConfirmModal({
+                title: 'Apply Bass Pattern to All',
+                message: 'This will replace the bass line for all chords with the selected pattern. Continue?',
+                confirmText: 'Apply to All',
+                danger: false
+            });
+            if (!confirmed) return;
+
             if (window.applyBassPatternToAll) {
                 await window.applyBassPatternToAll();
             } else if (window.regenerateAllBass) {
@@ -2437,6 +2500,14 @@ export class FullScreenBottomPanel {
 
             if (selectedIndices.length === 0) return;
 
+            const confirmed = await showConfirmModal({
+                title: 'Apply Bass Pattern to Selected',
+                message: `This will replace the bass line for ${selectedIndices.length} selected chord(s) with the current pattern. Continue?`,
+                confirmText: 'Apply to Selected',
+                danger: false
+            });
+            if (!confirmed) return;
+
             // Apply bass pattern to each selected chord
             if (window.regenerateBassForMeasure) {
                 for (const index of selectedIndices) {
@@ -2454,7 +2525,15 @@ export class FullScreenBottomPanel {
         setTimeout(() => this._updateApplyToSelectedButton(), 300);
 
         // Revert Selected button - reverts selected chord(s) to their chord card voicings
-        container.querySelector('#fs-bass-revert-selected')?.addEventListener('click', () => {
+        container.querySelector('#fs-bass-revert-selected')?.addEventListener('click', async () => {
+            const confirmed = await showConfirmModal({
+                title: 'Revert Selected Bass',
+                message: 'This will revert the bass line for selected chord(s) to their original chord voicings. Continue?',
+                confirmText: 'Revert Selected',
+                danger: false
+            });
+            if (!confirmed) return;
+
             if (window.revertBassToChordVoicing) {
                 window.revertBassToChordVoicing();
             }
@@ -2463,7 +2542,15 @@ export class FullScreenBottomPanel {
         });
 
         // Revert All button
-        container.querySelector('#fs-bass-revert')?.addEventListener('click', () => {
+        container.querySelector('#fs-bass-revert')?.addEventListener('click', async () => {
+            const confirmed = await showConfirmModal({
+                title: 'Revert All Bass',
+                message: 'This will revert the bass line for ALL chords to their original chord voicings. Continue?',
+                confirmText: 'Revert All',
+                danger: true
+            });
+            if (!confirmed) return;
+
             if (window.revertAllBassToChordVoicing) {
                 window.revertAllBassToChordVoicing();
             }
@@ -2602,17 +2689,17 @@ export class FullScreenBottomPanel {
         container.className = 'inline-flex flex-col rounded-lg overflow-visible flex-shrink-0';
         container.style.marginRight = '8px';
 
-        // Section banner (amber theme)
+        // Section banner (muted amber theme)
         const banner = document.createElement('div');
         banner.className = 'flex items-center gap-2 px-2 py-1 rounded-t-lg';
-        banner.style.backgroundColor = section.color || '#f59e0b';
+        banner.style.backgroundColor = section.color || '#b45309';
         banner.innerHTML = `<span class="text-white text-xs font-semibold" style="-webkit-text-fill-color: white;">${section.label}</span>`;
         container.appendChild(banner);
 
         // Cards area
         const cardsArea = document.createElement('div');
         cardsArea.className = 'flex items-start gap-1 p-2 rounded-b-lg';
-        const sectionColor = section.color || '#f59e0b';
+        const sectionColor = section.color || '#b45309';
         cardsArea.style.backgroundColor = sectionColor + '20';
         cardsArea.style.borderLeft = `2px solid ${sectionColor}`;
         cardsArea.style.borderRight = `2px solid ${sectionColor}`;

@@ -22,7 +22,8 @@ let g_NumOctaves = 4;
 // 'focus' - Minimal UI, no educational features (for experienced composers)
 // 'guided' - Balanced education + composition (default)
 // 'explore' - Maximum educational features for curious learners
-let experienceMode = localStorage.getItem('experienceMode') || 'guided';
+// NOTE: Always default to 'guided' on site load for consistent educational experience
+let experienceMode = 'guided';
 
 // Getters and Setters for currentTab
 export function getCurrentTab() {
