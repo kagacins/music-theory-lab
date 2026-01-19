@@ -135,6 +135,8 @@ export function setNumOctaves(value) {
 
 // Getters and Setters for experienceMode
 export function getExperienceMode() {
+    // Always return the in-memory value (defaults to 'guided' on page load)
+    // Mode does NOT persist across sessions per design - always starts at 'guided'
     return experienceMode;
 }
 
@@ -192,8 +194,9 @@ export function initializeGlobalState() {
     isDarkModeOn = false;
     isFretboardModeOn = false;
     g_NumOctaves = 4;
-    // Preserve experienceMode from localStorage, default to 'guided'
-    experienceMode = localStorage.getItem('experienceMode') || 'guided';
+    // Always reset to 'guided' on page load for consistent educational experience
+    // Mode does NOT persist across sessions per design
+    experienceMode = 'guided';
 }
 
 // Reset global state to defaults

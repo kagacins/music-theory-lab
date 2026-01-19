@@ -2363,41 +2363,30 @@ function renderProgressionDisplayImmediate(containerId = 'progression-visualizat
         playBtn.innerHTML = '<svg class="w-2.5 h-2.5 inline mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"></path></svg>Play';
         playBtn.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 active:bg-indigo-300 transition no-drag';
         playBtn.setAttribute('data-chord-index', index);
-        playBtn.onmousedown = (e) => {
+        // Use pointer events with capture to prevent stopping when card "depresses"
+        playBtn.onpointerdown = (e) => {
             e.stopPropagation();
-            // Don't preventDefault - audio needs the event to work properly
+            // Capture pointer so we keep receiving events even if element moves
+            playBtn.setPointerCapture(e.pointerId);
             // Get current index from wrapper's data attribute (handles drag-and-drop)
             const wrapper = e.target.closest(`#${containerId} > div`);
             const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
             startProgressionChord(currentIndex);
         };
-        playBtn.onmouseup = (e) => {
+        playBtn.onpointerup = (e) => {
             e.stopPropagation();
+            if (playBtn.hasPointerCapture(e.pointerId)) {
+                playBtn.releasePointerCapture(e.pointerId);
+            }
             stopTrainerChord();
         };
-        playBtn.onmouseleave = (e) => {
+        playBtn.onpointercancel = (e) => {
             e.stopPropagation();
+            if (playBtn.hasPointerCapture(e.pointerId)) {
+                playBtn.releasePointerCapture(e.pointerId);
+            }
             stopTrainerChord();
         };
-        // Touch events for mobile/tablet
-        playBtn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            // Get current index from wrapper's data attribute (handles drag-and-drop)
-            const wrapper = e.target.closest(`#${containerId} > div`);
-            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
-            startProgressionChord(currentIndex);
-        }, { passive: false });
-        playBtn.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            stopTrainerChord();
-        }, { passive: false });
-        playBtn.addEventListener('touchcancel', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            stopTrainerChord();
-        }, { passive: false });
         topControls.appendChild(playBtn);
 
         // Add Staff Notation Toggle button (icon only, next to Play)
@@ -4860,13 +4849,15 @@ function renderTensionCurve(container, progressionData, key) {
     container.insertBefore(curveContainer, container.firstChild);
 
     // Add event listeners to data points for click and hover
+    // Use pointer capture to prevent stopping when UI elements shift
     const dataPoints = curveContainer.querySelectorAll('.tension-curve-point');
     dataPoints.forEach((circle, index) => {
         const chord = progressionData[index];
         const tension = tensionValues[index];
 
-        // Press and hold to play chord
-        circle.addEventListener('mousedown', () => {
+        // Press and hold to play chord - use pointer capture
+        circle.addEventListener('pointerdown', (e) => {
+            circle.setPointerCapture(e.pointerId);
             if (window.startProgressionChord) {
                 window.startProgressionChord(index);
                 // Highlight this point and the corresponding chord card
@@ -4876,7 +4867,22 @@ function renderTensionCurve(container, progressionData, key) {
         });
 
         // Release to stop playing
-        circle.addEventListener('mouseup', () => {
+        circle.addEventListener('pointerup', (e) => {
+            if (circle.hasPointerCapture(e.pointerId)) {
+                circle.releasePointerCapture(e.pointerId);
+            }
+            if (window.stopTrainerChord) {
+                window.stopTrainerChord();
+            }
+            unhighlightAllTensionPoints();
+            unhighlightAllChordCards();
+        });
+
+        // Handle pointer cancel
+        circle.addEventListener('pointercancel', (e) => {
+            if (circle.hasPointerCapture(e.pointerId)) {
+                circle.releasePointerCapture(e.pointerId);
+            }
             if (window.stopTrainerChord) {
                 window.stopTrainerChord();
             }
@@ -4890,17 +4896,12 @@ function renderTensionCurve(container, progressionData, key) {
         });
 
         // Create detailed tooltip on hover (but not if it interferes with playback)
-        circle.addEventListener('mouseenter', (e) => {
+        circle.addEventListener('pointerenter', (e) => {
             showTensionTooltip(e, chord, tension, index, key);
         });
 
-        // Stop playing and hide tooltip if mouse leaves the circle
-        circle.addEventListener('mouseleave', () => {
-            if (window.stopTrainerChord) {
-                window.stopTrainerChord();
-            }
-            unhighlightAllTensionPoints();
-            unhighlightAllChordCards();
+        // Hide tooltip when pointer leaves (but don't stop playback - that's handled by pointerup)
+        circle.addEventListener('pointerleave', () => {
             hideTensionTooltip();
         });
     });
@@ -6724,9 +6725,12 @@ export function attachCardEventListeners(wrapper, index) {
         });
     });
 
-    // Play button
+    // Play button - uses pointer capture to prevent stopping when card "depresses"
     if (playBtn) {
-        playBtn.addEventListener('mousedown', () => {
+        playBtn.addEventListener('pointerdown', (e) => {
+            // Capture pointer so we keep receiving events even if element moves
+            playBtn.setPointerCapture(e.pointerId);
+
             // Select this card (persistent purple ring)
             selectChordCard(index);
 
@@ -6735,37 +6739,27 @@ export function attachCardEventListeners(wrapper, index) {
             highlightTensionPoint(index);
             highlightChordCard(index);
         });
-        playBtn.addEventListener('mouseup', () => {
+        playBtn.addEventListener('pointerup', (e) => {
+            // Release pointer capture
+            if (playBtn.hasPointerCapture(e.pointerId)) {
+                playBtn.releasePointerCapture(e.pointerId);
+            }
             stopTrainerChord();
             // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
         });
-        playBtn.addEventListener('mouseleave', () => {
+        playBtn.addEventListener('pointercancel', (e) => {
+            // Handle pointer cancel (e.g., system interruption)
+            if (playBtn.hasPointerCapture(e.pointerId)) {
+                playBtn.releasePointerCapture(e.pointerId);
+            }
             stopTrainerChord();
-            // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
         });
-
-        // Also handle touch events
-        playBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            // Select this card (persistent purple ring)
-            selectChordCard(index);
-
-            startProgressionChord(index);
-            highlightTensionPoint(index);
-            highlightChordCard(index);
-        }, { passive: false });
-
-        playBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            stopTrainerChord();
-            // Remove playback highlighting but keep selection (purple ring persists)
-            unhighlightAllTensionPoints();
-            unhighlightAllChordCards();
-        }, { passive: false });
+        // Note: With pointer capture, we don't need mouseleave/pointerleave handlers
+        // because the pointer stays "captured" to the button regardless of visual position
     }
 
     // Delete button
@@ -6834,14 +6828,16 @@ export function attachCardEventListeners(wrapper, index) {
         });
     }
 
-    // Inversion buttons
+    // Inversion buttons - use pointer capture to prevent stopping when card "depresses"
     inversionBtns.forEach(btn => {
         let wasPressed = false;
 
-        // Update inversion and start playing on mousedown (skip notation sync)
-        btn.addEventListener('mousedown', (e) => {
+        // Update inversion and start playing on pointerdown (skip notation sync)
+        btn.addEventListener('pointerdown', (e) => {
             e.stopPropagation();
             e.preventDefault();
+            // Capture pointer so we keep receiving events even if element moves
+            btn.setPointerCapture(e.pointerId);
             wasPressed = true;
             const inversion = parseInt(btn.getAttribute('data-inversion'));
 
@@ -6855,10 +6851,13 @@ export function attachCardEventListeners(wrapper, index) {
             startProgressionChord(index);
         });
 
-        // Stop playing on mouseup and sync notation immediately
-        btn.addEventListener('mouseup', (e) => {
+        // Stop playing on pointerup and sync notation immediately
+        btn.addEventListener('pointerup', (e) => {
             e.stopPropagation();
             e.preventDefault();
+            if (btn.hasPointerCapture(e.pointerId)) {
+                btn.releasePointerCapture(e.pointerId);
+            }
             stopTrainerChord();
 
             // Update notation preserving treble notes
@@ -6867,11 +6866,13 @@ export function attachCardEventListeners(wrapper, index) {
             wasPressed = false;
         });
 
-        // Also stop if mouse leaves button and sync if was pressed
-        btn.addEventListener('mouseleave', (e) => {
+        // Handle pointer cancel (system interruption)
+        btn.addEventListener('pointercancel', (e) => {
+            if (btn.hasPointerCapture(e.pointerId)) {
+                btn.releasePointerCapture(e.pointerId);
+            }
             stopTrainerChord();
 
-            // Sync notation if button was pressed
             if (wasPressed) {
                 updateChordAndRenderPreservingTrebleNotes(index);
             }
@@ -7166,13 +7167,13 @@ export function attachCardEventListeners(wrapper, index) {
             updateInversionButtonHighlight(chord.inversion || 0);
         }
 
-        // Tooltip inversion buttons - hold to play
+        // Tooltip inversion buttons - hold to play, use pointer capture
         tooltipInversionBtns.forEach(btn => {
             // Track if button was actually pressed (not just hovered)
             let wasPressed = false;
 
-            // Mouseenter - prevent any browser auto-scroll behavior
-            btn.addEventListener('mouseenter', (e) => {
+            // Pointerenter - prevent any browser auto-scroll behavior
+            btn.addEventListener('pointerenter', (e) => {
                 e.preventDefault();
                 // Prevent button from receiving focus which can trigger scroll
                 if (document.activeElement === btn) {
@@ -7180,10 +7181,12 @@ export function attachCardEventListeners(wrapper, index) {
                 }
             });
 
-            // Mousedown - start playing chord WITHOUT syncing notation (to prevent flicker)
-            btn.addEventListener('mousedown', (e) => {
+            // Pointerdown - start playing chord WITHOUT syncing notation (to prevent flicker)
+            btn.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
-                e.preventDefault(); // Prevent any browser default behavior that might cause scrolling
+                e.preventDefault();
+                // Capture pointer so we keep receiving events even if element moves
+                btn.setPointerCapture(e.pointerId);
                 wasPressed = true;
                 const inversion = parseInt(btn.getAttribute('data-inversion'));
 
@@ -7202,10 +7205,13 @@ export function attachCardEventListeners(wrapper, index) {
                 }
             });
 
-            // Mouseup - stop playing chord and sync notation immediately
-            btn.addEventListener('mouseup', (e) => {
+            // Pointerup - stop playing chord and sync notation immediately
+            btn.addEventListener('pointerup', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
+                if (btn.hasPointerCapture(e.pointerId)) {
+                    btn.releasePointerCapture(e.pointerId);
+                }
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
@@ -7219,14 +7225,15 @@ export function attachCardEventListeners(wrapper, index) {
                 wasPressed = false;
             });
 
-            // Mouseleave - stop playing if user drags off button and sync notation
-            btn.addEventListener('mouseleave', (e) => {
-                e.stopPropagation(); // Don't let this bubble to tooltip's mouseleave
+            // Pointercancel - handle system interruption
+            btn.addEventListener('pointercancel', (e) => {
+                if (btn.hasPointerCapture(e.pointerId)) {
+                    btn.releasePointerCapture(e.pointerId);
+                }
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
 
-                // Sync notation if button was pressed and user dragged off
                 if (wasPressed && inversionWasChanged && window.updateChordAndRenderPreservingTrebleNotes) {
                     window.updateChordAndRenderPreservingTrebleNotes(index, { skipCardRefresh: true });
                     inversionWasChanged = false;

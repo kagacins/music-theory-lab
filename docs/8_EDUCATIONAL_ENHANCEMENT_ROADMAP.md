@@ -156,32 +156,47 @@ Tension:  ╭──╮        ╭──────╮
 
 ---
 
-#### A3. Bass Line Motion Indicator
+#### A3. Bass Line Motion Indicator ✅ IMPLEMENTED
 
 **What:** Small arrows between chord cards showing bass movement direction and distance.
+
+**Status:** COMPLETE - Implemented 2026-01-19
+
+**Implementation Summary:**
+- Created `src/modules/ui/BassMotionIndicators.js` - singleton class with Experience Mode awareness
+- Bass note extraction uses `chord.notes[0]` which is always the lowest pitch (respects inversions)
+- Motion classification: step (1-2 semitones), skip (3-5), leap (6+), common tone (0)
+- Indicators inserted between chord cards in horizontal scroll containers
+- Color-coded: green (step/smooth), amber (skip), red (leap), gray (common tone)
+- Visible only in Explore mode (per roadmap Feature-Mode Matrix)
+- Auto-updates when Experience Mode changes via `experienceModeChanged` event
+- Auto-updates when chord properties change via `chordUpdated` event (root, type, inversion, octave)
+- Event dispatches added to: `updateChordRoot`, `updateChordType`, `updateChordInversion`, `updateRHOctaveShift`
 
 **Visual:**
 ```
 ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐
-│  C  │ → │ Am  │ ↓ │  F  │ ← │  G  │
+│  C  │ → │ Am  │ ↗ │  F  │ ← │  G  │
 │  I  │   │ vi  │   │ IV  │   │  V  │
 └─────┘   └─────┘   └─────┘   └─────┘
-         ↓step    ↓3rd      ↑step
+         ↓2       ↓3        ↑2
 ```
 
 **Arrow Types:**
-- → Ascending step (half/whole)
+- → Ascending step (half/whole = 1-2 semitones)
 - ← Descending step
-- ↗ Ascending skip (3rd-5th)
+- ↗ Ascending skip (3rd-4th = 3-5 semitones)
 - ↘ Descending skip
-- ⇗ Ascending leap (6th+)
+- ⇗ Ascending leap (5th+ = 6+ semitones)
 - ⇘ Descending leap
-- • Common tone (no movement)
+- • Common tone (no movement = 0 semitones)
 
-**Layer:** 1 (Ambient) - Visible only in Guided/Explore modes
-**Effort:** Low
-**Files to modify:**
-- `src/modules/features/progressionBuilder/` - Add between-card indicators
+**Layer:** 1 (Ambient) - Visible only in Explore mode
+**Files created/modified:**
+- `src/modules/ui/BassMotionIndicators.js` - New component (singleton pattern)
+- `src/modules/notation/fullScreen/FullScreenBottomPanel.js` - Integrated in Chord Progression, Quick Add, Auto-Bass panels
+- `src/modules/features/chordLab/ChordLabBottomPanel.js` - Integrated in Progression tab
+- `src/modules/features/progressionBuilder/ProgressionController.js` - Added `chordUpdated` event dispatches
 
 ---
 
@@ -741,8 +756,8 @@ Quick reference for which features appear in which mode:
 |---------|-------|-------|--------|---------|
 | **Ambient** |
 | Tension curve | 1 | ❌ | ✅ | ✅+ |
-| Function colors | 1 | ❌ | ✅ (subtle) | ✅ (prominent) |
-| Bass motion arrows | 1 | ❌ | ❌ | ✅ |
+| Function colors ✅ | 1 | ❌ | ✅ (subtle) | ✅ (prominent) |
+| Bass motion arrows ✅ | 1 | ❌ | ❌ | ✅ |
 | **On-Demand** |
 | Chord tooltips | 2 | Minimal | Standard | Rich |
 | "What If?" panel | 2 | ❌ | On click | On select |

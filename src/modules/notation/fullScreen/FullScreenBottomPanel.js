@@ -28,6 +28,7 @@ import { generateAllSuggestions } from '../../teaching/coachEngine/generators/in
 import { scanAllOpportunities } from '../../teaching/coachEngine/scanners/opportunityScanner.js';
 import { COACH_ITEM_TYPES } from '../../teaching/coachEngine/types.js';
 import { renderAmbientTensionStrip } from '../../ui/AmbientTensionStrip.js';
+import { renderBassMotionIndicators } from '../../ui/BassMotionIndicators.js';
 import { FUNCTION_LEGEND, getHarmonicFunctionFromRoman, shouldShowFunctionColors } from '../../ui/chordFunctionLegend.js';
 import { getExperienceMode } from '../../state/globalState.js';
 import { showConfirmModal } from '../../ui/modals.js';
@@ -687,6 +688,9 @@ export class FullScreenBottomPanel {
         // Render ambient tension strip (respects Experience Mode internally)
         // Insert it between the section picker and the cards container
         renderAmbientTensionStrip(container, chords, key);
+
+        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only)
+        renderBassMotionIndicators(cardsContainer, chords, key);
     }
 
     /**
@@ -1564,6 +1568,11 @@ export class FullScreenBottomPanel {
         // Render ambient tension strip (respects Experience Mode internally)
         renderAmbientTensionStrip(container, chords, key);
 
+        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only)
+        if (cardsContainer) {
+            renderBassMotionIndicators(cardsContainer, chords, key);
+        }
+
         // Root change handler
         container.querySelector('#fs-quick-root')?.addEventListener('change', () => {
             this._populateChordTypeDropdown(container);
@@ -2434,6 +2443,11 @@ export class FullScreenBottomPanel {
 
         // Render ambient tension strip (respects Experience Mode internally)
         renderAmbientTensionStrip(container, chords, key);
+
+        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only)
+        if (cardsContainer) {
+            renderBassMotionIndicators(cardsContainer, chords, key);
+        }
 
         // Pattern change handler
         container.querySelector('#fs-bass-pattern')?.addEventListener('change', (e) => {

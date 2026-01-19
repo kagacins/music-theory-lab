@@ -948,6 +948,11 @@ export function updateChordType(index, newType) {
         value: newType,
         chord: `${chord.root} ${newType}`
     });
+
+    // Dispatch event for ambient features (bass motion indicators, etc.)
+    window.dispatchEvent(new CustomEvent('chordUpdated', {
+        detail: { index, property: 'type', value: newType }
+    }));
 }
 
 /**
@@ -1056,6 +1061,11 @@ export function updateChordRoot(index, newRoot) {
         value: newRoot,
         chord: `${newRoot} ${chordType}`
     });
+
+    // Dispatch event for ambient features (bass motion indicators, etc.)
+    window.dispatchEvent(new CustomEvent('chordUpdated', {
+        detail: { index, property: 'root', value: newRoot }
+    }));
 }
 
 /**
@@ -1168,6 +1178,11 @@ export function updateChordInversion(index, newInversion, shouldUpdateUI = true,
             updatedIndex: index,
             updateType: 'inversion'
         }
+    }));
+
+    // Dispatch event for ambient features (bass motion indicators, etc.)
+    window.dispatchEvent(new CustomEvent('chordUpdated', {
+        detail: { index, property: 'inversion', value: newInversion }
     }));
 }
 
@@ -1530,6 +1545,11 @@ export function updateRHOctaveShift(index, shift) {
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
     }
+
+    // Dispatch event for ambient features (bass motion indicators, etc.)
+    window.dispatchEvent(new CustomEvent('chordUpdated', {
+        detail: { index, property: 'octaveShift', value: shift }
+    }));
 }
 
 /**
@@ -2729,6 +2749,12 @@ export function toggleProgressionNote(chordIndex, note) {
 
     // Sync progressionData changes to notation display
     updateChordAndRenderPreservingTrebleNotes(chordIndex);
+
+    // Dispatch event for ambient features (bass motion indicators, etc.)
+    // Omitting the root note changes the effective bass note
+    window.dispatchEvent(new CustomEvent('chordUpdated', {
+        detail: { index: chordIndex, property: 'omittedNotes', value: omittedNotes }
+    }));
 }
 
 /**

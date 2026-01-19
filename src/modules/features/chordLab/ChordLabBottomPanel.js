@@ -32,6 +32,7 @@ import {
 import { SHARP_NOTES, FLAT_NOTES, CHORD_DEFINITIONS, CHORD_GROUPS, INTERVAL_DEFINITIONS, INTERVAL_GROUPS, SCALE_DEFINITIONS, SCALE_CATEGORIES, generateDiatonicChords, generateScaleDiatonicChords } from '../../../data/music-data.js';
 import { isChordInScale } from '../chordBuilder.js';
 import { FUNCTION_LEGEND, getHarmonicFunctionFromRoman, shouldShowFunctionColors } from '../../ui/chordFunctionLegend.js';
+import { renderBassMotionIndicators } from '../../ui/BassMotionIndicators.js';
 
 // ============================================================================
 // CONSTANTS
@@ -1353,6 +1354,9 @@ export class ChordLabBottomPanel {
             // Scroll View: horizontal scrolling with section-aware layout
             this._renderCLScrollViewCards(cardsContainer, chords, key, sections);
         }
+
+        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only)
+        renderBassMotionIndicators(cardsContainer, chords, key);
     }
 
     /**
