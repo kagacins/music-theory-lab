@@ -2319,6 +2319,12 @@ export class NotationComposer {
     // Mouse leave - cancel any pending hold
     container.addEventListener('mouseleave', () => this.handleCanvasMouseLeave());
 
+    // Touch events for mobile long-press on chord brackets
+    container.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+    container.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+    container.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: true });
+    container.addEventListener('touchcancel', () => this.cancelLongPress());
+
     // Wheel event - hide measure edit overlay during trackpad/mouse wheel scrolling
     // (wheel fires directly from input device, unlike scroll which only fires on scrollable elements)
     container.addEventListener('wheel', () => this.hideMeasureEditOverlay(), { passive: true });
@@ -2352,6 +2358,12 @@ export class NotationComposer {
       page.canvas.addEventListener('dblclick', (e) => this.handleCanvasDblClick(e));
       page.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
       page.canvas.addEventListener('mouseleave', () => this.handleCanvasMouseLeave());
+
+      // Touch events for mobile long-press on chord brackets
+      page.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+      page.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+      page.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: true });
+      page.canvas.addEventListener('touchcancel', () => this.cancelLongPress());
 
       // Mark this canvas element as having listeners
       this.pagesWithCanvasListeners.add(page.canvas);
@@ -2480,6 +2492,26 @@ export class NotationComposer {
         staff: this.selectedStaff,
         pitch: staffPosition.pitch,
       });
+
+      // MOBILE: Show measure edit overlay on tap (since hover doesn't work on touch)
+      // This gives mobile users a button to tap to open the Measure Isolation Editor
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (isTouchDevice) {
+        // Get canvas/container rect for positioning
+        const container = this.pageManager ?
+          this.pageManager.container :
+          this.config.container;
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          // Get zoom factor from FullScreenNotationEditor (same pattern as handleMouseMove)
+          const fsEditor = window.getFullScreenNotationEditor?.();
+          const zoomFactor = (fsEditor?.isOpen || fsEditor?.isTabMode) ? (fsEditor.zoomLevel / 100) : 1;
+          const measureBounds = staffPosition.measure;
+          const measureRight = rect.left + (measureBounds.x + measureBounds.width) * zoomFactor;
+          const measureTop = rect.top + measureBounds.y * zoomFactor;
+          this.showMeasureEditOverlay(measureRight - 5, measureTop + 5, globalMeasureIndex);
+        }
+      }
     }
   }
 
@@ -2505,6 +2537,186 @@ export class NotationComposer {
         window.openMeasureIsolationEditor(globalMeasureIndex);
       }
     }
+  }
+
+  // ============================================================================
+  // TOUCH EVENT HANDLERS (Mobile long-press for chord bracket editor)
+  // ============================================================================
+
+  /**
+   * Handle touch start - check if touching a chord bracket for long-press detection
+   * @param {TouchEvent} e - Touch event
+   */
+  handleTouchStart(e) {
+    if (e.touches.length !== 1) {
+      this.cancelLongPress();
+      return;
+    }
+
+    const touch = e.touches[0];
+
+    // Get position from touch event (zoom-adjusted)
+    const position = this.getTouchPosition(touch);
+    if (!position) return;
+
+    // Check if touch is on a chord bracket region (pass page for multi-page mode)
+    const bracketRegion = this.findChordBracketAtPosition(position.x, position.y, position.page);
+
+    if (bracketRegion) {
+      // Store touch info for long-press detection
+      this.longPressData = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        region: bracketRegion,
+        timestamp: Date.now()
+      };
+
+      // Start long-press timer (500ms)
+      this.longPressTimer = setTimeout(() => {
+        this.triggerLongPress();
+      }, 500);
+
+      // Prevent default to avoid text selection, but allow scroll if user moves
+      // We'll check movement in touchmove
+    } else {
+      this.cancelLongPress();
+    }
+  }
+
+  /**
+   * Handle touch move - cancel long-press if moved too far
+   * @param {TouchEvent} e - Touch event
+   */
+  handleTouchMove(e) {
+    if (!this.longPressData || e.touches.length !== 1) {
+      this.cancelLongPress();
+      return;
+    }
+
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - this.longPressData.startX);
+    const deltaY = Math.abs(touch.clientY - this.longPressData.startY);
+
+    // Cancel if moved more than 10px (user is scrolling)
+    if (deltaX > 10 || deltaY > 10) {
+      this.cancelLongPress();
+    }
+  }
+
+  /**
+   * Handle touch end - cancel long-press timer
+   * @param {TouchEvent} e - Touch event
+   */
+  handleTouchEnd(e) {
+    // If long-press already triggered, don't do anything
+    if (this.longPressTriggered) {
+      this.longPressTriggered = false;
+      e.preventDefault(); // Prevent click from firing
+      return;
+    }
+
+    this.cancelLongPress();
+  }
+
+  /**
+   * Cancel any pending long-press
+   */
+  cancelLongPress() {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressData = null;
+    this.longPressTriggered = false;
+  }
+
+  /**
+   * Trigger long-press action - open chord bracket editor
+   */
+  triggerLongPress() {
+    if (!this.longPressData) return;
+
+    const { region } = this.longPressData;
+    this.longPressTriggered = true;
+
+    // Haptic feedback if available
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+
+    // Open the chord bracket editor
+    console.log('[ComposerIntegration] Long-press on chord bracket:', region.chordIndex);
+    if (window.showChordBracketEditor) {
+      window.showChordBracketEditor(region.chordIndex, region, null);
+    }
+
+    this.cancelLongPress();
+  }
+
+  /**
+   * Get position from touch event (similar to getPositionFromEvent but for Touch)
+   * @param {Touch} touch - Touch object
+   * @returns {Object|null} - {x, y} position or null
+   */
+  getTouchPosition(touch) {
+    // Get zoom factor from FullScreenNotationEditor if active
+    const fsEditor = window.getFullScreenNotationEditor?.();
+    const zoomFactor = (fsEditor?.isOpen || fsEditor?.isTabMode) ? (fsEditor.zoomLevel / 100) : 1;
+
+    // Multi-page mode
+    if (this.pageManager) {
+      // Find which page canvas contains this touch
+      const pages = this.pageManager.getAllPages();
+      for (const page of pages) {
+        const rect = page.canvas.getBoundingClientRect();
+        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          // Divide by zoomFactor to convert screen coords to canvas internal coords
+          return {
+            x: (touch.clientX - rect.left) / zoomFactor,
+            y: (touch.clientY - rect.top) / zoomFactor,
+            page: page
+          };
+        }
+      }
+      return null;
+    }
+
+    // Legacy single canvas mode
+    const container = this.config.container;
+    if (!container) return null;
+
+    const rect = container.getBoundingClientRect();
+    // Divide by zoomFactor to convert screen coords to canvas internal coords
+    return {
+      x: (touch.clientX - rect.left) / zoomFactor,
+      y: (touch.clientY - rect.top) / zoomFactor,
+    };
+  }
+
+  /**
+   * Find chord bracket region at given position
+   * @param {number} x - X coordinate
+   * @param {number} y - Y coordinate
+   * @returns {Object|null} - Chord bracket region or null
+   */
+  findChordBracketAtPosition(x, y, page = null) {
+    if (!this.chordBracketRegions || this.chordBracketRegions.length === 0) {
+      return null;
+    }
+
+    for (const region of this.chordBracketRegions) {
+      // In multi-page mode, check page index matches
+      if (page && region.pageIndex !== undefined && region.pageIndex !== page.pageIndex) {
+        continue;
+      }
+
+      if (x >= region.x && x <= region.x + region.width &&
+          y >= region.y && y <= region.y + region.height) {
+        return region;
+      }
+    }
+    return null;
   }
 
   // ============================================================================

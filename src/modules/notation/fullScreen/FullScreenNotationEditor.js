@@ -158,7 +158,8 @@ export class FullScreenNotationEditor {
         // Apply current zoom
         this._applyZoom();
 
-        // Apply sidebar state
+        // Apply sidebar state (auto-collapse on mobile)
+        this._checkMobileLayout();
         this._applySidebarState();
 
         // Initialize tabbed bottom panel
@@ -286,7 +287,8 @@ export class FullScreenNotationEditor {
         // Apply current zoom (uses shared method)
         this._applyZoom();
 
-        // Apply sidebar state (uses shared method)
+        // Apply sidebar state (auto-collapse on mobile, uses shared method)
+        this._checkMobileLayout();
         this._applySidebarState();
 
         // Initialize tabbed bottom panel
@@ -491,6 +493,17 @@ export class FullScreenNotationEditor {
                     </div>
                 </div>
 
+                <!-- Mobile-only: Edge tab to open notation toolbar (visible when sidebar collapsed) -->
+                <div id="fs-studio-edge-tab"
+                     onclick="window.fsStudioToggleSidebar && window.fsStudioToggleSidebar()"
+                     class="absolute left-0 top-1/3 z-[100] w-5 h-16 bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 text-white rounded-r-lg shadow-lg flex items-center justify-center cursor-pointer transition-all"
+                     title="Open Notation Tools"
+                     style="display: none;">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+
                 <!-- Main Content Area -->
                 <div class="flex-1 flex overflow-hidden">
                     <!-- Left Sidebar (Collapsible) -->
@@ -564,8 +577,21 @@ export class FullScreenNotationEditor {
 
             <!-- Sidebar Content (hidden when collapsed) -->
             <div class="sidebar-content flex flex-col h-full w-full overflow-hidden ${this.sidebarOpen ? '' : 'hidden'}">
-                <!-- Collapse Button Header -->
-                <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-gray-100 border-b border-gray-200">
+                <!-- Mobile-only: Sidebar header with collapse button (indigo theme) -->
+                <div id="fs-studio-sidebar-mobile-header" class="hidden bg-indigo-500 text-white px-3 py-2 flex-shrink-0">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-sm">Notation Tools</span>
+                        <button onclick="window.fsStudioToggleSidebar && window.fsStudioToggleSidebar()"
+                                class="w-8 h-8 flex items-center justify-center rounded hover:bg-indigo-600 active:bg-indigo-700 transition-colors"
+                                title="Close">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- Desktop: Collapse Button Header -->
+                <div id="fs-studio-sidebar-desktop-header" class="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-gray-100 border-b border-gray-200">
                     <span class="text-sm font-semibold text-gray-700">Notation Tools</span>
                     <button class="sidebar-collapse-btn p-1 rounded hover:bg-gray-200 transition-colors" title="Collapse Sidebar">
                         <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4269,6 +4295,21 @@ export class FullScreenNotationEditor {
     }
 
     /**
+     * Check if we're on a mobile device and auto-collapse sidebar
+     * This provides a better initial experience on phones/tablets
+     */
+    _checkMobileLayout() {
+        const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
+        if (isMobile && !this._mobileLayoutApplied) {
+            this.sidebarOpen = false;
+            this._mobileLayoutApplied = true;
+            // Add mobile-specific class for CSS targeting
+            const container = this._getActiveContainer();
+            container?.classList.add('mobile-layout');
+        }
+    }
+
+    /**
      * Apply current sidebar state to DOM
      */
     _applySidebarState() {
@@ -4276,6 +4317,8 @@ export class FullScreenNotationEditor {
         const sidebar = container?.querySelector('#fullscreen-sidebar');
         const sidebarContent = sidebar?.querySelector('.sidebar-content');
         const toggleStrip = sidebar?.querySelector('.sidebar-toggle-strip');
+        const edgeTab = container?.querySelector('#fs-studio-edge-tab');
+        const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
 
         if (!sidebar) return;
 
@@ -4289,6 +4332,11 @@ export class FullScreenNotationEditor {
             sidebar.classList.add('w-6');
             sidebarContent?.classList.add('hidden');
             toggleStrip?.classList.remove('hidden');
+        }
+
+        // Show/hide edge tab based on sidebar state (mobile only)
+        if (edgeTab) {
+            edgeTab.style.display = (!this.sidebarOpen && isMobile) ? 'flex' : 'none';
         }
 
         // Adjust bottom panel width to account for sidebar
@@ -5529,3 +5577,13 @@ window.refreshFullscreenChordPanel = refreshFullscreenChordPanel;
 // Expose tab mode functions to window
 window.initStudioNewTab = initStudioNewTab;
 window.closeStudioNewTab = closeStudioNewTab;
+
+// Mobile sidebar toggle (for edge tab and mobile header)
+window.fsStudioToggleSidebar = function() {
+    const editor = getFullScreenNotationEditor();
+    if (editor) {
+        editor.sidebarOpen = !editor.sidebarOpen;
+        editor._saveToStorage('fs_studio_sidebar_open', editor.sidebarOpen);
+        editor._applySidebarState();
+    }
+};

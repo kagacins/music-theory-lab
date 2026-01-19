@@ -1,0 +1,1222 @@
+/**
+ * Mobile Responsive Styles
+ *
+ * These styles ONLY apply on mobile/touch devices via media queries.
+ * They do not affect the desktop experience.
+ *
+ * Breakpoints:
+ * - max-width: 768px  = Tablets and phones
+ * - max-width: 480px  = Small phones
+ * - max-height: 500px = Landscape mode on phones
+ * - pointer: coarse   = Touch devices (any size)
+ * - hover: hover      = Devices with hover capability (mouse)
+ */
+
+/* ============================================================================
+   1. KEYBOARD HEIGHT ADJUSTMENT (Mobile)
+   ============================================================================ */
+
+/* Tablets and large phones - moderate keyboard height reduction */
+@media (max-width: 768px) {
+    :root {
+        --keyboard-height: 120px;
+    }
+
+    .keyboard,
+    .modern-keyboard.keyboard {
+        height: 120px !important;
+        min-height: 120px !important;
+        max-height: 120px !important;
+    }
+
+    /* Slightly smaller black keys */
+    .modern-keyboard .black-key {
+        height: 55% !important;
+    }
+
+    /* Reduce keyboard area padding */
+    #fs-chordlab-keyboard-area,
+    #fs-scaleexplorer-keyboard-area {
+        padding: 4px 8px !important;
+    }
+
+    /* Smaller key labels */
+    .white-key {
+        font-size: 0.55rem !important;
+        padding-bottom: 3px !important;
+    }
+}
+
+/* Small phones - slightly smaller keyboard but still usable */
+@media (max-width: 480px) {
+    :root {
+        --keyboard-height: 100px;
+    }
+
+    .keyboard,
+    .modern-keyboard.keyboard {
+        height: 100px !important;
+        min-height: 100px !important;
+        max-height: 100px !important;
+    }
+
+    .modern-keyboard .black-key {
+        height: 52% !important;
+    }
+
+    /* Smaller key labels on small screens */
+    .white-key {
+        font-size: 0.5rem !important;
+        padding-bottom: 2px !important;
+    }
+}
+
+/* CRITICAL: Landscape mode on phones - keyboard was taking entire screen */
+@media (max-height: 500px) and (orientation: landscape) {
+    :root {
+        --keyboard-height: 70px;
+    }
+
+    .keyboard,
+    .modern-keyboard.keyboard {
+        height: 70px !important;
+        max-height: 22vh !important;
+    }
+
+    .modern-keyboard .black-key {
+        height: 50% !important;
+    }
+
+    /* Hide key labels in landscape to save space */
+    .white-key {
+        font-size: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    /* Compact the keyboard section */
+    #keyboard-section {
+        padding: 2px 0 !important;
+    }
+
+    /* Hide octave controls in landscape mobile */
+    #octave-range-controls,
+    .octave-controls {
+        display: none !important;
+    }
+}
+
+/* ============================================================================
+   2. TOUCH TARGET SIZING
+   ============================================================================ */
+
+/* Apply to devices with coarse pointer (touch screens) */
+@media (pointer: coarse) {
+    /*
+     * MINIMAL touch target adjustments - only for critical small elements
+     * We do NOT want to resize all buttons, just ensure very small ones are tappable
+     */
+
+    /* Prevent accidental double-tap zoom on interactive elements */
+    button,
+    a,
+    input,
+    select,
+    .interactive,
+    .chord-card-wrapper,
+    .key {
+        touch-action: manipulation;
+    }
+
+    /* Only enforce min-height on primary action buttons, not all buttons */
+    .modal-actions button,
+    .primary-action,
+    .touch-target {
+        min-height: 44px;
+    }
+
+    /* Prevent iOS zoom on input focus (16px minimum) */
+    input[type="text"],
+    input[type="number"],
+    input[type="search"],
+    select {
+        font-size: 16px;
+    }
+}
+
+/* ============================================================================
+   3. BOTTOM PANEL HEIGHT REDUCTION
+   ============================================================================ */
+
+/* Tablets - reduce panel heights to ~40% of viewport */
+@media (max-width: 768px) {
+    #fs-dock-container .fs-dock-panel-content,
+    #fs-dock-container [class*="panel-content"],
+    .fs-dock-panel {
+        max-height: 40vh !important;
+    }
+
+    /* Reduce chord card heights in panels */
+    #fs-chord-cards-container,
+    #fs-quick-add-cards-container {
+        max-height: calc(40vh - 80px) !important;
+    }
+}
+
+/* Small phones - even smaller panels */
+@media (max-width: 480px) {
+    #fs-dock-container .fs-dock-panel-content,
+    #fs-dock-container [class*="panel-content"],
+    .fs-dock-panel {
+        max-height: 35vh !important;
+    }
+
+    #fs-chord-cards-container,
+    #fs-quick-add-cards-container {
+        max-height: calc(35vh - 70px) !important;
+    }
+}
+
+/* Landscape on mobile - very compact panels */
+@media (max-height: 500px) and (orientation: landscape) {
+    #fs-dock-container .fs-dock-panel-content,
+    #fs-dock-container [class*="panel-content"],
+    .fs-dock-panel {
+        max-height: 45vh !important;
+    }
+
+    /* Smaller dock bar buttons */
+    #fs-dock-bar button {
+        padding: 4px 8px !important;
+        font-size: 12px !important;
+    }
+
+    #fs-dock-bar {
+        height: 36px !important;
+    }
+}
+
+/* ============================================================================
+   4. SIDEBAR AUTO-COLLAPSE STYLES
+   ============================================================================ */
+
+/* On mobile, make sidebars collapsible overlays instead of taking space */
+@media (max-width: 768px) {
+    /* Fullscreen sidebars become slide-out overlays */
+    #fs-chordlab-sidebar,
+    #fs-scaleexplorer-sidebar,
+    .fullscreen-sidebar {
+        position: absolute !important;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 50;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    /* When sidebar is open (controlled by JS) */
+    #fs-chordlab-sidebar.mobile-open,
+    #fs-scaleexplorer-sidebar.mobile-open,
+    .fullscreen-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    /* Backdrop when sidebar is open */
+    .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 49;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-backdrop.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Make main content take full width when sidebar collapsed */
+    .fullscreen-main-content {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+}
+
+/* ============================================================================
+   5. HOVER TO TAP CONVERSION
+   ============================================================================ */
+
+/* Only apply hover effects on devices that support hover (mouse/trackpad) */
+@media (hover: hover) and (pointer: fine) {
+    .card:hover,
+    .chord-card-wrapper:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    button:hover {
+        filter: brightness(1.05);
+    }
+
+    .key:hover {
+        filter: brightness(0.95);
+    }
+}
+
+/* Always provide active/pressed feedback for touch */
+.card:active,
+.chord-card-wrapper:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+}
+
+button:active:not(.key) {
+    filter: brightness(0.9);
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+}
+
+/* Visual feedback on touch for keys */
+@media (pointer: coarse) {
+    .key:active {
+        transform: scale(0.95);
+        transition: transform 0.05s ease;
+    }
+}
+
+/* ============================================================================
+   6. RESPONSIVE FONT SCALING
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Bump up tiny text for mobile readability */
+    .text-\[9px\],
+    .text-\[10px\] {
+        font-size: 12px !important;
+    }
+
+    /* Slightly larger base small text */
+    .text-xs {
+        font-size: 13px;
+    }
+
+    /* Form labels should be readable */
+    label,
+    .label {
+        font-size: 14px;
+    }
+
+    /* Modal titles */
+    .modal-title,
+    [class*="modal"] h2,
+    [class*="modal"] h3 {
+        font-size: 18px !important;
+    }
+
+    /* Chord symbols in cards - keep readable but not huge */
+    .chord-symbol {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Even larger on very small screens for thumb-zone tapping */
+    .text-xs {
+        font-size: 14px;
+    }
+
+    .text-sm {
+        font-size: 15px;
+    }
+}
+
+/* ============================================================================
+   7. SCROLL SNAP FOR CHORD CARDS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Enable horizontal scroll snapping for chord card containers */
+    #progression-visualization,
+    #melody-progression-visualization,
+    #builder-progression-visualization,
+    #fs-chord-cards-container,
+    #fs-quick-add-cards-container,
+    .chord-cards-container {
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+
+    /* Each card snaps to start */
+    .chord-card-wrapper {
+        scroll-snap-align: start;
+        scroll-margin-left: 8px;
+    }
+
+    /* Slightly wider cards on mobile for easier touch */
+    .chord-card-wrapper {
+        width: 130px !important;
+        min-width: 130px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Even wider cards on small phones */
+    .chord-card-wrapper {
+        width: 140px !important;
+        min-width: 140px !important;
+    }
+}
+
+/* ============================================================================
+   8. MODAL RESPONSIVENESS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Make modals nearly full-width on mobile */
+    .modal-content,
+    [class*="modal-content"],
+    .max-w-lg,
+    .max-w-xl,
+    .max-w-2xl,
+    .max-w-3xl,
+    .max-w-4xl {
+        max-width: 95vw !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    /* Modal internal padding */
+    .modal-content,
+    [class*="modal-content"] {
+        padding: 16px !important;
+    }
+
+    /* Larger close buttons - easier to tap */
+    .modal-close,
+    [class*="modal"] button[aria-label="Close"],
+    [class*="modal"] .close-btn {
+        width: 44px !important;
+        height: 44px !important;
+        font-size: 24px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Modal action buttons - full width on mobile */
+    .modal-actions,
+    [class*="modal"] .button-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .modal-actions button,
+    [class*="modal"] .button-group button {
+        width: 100%;
+    }
+}
+
+/* Very small screens - modal takes almost full screen */
+@media (max-width: 480px) {
+    .modal-content,
+    [class*="modal-content"] {
+        max-width: 100vw !important;
+        max-height: 90vh !important;
+        margin: 5vh 0 !important;
+        border-radius: 16px 16px 0 0 !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+    }
+}
+
+/* ============================================================================
+   9. FULLSCREEN TAB LAYOUT ADJUSTMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Header bar in fullscreen tabs - more compact */
+    .fullscreen-header,
+    #fs-chordlab-header,
+    #fs-scaleexplorer-header,
+    #fs-notation-header {
+        padding: 8px 12px !important;
+        gap: 8px !important;
+    }
+
+    /* Reduce header button sizes */
+    .fullscreen-header button,
+    [id*="fs-"] header button {
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+    }
+
+    /* FAB positioning - higher to avoid thumb zone conflicts */
+    #fs-chordlab-fab,
+    #fs-scaleexplorer-fab,
+    .fullscreen-fab {
+        bottom: 80px !important;
+        right: 12px !important;
+    }
+}
+
+/* Landscape mobile - ultra compact header */
+@media (max-height: 500px) and (orientation: landscape) {
+    .fullscreen-header,
+    #fs-chordlab-header,
+    #fs-scaleexplorer-header,
+    #fs-notation-header {
+        padding: 4px 8px !important;
+        min-height: 36px !important;
+    }
+
+    .fullscreen-header button {
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+    }
+}
+
+/* ============================================================================
+   10. HIDE DESKTOP-ONLY ELEMENTS ON MOBILE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Hide verbose labels, keep icons */
+    .desktop-only,
+    .hide-on-mobile {
+        display: none !important;
+    }
+
+    /* Show mobile-specific elements */
+    .mobile-only,
+    .show-on-mobile {
+        display: block !important;
+    }
+
+    /* Hide keyboard shortcuts hints */
+    .keyboard-shortcut,
+    kbd {
+        display: none !important;
+    }
+}
+
+/* ============================================================================
+   11. PERFORMANCE OPTIMIZATIONS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Reduce animation complexity on mobile for smoother performance */
+    .card,
+    .chord-card-wrapper,
+    button,
+    .key {
+        transition-duration: 0.15s !important;
+    }
+
+    /* Disable expensive box shadows on mobile */
+    .reduce-shadows .card,
+    .reduce-shadows .chord-card-wrapper {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Reduce blur effects which are expensive on mobile GPUs */
+    .backdrop-blur-sm,
+    .backdrop-blur,
+    .backdrop-blur-lg {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ============================================================================
+   12. NOTATION AREA MOBILE ADJUSTMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Make notation scrollable horizontally */
+    .notation-container,
+    #notation-area,
+    .vexflow-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Notation toolbar - horizontal scroll instead of wrap */
+    .notation-toolbar,
+    #notation-toolbar {
+        overflow-x: auto;
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+        padding: 8px !important;
+    }
+
+    /* Toolbar buttons - slightly larger for touch */
+    .notation-toolbar button {
+        min-width: 40px;
+        min-height: 40px;
+        flex-shrink: 0;
+    }
+}
+
+/* ============================================================================
+   13. TAB BAR MOBILE ADJUSTMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Compact tab labels */
+    #main-tabs button,
+    .tab-button {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
+
+    /* Hide tab descriptions/subtitles on mobile */
+    .tab-description,
+    .tab-subtitle {
+        display: none !important;
+    }
+
+    /* Horizontal scroll for tabs if too many */
+    #main-tabs,
+    .tabs-container {
+        overflow-x: auto;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Very small screens - icon-only tabs */
+@media (max-width: 480px) {
+    #main-tabs button span:not(.tab-icon),
+    .tab-button .tab-label {
+        display: none;
+    }
+
+    .tab-icon {
+        font-size: 18px !important;
+    }
+}
+
+/* ============================================================================
+   14. CHORD LIBRARY MOBILE IMPROVEMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Hide Details On/Off toggle on mobile - not needed */
+    #fs-library-tooltips,
+    #fs-library-tooltips + div,
+    #fs-details-off-label,
+    #fs-details-on-label,
+    /* Target the parent container of the Details toggle */
+    .flex.items-center.gap-1\.5:has(#fs-library-tooltips) {
+        display: none !important;
+    }
+
+    /* Compact Chord Library header - single row layout */
+    .bg-gradient-to-r.from-indigo-600 .flex.items-center.gap-3 {
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
+
+    /* Hide "Chord Library" text on mobile to save space */
+    .bg-gradient-to-r.from-indigo-600 > span.text-white.font-semibold {
+        display: none !important;
+    }
+
+    /* Make toggle and dropdown more compact */
+    .bg-gradient-to-r.from-indigo-600 .bg-white\/20 {
+        padding: 4px 6px !important;
+    }
+
+    /* Slightly larger text for toggle labels (but not huge) */
+    .bg-gradient-to-r.from-indigo-600 .text-\[10px\] {
+        font-size: 11px !important;
+    }
+
+    /* Compact scale dropdown */
+    #fs-library-scale {
+        font-size: 11px !important;
+        padding: 4px 6px !important;
+        max-width: 100px !important;
+    }
+
+    /* Hide "Scale:" label and filter icon on mobile */
+    .bg-gradient-to-r.from-indigo-600 span.text-white\/80:not([id]),
+    .bg-gradient-to-r.from-indigo-600 svg.w-3\.5.h-3\.5 {
+        display: none !important;
+    }
+
+    /* Ensure header bar doesn't wrap */
+    .bg-gradient-to-r.from-indigo-600.to-blue-600 {
+        padding: 6px 8px !important;
+    }
+
+    /* Chord info icons - slightly larger for touch */
+    .chord-info-icon {
+        width: 16px !important;
+        height: 16px !important;
+        font-size: 10px !important;
+    }
+
+    /* Chord tooltips - ensure they fit on mobile */
+    .fs-chord-tooltip {
+        max-width: 90vw !important;
+        left: 5vw !important;
+        right: 5vw !important;
+        transform: none !important;
+    }
+}
+
+/* ============================================================================
+   15. MOBILE HEADER COMPACTING
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Reduce header height */
+    #main-header {
+        height: 40px !important;
+        min-height: 40px !important;
+        padding: 0 8px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Hide the main title, show only tab subtitle */
+    #main-title {
+        display: none !important;
+    }
+
+    /* Make tab subtitle the main visible title (keep amber color) */
+    #tab-subtitle {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Hide Tutorial button on mobile header */
+    #main-header button[onclick*="startLetItBeTutorial"] {
+        display: none !important;
+    }
+
+    /* Compact About button but keep text visible */
+    #main-header button[onclick*="showAboutModal"] {
+        padding: 4px 8px !important;
+    }
+
+    /* Force the text span to show on mobile (overrides hidden sm:flex) */
+    #main-header button[onclick*="showAboutModal"] > span {
+        display: flex !important;
+        font-size: 9px !important;
+    }
+
+    #main-header button[onclick*="showAboutModal"] > span > span {
+        font-size: 9px !important;
+    }
+
+    /* Compact sidebar toggle button */
+    #sidebar-toggle {
+        padding: 4px !important;
+    }
+
+    /* Reduce main app container padding */
+    #main-app {
+        padding: 4px 8px 2px 8px !important;
+    }
+}
+
+/* ============================================================================
+   16. CHORD BUTTON DENSITY (Mobile)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Tighter chord grid */
+    #fs-chord-grid-container {
+        padding: 6px !important;
+    }
+
+    /* More columns on mobile for better density */
+    #fs-chord-grid-container > .grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 4px !important;
+    }
+
+    /* Compact group containers */
+    #fs-chord-grid-container .border.border-gray-200.rounded-lg {
+        padding: 4px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Smaller group titles */
+    #fs-chord-grid-container .text-xs.font-semibold {
+        font-size: 9px !important;
+        padding: 2px 0 !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Compact chord buttons */
+    .key-button-wrapper {
+        border-radius: 4px !important;
+    }
+
+    .key-button-wrapper button {
+        padding: 4px 6px !important;
+        font-size: 11px !important;
+    }
+
+    /* Tighter button grid inside groups */
+    #fs-chord-grid-container .grid.grid-cols-1 {
+        gap: 3px !important;
+    }
+
+    /* Reduce hover scale effect on mobile (less jumpy) */
+    .key-button-wrapper {
+        transform: none !important;
+    }
+
+    .key-button-wrapper:active {
+        transform: scale(0.98) !important;
+    }
+}
+
+/* ============================================================================
+   17. MOBILE SIDEBAR SLIDE-OUT (Chord Lab)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Show the mobile header inside sidebar */
+    #fs-sidebar-mobile-header {
+        display: flex !important;
+    }
+
+    /* Make sidebar slide over content on mobile (absolute positioning) */
+    #fs-chordlab-sidebar {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        z-index: 200 !important;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15) !important;
+        max-width: 85vw !important;
+    }
+
+    /* When collapsed, slide completely off-screen */
+    #fs-chordlab-sidebar.w-0 {
+        transform: translateX(-100%) !important;
+        box-shadow: none !important;
+    }
+
+    /* When expanded, slide in */
+    #fs-chordlab-sidebar:not(.w-0) {
+        transform: translateX(0) !important;
+        width: 220px !important;
+        min-width: 220px !important;
+    }
+
+    /* Edge tab styling - small arrow on left edge */
+    #fs-sidebar-edge-tab {
+        position: fixed !important;
+        left: 0 !important;
+        top: 40% !important;
+        z-index: 150 !important;
+    }
+}
+
+/* ============================================================================
+   18. SCALE EXPLORER MOBILE IMPROVEMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Hide the green "Scale Explorer" header on mobile */
+    #fs-scaleexplorer-header {
+        display: none !important;
+    }
+
+    /* Show the mobile header inside sidebar */
+    #fs-scaleexplorer-sidebar-mobile-header {
+        display: flex !important;
+    }
+
+    /* Make sidebar slide over content on mobile (absolute positioning) */
+    #fs-scaleexplorer-sidebar {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        z-index: 200 !important;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15) !important;
+        max-width: 85vw !important;
+    }
+
+    /* When collapsed, slide completely off-screen */
+    #fs-scaleexplorer-sidebar.w-0 {
+        transform: translateX(-100%) !important;
+        box-shadow: none !important;
+    }
+
+    /* When expanded, slide in */
+    #fs-scaleexplorer-sidebar:not(.w-0) {
+        transform: translateX(0) !important;
+        width: 220px !important;
+        min-width: 220px !important;
+    }
+
+    /* Edge tab styling - small arrow on left edge */
+    #fs-scaleexplorer-edge-tab {
+        position: fixed !important;
+        left: 0 !important;
+        top: 40% !important;
+        z-index: 150 !important;
+    }
+
+    /* Hide FAB on mobile - use bottom dock instead */
+    #fs-scaleexplorer-fab {
+        display: none !important;
+    }
+
+    /* Compact scale info panel */
+    #fs-scale-info-panel {
+        padding: 6px 8px !important;
+    }
+
+    #fs-scale-info-panel h3 {
+        font-size: 14px !important;
+        margin-bottom: 2px !important;
+    }
+
+    #fs-scale-info-panel p,
+    #fs-scale-info-panel span {
+        font-size: 11px !important;
+    }
+
+    /* Reduce padding on scale info content */
+    #fs-scale-info-panel .flex {
+        gap: 4px !important;
+    }
+
+    /* Compact scale types grid */
+    #fs-scale-types-grid {
+        padding: 4px !important;
+    }
+
+    #fs-scale-types-grid .grid {
+        gap: 4px !important;
+    }
+
+    /* Smaller scale type buttons */
+    #fs-scale-types-grid button {
+        padding: 4px 6px !important;
+        font-size: 11px !important;
+    }
+
+    /* Compact bottom dock - must fit horizontally on mobile */
+    #fs-scaleexplorer-bottom-dock {
+        bottom: 8px !important;
+        left: 4px !important;
+        right: 4px !important;
+    }
+
+    #fs-scaleexplorer-bottom-dock .pointer-events-auto {
+        padding: 6px 8px !important;
+        gap: 2px !important;
+        width: 100% !important;
+        justify-content: center !important;
+        flex-wrap: nowrap !important;
+    }
+
+    /* Hide scale name display on mobile - redundant with info panel */
+    #fs-scaleexplorer-bottom-dock .bg-lime-500\/20 {
+        display: none !important;
+    }
+
+    /* Hide dividers on mobile */
+    #fs-scaleexplorer-bottom-dock .w-px.h-6 {
+        display: none !important;
+    }
+
+    /* Compact play/stop buttons - icon only */
+    #fs-scaleexplorer-bottom-dock button[onclick*="Play"],
+    #fs-scaleexplorer-bottom-dock button[onclick*="Stop"] {
+        padding: 6px !important;
+        gap: 0 !important;
+        min-width: 32px !important;
+        justify-content: center !important;
+    }
+
+    /* Hide text labels in play/stop buttons */
+    #fs-scaleexplorer-bottom-dock button[onclick*="Play"] > svg + *,
+    #fs-scaleexplorer-bottom-dock button[onclick*="Stop"] > svg + * {
+        display: none !important;
+    }
+
+    #fs-scaleexplorer-bottom-dock svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+
+    /* Compact speed/octave controls */
+    #fs-scaleexplorer-bottom-dock .bg-white\/10 {
+        padding: 2px 4px !important;
+        gap: 2px !important;
+    }
+
+    #fs-scaleexplorer-bottom-dock .bg-white\/10 button {
+        width: 20px !important;
+        height: 20px !important;
+        min-width: 20px !important;
+        padding: 0 !important;
+    }
+
+    #fs-scaleexplorer-bottom-dock .bg-white\/10 span {
+        font-size: 9px !important;
+    }
+
+    /* Octave label */
+    #fs-scaleexplorer-bottom-dock .text-gray-400 {
+        font-size: 8px !important;
+    }
+
+    /* Reduce main content padding */
+    #fs-scaleexplorer-main-content {
+        padding: 4px !important;
+        padding-bottom: 60px !important;
+    }
+}
+
+/* ============================================================================
+   19. COMPOSITION STUDIO MOBILE IMPROVEMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Show the mobile header inside sidebar, hide desktop header */
+    #fs-studio-sidebar-mobile-header {
+        display: flex !important;
+    }
+
+    #fs-studio-sidebar-desktop-header {
+        display: none !important;
+    }
+
+    /* Make sidebar slide over content on mobile (absolute positioning) */
+    #fullscreen-sidebar {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        z-index: 200 !important;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15) !important;
+        max-width: 85vw !important;
+    }
+
+    /* When collapsed, slide completely off-screen */
+    #fullscreen-sidebar.w-6 {
+        transform: translateX(-100%) !important;
+        box-shadow: none !important;
+        width: 0 !important;
+    }
+
+    /* When expanded, slide in */
+    #fullscreen-sidebar.w-64 {
+        transform: translateX(0) !important;
+        width: 260px !important;
+        min-width: 260px !important;
+    }
+
+    /* Hide the toggle strip on mobile - use edge tab instead */
+    #fullscreen-sidebar .sidebar-toggle-strip {
+        display: none !important;
+    }
+
+    /* Edge tab styling - small arrow on left edge */
+    #fs-studio-edge-tab {
+        position: fixed !important;
+        left: 0 !important;
+        top: 40% !important;
+        z-index: 150 !important;
+    }
+
+    /* Compact purple header for mobile */
+    .fullscreen-header {
+        height: auto !important;
+        min-height: 40px !important;
+        padding: 6px 8px !important;
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+
+    /* Hide "Classic" text in back button, keep just the arrow */
+    #studio-new-back-btn span {
+        display: none !important;
+    }
+
+    /* Compact title area */
+    #fs-title-composer {
+        padding: 2px 4px !important;
+        gap: 4px !important;
+    }
+
+    #fs-composition-title {
+        font-size: 14px !important;
+        max-width: 120px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* Hide the edit pencil icon on mobile */
+    #fs-title-composer svg {
+        display: none !important;
+    }
+
+    /* Smaller key/time badge */
+    #fullscreen-key-time-badge {
+        font-size: 11px !important;
+        padding: 2px 6px !important;
+    }
+
+    /* Hide header center section labels on mobile */
+    .fullscreen-header label {
+        display: none !important;
+    }
+
+    /* Compact dropdowns */
+    #fullscreen-measures-dropdown,
+    #fullscreen-timesig-dropdown {
+        font-size: 11px !important;
+        padding: 4px 6px !important;
+        min-width: 50px !important;
+    }
+
+    /* Compact metronome button */
+    #fullscreen-metronome-toggle {
+        padding: 4px 6px !important;
+    }
+
+    #fullscreen-metronome-toggle span {
+        font-size: 10px !important;
+    }
+
+    /* Compact zoom controls */
+    .fullscreen-header .flex.items-center.gap-1 {
+        padding: 2px 4px !important;
+    }
+
+    #fullscreen-zoom-level {
+        font-size: 10px !important;
+        min-width: 2.5rem !important;
+    }
+
+    /* Reduce canvas padding on mobile */
+    #fullscreen-canvas-container {
+        padding: 8px !important;
+    }
+
+    /* Hide help link overlay on mobile - clutter */
+    #fs-help-link-overlay {
+        display: none !important;
+    }
+}
+
+/* ============================================================================
+   20. COMPOSITION STUDIO CHORD CARDS SPACING (Mobile)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Tighter chord card spacing in bottom panel */
+    #fs-chord-cards-container,
+    #fs-quick-add-cards-container {
+        gap: 4px !important;
+    }
+
+    /* Reduce chord card width slightly on mobile */
+    #fs-chord-cards-container .chord-card-wrapper,
+    #fs-quick-add-cards-container .chord-card-wrapper {
+        width: 100px !important;
+        min-width: 100px !important;
+    }
+
+    /* Compact simplified cards in bottom panel */
+    #fs-chord-cards-container .simplified-card,
+    #fs-quick-add-cards-container .simplified-card {
+        padding: 6px !important;
+        min-height: auto !important;
+    }
+
+    /* Smaller chord symbols in cards */
+    #fs-chord-cards-container .text-lg,
+    #fs-quick-add-cards-container .text-lg {
+        font-size: 14px !important;
+    }
+
+    /* Smaller beat info text */
+    #fs-chord-cards-container .text-xs,
+    #fs-quick-add-cards-container .text-xs {
+        font-size: 9px !important;
+    }
+
+    /* Compact the bottom panel header row */
+    .fs-panel-header {
+        padding: 6px 8px !important;
+        gap: 4px !important;
+    }
+
+    /* Smaller panel title */
+    .fs-panel-header h3 {
+        font-size: 12px !important;
+    }
+
+    /* Compact panel controls row */
+    .fs-panel-controls {
+        gap: 4px !important;
+        flex-wrap: wrap !important;
+    }
+
+    /* Smaller control buttons in panel */
+    .fs-panel-controls select,
+    .fs-panel-controls button {
+        font-size: 10px !important;
+        padding: 4px 6px !important;
+    }
+}
+
+/* ============================================================================
+   21. MEASURE EDIT OVERLAY - MOBILE TOUCH IMPROVEMENTS
+   ============================================================================ */
+
+@media (max-width: 768px), (pointer: coarse) {
+    /* Make measure edit overlay button larger and more visible on mobile */
+    #measure-edit-overlay {
+        padding: 8px !important;
+    }
+
+    #measure-edit-overlay .measure-edit-btn {
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    #measure-edit-overlay .measure-edit-btn svg {
+        width: 22px !important;
+        height: 22px !important;
+    }
+
+    /* Keep overlay visible longer on touch devices (no hover to maintain it) */
+    #measure-edit-overlay {
+        transition: opacity 0.3s ease !important;
+    }
+}

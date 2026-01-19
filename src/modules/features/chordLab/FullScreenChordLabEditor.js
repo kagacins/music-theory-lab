@@ -155,7 +155,8 @@ class FullScreenChordLabEditor {
         // Capture the keyboard from its original location
         this._captureKeyboard();
 
-        // Apply sidebar state
+        // Apply sidebar state (auto-collapse on mobile)
+        this._checkMobileLayout();
         this._applySidebarState();
 
         // Initialize bottom panel
@@ -230,9 +231,20 @@ class FullScreenChordLabEditor {
                 <!-- Keyboard will be moved here -->
             </div>
 
+            <!-- Mobile-only: Edge tab to open sidebar (visible when sidebar collapsed) -->
+            <div id="fs-sidebar-edge-tab"
+                 onclick="window.fsChordLabToggleSidebar && window.fsChordLabToggleSidebar()"
+                 class="absolute left-0 top-1/3 z-[100] w-5 h-16 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-r-lg shadow-lg flex items-center justify-center cursor-pointer transition-all"
+                 title="Open Settings"
+                 style="display: none;">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </div>
+
             <!-- Content area below keyboard: Sidebar + Main - extends to bottom -->
             <div class="flex flex-1 overflow-hidden">
-                <!-- Sidebar (narrow, compact) -->
+                <!-- Sidebar (narrow, compact) with mobile slide-in behavior -->
                 ${this._generateSidebarHTML()}
 
                 <!-- Main content area -->
@@ -315,8 +327,16 @@ class FullScreenChordLabEditor {
 
         return `
         <div id="fs-chordlab-header" class="bg-gradient-to-r from-amber-600 to-orange-600 px-4 py-2 flex items-center justify-between shadow-lg">
-            <!-- Left: Back button and title -->
+            <!-- Left: Sidebar toggle (mobile) + Back button and title -->
             <div class="flex items-center gap-3">
+                <!-- Sidebar toggle - hamburger menu for mobile -->
+                <button id="fs-sidebar-toggle" onclick="window.fsChordLabToggleSidebar && window.fsChordLabToggleSidebar()"
+                        class="flex items-center justify-center w-9 h-9 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                        title="Toggle sidebar">
+                    <svg class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
                 <button onclick="window.switchTab && window.switchTab('builder')"
                         class="flex items-center gap-1 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-sm transition-colors"
                         title="Return to Chord Lab (Classic)">
@@ -444,7 +464,20 @@ class FullScreenChordLabEditor {
         const maxInversion = chordDef ? Math.min(chordDef.intervals.length - 1, 4) : 2;
 
         return `
-        <div id="fs-chordlab-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm" style="min-width: 200px;">
+        <div id="fs-chordlab-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm transition-all duration-300" style="min-width: 200px;">
+            <!-- Mobile-only: Sidebar header with collapse button -->
+            <div id="fs-sidebar-mobile-header" class="hidden bg-amber-500 text-white px-3 py-2 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-sm">Voicing Settings</span>
+                    <button onclick="window.fsChordLabToggleSidebar && window.fsChordLabToggleSidebar()"
+                            class="w-8 h-8 flex items-center justify-center rounded hover:bg-amber-600 active:bg-amber-700 transition-colors"
+                            title="Close Settings">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
             <div class="p-2.5 space-y-2.5">
                 <!-- Root Note -->
                 <div class="bg-gray-100 rounded p-2.5">
@@ -1079,17 +1112,45 @@ class FullScreenChordLabEditor {
         }
     }
 
+    /**
+     * Check if we're on a mobile device and auto-collapse sidebar
+     * This provides a better initial experience on phones/tablets
+     */
+    _checkMobileLayout() {
+        const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
+        if (isMobile && !this._mobileLayoutApplied) {
+            this.sidebarCollapsed = true;
+            this._mobileLayoutApplied = true;
+            // Add mobile-specific class for CSS targeting
+            this.tabContent?.classList.add('mobile-layout');
+
+            // Set keyboard to 2 octaves on mobile for better vertical space usage
+            // User can still change it in the sidebar if they want more octaves
+            if (window.handleOctaveRangeChange) {
+                window.handleOctaveRangeChange(2);
+            }
+        }
+    }
+
     _applySidebarState() {
         const sidebar = this.tabContent?.querySelector('#fs-chordlab-sidebar');
-        const toggle = this.tabContent?.querySelector('#fs-sidebar-toggle svg');
+        const edgeTab = this.tabContent?.querySelector('#fs-sidebar-edge-tab');
+        const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
 
-        if (sidebar && this.sidebarCollapsed) {
-            sidebar.classList.add('w-0', 'min-w-0', 'overflow-hidden', 'p-0');
-            sidebar.classList.remove('w-56');
-            sidebar.style.minWidth = '0';
+        if (sidebar) {
+            if (this.sidebarCollapsed) {
+                sidebar.classList.add('w-0', 'min-w-0', 'overflow-hidden', 'p-0');
+                sidebar.classList.remove('w-56');
+                sidebar.style.minWidth = '0';
+            } else {
+                sidebar.classList.remove('w-0', 'min-w-0', 'overflow-hidden', 'p-0');
+                sidebar.classList.add('w-56');
+                sidebar.style.minWidth = '220px';
+            }
         }
-        if (toggle && this.sidebarCollapsed) {
-            toggle.classList.add('rotate-180');
+        // Show/hide edge tab based on sidebar state (mobile only)
+        if (edgeTab) {
+            edgeTab.style.display = (this.sidebarCollapsed && isMobile) ? 'flex' : 'none';
         }
     }
 
@@ -1100,24 +1161,7 @@ class FullScreenChordLabEditor {
     _toggleSidebar() {
         this.sidebarCollapsed = !this.sidebarCollapsed;
         this._saveToStorage(STORAGE_KEYS.SIDEBAR_COLLAPSED, this.sidebarCollapsed);
-
-        const sidebar = this.tabContent?.querySelector('#fs-chordlab-sidebar');
-        const toggle = this.tabContent?.querySelector('#fs-sidebar-toggle svg');
-
-        if (sidebar) {
-            if (this.sidebarCollapsed) {
-                sidebar.classList.add('w-0', 'min-w-0', 'overflow-hidden');
-                sidebar.classList.remove('w-56');
-                sidebar.style.minWidth = '0';
-            } else {
-                sidebar.classList.remove('w-0', 'min-w-0', 'overflow-hidden');
-                sidebar.classList.add('w-56');
-                sidebar.style.minWidth = '220px';
-            }
-        }
-        if (toggle) {
-            toggle.classList.toggle('rotate-180', this.sidebarCollapsed);
-        }
+        this._applySidebarState();
     }
 
     _toggleEnharmonic(isFlat) {

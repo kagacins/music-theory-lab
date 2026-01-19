@@ -145,7 +145,8 @@ class FullScreenScaleExplorer {
         // Capture the keyboard from its original location
         this._captureKeyboard();
 
-        // Apply sidebar state
+        // Apply sidebar state (auto-collapse on mobile)
+        this._checkMobileLayout();
         this._applySidebarState();
 
         // Initialize bottom panel
@@ -218,14 +219,25 @@ class FullScreenScaleExplorer {
     _generateTabModeHTML() {
         return `
         <div id="scaleexplorer-new-content" class="w-full h-full flex flex-col bg-gray-100 overflow-hidden relative">
-            <!-- Keyboard container (FULL WIDTH at top) -->
+            <!-- Keyboard container (FULL WIDTH at top - matching Chord Lab layout) -->
             <div id="fs-scaleexplorer-keyboard-area" class="w-full px-4 py-2 bg-gray-200 border-b border-gray-300">
                 <!-- Keyboard will be moved here -->
             </div>
 
+            <!-- Mobile-only: Edge tab to open sidebar (visible when sidebar collapsed) -->
+            <div id="fs-scaleexplorer-edge-tab"
+                 onclick="window.fsScaleExplorerToggleSidebar && window.fsScaleExplorerToggleSidebar()"
+                 class="absolute left-0 top-1/3 z-[100] w-5 h-16 bg-lime-500 hover:bg-lime-600 active:bg-lime-700 text-white rounded-r-lg shadow-lg flex items-center justify-center cursor-pointer transition-all"
+                 title="Open Filters"
+                 style="display: none;">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </div>
+
             <!-- Content area below keyboard: Sidebar + Main - extends to bottom -->
             <div class="flex flex-1 overflow-hidden">
-                <!-- Sidebar (narrow, compact) -->
+                <!-- Sidebar (narrow, compact) with mobile slide-in behavior -->
                 ${this._generateSidebarHTML()}
 
                 <!-- Main content area -->
@@ -258,7 +270,20 @@ class FullScreenScaleExplorer {
         const rootIndex = getScaleRootIndex();
 
         return `
-        <div id="fs-scaleexplorer-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm" style="min-width: 200px;">
+        <div id="fs-scaleexplorer-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm transition-all duration-300" style="min-width: 200px;">
+            <!-- Mobile-only: Sidebar header with collapse button -->
+            <div id="fs-scaleexplorer-sidebar-mobile-header" class="hidden bg-lime-500 text-white px-3 py-2 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-sm">Root & Filters</span>
+                    <button onclick="window.fsScaleExplorerToggleSidebar && window.fsScaleExplorerToggleSidebar()"
+                            class="w-8 h-8 flex items-center justify-center rounded hover:bg-lime-600 active:bg-lime-700 transition-colors"
+                            title="Close">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
             <div class="p-2 space-y-2">
                 <!-- Root Note -->
                 <div class="bg-gray-50 rounded p-2">
@@ -963,16 +988,39 @@ class FullScreenScaleExplorer {
         `;
     }
 
+    /**
+     * Check if we're on a mobile device and auto-collapse sidebar
+     * This provides a better initial experience on phones/tablets
+     */
+    _checkMobileLayout() {
+        const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
+        if (isMobile && !this._mobileLayoutApplied) {
+            this.sidebarCollapsed = true;
+            this._mobileLayoutApplied = true;
+            // Add mobile-specific class for CSS targeting
+            this.tabContent?.classList.add('mobile-layout');
+        }
+    }
+
     _applySidebarState() {
         const sidebar = this.tabContent?.querySelector('#fs-scaleexplorer-sidebar');
+        const edgeTab = this.tabContent?.querySelector('#fs-scaleexplorer-edge-tab');
+        const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window;
+
         if (sidebar) {
             if (this.sidebarCollapsed) {
                 sidebar.classList.add('w-0', 'min-w-0', 'overflow-hidden', 'p-0');
                 sidebar.classList.remove('w-52');
+                sidebar.style.minWidth = '0';
             } else {
                 sidebar.classList.remove('w-0', 'min-w-0', 'overflow-hidden', 'p-0');
                 sidebar.classList.add('w-52');
+                sidebar.style.minWidth = '200px';
             }
+        }
+        // Show/hide edge tab based on sidebar state (mobile only)
+        if (edgeTab) {
+            edgeTab.style.display = (this.sidebarCollapsed && isMobile) ? 'flex' : 'none';
         }
     }
 

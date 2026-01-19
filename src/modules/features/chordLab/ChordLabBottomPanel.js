@@ -419,7 +419,9 @@ export class ChordLabBottomPanel {
         }
 
         tooltip.innerHTML = `
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; color: #fbbf24;">${symbol}</div>
+            <button class="tooltip-close-btn" style="position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: #4b5563; color: #d1d5db; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; transition: all 0.15s;"
+                    title="Close">×</button>
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; color: #fbbf24; padding-right: 24px;">${symbol}</div>
             <div style="font-weight: 500; font-size: 12px; margin-bottom: 6px; color: #d1d5db;">${chordType}</div>
             <div style="font-size: 11px; color: #9ca3af; margin-bottom: 8px;">${description || 'No description available'}</div>
             <div style="font-weight: 500; font-size: 11px; margin-bottom: 4px; color: #d1d5db;">Inversions:</div>
@@ -427,6 +429,24 @@ export class ChordLabBottomPanel {
                 ${inversionButtonsHtml}
             </div>
         `;
+
+        // Add close button event handler
+        const closeBtn = tooltip.querySelector('.tooltip-close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tooltip.style.opacity = '0';
+                tooltip.style.visibility = 'hidden';
+            });
+            closeBtn.addEventListener('mouseenter', () => {
+                closeBtn.style.backgroundColor = '#ef4444';
+                closeBtn.style.color = 'white';
+            });
+            closeBtn.addEventListener('mouseleave', () => {
+                closeBtn.style.backgroundColor = '#4b5563';
+                closeBtn.style.color = '#d1d5db';
+            });
+        }
 
         document.body.appendChild(tooltip);
 

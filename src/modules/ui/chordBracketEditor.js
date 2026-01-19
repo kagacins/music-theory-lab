@@ -348,20 +348,47 @@ export function showChordBracketEditor(chordIndex, region, event) {
 
     let left, top;
 
+    // Get position from event or region (region is used for touch long-press when event is null)
+    let clickX, clickY;
+    if (event && event.clientX !== undefined) {
+        clickX = event.clientX;
+        clickY = event.clientY;
+    } else if (region) {
+        // For touch long-press: use region center, converted to viewport coords
+        // Region coords are in canvas internal space, need to convert to viewport
+        const fsEditor = window.getFullScreenNotationEditor?.();
+        const zoomFactor = (fsEditor?.isOpen || fsEditor?.isTabMode) ? (fsEditor.zoomLevel / 100) : 1;
+        const container = document.querySelector('#fullscreen-canvas-container') ||
+                          document.querySelector('#notation-container');
+        if (container) {
+            const rect = container.getBoundingClientRect();
+            clickX = rect.left + (region.x + region.width / 2) * zoomFactor;
+            clickY = rect.top + (region.y + region.height / 2) * zoomFactor;
+        } else {
+            // Fallback: center of viewport
+            clickX = viewportWidth / 2;
+            clickY = viewportHeight / 2;
+        }
+    } else {
+        // No positioning info - center in viewport
+        clickX = viewportWidth / 2;
+        clickY = viewportHeight / 2;
+    }
+
     // Check if there's enough space to the RIGHT of the click to fit the editor
-    const spaceOnRight = viewportWidth - event.clientX - horizontalGapRight - 10; // 10px margin
+    const spaceOnRight = viewportWidth - clickX - horizontalGapRight - 10; // 10px margin
     const hasSpaceOnRight = spaceOnRight >= editorWidth;
 
     if (hasSpaceOnRight) {
         // Position editor to the RIGHT of the chord
-        left = event.clientX + horizontalGapRight;
+        left = clickX + horizontalGapRight;
     } else {
         // Not enough space on right - position editor to the LEFT of the chord
-        left = event.clientX - editorWidth - horizontalGapLeft;
+        left = clickX - editorWidth - horizontalGapLeft;
     }
 
     // Vertically center the editor around the click point
-    top = event.clientY - editorHeight / 2;
+    top = clickY - editorHeight / 2;
 
     // Keep within viewport bounds
     if (left < 10) left = 10;
