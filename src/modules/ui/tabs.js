@@ -3,7 +3,7 @@
  * Handles switching between different tabs (Builder, Trainer, Scales) and refreshing tab content
  */
 
-import { getCurrentTab, setCurrentTab } from '../state/globalState.js';
+import { getCurrentTab, setCurrentTab, getExperienceMode } from '../state/globalState.js';
 import { getTrainerState } from '../state/trainerState.js';
 import { clearHighlights, updateKeyboardLabels, highlightTrainer } from './keyboard.js';
 import { updateBuilderDisplay, renderBuilderSelectors, updateChordTypeButtonCaptions, updateIntervalButtonCaptions } from '../features/chordBuilder.js';
@@ -527,9 +527,11 @@ export function switchTab(tabId, options = {}) {
         }, 100);
 
         // Trigger coach analysis when entering Composition Studio (New)
+        // Only if Experience Mode is not 'focus' (respects user's educational preference)
         // Use a small delay to ensure everything is initialized
         setTimeout(() => {
-            if (window.triggerCoachAnalysis) {
+            const mode = getExperienceMode();
+            if (mode !== 'focus' && window.triggerCoachAnalysis) {
                 window.triggerCoachAnalysis();
             }
         }, 500);

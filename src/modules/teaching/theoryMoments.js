@@ -7,6 +7,7 @@
 import { THEORY_MOMENTS, getTheoryMomentConfig, getChordSpecificContent } from './theoryMomentsConfig.js';
 import { BORROWED_CHORDS, CADENCE_PATTERNS } from '../analysis/patternDetection.js';
 import { isGuidedModeActive } from '../ui/lessonGuidedMode.js';
+import { getExperienceMode } from '../state/globalState.js';
 
 // ============================================================================
 // STATE
@@ -36,6 +37,13 @@ export function initTheoryMoments() {
     // Listen for chord additions
     window.addEventListener('chordAddedForTheory', handleChordAdded);
     window.addEventListener('progressionAnalyzed', handleProgressionAnalyzed);
+
+    // Listen for Experience Mode changes
+    // Theory Moments is disabled in Focus mode, enabled in Guided/Explore modes
+    window.addEventListener('experienceModeChanged', handleExperienceModeChanged);
+
+    // Sync with current Experience Mode on init
+    syncWithExperienceMode();
 
     // Expose functions globally
     window.toggleTheoryMoments = toggleTheoryMoments;
@@ -106,6 +114,38 @@ function updateToggleButton() {
     }
     if (status) {
         status.textContent = isEnabled ? 'On' : 'Off';
+    }
+}
+
+// ============================================================================
+// EXPERIENCE MODE INTEGRATION
+// ============================================================================
+
+/**
+ * Handle Experience Mode changes
+ * Theory Moments is disabled in Focus mode, enabled in Guided/Explore modes
+ */
+function handleExperienceModeChanged(event) {
+    syncWithExperienceMode();
+}
+
+/**
+ * Sync Theory Moments enabled state with Experience Mode
+ * Focus mode = disabled, Guided/Explore = enabled
+ */
+function syncWithExperienceMode() {
+    const mode = getExperienceMode?.() || 'guided';
+    const shouldBeEnabled = mode !== 'focus';
+
+    if (isEnabled !== shouldBeEnabled) {
+        isEnabled = shouldBeEnabled;
+        updateToggleButton();
+        console.log(`[TheoryMoments] ${shouldBeEnabled ? 'Enabled' : 'Disabled'} based on Experience Mode: ${mode}`);
+
+        // If switching to focus mode, hide any visible moment
+        if (!shouldBeEnabled) {
+            hideTheoryMoment();
+        }
     }
 }
 

@@ -773,6 +773,352 @@ Quick reference for which features appear in which mode:
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Last Updated:** January 2026
 **Next Review:** After Phase 1 completion
+
+---
+
+## Appendix A: Phase 1 Implementation Details
+
+### A1. Current Tension System Audit
+
+**Existing Analysis Infrastructure (`src/modules/analysis/TensionArcPlanner.js`):**
+- `CHORD_TENSION_SCORES` - 32+ chord types with baseTension, stability, resolution
+- `TENSION_ARC_TEMPLATES` - 8 templates: Pop, Epic, Jazz, Ballad, Rock, EDM, Classical, Ambient
+- `TensionArcPlanner` class with:
+  - `calculateChordTension(chord, key, context)` → weighted score (0-1)
+  - `calculateCurrentCurve(progression, key)` → array of tension values
+  - `compareToTarget(progression, key)` → alignment %, mismatches
+  - `getTargetTensionAt(position)` → interpolated target tension
+  - Multi-dimensional mode (harmonic, rhythmic, melodic, dynamic)
+
+**Existing UI Components:**
+
+| Component | Location | Purpose | Visibility |
+|-----------|----------|---------|------------|
+| `TensionArcUI` | `src/modules/ui/TensionArcUI.js` | Full visualization | Renders to `#progression-visualization-panel` |
+| Optimize Intent | `UnifiedRecommendationModal/ChordTab.js` | Embedded in Chord tab | Modal > Chord tab > Optimize |
+| `tensionOptimizerModal` | `src/modules/ui/tensionOptimizerModal.js` | Dedicated modal | Manual trigger |
+| `renderTensionCurve` | `ProgressionRenderer.js:4623` | Simple curve | Progression panel |
+
+**Current Flow:**
+1. `TensionArcUI.render()` removes all existing `#tension-arc-container` elements
+2. Inserts full visualization at end of `#progression-visualization-panel`
+3. Includes: header, template selector, SVG graph, stats, mismatch list, controls
+
+**Problem:** Full visualization is overwhelming for ambient use. Need a **simplified ambient version**.
+
+---
+
+### A2. Ambient Tension Strip Design
+
+**Goal:** A minimal, always-visible tension indicator that doesn't require interaction.
+
+**Design Specifications:**
+
+```
+Height: 32px total
+├── 24px: SVG tension curve (no axes, no labels)
+└── 8px: padding
+
+Colors:
+├── Low tension (0-0.33): #10b981 (green)
+├── Medium tension (0.33-0.66): #f59e0b (amber)
+└── High tension (0.66-1.0): #ef4444 (red)
+
+Features:
+├── Gradient-filled area under curve
+├── Smooth bezier path connecting points
+├── Subtle vertical lines at chord boundaries
+├── NO: template selector, checkboxes, mismatch list, stats
+└── Click to expand → Opens full TensionArcUI or Optimize intent
+```
+
+**Visual Mockup:**
+```
+┌────────────────────────────────────────────────────────────────┐
+│  ╭──╮        ╭────────╮                                        │
+│ ╱    ╲      ╱          ╲────                   ← 24px curve    │
+│▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                   ← gradient fill │
+└─┬──┬──┬──┬──┬──┬──┬──┬──────────────────────────────────────────┘
+  C  Am  F  G  C  Am  G  C                        ← chord positions
+```
+
+**Interaction:**
+- Hover: Show tooltip with tension value ("Tension: 72% - High")
+- Click: Open Unified Recommendation Modal → Optimize tab
+- Mode-aware: Hidden in Focus mode, visible in Guided/Explore
+
+---
+
+### A3. Implementation Plan: Ambient Tension Strip
+
+**New File:** `src/modules/ui/AmbientTensionStrip.js`
+
+```javascript
+/**
+ * AmbientTensionStrip - Minimal tension visualization for ambient display
+ *
+ * A simplified, compact tension curve that:
+ * - Shows at-a-glance tension shape
+ * - Requires no interaction to provide value
+ * - Expands to full analysis on click
+ * - Respects Experience Mode settings
+ */
+
+import { getTensionArcPlanner } from '../analysis/TensionArcPlanner.js';
+import { getExperienceMode } from '../state/globalState.js'; // To be added
+
+export class AmbientTensionStrip {
+    constructor() {
+        this.planner = getTensionArcPlanner();
+        this.height = 32;
+        this.curveHeight = 24;
+    }
+
+    /**
+     * Render minimal tension strip
+     * @param {HTMLElement} container - Container to render into
+     * @param {Array} progressionData - Chord progression
+     * @param {string} key - Current key
+     */
+    render(container, progressionData, key) {
+        // Check experience mode
+        const mode = getExperienceMode?.() || 'guided';
+        if (mode === 'focus') {
+            this.remove(container);
+            return;
+        }
+
+        if (!progressionData || progressionData.length < 2) {
+            this.remove(container);
+            return;
+        }
+
+        const curve = this.planner.calculateCurrentCurve(progressionData, key);
+        const html = this.generateHTML(curve, progressionData);
+
+        // Find or create container
+        let strip = container.querySelector('#ambient-tension-strip');
+        if (!strip) {
+            strip = document.createElement('div');
+            strip.id = 'ambient-tension-strip';
+            // Insert before chord cards
+            const cardsContainer = container.querySelector('.chord-cards-container, #chord-cards');
+            if (cardsContainer) {
+                container.insertBefore(strip, cardsContainer);
+            } else {
+                container.prepend(strip);
+            }
+        }
+
+        strip.innerHTML = html;
+        this.attachListeners(strip);
+    }
+
+    generateHTML(curve, progressionData) {
+        const width = Math.min(800, window.innerWidth - 40);
+        const padding = { left: 8, right: 8 };
+        const graphWidth = width - padding.left - padding.right;
+        const xStep = graphWidth / Math.max(1, curve.length - 1);
+
+        const points = curve.map((point, i) => ({
+            x: padding.left + (i * xStep),
+            y: this.curveHeight - (point.tension * (this.curveHeight - 4)) - 2,
+            tension: point.tension
+        }));
+
+        const pathData = this.createSmoothPath(points);
+        const areaPath = `${pathData} L ${points[points.length - 1]?.x || padding.left} ${this.curveHeight} L ${points[0]?.x || padding.left} ${this.curveHeight} Z`;
+
+        return `
+            <div style="
+                height: ${this.height}px;
+                padding: 4px 0;
+                cursor: pointer;
+                transition: background 0.2s;
+            "
+            class="ambient-tension-strip-inner hover:bg-gray-50 rounded"
+            title="Click for full tension analysis">
+                <svg width="${width}" height="${this.curveHeight}" style="display: block;">
+                    <defs>
+                        <linearGradient id="ambient-tension-gradient" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#10b981" stop-opacity="0.3" />
+                            <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.3" />
+                            <stop offset="100%" stop-color="#ef4444" stop-opacity="0.3" />
+                        </linearGradient>
+                        <linearGradient id="ambient-tension-stroke" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="50%" stop-color="#f59e0b" />
+                            <stop offset="100%" stop-color="#ef4444" />
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Area fill -->
+                    <path d="${areaPath}" fill="url(#ambient-tension-gradient)" />
+
+                    <!-- Curve line -->
+                    <path d="${pathData}"
+                          stroke="url(#ambient-tension-stroke)"
+                          stroke-width="2"
+                          fill="none"
+                          stroke-linecap="round" />
+
+                    <!-- Chord position markers -->
+                    ${points.map((p, i) => `
+                        <line x1="${p.x}" y1="${this.curveHeight - 2}"
+                              x2="${p.x}" y2="${this.curveHeight}"
+                              stroke="#d1d5db" stroke-width="1" />
+                    `).join('')}
+                </svg>
+            </div>
+        `;
+    }
+
+    createSmoothPath(points) {
+        if (!points || points.length === 0) return '';
+        if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+        let path = `M ${points[0].x} ${points[0].y}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const curr = points[i];
+            const next = points[i + 1];
+            const midX = (curr.x + next.x) / 2;
+            const midY = (curr.y + next.y) / 2;
+            path += ` Q ${curr.x} ${curr.y}, ${midX} ${midY}`;
+        }
+        // Final point
+        const last = points[points.length - 1];
+        path += ` L ${last.x} ${last.y}`;
+        return path;
+    }
+
+    attachListeners(strip) {
+        strip.addEventListener('click', () => {
+            // Open Unified Recommendation Modal to Optimize tab
+            if (window.showUnifiedRecommendationModal) {
+                window.showUnifiedRecommendationModal({
+                    initialTab: 'chord',
+                    initialIntent: 'optimize'
+                });
+            }
+        });
+    }
+
+    remove(container) {
+        const strip = container.querySelector('#ambient-tension-strip');
+        if (strip) strip.remove();
+    }
+}
+
+// Singleton
+let instance = null;
+export function getAmbientTensionStrip() {
+    if (!instance) instance = new AmbientTensionStrip();
+    return instance;
+}
+
+export function renderAmbientTensionStrip(container, progressionData, key) {
+    getAmbientTensionStrip().render(container, progressionData, key);
+}
+```
+
+---
+
+### A4. Experience Mode Implementation
+
+**New State:** Add to `src/modules/state/globalState.js`
+
+```javascript
+// Experience Mode: 'focus' | 'guided' | 'explore'
+let experienceMode = localStorage.getItem('experienceMode') || 'guided';
+
+export function getExperienceMode() {
+    return experienceMode;
+}
+
+export function setExperienceMode(mode) {
+    if (['focus', 'guided', 'explore'].includes(mode)) {
+        experienceMode = mode;
+        localStorage.setItem('experienceMode', mode);
+        // Emit event for listeners
+        window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode } }));
+    }
+}
+```
+
+**UI Toggle Location:** Add to Composition Studio header (right section)
+
+```html
+<!-- In FullScreenNotationEditor._generateTabModeHTML() right section -->
+<div class="experience-mode-toggle flex items-center gap-2 mr-4">
+    <span class="text-xs text-gray-500">Mode:</span>
+    <div class="flex bg-gray-200 rounded-full p-0.5">
+        <button data-mode="focus" class="px-2 py-0.5 text-xs rounded-full transition-colors">Focus</button>
+        <button data-mode="guided" class="px-2 py-0.5 text-xs rounded-full transition-colors bg-white shadow">Guided</button>
+        <button data-mode="explore" class="px-2 py-0.5 text-xs rounded-full transition-colors">Explore</button>
+    </div>
+</div>
+```
+
+---
+
+### A5. Integration Points
+
+**Files to Modify:**
+
+1. **`src/modules/state/globalState.js`**
+   - Add `experienceMode` state
+   - Add getter/setter with localStorage persistence
+   - Add event emission on change
+
+2. **`src/modules/notation/fullScreen/FullScreenNotationEditor.js`**
+   - Add Experience Mode toggle to header
+   - Wire up click handlers
+
+3. **`src/modules/features/progressionBuilder/ProgressionRenderer.js`**
+   - Call `renderAmbientTensionStrip()` after rendering chord cards
+   - Respect experience mode
+
+4. **`src/modules/teaching/coachEngine/coachEngine.js`**
+   - Check experience mode before showing nudges
+   - Focus mode: disable all nudges
+   - Guided mode: moderate nudges
+   - Explore mode: all nudges enabled
+
+5. **`src/modules/teaching/theoryMoments.js`**
+   - Check experience mode before showing moments
+   - Focus mode: disabled
+   - Guided mode: important only
+   - Explore mode: all
+
+---
+
+### A6. Phase 1 Task Breakdown
+
+| Task | File(s) | Effort | Priority |
+|------|---------|--------|----------|
+| Add Experience Mode to globalState | `globalState.js` | 1 hour | P0 |
+| Create AmbientTensionStrip component | New file | 3 hours | P0 |
+| Add Experience Mode toggle to Composition Studio header | `FullScreenNotationEditor.js` | 2 hours | P0 |
+| Integrate AmbientTensionStrip into ProgressionRenderer | `ProgressionRenderer.js` | 1 hour | P0 |
+| Wire Coach Engine to Experience Mode | `coachEngine.js` | 2 hours | P1 |
+| Wire Theory Moments to Experience Mode | `theoryMoments.js` | 1 hour | P1 |
+| Add to Progression Builder (classic mode) | `progressionBuilder/index.js` | 1 hour | P2 |
+| Testing and refinement | All | 2 hours | P1 |
+
+**Total Estimated Effort:** ~13 hours (2 days)
+
+---
+
+### A7. Success Criteria for Phase 1
+
+- [ ] Experience Mode toggle visible in Composition Studio header
+- [ ] Mode persists across sessions (localStorage)
+- [ ] Ambient Tension Strip renders below progression header
+- [ ] Strip hidden in Focus mode, visible in Guided/Explore
+- [ ] Click on strip opens Unified Recommendation Modal → Optimize
+- [ ] Coach nudges respect Experience Mode
+- [ ] Theory Moments respect Experience Mode
+- [ ] No visual regressions in existing tension visualizations

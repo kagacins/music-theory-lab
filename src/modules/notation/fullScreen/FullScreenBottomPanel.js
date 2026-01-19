@@ -27,6 +27,7 @@ import { detectAllObservations } from '../../teaching/coachEngine/detectors/inde
 import { generateAllSuggestions } from '../../teaching/coachEngine/generators/index.js';
 import { scanAllOpportunities } from '../../teaching/coachEngine/scanners/opportunityScanner.js';
 import { COACH_ITEM_TYPES } from '../../teaching/coachEngine/types.js';
+import { renderAmbientTensionStrip } from '../../ui/AmbientTensionStrip.js';
 
 // ============================================================================
 // CONSTANTS
@@ -679,6 +680,10 @@ export class FullScreenBottomPanel {
             // Scroll View: horizontal scrolling with section-aware layout
             this._renderFSScrollViewCards(cardsContainer, chords, key, sections);
         }
+
+        // Render ambient tension strip (respects Experience Mode internally)
+        // Insert it between the section picker and the cards container
+        renderAmbientTensionStrip(container, chords, key);
     }
 
     /**

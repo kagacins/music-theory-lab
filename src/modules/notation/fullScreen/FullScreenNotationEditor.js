@@ -445,9 +445,32 @@ export class FullScreenNotationEditor {
                         </div>
                     </div>
 
-                    <!-- Right: Metronome + Zoom Controls -->
+                    <!-- Right: Experience Mode + Metronome + Zoom Controls -->
                     <div class="flex items-center gap-2">
-                        <!-- Coach Toggle and Analyze Button HIDDEN: Coach is accessed via measure compass icons -->
+                        <!-- Experience Mode Toggle -->
+                        <div id="experience-mode-toggle" class="flex items-center gap-1.5 mr-2">
+                            <span class="text-xs text-white/70" style="-webkit-text-fill-color: rgba(255,255,255,0.7) !important;">Mode:</span>
+                            <div class="flex bg-white/20 rounded-full p-0.5">
+                                <button data-mode="focus"
+                                        class="experience-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-full transition-all ${this._getExperienceMode() === 'focus' ? 'bg-white text-indigo-700 shadow-sm' : 'text-white/80 hover:bg-white/10'}"
+                                        style="${this._getExperienceMode() === 'focus' ? 'color: #4338ca !important; -webkit-text-fill-color: #4338ca !important;' : '-webkit-text-fill-color: rgba(255,255,255,0.8) !important;'}"
+                                        title="Focus Mode: Minimal UI for experienced composers">
+                                    Focus
+                                </button>
+                                <button data-mode="guided"
+                                        class="experience-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-full transition-all ${this._getExperienceMode() === 'guided' ? 'bg-white text-indigo-700 shadow-sm' : 'text-white/80 hover:bg-white/10'}"
+                                        style="${this._getExperienceMode() === 'guided' ? 'color: #4338ca !important; -webkit-text-fill-color: #4338ca !important;' : '-webkit-text-fill-color: rgba(255,255,255,0.8) !important;'}"
+                                        title="Guided Mode: Balanced education + composition">
+                                    Guided
+                                </button>
+                                <button data-mode="explore"
+                                        class="experience-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-full transition-all ${this._getExperienceMode() === 'explore' ? 'bg-white text-indigo-700 shadow-sm' : 'text-white/80 hover:bg-white/10'}"
+                                        style="${this._getExperienceMode() === 'explore' ? 'color: #4338ca !important; -webkit-text-fill-color: #4338ca !important;' : '-webkit-text-fill-color: rgba(255,255,255,0.8) !important;'}"
+                                        title="Explore Mode: Maximum educational features">
+                                    Explore
+                                </button>
+                            </div>
+                        </div>
 
                         <!-- Metronome Toggle -->
                         <button id="fullscreen-metronome-toggle"
@@ -1399,6 +1422,22 @@ export class FullScreenNotationEditor {
                 }
             });
         }
+
+        // Experience Mode toggle buttons
+        const experienceModeButtons = this.tabContent.querySelectorAll('.experience-mode-btn');
+        experienceModeButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const mode = e.target.dataset.mode;
+                if (mode) {
+                    this._setExperienceMode(mode);
+                }
+            });
+        });
+
+        // Listen for external experience mode changes (from other UI or localStorage)
+        window.addEventListener('experienceModeChanged', (e) => {
+            this._updateExperienceModeButtons(e.detail?.mode);
+        });
 
         // === SHARED HANDLERS ===
         // These handlers work for both modal and tab mode using _getActiveContainer()
@@ -5293,6 +5332,62 @@ export class FullScreenNotationEditor {
         if (label) {
             label.textContent = enabled ? 'On' : 'Off';
         }
+    }
+
+    /**
+     * Get current experience mode from global state
+     */
+    _getExperienceMode() {
+        // Import dynamically to avoid circular dependencies
+        const globalState = window.globalState || {};
+        if (typeof globalState.getExperienceMode === 'function') {
+            return globalState.getExperienceMode();
+        }
+        // Fallback: check localStorage directly
+        return localStorage.getItem('experienceMode') || 'guided';
+    }
+
+    /**
+     * Set experience mode and update UI
+     */
+    _setExperienceMode(mode) {
+        if (!['focus', 'guided', 'explore'].includes(mode)) return;
+
+        // Update global state
+        if (window.globalState?.setExperienceMode) {
+            window.globalState.setExperienceMode(mode);
+        } else {
+            // Fallback: set localStorage and dispatch event
+            localStorage.setItem('experienceMode', mode);
+            window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode } }));
+        }
+
+        // Update button appearance
+        this._updateExperienceModeButtons(mode);
+    }
+
+    /**
+     * Update experience mode button appearance
+     */
+    _updateExperienceModeButtons(currentMode) {
+        const container = this._getActiveContainer();
+        if (!container) return;
+
+        const buttons = container.querySelectorAll('.experience-mode-btn');
+        buttons.forEach(btn => {
+            const btnMode = btn.dataset.mode;
+            const isActive = btnMode === currentMode;
+
+            if (isActive) {
+                btn.classList.add('bg-white', 'text-indigo-700', 'shadow-sm');
+                btn.classList.remove('text-white/80', 'hover:bg-white/10');
+                btn.style.cssText = 'color: #4338ca !important; -webkit-text-fill-color: #4338ca !important;';
+            } else {
+                btn.classList.remove('bg-white', 'text-indigo-700', 'shadow-sm');
+                btn.classList.add('text-white/80', 'hover:bg-white/10');
+                btn.style.cssText = '-webkit-text-fill-color: rgba(255,255,255,0.8) !important;';
+            }
+        });
     }
 
     /**

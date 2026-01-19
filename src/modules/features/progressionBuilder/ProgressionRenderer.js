@@ -31,7 +31,8 @@ import {
     clearSelection,
     selectSingle
 } from '../../state/trainerState.js';
-import { getNotationPreference, getCurrentTab } from '../../state/globalState.js';
+import { getNotationPreference, getCurrentTab, getExperienceMode } from '../../state/globalState.js';
+import { renderAmbientTensionStrip, removeAmbientTensionStrip } from '../../ui/AmbientTensionStrip.js';
 import {
     getKeyBasedEnharmonic,
     setKeyDropdownValue,
@@ -2271,6 +2272,10 @@ function renderProgressionDisplayImmediate(containerId = 'progression-visualizat
             // Initialize sortable on the grid container
             initializeSimplifiedSortable(gridContainer);
         }
+
+        // Render ambient tension strip (visible in Guided and Explore modes)
+        // The strip respects Experience Mode internally
+        renderAmbientTensionStrip(container, trainerState.progressionData, trainerState.currentKey || 'C');
 
         container.appendChild(gridContainer);
 

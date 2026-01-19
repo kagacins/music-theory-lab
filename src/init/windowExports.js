@@ -245,7 +245,10 @@ import {
     getIsFretboardModeOn,
     setIsFretboardModeOn,
     getNumOctaves,
-    setNumOctaves
+    setNumOctaves,
+    getExperienceMode,
+    setExperienceMode,
+    isFeatureEnabled
 } from '../modules/state/globalState.js';
 import { getTrainerState, setProgressionData, setIsReady, getCurrentKey, setCurrentKey, invalidateProgressionDataCache } from '../modules/state/trainerState.js';
 import {
@@ -1586,6 +1589,23 @@ export function setupWindowExports() {
     window.updateKeyboardLabels = updateKeyboardLabels;
     window.getIsFretboardModeOn = getIsFretboardModeOn;
     window.setIsFretboardModeOn = setIsFretboardModeOn;
+
+    // Experience Mode exports
+    window.getExperienceMode = getExperienceMode;
+    window.setExperienceMode = setExperienceMode;
+    window.isFeatureEnabled = isFeatureEnabled;
+
+    // Expose globalState object for modules that need multiple functions
+    window.globalState = {
+        getExperienceMode,
+        setExperienceMode,
+        isFeatureEnabled,
+        getEnharmonicPreference,
+        getNotationPreference,
+        getNumOctaves,
+        getIsFretboardModeOn,
+        setIsFretboardModeOn
+    };
 
     // Panel state persistence functions
     window.savePanelState = savePanelState;

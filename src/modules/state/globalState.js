@@ -18,6 +18,12 @@ let isDarkModeOn = false; // Default to off (light mode is default)
 let isFretboardModeOn = false; // Default to off (piano keyboard is default)
 let g_NumOctaves = 4;
 
+// Experience Mode: Controls educational feature density
+// 'focus' - Minimal UI, no educational features (for experienced composers)
+// 'guided' - Balanced education + composition (default)
+// 'explore' - Maximum educational features for curious learners
+let experienceMode = localStorage.getItem('experienceMode') || 'guided';
+
 // Getters and Setters for currentTab
 export function getCurrentTab() {
     return currentTab;
@@ -126,6 +132,32 @@ export function setNumOctaves(value) {
     g_NumOctaves = value;
 }
 
+// Getters and Setters for experienceMode
+export function getExperienceMode() {
+    return experienceMode;
+}
+
+export function setExperienceMode(mode) {
+    if (['focus', 'guided', 'explore'].includes(mode)) {
+        console.log(`[globalState] setExperienceMode: changing from ${experienceMode} to ${mode}`);
+        experienceMode = mode;
+        localStorage.setItem('experienceMode', mode);
+        // Emit event for listeners to react to mode changes
+        console.log('[globalState] Dispatching experienceModeChanged event');
+        window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode } }));
+    }
+}
+
+/**
+ * Check if current experience mode allows a feature
+ * @param {string} featureLevel - 'focus' | 'guided' | 'explore' - minimum mode required
+ * @returns {boolean} - true if feature should be shown
+ */
+export function isFeatureEnabled(featureLevel) {
+    const levels = { focus: 0, guided: 1, explore: 2 };
+    return levels[experienceMode] >= levels[featureLevel];
+}
+
 // Get complete global state
 export function getGlobalState() {
     return {
@@ -140,7 +172,8 @@ export function getGlobalState() {
         isCompactModeOn,
         isDarkModeOn,
         isFretboardModeOn,
-        g_NumOctaves
+        g_NumOctaves,
+        experienceMode
     };
 }
 
@@ -158,6 +191,8 @@ export function initializeGlobalState() {
     isDarkModeOn = false;
     isFretboardModeOn = false;
     g_NumOctaves = 4;
+    // Preserve experienceMode from localStorage, default to 'guided'
+    experienceMode = localStorage.getItem('experienceMode') || 'guided';
 }
 
 // Reset global state to defaults

@@ -3594,8 +3594,10 @@ export class NotationComposer {
       }
     }
 
-    // NOTE: updateChordLabelOverlays is NOT called here - the caller (_scheduleChordBadgeUpdate)
-    // will call it after coach analysis completes, avoiding duplicate calls
+    // Update the visual badge overlays to reflect the new coach items
+    // This is called directly when coach analysis runs (e.g., mode switch to Guided)
+    // as well as during normal render cycles via _scheduleChordBadgeUpdate
+    this.updateChordLabelOverlays();
   }
 
   /**
