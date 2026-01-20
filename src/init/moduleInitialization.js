@@ -164,6 +164,9 @@ import '../modules/community/mySubmissions.js';
 // Import chordBracketEditor (registers window.showChordBracketEditor on import)
 import '../modules/ui/chordBracketEditor.js';
 
+// ChordContextMenu has been deprecated in favor of the enhanced ChordBracketEditor
+// import '../modules/ui/ChordContextMenu.js';
+
 import {
     initAdminFab
 } from '../modules/admin/adminFab.js';

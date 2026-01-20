@@ -5165,10 +5165,14 @@ export class FullScreenNotationEditor {
 
     /**
      * Handle progression update events
+     * @param {CustomEvent} event - The progressionUpdated event
      */
-    _onProgressionUpdate() {
-        // Re-render chord progression in bottom panel
-        if (this.isOpen || this.isTabMode) {
+    _onProgressionUpdate(event) {
+        // Check if caller requested to skip UI refresh (e.g., during tooltip inversion changes)
+        const skipUIRefresh = event?.detail?.skipUIRefresh;
+
+        // Re-render chord progression in bottom panel (unless skipped)
+        if ((this.isOpen || this.isTabMode) && !skipUIRefresh) {
             this.bottomPanel?.refresh();
             // Also update time signature dropdown and header in case it changed
             this._updateTimeSignatureDropdown();

@@ -118,7 +118,8 @@ export function spellNoteInKey(note, key) {
 
 /**
  * Convert a note name with octave to MIDI number
- * @param {string} note - Note name with octave (e.g., "C4")
+ * Handles double accidentals (##, bb, x) by converting to simple enharmonics
+ * @param {string} note - Note name with octave (e.g., "C4", "F##3", "Bbb4")
  * @returns {number} MIDI number
  */
 export function noteToMidi(note) {
@@ -126,14 +127,43 @@ export function noteToMidi(note) {
         console.warn(`Invalid note passed to noteToMidi: ${note}`);
         return NaN;
     }
+
+    // Convert double accidentals to simple enharmonics for Tone.js compatibility
+    let convertedNote = note;
+    const match = note.match(/^([A-G])(##|bb|x)?([#b])?(\d+)$/);
+    if (match) {
+        const [, letter, doubleAcc, singleAcc, octave] = match;
+        let octaveNum = parseInt(octave, 10);
+
+        if (doubleAcc === '##' || doubleAcc === 'x') {
+            // Double sharp: raise by 2 semitones
+            const doubleSharpMap = {
+                'C': 'D', 'D': 'E', 'E': 'F#', 'F': 'G', 'G': 'A', 'A': 'B', 'B': 'C#'
+            };
+            const newNote = doubleSharpMap[letter];
+            // Handle octave boundary: B## → C# of next octave
+            if (letter === 'B') octaveNum += 1;
+            convertedNote = newNote + octaveNum;
+        } else if (doubleAcc === 'bb') {
+            // Double flat: lower by 2 semitones
+            const doubleFlatMap = {
+                'C': 'Bb', 'D': 'C', 'E': 'D', 'F': 'Eb', 'G': 'F', 'A': 'G', 'B': 'A'
+            };
+            const newNote = doubleFlatMap[letter];
+            // Handle octave boundary: Cbb → Bb of previous octave
+            if (letter === 'C') octaveNum -= 1;
+            convertedNote = newNote + octaveNum;
+        }
+    }
+
     try {
-        const midi = Tone.Midi(note).toMidi();
+        const midi = Tone.Midi(convertedNote).toMidi();
         if (isNaN(midi)) {
-            console.warn(`noteToMidi returned NaN for note: ${note}`);
+            console.warn(`noteToMidi returned NaN for note: ${note} (converted: ${convertedNote})`);
         }
         return midi;
     } catch (e) {
-        console.warn(`Error converting note to MIDI: ${note}`, e);
+        console.warn(`Error converting note to MIDI: ${note} (converted: ${convertedNote})`, e);
         return NaN;
     }
 }
@@ -436,8 +466,9 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
     // Standard inversion: take the bottom N notes and move them up an octave.
     if (inversion > 0) {
         // Parse all notes to get their components
+        // Regex handles: single accidentals (#, b), double accidentals (##, bb, x for double sharp)
         const notesWithMidi = invertedNotes.map((note, idx) => {
-            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            const match = note.match(/^([A-G](?:##|bb|x|[#b])?)(\d+)$/);
             if (!match) return { note, midi: 0, name: note, octave: 0, originalIndex: idx };
             return {
                 note,

@@ -86,9 +86,10 @@ import {
     initializeSectionContainerSortable
 } from './ProgressionDragDrop.js';
 import { dispatchBuilderEvent } from '../../ui/lessonGuidedMode.js';
-import { getLHNotes, getInvertedChordNotes, noteToMidi } from '../../utils/noteUtils.js';
+import { getLHNotes, getInvertedChordNotes, noteToMidi, getChordNotes, spellNoteInKey, getEnharmonicPreferenceForKey } from '../../utils/noteUtils.js';
 import { initAudio, getAudioIsReady, getPiano } from '../../audio/audioEngine.js';
 import { highlightTrainer } from '../../ui/keyboard.js';
+import { generateComprehensiveRecommendations } from '../comprehensiveChordRecommendations.js';
 
 // Note: ChordGeneration and HelperFunctions modules were planned for future refactoring
 // but are not currently needed as functions are imported from other modules
@@ -7167,13 +7168,13 @@ export function attachCardEventListeners(wrapper, index) {
             updateInversionButtonHighlight(chord.inversion || 0);
         }
 
-        // Tooltip inversion buttons - hold to play, use pointer capture
+        // Tooltip inversion buttons - hold to play
         tooltipInversionBtns.forEach(btn => {
             // Track if button was actually pressed (not just hovered)
             let wasPressed = false;
 
-            // Pointerenter - prevent any browser auto-scroll behavior
-            btn.addEventListener('pointerenter', (e) => {
+            // Mouseenter - prevent any browser auto-scroll behavior
+            btn.addEventListener('mouseenter', (e) => {
                 e.preventDefault();
                 // Prevent button from receiving focus which can trigger scroll
                 if (document.activeElement === btn) {
@@ -7181,12 +7182,10 @@ export function attachCardEventListeners(wrapper, index) {
                 }
             });
 
-            // Pointerdown - start playing chord WITHOUT syncing notation (to prevent flicker)
-            btn.addEventListener('pointerdown', (e) => {
+            // Mousedown - start playing chord WITHOUT syncing notation (to prevent flicker)
+            btn.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
-                e.preventDefault();
-                // Capture pointer so we keep receiving events even if element moves
-                btn.setPointerCapture(e.pointerId);
+                e.preventDefault(); // Prevent any browser default behavior that might cause scrolling
                 wasPressed = true;
                 const inversion = parseInt(btn.getAttribute('data-inversion'));
 
@@ -7205,13 +7204,10 @@ export function attachCardEventListeners(wrapper, index) {
                 }
             });
 
-            // Pointerup - stop playing chord and sync notation immediately
-            btn.addEventListener('pointerup', (e) => {
+            // Mouseup - stop playing chord and sync notation immediately
+            btn.addEventListener('mouseup', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                if (btn.hasPointerCapture(e.pointerId)) {
-                    btn.releasePointerCapture(e.pointerId);
-                }
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
@@ -7225,15 +7221,14 @@ export function attachCardEventListeners(wrapper, index) {
                 wasPressed = false;
             });
 
-            // Pointercancel - handle system interruption
-            btn.addEventListener('pointercancel', (e) => {
-                if (btn.hasPointerCapture(e.pointerId)) {
-                    btn.releasePointerCapture(e.pointerId);
-                }
+            // Mouseleave - stop playing if user drags off button and sync notation
+            btn.addEventListener('mouseleave', (e) => {
+                e.stopPropagation(); // Don't let this bubble to tooltip's mouseleave
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
 
+                // Sync notation if button was pressed and user dragged off
                 if (wasPressed && inversionWasChanged && window.updateChordAndRenderPreservingTrebleNotes) {
                     window.updateChordAndRenderPreservingTrebleNotes(index, { skipCardRefresh: true });
                     inversionWasChanged = false;
@@ -7273,27 +7268,52 @@ export function attachCardEventListeners(wrapper, index) {
                 }
             }, { passive: true });
 
-            // Prevent click event from bubbling
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
+            // Note: We intentionally do NOT add a click listener here.
+            // The Chord Lab tooltips work without one, and adding it causes issues
+            // because the click event fires AFTER mouseup, and stopPropagation
+            // doesn't prevent other document-level listeners from firing.
         });
 
         // Close tooltip when clicking outside
-        document.addEventListener('click', (e) => {
-            if (isTooltipPinned && !cardWrapper.contains(e.target) && !chordTooltip.contains(e.target)) {
-                chordTooltip.classList.add('hidden');
-                isTooltipPinned = false;
-                // Update the card UI after closing to show any inversion changes
-                updateSingleCard(index);
-                updateTensionCurveIfVisible();
-
-                // Also update the Composition Studio's notation
-                if (window.updateChordAndRenderPreservingTrebleNotes) {
-                    window.updateChordAndRenderPreservingTrebleNotes(index);
-                }
+        // Use mousedown instead of click to fire BEFORE any other click handlers
+        const handleOutsideMousedown = (e) => {
+            // Safety check: if tooltip was removed from DOM, stop listening
+            if (!chordTooltip || !document.body.contains(chordTooltip)) {
+                document.removeEventListener('mousedown', handleOutsideMousedown);
+                return;
             }
-        });
+
+            // Only process if THIS specific tooltip is currently visible and pinned
+            // This is critical because there are multiple handlers (one per card)
+            if (!isTooltipPinned || chordTooltip.classList.contains('hidden')) {
+                return;
+            }
+
+            // Don't close if mousedown is inside ANY visible chord tooltip
+            // This handles the case where multiple handlers exist but we clicked inside a tooltip
+            const clickedTooltip = e.target.closest('.chord-tooltip');
+            if (clickedTooltip && !clickedTooltip.classList.contains('hidden')) {
+                return;
+            }
+
+            // Don't close if mousedown is inside the card wrapper (info button area)
+            if (cardWrapper && cardWrapper.contains(e.target)) {
+                return;
+            }
+
+            // Mousedown is outside - close the tooltip
+            chordTooltip.classList.add('hidden');
+            isTooltipPinned = false;
+            // Update the card UI after closing to show any inversion changes
+            updateSingleCard(index);
+            updateTensionCurveIfVisible();
+
+            // Also update the Composition Studio's notation
+            if (window.updateChordAndRenderPreservingTrebleNotes) {
+                window.updateChordAndRenderPreservingTrebleNotes(index);
+            }
+        };
+        document.addEventListener('mousedown', handleOutsideMousedown);
     }
 
     // === DURATION SELECTOR (single dropdown) ===

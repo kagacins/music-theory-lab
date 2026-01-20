@@ -1171,12 +1171,15 @@ export function updateChordInversion(index, newInversion, shouldUpdateUI = true,
     }
 
     // Dispatch progressionUpdated event for full-screen chord cards and other listeners
+    // Include skipUIRefresh flag when called from tooltip (shouldUpdateUI=false) to prevent
+    // the fullscreen bottom panel from re-rendering and closing the tooltip
     window.dispatchEvent(new CustomEvent('progressionUpdated', {
         detail: {
             progression: trainerState.progressionData,
             key: trainerState.currentKey,
             updatedIndex: index,
-            updateType: 'inversion'
+            updateType: 'inversion',
+            skipUIRefresh: !shouldUpdateUI
         }
     }));
 

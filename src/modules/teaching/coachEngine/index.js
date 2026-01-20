@@ -232,11 +232,8 @@ class CoachEngine {
      * @param {boolean} clearCooldowns - If true, clears all cooldowns first (for manual "Analyze" button)
      */
     analyzeCurrentComposition(clearCooldowns = true) {
-        console.log('[CoachEngine] analyzeCurrentComposition called, clearCooldowns:', clearCooldowns, 'enabled:', this.enabled);
-
         // Don't run analysis if coach is disabled (Focus mode)
         if (!this.enabled) {
-            console.log('[CoachEngine] Skipping analysis - coach is disabled (Focus mode)');
             return;
         }
 
@@ -247,12 +244,10 @@ class CoachEngine {
         }
 
         const context = this._buildContext();
-        console.log('[CoachEngine] Built context:', context ? 'valid' : 'null', context ? `(${context.progressionData?.length} chords)` : '');
         if (context) {
             this._runAnalysis(context);
         } else {
             // No context (e.g., progression cleared or < 2 chords) - clear badges
-            console.log('[CoachEngine] No context, clearing badges');
             if (window.updateMeasureCoachItems) {
                 window.updateMeasureCoachItems([]);
             }
@@ -350,27 +345,19 @@ class CoachEngine {
         const mode = getExperienceMode?.() || 'guided';
         const shouldBeEnabled = mode !== 'focus';
 
-        console.log(`[CoachEngine] _syncWithExperienceMode: mode=${mode}, shouldBeEnabled=${shouldBeEnabled}, wasEnabled=${this.enabled}`);
-
         const wasEnabled = this.enabled;
         this.enabled = shouldBeEnabled;
 
         if (wasEnabled !== shouldBeEnabled) {
-            console.log(`[CoachEngine] State changed: ${shouldBeEnabled ? 'Enabled' : 'Disabled'}`);
-
             if (!shouldBeEnabled) {
                 // Switching to focus mode - clear any visible badges/nudges
-                console.log('[CoachEngine] Clearing badges for Focus mode');
                 if (window.updateMeasureCoachItems) {
                     window.updateMeasureCoachItems([]);
                 }
             } else {
                 // Switching back to Guided/Explore - re-run analysis to show badges
-                console.log('[CoachEngine] Re-running analysis for Guided/Explore mode');
                 this.analyzeCurrentComposition();
             }
-        } else {
-            console.log('[CoachEngine] No state change needed');
         }
     }
 
@@ -444,7 +431,6 @@ class CoachEngine {
      * Run all detectors and process results
      */
     _runAnalysis(context) {
-        console.log('[CoachEngine] _runAnalysis called, detectors count:', this._detectors.length);
         const allItems = [];
 
         // Run registered detectors
@@ -459,8 +445,6 @@ class CoachEngine {
             }
         }
 
-        console.log('[CoachEngine] Analysis found', allItems.length, 'items');
-
         // Filter, prioritize, and queue
         const filtered = this._filterItems(allItems);
         const prioritized = this._prioritizeItems(filtered);
@@ -469,10 +453,7 @@ class CoachEngine {
         // Update measure coach items for notation overlay icons
         // Pass ALL detected items (not just filtered) so the icons show everything
         if (window.updateMeasureCoachItems) {
-            console.log('[CoachEngine] Calling updateMeasureCoachItems with', allItems.length, 'items');
             window.updateMeasureCoachItems(allItems);
-        } else {
-            console.warn('[CoachEngine] window.updateMeasureCoachItems not available');
         }
 
         // Process queue

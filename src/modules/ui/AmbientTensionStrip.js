@@ -10,12 +10,14 @@
  * This is a Layer 1 (Ambient) feature per the Educational Enhancement Roadmap.
  */
 
-import { getTensionArcPlanner } from '../analysis/TensionArcPlanner.js';
+import { getTensionArcPlanner, CHORD_TENSION_SCORES } from '../analysis/TensionArcPlanner.js';
 import { getExperienceMode } from '../state/globalState.js';
+import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 
 export class AmbientTensionStrip {
     constructor() {
         this.planner = getTensionArcPlanner();
+        this.harmonyAnalyzer = getHarmonyAnalyzer();
         this.height = 32;
         this.curveHeight = 24;
         // Track hashes per container to support multiple render targets
@@ -120,7 +122,7 @@ export class AmbientTensionStrip {
         }
 
         strip.innerHTML = html;
-        this._attachListeners(strip, progressionData);
+        this._attachListeners(strip, progressionData, key, curve);
     }
 
     /**
@@ -295,20 +297,135 @@ export class AmbientTensionStrip {
     }
 
     /**
+     * Generate a human-readable explanation of WHY a chord has its tension level
+     * @param {Object} chord - Chord object
+     * @param {string} key - Current key
+     * @param {number} tension - Calculated tension value (0-1)
+     * @param {number} index - Position in progression
+     * @param {number} total - Total chords in progression
+     * @returns {string} Explanation text
+     */
+    _generateTensionExplanation(chord, key, tension, index, total) {
+        if (!chord) return 'Unknown chord';
+
+        const reasons = [];
+        const tensionPct = Math.round(tension * 100);
+        const tensionLevel = tension < 0.33 ? 'Low' : tension < 0.66 ? 'Medium' : 'High';
+
+        // Get chord type info
+        const typeInfo = CHORD_TENSION_SCORES[chord.type];
+        const chordSymbol = `${chord.root}${this._getChordSymbol(chord.type)}`;
+
+        // 1. Chord type contribution
+        if (typeInfo) {
+            if (typeInfo.baseTension >= 0.7) {
+                reasons.push(`${chord.type} chords have inherent dissonance`);
+            } else if (typeInfo.baseTension >= 0.5) {
+                reasons.push(`${chord.type} chords create moderate tension`);
+            } else if (typeInfo.baseTension <= 0.25) {
+                reasons.push(`${chord.type} chords are stable and consonant`);
+            }
+        }
+
+        // 2. Harmonic function contribution
+        try {
+            const func = this.harmonyAnalyzer.getChordFunction(chord, key);
+            if (func === 'Dominant') {
+                reasons.push(`Dominant function creates strong pull to resolve`);
+            } else if (func === 'Tonic') {
+                reasons.push(`Tonic function provides resolution and rest`);
+            } else if (func === 'Subdominant' || func === 'Predominant') {
+                reasons.push(`${func} function builds anticipation`);
+            }
+        } catch (e) {
+            // Harmony analyzer not available
+        }
+
+        // 3. Borrowed/chromatic chord
+        try {
+            const scaleChords = this.harmonyAnalyzer.getMajorScaleChords(key);
+            const isInKey = this.harmonyAnalyzer.isChordInKey(chord, scaleChords);
+            if (!isInKey) {
+                reasons.push(`Borrowed from outside the key (adds color)`);
+            }
+        } catch (e) {
+            // Harmony analyzer not available
+        }
+
+        // 4. Inversion
+        if (chord.inversion && chord.inversion > 0) {
+            const inversionNames = ['', '1st', '2nd', '3rd'];
+            reasons.push(`${inversionNames[chord.inversion] || chord.inversion + 'th'} inversion adds instability`);
+        }
+
+        // Build the explanation
+        let explanation = `${chordSymbol}: ${tensionPct}% tension (${tensionLevel})`;
+        if (reasons.length > 0) {
+            explanation += '\n• ' + reasons.slice(0, 2).join('\n• ');
+        }
+
+        return explanation;
+    }
+
+    /**
+     * Get chord symbol for display
+     */
+    _getChordSymbol(type) {
+        const symbols = {
+            'Major': '',
+            'Minor': 'm',
+            'Diminished': '°',
+            'Augmented': '+',
+            'Dominant 7th': '7',
+            'Major 7th': 'maj7',
+            'Minor 7th': 'm7',
+            'Diminished 7th': '°7',
+            'Half-Diminished 7th': 'ø7',
+            'Sus2': 'sus2',
+            'Sus4': 'sus4',
+            'Add9': 'add9',
+            'Major 9th': 'maj9',
+            'Dominant 9th': '9',
+            'Minor 9th': 'm9'
+        };
+        return symbols[type] || '';
+    }
+
+    /**
      * Attach event listeners
      */
-    _attachListeners(strip, progressionData) {
+    _attachListeners(strip, progressionData, key, curve) {
         const inner = strip.querySelector('.ambient-tension-strip-inner');
         if (!inner) return;
 
+        // Create a floating tooltip element for rich explanations
+        // Use position: fixed to escape overflow containers
+        let tooltip = document.getElementById('tension-explanation-tooltip-global');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'tension-explanation-tooltip-global';
+            tooltip.style.cssText = `
+                position: fixed;
+                z-index: 999999;
+                background: white;
+                border-radius: 10px;
+                font-size: 12px;
+                line-height: 1.5;
+                max-width: 280px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.1);
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.2s ease;
+                overflow: hidden;
+            `;
+            document.body.appendChild(tooltip);
+        }
+
         // Click to open full tension analysis
         inner.addEventListener('click', (e) => {
-            // Don't open if clicking on a specific point (future: could show point tooltip)
+            // Don't open modal if clicking on a specific point - just show tooltip
             if (e.target.classList.contains('tension-point')) {
-                const index = parseInt(e.target.dataset.index, 10);
-                const tension = e.target.dataset.tension;
-                // Could show tooltip or highlight chord card here
-                console.log(`Chord ${index + 1}: ${tension}% tension`);
+                return;
             }
 
             // Open Unified Recommendation Modal to Optimize tab
@@ -320,24 +437,159 @@ export class AmbientTensionStrip {
             }
         });
 
-        // Hover effects on points
+        // Hover effects on points with rich explanation tooltips
         const points = strip.querySelectorAll('.tension-point');
         points.forEach(point => {
-            point.addEventListener('mouseenter', () => {
+            point.addEventListener('mouseenter', (e) => {
                 point.setAttribute('r', '5');
                 const index = parseInt(point.dataset.index, 10);
+                const chord = progressionData[index];
+                const tensionValue = curve[index]?.tension || 0;
+
+                // Generate pretty HTML tooltip
+                const tooltipContent = this._generatePrettyTooltipHTML(
+                    chord, key, tensionValue, index, progressionData.length
+                );
+
+                // Show tooltip with pretty formatting
+                tooltip.innerHTML = tooltipContent;
+                tooltip.style.opacity = '1';
+
+                // Position tooltip above the point using fixed positioning
+                const pointRect = point.getBoundingClientRect();
+                const tooltipWidth = 280;
+
+                // Center horizontally on the point, but keep within viewport
+                let left = pointRect.left + pointRect.width / 2 - tooltipWidth / 2;
+                left = Math.max(10, Math.min(left, window.innerWidth - tooltipWidth - 10));
+
+                // Position above the point
+                const top = pointRect.top - 10;
+
+                tooltip.style.left = `${left}px`;
+                tooltip.style.bottom = `${window.innerHeight - top}px`;
+                tooltip.style.top = 'auto';
+
                 // Highlight corresponding chord card
                 if (window.highlightChordCard) {
                     window.highlightChordCard(index);
                 }
             });
+
             point.addEventListener('mouseleave', () => {
                 point.setAttribute('r', '3');
+                tooltip.style.opacity = '0';
                 if (window.unhighlightAllChordCards) {
                     window.unhighlightAllChordCards();
                 }
             });
         });
+    }
+
+    /**
+     * Generate pretty HTML for the tooltip
+     */
+    _generatePrettyTooltipHTML(chord, key, tension, index, total) {
+        if (!chord) return '<div style="padding: 12px;">Unknown chord</div>';
+
+        const tensionPct = Math.round(tension * 100);
+        const tensionLevel = tension < 0.33 ? 'Low' : tension < 0.66 ? 'Medium' : 'High';
+        const tensionColor = this._getTensionColor(tension);
+        const chordSymbol = `${chord.root}${this._getChordSymbol(chord.type)}`;
+
+        // Get gradient colors based on tension
+        const gradientStart = tension < 0.33 ? '#10b981' : tension < 0.66 ? '#f59e0b' : '#ef4444';
+        const gradientEnd = tension < 0.33 ? '#059669' : tension < 0.66 ? '#d97706' : '#dc2626';
+
+        // Collect reasons
+        const reasons = [];
+        const typeInfo = CHORD_TENSION_SCORES[chord.type];
+
+        if (typeInfo) {
+            if (typeInfo.baseTension >= 0.7) {
+                reasons.push({ icon: '⚡', text: `${chord.type} chords have inherent dissonance` });
+            } else if (typeInfo.baseTension >= 0.5) {
+                reasons.push({ icon: '〰️', text: `${chord.type} chords create moderate tension` });
+            } else if (typeInfo.baseTension <= 0.25) {
+                reasons.push({ icon: '✨', text: `${chord.type} chords are stable and consonant` });
+            }
+        }
+
+        try {
+            const func = this.harmonyAnalyzer.getChordFunction(chord, key);
+            if (func === 'Dominant') {
+                reasons.push({ icon: '➡️', text: 'Dominant function - wants to resolve' });
+            } else if (func === 'Tonic') {
+                reasons.push({ icon: '🏠', text: 'Tonic function - home base, restful' });
+            } else if (func === 'Subdominant' || func === 'Predominant') {
+                reasons.push({ icon: '📈', text: `${func} - builds anticipation` });
+            }
+        } catch (e) {}
+
+        try {
+            const scaleChords = this.harmonyAnalyzer.getMajorScaleChords(key);
+            const isInKey = this.harmonyAnalyzer.isChordInKey(chord, scaleChords);
+            if (!isInKey) {
+                reasons.push({ icon: '🎨', text: 'Borrowed chord - adds color' });
+            }
+        } catch (e) {}
+
+        if (chord.inversion && chord.inversion > 0) {
+            const inversionNames = ['', '1st', '2nd', '3rd'];
+            reasons.push({ icon: '↕️', text: `${inversionNames[chord.inversion] || chord.inversion + 'th'} inversion` });
+        }
+
+        // Build HTML
+        const reasonsHTML = reasons.slice(0, 3).map(r =>
+            `<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+                <span style="font-size: 14px;">${r.icon}</span>
+                <span style="color: #4b5563;">${r.text}</span>
+            </div>`
+        ).join('');
+
+        return `
+            <!-- Header with gradient -->
+            <div style="
+                background: linear-gradient(135deg, ${gradientStart}, ${gradientEnd});
+                padding: 10px 14px;
+                color: white;
+            ">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; font-size: 16px;">${chordSymbol}</span>
+                    <span style="
+                        background: rgba(255,255,255,0.25);
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        font-size: 11px;
+                        font-weight: 600;
+                    ">${tensionLevel}</span>
+                </div>
+                <div style="margin-top: 4px; font-size: 13px; opacity: 0.9;">
+                    Tension: ${tensionPct}%
+                </div>
+            </div>
+            <!-- Body with reasons -->
+            ${reasons.length > 0 ? `
+                <div style="padding: 10px 14px; background: #fafafa;">
+                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #9ca3af; margin-bottom: 6px;">
+                        Why this tension?
+                    </div>
+                    ${reasonsHTML}
+                </div>
+            ` : ''}
+            <!-- Arrow pointer -->
+            <div style="
+                position: absolute;
+                bottom: -8px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 0;
+                height: 0;
+                border-left: 8px solid transparent;
+                border-right: 8px solid transparent;
+                border-top: 8px solid ${reasons.length > 0 ? '#fafafa' : 'white'};
+            "></div>
+        `;
     }
 
     /**

@@ -2457,9 +2457,39 @@ export class NotationComposer {
     if (!container) return null;
 
     const rect = container.getBoundingClientRect();
+
+    // Get CSS pixel position relative to container
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+
+    // Check if container is a canvas - if so, scale to internal coordinates
+    // Canvas may have higher internal resolution (e.g., for retina displays)
+    if (container.tagName === 'CANVAS') {
+      const scaleX = container.width / rect.width;
+      const scaleY = container.height / rect.height;
+      return {
+        x: cssX * scaleX,
+        y: cssY * scaleY,
+      };
+    }
+
+    // For non-canvas containers, also check for canvas child
+    const canvas = container.querySelector('canvas');
+    if (canvas) {
+      const canvasRect = canvas.getBoundingClientRect();
+      const canvasCssX = e.clientX - canvasRect.left;
+      const canvasCssY = e.clientY - canvasRect.top;
+      const scaleX = canvas.width / canvasRect.width;
+      const scaleY = canvas.height / canvasRect.height;
+      return {
+        x: canvasCssX * scaleX,
+        y: canvasCssY * scaleY,
+      };
+    }
+
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: cssX,
+      y: cssY,
     };
   }
 
@@ -2472,6 +2502,21 @@ export class NotationComposer {
     // Get position - works for both single and multi-page mode
     const position = this.getPositionFromEvent(e);
     if (!position) return;
+
+    // Check if click is on a chord bracket - show ChordBracketEditor if so
+    const bracketRegion = this.findChordBracketAtPosition(position.x, position.y, position.page);
+
+    if (bracketRegion) {
+      // Show the Chord Bracket Editor at click position
+      // This also selects the chord for context
+      if (window.selectProgressionChord) {
+        window.selectProgressionChord(bracketRegion.chordIndex);
+      }
+      if (window.showChordBracketEditor) {
+        window.showChordBracketEditor(bracketRegion.chordIndex, null, e);
+        return; // Don't process further - bracket click handled
+      }
+    }
 
     // Find what was clicked
     const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
@@ -2705,17 +2750,23 @@ export class NotationComposer {
       return null;
     }
 
+    // Get page index - page object may have 'index' or 'pageIndex' property
+    const pageIndex = page?.index ?? page?.pageIndex;
     for (const region of this.chordBracketRegions) {
       // In multi-page mode, check page index matches
-      if (page && region.pageIndex !== undefined && region.pageIndex !== page.pageIndex) {
+      // But if page is null/undefined (legacy single canvas mode), skip the page check
+      if (page && region.pageIndex !== undefined && region.pageIndex !== pageIndex) {
         continue;
       }
 
-      if (x >= region.x && x <= region.x + region.width &&
-          y >= region.y && y <= region.y + region.height) {
+      const inX = x >= region.x && x <= region.x + region.width;
+      const inY = y >= region.y && y <= region.y + region.height;
+
+      if (inX && inY) {
         return region;
       }
     }
+
     return null;
   }
 
