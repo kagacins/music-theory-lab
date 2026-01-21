@@ -26,12 +26,17 @@ export const CHORD_VIEWS = {
 
 // Intent-based sub-tabs for the Chord Hub
 export const CHORD_INTENTS = {
-    SUGGEST: 'suggest',      // What chord comes next? (Quick + Explorer)
-    COMPARE: 'compare',      // Compare alternatives for a position
-    TRANSFORM: 'transform',  // Transform the whole progression
-    OPTIMIZE: 'optimize',    // Optimize for tension curve
-    SEQUENCE: 'sequence',    // Build multi-chord sequences
-    ADVANCED: 'advanced'     // Borrowed chords, secondary dominants, chromatic mediants
+    SUGGEST: 'suggest',        // What chord comes next? (Quick + Explorer)
+    ALTERNATIVES: 'alternatives', // Compare & transform alternatives (unified view)
+    OPTIMIZE: 'optimize',      // Optimize for tension curve
+    SEQUENCE: 'sequence',      // Build multi-chord sequences
+    ADVANCED: 'advanced'       // Borrowed chords, secondary dominants, chromatic mediants
+};
+
+// Legacy aliases for backwards compatibility with localStorage
+export const CHORD_INTENTS_LEGACY = {
+    COMPARE: 'compare',      // Now maps to ALTERNATIVES
+    TRANSFORM: 'transform'   // Now maps to ALTERNATIVES
 };
 
 export const MELODY_VIEWS = {
@@ -53,7 +58,12 @@ const modalState = {
 
     // Chord tab state
     chordView: localStorage.getItem('unified-modal-chord-view') || CHORD_VIEWS.QUICK,
-    chordIntent: localStorage.getItem('unified-modal-chord-intent') || CHORD_INTENTS.SUGGEST,
+    // Handle legacy localStorage values (compare/transform now map to alternatives)
+    chordIntent: (() => {
+        const stored = localStorage.getItem('unified-modal-chord-intent');
+        if (stored === 'compare' || stored === 'transform') return CHORD_INTENTS.ALTERNATIVES;
+        return stored || CHORD_INTENTS.SUGGEST;
+    })(),
     style: localStorage.getItem('chord-suggestion-style') || 'balanced',
     mood: localStorage.getItem('chord-suggestion-mood') || 'bright',
     activeInversion: 0,

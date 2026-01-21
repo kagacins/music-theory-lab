@@ -225,10 +225,12 @@ function buildUnderstandTabContent(chord, key, chordIndex) {
  * Get voice leading hints based on surrounding chords
  * Compares actual pitches (with octaves) for true common tones,
  * and pitch classes (without octaves) for potential voice leading opportunities
+ * Shows both directions: from previous chord AND to next chord
  */
 function getVoiceLeadingHints(chord, prevChord, nextChord, key) {
     const hints = [];
 
+    // Analyze voice leading FROM previous chord
     if (prevChord && prevChord.type !== 'No Chord') {
         const prevNotesWithOctave = prevChord.notes || [];
         const currNotesWithOctave = chord.notes || [];
@@ -242,31 +244,39 @@ function getVoiceLeadingHints(chord, prevChord, nextChord, key) {
         const sharedPitchClasses = [...new Set(currPitchClasses.filter(n => prevPitchClasses.includes(n)))];
 
         if (trueCommonTones.length > 0) {
-            // Exact same notes - can be held steady
             const displayNotes = trueCommonTones.map(n => n.replace(/\d+$/, ''));
-            hints.push(`Share${trueCommonTones.length === 1 ? 's' : ''} ${displayNotes.join(', ')} at same octave - hold ${trueCommonTones.length === 1 ? 'it' : 'them'} steady`);
+            hints.push(`← From prev: ${displayNotes.join(', ')} held at same octave`);
         } else if (sharedPitchClasses.length > 0) {
-            // Same pitch class but different octave - note the octave shift
-            hints.push(`${sharedPitchClasses.join(', ')} appears in both chords but at different octaves`);
+            hints.push(`← From prev: ${sharedPitchClasses.join(', ')} shared but octave shifts`);
         } else {
-            hints.push('No common tones - move voices by step where possible');
+            hints.push(`← From prev: No common tones - move by step`);
         }
     }
 
-    if (nextChord && nextChord.type !== 'No Chord' && hints.length === 0) {
+    // Analyze voice leading TO next chord
+    if (nextChord && nextChord.type !== 'No Chord') {
         const nextNotesWithOctave = nextChord.notes || [];
         const currNotesWithOctave = chord.notes || [];
 
         // Find TRUE common tones with next chord
         const trueCommonTones = currNotesWithOctave.filter(n => nextNotesWithOctave.includes(n));
 
+        // Find pitch classes in common
+        const nextPitchClasses = nextNotesWithOctave.map(n => n.replace(/\d+$/, ''));
+        const currPitchClasses = currNotesWithOctave.map(n => n.replace(/\d+$/, ''));
+        const sharedPitchClasses = [...new Set(currPitchClasses.filter(n => nextPitchClasses.includes(n)))];
+
         if (trueCommonTones.length > 0) {
             const displayNotes = trueCommonTones.map(n => n.replace(/\d+$/, ''));
-            hints.push(`Will share ${displayNotes.join(', ')} with next chord - prepare to hold`);
+            hints.push(`→ To next: Hold ${displayNotes.join(', ')}`);
+        } else if (sharedPitchClasses.length > 0) {
+            hints.push(`→ To next: ${sharedPitchClasses.join(', ')} shared but octave shifts`);
+        } else {
+            hints.push(`→ To next: No common tones - move by step`);
         }
     }
 
-    return hints.length > 0 ? hints[0] : null;
+    return hints.length > 0 ? hints.join(' · ') : null;
 }
 
 /**
@@ -306,182 +316,6 @@ function getCommonUsages(chordType, roman) {
     }
 
     return result.slice(0, 3); // Limit to 3 usages
-}
-
-/**
- * Build the "What If?" tab content - Quick variations to audition
- */
-function buildWhatIfTabContent(chord, key, chordIndex) {
-    const isNoChord = chord.type === 'No Chord';
-    if (isNoChord) {
-        return `
-            <div class="p-4 text-center text-gray-500">
-                <div class="text-2xl mb-2">🔄</div>
-                <div class="text-sm">No variations for N.C.</div>
-            </div>
-        `;
-    }
-
-    // Generate context-aware variations
-    const variations = getQuickVariations(chord, key);
-
-    return `
-        <div class="p-3 space-y-3 text-xs">
-            <div class="text-gray-600 text-[11px] mb-2">
-                Click to preview, double-click to apply
-            </div>
-
-            <!-- Variation buttons grid -->
-            <div class="grid grid-cols-2 gap-2">
-                ${variations.map((v, i) => `
-                    <button class="whatif-btn group relative px-3 py-2.5 bg-gradient-to-br ${v.gradient} text-white rounded-lg text-[11px] font-semibold text-left hover:shadow-md transition-all overflow-hidden"
-                            data-variation-type="${v.type}"
-                            data-variation-root="${v.root || chord.root}"
-                            data-variation-chord-type="${v.chordType}"
-                            data-variation-inversion="${v.inversion !== undefined ? v.inversion : chord.inversion || 0}"
-                            title="${v.description}">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">${v.icon}</span>
-                            <div>
-                                <div class="font-bold">${v.label}</div>
-                                <div class="text-[9px] opacity-80">${v.preview}</div>
-                            </div>
-                        </div>
-                        <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                    </button>
-                `).join('')}
-            </div>
-
-            <!-- Current vs Preview comparison -->
-            <div class="whatif-comparison hidden mt-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                <div class="flex justify-between items-center text-[10px]">
-                    <div class="text-center">
-                        <div class="text-gray-500">Current</div>
-                        <div class="font-bold text-gray-700 whatif-current">${chord.root}${CHORD_DEFINITIONS[chord.type]?.symbol || ''}</div>
-                    </div>
-                    <div class="text-gray-400">→</div>
-                    <div class="text-center">
-                        <div class="text-gray-500">Preview</div>
-                        <div class="font-bold text-indigo-600 whatif-preview">-</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Apply button (hidden until variation is selected) -->
-            <div class="whatif-apply-container hidden pt-2 border-t border-gray-200">
-                <button class="whatif-apply-btn w-full py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg text-[11px] font-bold hover:from-green-600 hover:to-emerald-700 transition-all">
-                    ✓ Apply This Variation
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-/**
- * Generate quick variations for What If panel
- */
-function getQuickVariations(chord, key) {
-    const variations = [];
-    const { root, type, inversion } = chord;
-    const chordDef = CHORD_DEFINITIONS[type];
-
-    // 1. Quality change (Major ↔ Minor)
-    if (type === 'Major') {
-        variations.push({
-            type: 'quality',
-            icon: '🌙',
-            label: 'Minor?',
-            preview: `${root}m`,
-            chordType: 'Minor',
-            gradient: 'from-purple-500 to-purple-600',
-            description: 'Change to minor for a darker, more emotional sound'
-        });
-    } else if (type === 'Minor') {
-        variations.push({
-            type: 'quality',
-            icon: '☀️',
-            label: 'Major?',
-            preview: `${root}`,
-            chordType: 'Major',
-            gradient: 'from-amber-500 to-orange-500',
-            description: 'Change to major for a brighter, happier sound'
-        });
-    }
-
-    // 2. Add 7th (if triad)
-    if (['Major', 'Minor', 'Diminished', 'Augmented'].includes(type)) {
-        const seventh = type === 'Major' ? 'Major 7th' :
-                       type === 'Minor' ? 'Minor 7th' :
-                       type === 'Diminished' ? 'Diminished 7th' : 'Augmented 7th';
-        const symbol = CHORD_DEFINITIONS[seventh]?.symbol || '7';
-        variations.push({
-            type: 'extend',
-            icon: '✨',
-            label: 'Add 7th?',
-            preview: `${root}${symbol}`,
-            chordType: seventh,
-            gradient: 'from-blue-500 to-indigo-600',
-            description: 'Add a 7th for richer jazz/pop sound'
-        });
-    }
-
-    // 3. Suspended variation
-    if (type === 'Major' || type === 'Minor') {
-        variations.push({
-            type: 'suspend',
-            icon: '🎯',
-            label: 'Sus4?',
-            preview: `${root}sus4`,
-            chordType: 'Sus4',
-            gradient: 'from-teal-500 to-cyan-600',
-            description: 'Suspend the 3rd for tension before resolution'
-        });
-    }
-
-    // 4. Inversion (cycle to next)
-    if (chordDef && chordDef.intervals.length > 1) {
-        const maxInv = chordDef.intervals.length - 1;
-        const nextInv = ((inversion || 0) + 1) % (maxInv + 1);
-        const invLabel = nextInv === 0 ? 'Root' : `${nextInv}${nextInv === 1 ? 'st' : nextInv === 2 ? 'nd' : 'rd'}`;
-        variations.push({
-            type: 'invert',
-            icon: '🔃',
-            label: `${invLabel} Inv?`,
-            preview: `${root}${CHORD_DEFINITIONS[type]?.symbol || ''}/${nextInv}`,
-            chordType: type,
-            inversion: nextInv,
-            gradient: 'from-pink-500 to-rose-600',
-            description: `Try ${invLabel.toLowerCase()} inversion for different bass note`
-        });
-    }
-
-    // 5. Dominant 7th (for V chords or any major that could be secondary dominant)
-    if (type === 'Major') {
-        variations.push({
-            type: 'dominant',
-            icon: '⚡',
-            label: 'Dom 7th?',
-            preview: `${root}7`,
-            chordType: 'Dominant 7th',
-            gradient: 'from-red-500 to-orange-600',
-            description: 'Make it a dominant 7th for stronger resolution'
-        });
-    }
-
-    // 6. Add9 for richer texture
-    if (type === 'Major' || type === 'Minor') {
-        variations.push({
-            type: 'color',
-            icon: '🌈',
-            label: 'Add9?',
-            preview: `${root}add9`,
-            chordType: 'Add9',
-            gradient: 'from-violet-500 to-purple-600',
-            description: 'Add the 9th for a shimmery pop/R&B color'
-        });
-    }
-
-    return variations.slice(0, 6); // Max 6 variations (3x2 grid)
 }
 
 /**
@@ -615,45 +449,36 @@ function buildRecommendTabContent(chordIndex, chord, key) {
                 ${isLastChord ? 'Suggestions for what comes next' : `Chord ${chordIndex + 1} of ${progression.length}`}
             </div>
 
-            <!-- Quick action buttons -->
+            <!-- Open Recommendations Modal buttons -->
             <div class="space-y-2">
+                <div class="text-[10px] font-semibold text-gray-500 uppercase mb-1">Open Recommendations Panel</div>
+
+                <!-- Alternatives button -->
+                <button class="recommend-alternatives-btn w-full px-3 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-2 hover:from-pink-600 hover:to-rose-600 transition shadow-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    Alternatives
+                    <span class="text-[9px] opacity-80">Replace this chord</span>
+                </button>
+
+                <!-- Suggested Next button -->
                 <button class="recommend-suggest-btn w-full px-3 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-2 hover:from-purple-600 hover:to-indigo-600 transition shadow-sm">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
                     </svg>
-                    Open Full Suggestions Panel
+                    Suggested Next
+                    <span class="text-[9px] opacity-80">What comes after?</span>
                 </button>
 
-                <div class="grid grid-cols-2 gap-2">
-                    <button class="recommend-compare-btn px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 transition">
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
-                        </svg>
-                        Alternatives
-                    </button>
-
-                    <button class="recommend-transform-btn px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 transition">
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/>
-                        </svg>
-                        Transform
-                    </button>
-                </div>
-            </div>
-
-            <!-- Quick next chord suggestions (top 3) -->
-            <div class="pt-2 border-t border-gray-200">
-                <div class="text-[10px] font-semibold text-gray-500 uppercase mb-2">Quick Picks</div>
-                <div class="flex gap-1.5 flex-wrap">
-                    ${getQuickNextSuggestions(chord, key).map(s => `
-                        <button class="quick-suggestion-btn px-2 py-1 bg-gray-100 hover:bg-indigo-100 text-gray-700 hover:text-indigo-700 rounded text-[10px] font-semibold transition"
-                                data-root="${s.root}"
-                                data-type="${s.type}"
-                                title="${s.reason}">
-                            ${s.root}${CHORD_DEFINITIONS[s.type]?.symbol || ''}
-                        </button>
-                    `).join('')}
-                </div>
+                <!-- Advanced Recommendations button -->
+                <button class="recommend-advanced-btn w-full px-3 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-2 hover:from-amber-600 hover:to-orange-600 transition shadow-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+                    </svg>
+                    Advanced
+                    <span class="text-[9px] opacity-80">Borrowed, secondary dom.</span>
+                </button>
             </div>
         </div>
     `;
@@ -735,66 +560,6 @@ function detectPatternContinuation(progression, chordIndex, key) {
     }
 
     return null;
-}
-
-/**
- * Get quick next chord suggestions
- */
-function getQuickNextSuggestions(currentChord, key) {
-    const suggestions = [];
-    const keyRoot = key.replace('m', '').replace('maj', '');
-    const isMinorKey = key.includes('m') && !key.includes('maj');
-
-    // Get roman numeral for context
-    const roman = currentChord.roman || getHarmonyAnalyzer()?.getRomanNumeral?.(currentChord, key) || '';
-    const upperRoman = roman.toUpperCase().replace(/[^IViv]/g, '');
-
-    // Suggest based on current chord function
-    if (upperRoman === 'I') {
-        // From I: go to IV, V, or vi
-        suggestions.push({ root: getScaleDegree(keyRoot, 4, isMinorKey), type: 'Major', reason: 'IV - subdominant motion' });
-        suggestions.push({ root: getScaleDegree(keyRoot, 5, isMinorKey), type: 'Major', reason: 'V - dominant preparation' });
-        suggestions.push({ root: getScaleDegree(keyRoot, 6, isMinorKey), type: 'Minor', reason: 'vi - relative minor color' });
-    } else if (upperRoman === 'IV') {
-        // From IV: go to V, I, or ii
-        suggestions.push({ root: getScaleDegree(keyRoot, 5, isMinorKey), type: 'Major', reason: 'V - classic IV-V motion' });
-        suggestions.push({ root: keyRoot, type: isMinorKey ? 'Minor' : 'Major', reason: 'I - plagal direction' });
-        suggestions.push({ root: getScaleDegree(keyRoot, 2, isMinorKey), type: 'Minor', reason: 'ii - pre-dominant' });
-    } else if (upperRoman === 'V') {
-        // From V: resolve to I, deceptive to vi
-        suggestions.push({ root: keyRoot, type: isMinorKey ? 'Minor' : 'Major', reason: 'I - resolution!' });
-        suggestions.push({ root: getScaleDegree(keyRoot, 6, isMinorKey), type: 'Minor', reason: 'vi - deceptive cadence' });
-        suggestions.push({ root: getScaleDegree(keyRoot, 4, isMinorKey), type: 'Major', reason: 'IV - extended phrase' });
-    } else {
-        // Default suggestions
-        suggestions.push({ root: keyRoot, type: isMinorKey ? 'Minor' : 'Major', reason: 'I - tonic' });
-        suggestions.push({ root: getScaleDegree(keyRoot, 5, isMinorKey), type: 'Major', reason: 'V - dominant' });
-        suggestions.push({ root: getScaleDegree(keyRoot, 4, isMinorKey), type: 'Major', reason: 'IV - subdominant' });
-    }
-
-    return suggestions.slice(0, 4);
-}
-
-/**
- * Get scale degree note from root
- */
-function getScaleDegree(root, degree, isMinor) {
-    const majorIntervals = [0, 2, 4, 5, 7, 9, 11]; // 1,2,3,4,5,6,7
-    const minorIntervals = [0, 2, 3, 5, 7, 8, 10]; // Natural minor
-
-    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-
-    let rootIdx = notes.indexOf(root);
-    const useFlats = root.includes('b') || ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'].includes(root);
-
-    if (rootIdx === -1) rootIdx = flatNotes.indexOf(root);
-    if (rootIdx === -1) return root;
-
-    const intervals = isMinor ? minorIntervals : majorIntervals;
-    const targetIdx = (rootIdx + intervals[degree - 1]) % 12;
-
-    return useFlats ? flatNotes[targetIdx] : notes[targetIdx];
 }
 
 /**
@@ -969,9 +734,6 @@ function createEditorHTML(chord, index, key) {
                 <button class="tab-btn flex-1 py-1.5 px-1 text-[11px] font-semibold text-center rounded-md transition-all cursor-pointer whitespace-nowrap ${activeTab === 'understand' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200' : 'bg-gray-200 text-gray-600 hover:bg-white hover:shadow-sm'}" data-tab="understand">
                     📖 Theory
                 </button>
-                <button class="tab-btn flex-1 py-1.5 px-1 text-[11px] font-semibold text-center rounded-md transition-all cursor-pointer whitespace-nowrap ${activeTab === 'whatif' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200' : 'bg-gray-200 text-gray-600 hover:bg-white hover:shadow-sm'}" data-tab="whatif">
-                    🔄 Try
-                </button>
                 <button class="tab-btn flex-1 py-1.5 px-1 text-[11px] font-semibold text-center rounded-md transition-all cursor-pointer whitespace-nowrap ${activeTab === 'melody' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-200' : 'bg-gray-200 text-gray-600 hover:bg-white hover:shadow-sm'}" data-tab="melody">
                     🎵 Melody
                 </button>
@@ -1046,11 +808,6 @@ function createEditorHTML(chord, index, key) {
                 <!-- Theory/Understand Tab Content -->
                 <div class="tab-content" data-tab-content="understand" style="display: ${activeTab === 'understand' ? 'block' : 'none'}">
                     ${buildUnderstandTabContent(chord, key, index)}
-                </div>
-
-                <!-- What If? Tab Content -->
-                <div class="tab-content" data-tab-content="whatif" style="display: ${activeTab === 'whatif' ? 'block' : 'none'}">
-                    ${buildWhatIfTabContent(chord, key, index)}
                 </div>
 
                 <!-- Melody Tab Content -->
@@ -1293,116 +1050,51 @@ function attachEditorEventListeners(editor, chordIndex, key) {
         });
     });
 
-    // Recommendation tab buttons
+    // Ideas tab - modal buttons (open Unified Recommendations Modal)
+    const recommendAlternativesBtn = editor.querySelector('.recommend-alternatives-btn');
     const recommendSuggestBtn = editor.querySelector('.recommend-suggest-btn');
-    const recommendCompareBtn = editor.querySelector('.recommend-compare-btn');
-    const recommendTransformBtn = editor.querySelector('.recommend-transform-btn');
+    const recommendAdvancedBtn = editor.querySelector('.recommend-advanced-btn');
+
+    if (recommendAlternativesBtn) {
+        recommendAlternativesBtn.addEventListener('click', () => {
+            hideChordBracketEditor();
+            if (window.showUnifiedRecommendationModal) {
+                window.showUnifiedRecommendationModal({
+                    initialTab: 'chord',
+                    initialIntent: 'alternatives',
+                    selectedChordIndex: chordIndex
+                });
+            }
+        });
+    }
 
     if (recommendSuggestBtn) {
         recommendSuggestBtn.addEventListener('click', () => {
             hideChordBracketEditor();
             if (window.showUnifiedRecommendationModal) {
                 window.showUnifiedRecommendationModal({
-                    initialIntent: 'next',
+                    initialTab: 'chord',
+                    initialIntent: 'suggest',
                     selectedChordIndex: chordIndex
                 });
             }
         });
     }
 
-    if (recommendCompareBtn) {
-        recommendCompareBtn.addEventListener('click', () => {
+    if (recommendAdvancedBtn) {
+        recommendAdvancedBtn.addEventListener('click', () => {
             hideChordBracketEditor();
             if (window.showUnifiedRecommendationModal) {
                 window.showUnifiedRecommendationModal({
                     initialTab: 'chord',
-                    initialIntent: 'compare',
+                    initialIntent: 'advanced',
                     selectedChordIndex: chordIndex
                 });
             }
         });
     }
 
-    if (recommendTransformBtn) {
-        recommendTransformBtn.addEventListener('click', () => {
-            hideChordBracketEditor();
-            if (window.showUnifiedRecommendationModal) {
-                window.showUnifiedRecommendationModal({
-                    initialTab: 'chord',
-                    initialIntent: 'transform',
-                    selectedChordIndex: chordIndex
-                });
-            }
-        });
-    }
-
-    // What If tab - variation buttons
-    const whatIfBtns = editor.querySelectorAll('.whatif-btn');
-    const whatIfComparison = editor.querySelector('.whatif-comparison');
-    const whatIfPreview = editor.querySelector('.whatif-preview');
-    const whatIfApplyContainer = editor.querySelector('.whatif-apply-container');
-    const whatIfApplyBtn = editor.querySelector('.whatif-apply-btn');
-
-    let pendingVariation = null;
-
-    whatIfBtns.forEach(btn => {
-        // Single click: preview (play the variation)
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-
-            const variationType = btn.dataset.variationType;
-            const variationRoot = btn.dataset.variationRoot;
-            const variationChordType = btn.dataset.variationChordType;
-            const variationInversion = parseInt(btn.dataset.variationInversion, 10) || 0;
-
-            // Store pending variation
-            pendingVariation = {
-                root: variationRoot,
-                type: variationChordType,
-                inversion: variationInversion
-            };
-
-            // Update comparison display
-            if (whatIfComparison) {
-                whatIfComparison.classList.remove('hidden');
-            }
-            if (whatIfPreview) {
-                whatIfPreview.textContent = `${variationRoot}${CHORD_DEFINITIONS[variationChordType]?.symbol || ''}`;
-            }
-            if (whatIfApplyContainer) {
-                whatIfApplyContainer.classList.remove('hidden');
-            }
-
-            // Highlight selected button
-            whatIfBtns.forEach(b => b.classList.remove('ring-2', 'ring-white', 'ring-offset-2'));
-            btn.classList.add('ring-2', 'ring-white', 'ring-offset-2');
-
-            // Play preview of the variation
-            playVariationPreview(variationRoot, variationChordType, variationInversion);
-        });
-
-        // Double click: apply immediately
-        btn.addEventListener('dblclick', (e) => {
-            e.stopPropagation();
-
-            const variationRoot = btn.dataset.variationRoot;
-            const variationChordType = btn.dataset.variationChordType;
-            const variationInversion = parseInt(btn.dataset.variationInversion, 10) || 0;
-
-            applyVariation(chordIndex, variationRoot, variationChordType, variationInversion, key);
-        });
-    });
-
-    // Apply button for What If
-    if (whatIfApplyBtn) {
-        whatIfApplyBtn.addEventListener('click', () => {
-            if (pendingVariation) {
-                applyVariation(chordIndex, pendingVariation.root, pendingVariation.type, pendingVariation.inversion, key);
-            }
-        });
-    }
-
-    // Pattern continuation button
+    // Pattern continuation button (kept - still in Ideas tab)
     const patternContinueBtn = editor.querySelector('.pattern-continue-btn');
     if (patternContinueBtn) {
         patternContinueBtn.addEventListener('click', () => {
@@ -1416,21 +1108,6 @@ function attachEditorEventListeners(editor, chordIndex, key) {
             }
         });
     }
-
-    // Quick suggestion buttons
-    const quickSuggestionBtns = editor.querySelectorAll('.quick-suggestion-btn');
-    quickSuggestionBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const root = btn.dataset.root;
-            const type = btn.dataset.type;
-
-            // Add chord after current position
-            if (window.addChordToProgression) {
-                window.addChordToProgression(root, type, 0, 4, chordIndex + 1);
-                hideChordBracketEditor();
-            }
-        });
-    });
 
     // Drag handle - make editor draggable
     if (dragHandle && editorElement) {
@@ -1781,65 +1458,6 @@ function playChordOnce(chordIndex) {
             }
         }, 500);
     }
-}
-
-/**
- * Play a variation preview (temporary chord without modifying state)
- * Uses octave 3 to match bass clef range where chords are typically placed
- */
-function playVariationPreview(root, chordType, inversion) {
-    try {
-        // Get notes for the variation at octave 3 (bass clef range)
-        const result = getChordNotes(root, chordType, getCurrentKey() || 'C', 3);
-        let notes = result?.specificNotes || [];
-
-        // Apply inversion if needed
-        if (inversion > 0 && notes.length > 1) {
-            for (let i = 0; i < inversion && i < notes.length - 1; i++) {
-                const note = notes.shift();
-                // Move to next octave
-                const match = note.match(/([A-G][#b]?)(\d+)/);
-                if (match) {
-                    notes.push(`${match[1]}${parseInt(match[2]) + 1}`);
-                }
-            }
-        }
-
-        // Play using audio engine
-        const piano = window.getPiano?.();
-        if (piano && notes.length > 0) {
-            piano.triggerAttackRelease(notes, '2n');
-        }
-    } catch (err) {
-        console.warn('[ChordBracketEditor] Could not play variation preview:', err);
-    }
-}
-
-/**
- * Apply a variation to the chord at given index
- */
-function applyVariation(chordIndex, root, chordType, inversion, key) {
-    // Save state for undo
-    if (window.saveStateBeforeChange) {
-        window.saveStateBeforeChange();
-    }
-
-    // Update chord using ProgressionController functions
-    if (window.updateChordRoot && root) {
-        window.updateChordRoot(chordIndex, root);
-    }
-    if (window.updateChordType && chordType) {
-        window.updateChordType(chordIndex, chordType);
-    }
-    if (window.updateChordInversion && inversion !== undefined) {
-        window.updateChordInversion(chordIndex, inversion, true, true);
-    }
-
-    // Refresh the editor to show updated state
-    refreshEditorContent(chordIndex, key);
-
-    // Play the new chord
-    playChordOnce(chordIndex);
 }
 
 /**

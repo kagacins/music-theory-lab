@@ -12,9 +12,9 @@ import { COACH_ITEM_TYPES, COACH_CATEGORIES, OBSERVATION_TYPES } from '../types.
 // ============================================================================
 
 /**
- * Normalize roman numeral for comparison
+ * Normalize roman numeral for comparison (removes extensions like 7, maj7, etc.)
  * @param {string} roman - Roman numeral string
- * @returns {string} Normalized roman numeral
+ * @returns {string} Normalized roman numeral (base only)
  */
 function normalizeRoman(roman) {
     if (!roman) return '';
@@ -24,6 +24,30 @@ function normalizeRoman(roman) {
         .replace(/♯/g, '#');
     // Remove extensions but keep base numeral and accidentals
     return normalized.replace(/(maj|min|add|sus|dim|aug|°)/gi, '').replace(/7|9|11|13/g, '');
+}
+
+/**
+ * Check if a roman numeral represents a minor chord (lowercase)
+ * @param {string} roman - Roman numeral string
+ * @returns {boolean} True if minor
+ */
+function isMinorRoman(roman) {
+    if (!roman) return false;
+    // Extract just the numeral part (remove accidentals and extensions)
+    const match = roman.match(/[b#♭♯]?([ivIV]+)/);
+    if (!match) return false;
+    const numeral = match[1];
+    // Lowercase numerals indicate minor
+    return numeral === numeral.toLowerCase();
+}
+
+/**
+ * Check if a chord is inverted
+ * @param {Object} chord - Chord object
+ * @returns {boolean} True if chord is inverted (inversion > 0)
+ */
+function isInverted(chord) {
+    return chord && (chord.inversion > 0 || chord.inversion === 1 || chord.inversion === 2 || chord.inversion === 3);
 }
 
 /**
@@ -46,6 +70,8 @@ export function detectCadences(context) {
 
         const prevRoman = normalizeRoman(prevChord.roman || prevChord.romanNumeral);
         const currRoman = normalizeRoman(currChord.roman || currChord.romanNumeral);
+        const prevRomanRaw = prevChord.roman || prevChord.romanNumeral || '';
+        const currRomanRaw = currChord.roman || currChord.romanNumeral || '';
 
         if (!prevRoman || !currRoman) continue;
 
@@ -55,35 +81,94 @@ export function detectCadences(context) {
             items.push({
                 ...OBSERVATION_TYPES['deceptive-cadence'],
                 data: {
-                    from: prevRoman,
-                    to: currRoman,
+                    from: prevRomanRaw,
+                    to: currRomanRaw,
                     startIndex: i - 1,
                     endIndex: i,
-                    // Only show badge on resolution chord (the second chord)
-                    // This avoids cluttering UI with badges on both V and vi
                     chordIndices: [i],
                     chordIndex: i,
-                    chord: currChord,  // For "Hear It" button - play the resolution chord
+                    chord: currChord,
                     fromChord: prevChord,
                     toChord: currChord
                 }
             });
         }
 
-        // Plagal Cadence: IV → I or iv → I
+        // Plagal Cadences: IV/iv → I
         if ((prevRoman === 'IV' || prevRoman === 'iv') &&
             (currRoman === 'I' || currRoman === 'i')) {
+
+            const prevIsMinor = isMinorRoman(prevRomanRaw);
+            const prevInverted = isInverted(prevChord);
+            const currInverted = isInverted(currChord);
+
+            // Determine which type of plagal cadence
+            if (prevInverted || currInverted) {
+                // Inverted Plagal Cadence
+                items.push({
+                    ...OBSERVATION_TYPES['inverted-plagal-cadence'],
+                    data: {
+                        from: prevRomanRaw,
+                        to: currRomanRaw,
+                        startIndex: i - 1,
+                        endIndex: i,
+                        chordIndices: [i],
+                        chordIndex: i,
+                        chord: currChord,
+                        fromChord: prevChord,
+                        toChord: currChord,
+                        prevInverted,
+                        currInverted
+                    }
+                });
+            } else if (prevIsMinor) {
+                // Minor Plagal Cadence (iv → I)
+                items.push({
+                    ...OBSERVATION_TYPES['minor-plagal-cadence'],
+                    data: {
+                        from: prevRomanRaw,
+                        to: currRomanRaw,
+                        startIndex: i - 1,
+                        endIndex: i,
+                        chordIndices: [i],
+                        chordIndex: i,
+                        chord: currChord,
+                        fromChord: prevChord,
+                        toChord: currChord
+                    }
+                });
+            } else {
+                // Standard Plagal Cadence (IV → I)
+                items.push({
+                    ...OBSERVATION_TYPES['plagal-cadence'],
+                    data: {
+                        from: prevRomanRaw,
+                        to: currRomanRaw,
+                        startIndex: i - 1,
+                        endIndex: i,
+                        chordIndices: [i],
+                        chordIndex: i,
+                        chord: currChord,
+                        fromChord: prevChord,
+                        toChord: currChord
+                    }
+                });
+            }
+        }
+
+        // Backdoor Cadence: ♭VII → I
+        if ((prevRoman === 'bVII' || prevRoman === 'bvii') &&
+            (currRoman === 'I' || currRoman === 'i')) {
             items.push({
-                ...OBSERVATION_TYPES['plagal-cadence'],
+                ...OBSERVATION_TYPES['backdoor-cadence'],
                 data: {
-                    from: prevRoman,
-                    to: currRoman,
+                    from: prevRomanRaw,
+                    to: currRomanRaw,
                     startIndex: i - 1,
                     endIndex: i,
-                    // Only show badge on resolution chord (the I chord)
                     chordIndices: [i],
                     chordIndex: i,
-                    chord: currChord,  // For "Hear It" button - play the resolution chord
+                    chord: currChord,
                     fromChord: prevChord,
                     toChord: currChord
                 }
@@ -96,14 +181,13 @@ export function detectCadences(context) {
             items.push({
                 ...OBSERVATION_TYPES['perfect-cadence'],
                 data: {
-                    from: prevRoman,
-                    to: currRoman,
+                    from: prevRomanRaw,
+                    to: currRomanRaw,
                     startIndex: i - 1,
                     endIndex: i,
-                    // Only show badge on resolution chord (the I chord)
                     chordIndices: [i],
                     chordIndex: i,
-                    chord: currChord,  // For "Hear It" button - play the resolution chord
+                    chord: currChord,
                     fromChord: prevChord,
                     toChord: currChord
                 }
@@ -111,15 +195,14 @@ export function detectCadences(context) {
         }
 
         // Half Cadence: ends on V
-        // Check if this is the last chord or followed by non-resolution
         if (i === progression.length - 1 &&
             (currRoman === 'V' || currRoman === 'V7')) {
             items.push({
                 ...OBSERVATION_TYPES['half-cadence'],
                 data: {
-                    to: currRoman,
+                    to: currRomanRaw,
                     chordIndex: i,
-                    chord: currChord,  // For "Hear It" button
+                    chord: currChord,
                     toChord: currChord
                 }
             });

@@ -161,6 +161,63 @@ export const OBSERVATION_TYPES = {
         cooldown: 60000
     },
 
+    'minor-plagal-cadence': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.CADENCE,
+        id: 'minor-plagal-cadence',
+        priority: 75,
+        emoji: '🙏',
+        title: 'Minor Plagal Cadence',
+        message: {
+            simple: "A darker 'Amen'! The minor iv to I adds a bittersweet feeling.",
+            intermediate: "Minor plagal cadence (iv→I) - borrowing the minor iv adds emotional depth to the resolution.",
+            advanced: "The iv→I minor plagal borrows from parallel minor, introducing ♭6 for chromatic color while maintaining subdominant function."
+        },
+        actions: {
+            learnMore: 'lesson-cadences',
+            explorePanel: 'theory'
+        },
+        cooldown: 60000
+    },
+
+    'backdoor-cadence': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.CADENCE,
+        id: 'backdoor-cadence',
+        priority: 80,
+        emoji: '🚪',
+        title: 'Backdoor Cadence',
+        message: {
+            simple: "A sneaky way home! ♭VII to I is like coming in through the back door.",
+            intermediate: "Backdoor cadence (♭VII→I) - a jazz favorite that's a cousin to the plagal cadence.",
+            advanced: "The ♭VII→I backdoor resolution shares 3 of 4 notes with iv7→I, functioning as a plagal variant with dominant 7th color on ♭VII."
+        },
+        actions: {
+            learnMore: 'lesson-cadences',
+            explorePanel: 'theory'
+        },
+        cooldown: 60000
+    },
+
+    'inverted-plagal-cadence': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.CADENCE,
+        id: 'inverted-plagal-cadence',
+        priority: 65,
+        emoji: '🙏',
+        title: 'Inverted Plagal Cadence',
+        message: {
+            simple: "A gentler 'Amen' - using inversions makes the ending feel less final.",
+            intermediate: "Inverted plagal cadence - one or both chords inverted creates a softer, less conclusive resolution.",
+            advanced: "Inverted plagal motion weakens closure by avoiding root position bass movement, useful for phrase extension or softer transitions."
+        },
+        actions: {
+            learnMore: 'lesson-cadences',
+            explorePanel: 'theory'
+        },
+        cooldown: 90000
+    },
+
     'perfect-cadence': {
         type: COACH_ITEM_TYPES.OBSERVATION,
         category: COACH_CATEGORIES.CADENCE,

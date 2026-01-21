@@ -471,6 +471,8 @@ function showTheoryMoment(moment) {
     popup.className = 'fixed top-4 right-4 z-[99998] max-w-sm animate-slide-in';
     popup.style.cssText = `
         animation: slideInRight 0.3s ease-out;
+        pointer-events: auto;
+        isolation: isolate;
     `;
 
     popup.innerHTML = `

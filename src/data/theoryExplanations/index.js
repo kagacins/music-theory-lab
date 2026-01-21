@@ -293,16 +293,19 @@ function romanToChordName(numeral, key) {
 
   // Determine quality based on case
   const isMinor = baseNumeral === baseNumeral.toLowerCase();
-  const quality = isMinor ? ' minor' : ' major';
 
   // Build the chord name
+  // For simple numerals without suffix (I, ii, IV, etc.), just add "m" for minor, nothing for major
+  // This prevents awkward text like "C majormaj7" when {IV}maj7 templates are used
   let chordName = note;
   if (suffix) {
-    // Add suffix without quality for 7th chords etc.
+    // Add suffix for 7th chords etc.
     chordName += suffix;
-  } else {
-    chordName += quality;
+  } else if (isMinor) {
+    // Only add "m" for minor chords, not " minor"
+    chordName += 'm';
   }
+  // Major chords get no suffix - just the note name (e.g., "C" not "C major")
 
   return chordName;
 }

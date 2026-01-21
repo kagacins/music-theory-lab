@@ -36,7 +36,7 @@ import {
     HARMONIZE_SECTION_TYPES,
     BASS_STYLE_CATEGORIES
 } from './Constants.js';
-import { closeUnifiedRecommendationModal } from './index.js';
+import { updatePersistentProgressionBar } from './StructureBuilders.js';
 
 // ============================================================================
 // HARMONIZE TAB - MAIN ENTRY POINT
@@ -582,13 +582,20 @@ function renderHarmonizeTab(container) {
                 }
             }, 100);
 
-            // Stay on Melody Composer tab
-            if (window.switchTab) {
-                window.switchTab('melody');
-            }
-            // Toast notification
+            // Toast notification - stay on current page and keep modal open
             if (window.showToast) {
                 window.showToast(`Applied harmonization (${chordProgression.length} chords)`, { type: 'success' });
+            }
+
+            // Update the persistent progression bar in the modal to reflect changes
+            if (typeof updatePersistentProgressionBar === 'function') {
+                updatePersistentProgressionBar();
+            }
+
+            // Re-render the harmonize tab to show updated state
+            const contentContainer = document.getElementById('unified-modal-content');
+            if (contentContainer) {
+                renderHarmonizeTab(contentContainer);
             }
         } catch (err) {
             console.error('Failed to apply harmonization:', err);
@@ -596,8 +603,6 @@ function renderHarmonizeTab(container) {
                 window.showToast('Failed to apply harmonization', { type: 'error' });
             }
         }
-
-        closeUnifiedRecommendationModal();
     });
 
     buttonContainer.appendChild(applyBtn);

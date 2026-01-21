@@ -542,6 +542,9 @@ export function createTabNavigation() {
             justify-content: center;
             margin-left: 2px;
             flex-shrink: 0;
+            pointer-events: auto;
+            position: relative;
+            z-index: 10;
         `;
         infoBtn.addEventListener('click', (e) => {
             e.stopPropagation();

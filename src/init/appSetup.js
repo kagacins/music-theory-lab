@@ -24,8 +24,10 @@ import {
     getIsClassicKeyboardOn,
     getIsCompactModeOn,
     getIsDarkModeOn,
+    setIsDarkModeOn,
     getIsFretboardModeOn,
     getNotationPreference,
+    setNotationPreference,
     getNumOctaves
 } from '../modules/state/globalState.js';
 
@@ -210,7 +212,9 @@ export function setupApp() {
     }
 
     // Initialize toggle states (with null checks for optional toggles)
+    // NOTE: Notation style toggle is temporarily disabled - always force 'full' mode
     const notationToggle = document.getElementById('notation-toggle');
+    setNotationPreference('full');
     if (notationToggle) notationToggle.checked = false;
     const romanNumeralToggle = document.getElementById('roman-numeral-toggle');
     if (romanNumeralToggle) romanNumeralToggle.checked = false;
@@ -460,32 +464,24 @@ export function setupApp() {
     }
 
     // Initialize dark mode toggle and apply saved state
+    // NOTE: Dark mode is temporarily disabled - always force light mode
     const darkModeToggle = document.getElementById('dark-mode-toggle');
-    const isDarkMode = getIsDarkModeOn();
-    if (darkModeToggle) {
-        darkModeToggle.checked = isDarkMode;
+    // Force light mode regardless of saved state
+    setIsDarkModeOn(false);
+    document.body.classList.remove('dark-mode');
 
-        // Update indicator colors
+    if (darkModeToggle) {
+        darkModeToggle.checked = false;
+
+        // Update indicator colors to show light mode
         const lightIndicator = document.getElementById('dark-mode-light-indicator');
         const darkIndicator = document.getElementById('dark-mode-dark-indicator');
         if (lightIndicator && darkIndicator) {
-            if (isDarkMode) {
-                darkIndicator.classList.remove('text-gray-500');
-                darkIndicator.classList.add('text-indigo-300');
-                lightIndicator.classList.remove('text-indigo-300');
-                lightIndicator.classList.add('text-gray-500');
-            } else {
-                lightIndicator.classList.remove('text-gray-500');
-                lightIndicator.classList.add('text-indigo-300');
-                darkIndicator.classList.remove('text-indigo-300');
-                darkIndicator.classList.add('text-gray-500');
-            }
+            lightIndicator.classList.remove('text-gray-500');
+            lightIndicator.classList.add('text-indigo-300');
+            darkIndicator.classList.remove('text-indigo-300');
+            darkIndicator.classList.add('text-gray-500');
         }
-    }
-
-    // Apply dark mode class to body if dark mode is enabled
-    if (isDarkMode) {
-        document.body.classList.add('dark-mode');
     }
 
     // ===========================
