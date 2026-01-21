@@ -2446,6 +2446,13 @@ export async function importDetectedChords() {
     // Close modal
     closeAudioAnalyzerModal();
 
+    // Switch to Chord Progression panel in fullscreen mode after importing
+    const editor = window.getFullScreenNotationEditor?.();
+    if (editor?.bottomPanel?.toggle) {
+        // Open chords panel (this will close workbench if it was open)
+        editor.bottomPanel.toggle('chords');
+    }
+
     // Show success message
     const countText = `${totalChords} chord${totalChords !== 1 ? 's' : ''}`;
 }

@@ -71,14 +71,15 @@ Rather than showing everything always, implement **Experience Modes** that contr
 | Mode | Target User | Information Density | Features Visible |
 |------|-------------|---------------------|------------------|
 | **Focus** | Experienced composers | Minimal | Just composition tools, no education |
-| **Guided** | Active learners | Moderate | Tooltips, suggestions, Theory Moments |
-| **Explore** | Curious beginners | Rich | All educational features, proactive hints |
+| **Learn** | Active learners & curious beginners | Rich | All educational features enabled |
+
+> **Note (2026-01-21):** Originally planned as three modes (Focus/Guided/Explore), but consolidated to two modes (Focus/Learn) because the practical differences between Guided and Explore were minimal. The infrastructure supports adding a third mode later if needed.
 
 **Implementation:**
-- Single toggle in header: `Focus ← → Explore` slider
-- Persisted to localStorage
+- Two-button toggle in header: `[Focus] [Learn]`
+- Does NOT persist across sessions (always starts in Learn mode)
 - Affects ALL educational surfaces consistently
-- Default: Guided (middle ground)
+- Default: Learn (all educational features enabled)
 
 ---
 
@@ -594,21 +595,34 @@ These exist for users who want to learn deeply. They require opening panels/moda
 
 ### The Experience Mode Toggle
 
-**Location:** Global header, always accessible
+**Location:** Composition Studio header, right section
 
-**Visual:**
+**Current Implementation (Two Modes):**
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  🎹 Music Theory Lab    [Focus ○───●─── Explore]   ⚙️   │
+│  🎹 Music Theory Lab    Mode: [Focus] [Learn]       ⚙️   │
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Three Positions:**
-1. **Focus** (left) - Minimal UI, no educational popups
-2. **Guided** (center, default) - Balanced education + composition
-3. **Explore** (right) - Maximum educational features
+**Two Positions:**
+1. **Focus** - Minimal UI, no educational popups (for experienced composers)
+2. **Learn** (default) - All educational features enabled
 
-### What Each Mode Controls
+### What Each Mode Controls (Current)
+
+| Feature | Focus | Learn |
+|---------|-------|-------|
+| Tension curve | Hidden | Visible |
+| Function colors | Visible | Visible |
+| Bass motion arrows | Hidden | Visible |
+| Pattern suggestions | Disabled | Enabled |
+| Theory Moments | Disabled | Enabled |
+| Coach Engine | Disabled | Enabled |
+| Chord Function Legend | Hidden | Available |
+
+### Original Three-Mode Design (Preserved for Future)
+
+If we need more granular control later, the infrastructure supports three modes:
 
 | Feature | Focus | Guided | Explore |
 |---------|-------|--------|---------|
@@ -629,8 +643,8 @@ These exist for users who want to learn deeply. They require opening panels/moda
 Allow users to save and name their preferred configurations:
 
 - **"Flow State"** - Focus mode + metronome + loop
-- **"Student"** - Explore mode + Theory Moments on
-- **"Teacher Demo"** - Explore mode + all visualizations
+- **"Student"** - Learn mode + Theory Moments on
+- **"Teacher Demo"** - Learn mode + all visualizations
 - **"Quick Sketch"** - Focus mode + minimal panels
 
 ---
@@ -752,12 +766,30 @@ The Composition DNA dashboard tracks user patterns. Expand:
 
 Quick reference for which features appear in which mode:
 
+> **Note (2026-01-21):** Consolidated to two modes. Original three-mode matrix preserved below for reference if we expand to three modes later.
+
+### Current Implementation (Two Modes)
+
+| Feature | Layer | Focus | Learn |
+|---------|-------|-------|-------|
+| **Ambient** |
+| Tension curve ✅ | 1 | ❌ | ✅ |
+| Function colors ✅ | 1 | ✅ | ✅ |
+| Bass motion arrows ✅ | 1 | ❌ | ✅ |
+| **On-Demand** |
+| Chord tooltips | 2 | Minimal | Rich |
+| Pattern continuation ✅ | 2 | ❌ | ✅ |
+| Theory Moments ✅ | 2-3 | ❌ | ✅ |
+| Coach Engine ✅ | 2-3 | ❌ | ✅ |
+
+### Original Three-Mode Matrix (For Future Reference)
+
 | Feature | Layer | Focus | Guided | Explore |
 |---------|-------|-------|--------|---------|
 | **Ambient** |
 | Tension curve | 1 | ❌ | ✅ | ✅+ |
-| Function colors ✅ | 1 | ❌ | ✅ (subtle) | ✅ (prominent) |
-| Bass motion arrows ✅ | 1 | ❌ | ❌ | ✅ |
+| Function colors | 1 | ❌ | ✅ (subtle) | ✅ (prominent) |
+| Bass motion arrows | 1 | ❌ | ❌ | ✅ |
 | **On-Demand** |
 | Chord tooltips | 2 | Minimal | Standard | Rich |
 | "What If?" panel | 2 | ❌ | On click | On select |

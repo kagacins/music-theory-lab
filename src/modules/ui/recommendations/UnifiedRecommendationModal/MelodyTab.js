@@ -14,6 +14,7 @@
 // External data and utilities
 import { CHORD_DEFINITIONS } from '../../../../data/music-data.js';
 import { spellNoteInKey } from '../../../utils/noteUtils.js';
+import { beatsToDuration } from '../../../notation/durationUtils.js';
 
 // Melody suggestion engine
 import {
@@ -1476,43 +1477,7 @@ function playPhrase(phrase) {
     }
 }
 
-/**
- * Convert beat duration to Tone.js duration notation
- * @param {number} beats - Duration in beats (e.g., 1 = quarter, 0.5 = eighth)
- * @returns {Object} - { duration: string, dotted: boolean }
- */
-function beatsToDuration(beats) {
-    // Common beat values to Tone.js notation
-    const beatMap = {
-        4: { duration: '1n', dotted: false },      // whole note
-        3: { duration: '2n', dotted: true },       // dotted half
-        2: { duration: '2n', dotted: false },      // half note
-        1.5: { duration: '4n', dotted: true },     // dotted quarter
-        1: { duration: '4n', dotted: false },      // quarter note
-        0.75: { duration: '8n', dotted: true },    // dotted eighth
-        0.5: { duration: '8n', dotted: false },    // eighth note
-        0.375: { duration: '16n', dotted: true },  // dotted sixteenth
-        0.25: { duration: '16n', dotted: false },  // sixteenth note
-        0.125: { duration: '32n', dotted: false }  // thirty-second note
-    };
-
-    // Find closest match
-    if (beatMap[beats]) {
-        return beatMap[beats];
-    }
-
-    // Find closest value
-    let closestBeats = 1;
-    let closestDiff = Math.abs(beats - 1);
-    for (const b of Object.keys(beatMap)) {
-        const diff = Math.abs(beats - parseFloat(b));
-        if (diff < closestDiff) {
-            closestDiff = diff;
-            closestBeats = parseFloat(b);
-        }
-    }
-    return beatMap[closestBeats];
-}
+// beatsToDuration imported from durationUtils.js (canonical source)
 
 function applyPhrase(phrase) {
     // Save state for undo BEFORE making any changes

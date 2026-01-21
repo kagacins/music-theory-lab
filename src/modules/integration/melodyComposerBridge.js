@@ -14,6 +14,10 @@ import {
     syncProgressionToComposition
 } from './progressionNotationSync.js';
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
+import {
+    durationToBeats,
+    beatsToDuration,
+} from '../notation/durationUtils.js';
 
 // Reference to composition state
 let compositionState = null;
@@ -150,102 +154,7 @@ export function addNoteViaBridge(measureIndex, staff, note) {
     compositionState.addNote(measureIndex, staff, voiceIndex, note);
 }
 
-/**
- * Helper to convert duration string to beats (with tuplet support)
- * @param {string} duration - Duration like '4n', '8n', '8t' (triplet), etc.
- * @param {boolean} dotted - Whether the note is dotted
- * @returns {number} - Number of beats
- */
-function durationToBeats(duration, dotted = false) {
-    const baseDurations = {
-        '1n': 4,
-        '2n': 2,
-        '4n': 1,
-        '8n': 0.5,
-        '16n': 0.25,
-        '32n': 0.125,
-    };
-
-    // Tuplet ratios
-    const tupletRatios = {
-        triplet: { actual: 3, normal: 2 },
-        quintuplet: { actual: 5, normal: 4 },
-        sextuplet: { actual: 6, normal: 4 },
-    };
-
-    // Handle dotted suffix in duration string (e.g., '2n.' -> '2n' with dotted=true)
-    let cleanDuration = duration;
-    let hasDotSuffix = false;
-    if (duration && typeof duration === 'string' && duration.includes('.')) {
-        cleanDuration = duration.replace('.', '');
-        hasDotSuffix = true;
-    }
-
-    // Use dotted flag OR dot in duration string
-    const isDotted = dotted || hasDotSuffix;
-
-    // Check for tuplet duration suffix (t=triplet, q=quintuplet, x=sextuplet)
-    let baseDuration = cleanDuration;
-    let tupletType = null;
-    if (cleanDuration && typeof cleanDuration === 'string') {
-        if (cleanDuration.endsWith('t') && /^\d+t$/.test(cleanDuration)) {
-            baseDuration = cleanDuration.replace('t', 'n');
-            tupletType = 'triplet';
-        } else if (cleanDuration.endsWith('q') && /^\d+q$/.test(cleanDuration)) {
-            baseDuration = cleanDuration.replace('q', 'n');
-            tupletType = 'quintuplet';
-        } else if (cleanDuration.endsWith('x') && /^\d+x$/.test(cleanDuration)) {
-            baseDuration = cleanDuration.replace('x', 'n');
-            tupletType = 'sextuplet';
-        }
-    }
-
-    let beats = baseDurations[baseDuration] || 1;
-
-    // Apply tuplet ratio if this is a tuplet note
-    if (tupletType && tupletRatios[tupletType]) {
-        const ratio = tupletRatios[tupletType];
-        beats = beats * (ratio.normal / ratio.actual);
-    }
-
-    return isDotted ? beats * 1.5 : beats;
-}
-
-/**
- * Helper to convert beats to duration
- * @param {number} beats - Number of beats
- * @returns {Object} - {duration, dotted}
- */
-function beatsToDuration(beats) {
-    const durationMap = [
-        { beats: 4, duration: '1n', dotted: false },
-        { beats: 3, duration: '2n', dotted: true },
-        { beats: 2, duration: '2n', dotted: false },
-        { beats: 1.5, duration: '4n', dotted: true },
-        { beats: 1, duration: '4n', dotted: false },
-        { beats: 0.75, duration: '8n', dotted: true },
-        { beats: 0.5, duration: '8n', dotted: false },
-        { beats: 0.375, duration: '16n', dotted: true },
-        { beats: 0.25, duration: '16n', dotted: false },
-        { beats: 0.125, duration: '32n', dotted: false },
-    ];
-
-    // Find exact match
-    for (const entry of durationMap) {
-        if (Math.abs(entry.beats - beats) < 0.001) {
-            return { duration: entry.duration, dotted: entry.dotted };
-        }
-    }
-
-    // If no exact match, return closest smaller
-    for (const entry of durationMap) {
-        if (entry.beats <= beats) {
-            return { duration: entry.duration, dotted: entry.dotted };
-        }
-    }
-
-    return { duration: '4n', dotted: false };
-}
+// Duration utilities imported from durationUtils.js (canonical source)
 
 /**
  * Get remaining beats in a measure

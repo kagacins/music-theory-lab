@@ -20,10 +20,11 @@ let g_NumOctaves = 4;
 
 // Experience Mode: Controls educational feature density
 // 'focus' - Minimal UI, no educational features (for experienced composers)
-// 'guided' - Balanced education + composition (default)
-// 'explore' - Maximum educational features for curious learners
-// NOTE: Always default to 'guided' on site load for consistent educational experience
-let experienceMode = 'guided';
+// 'learn' - All educational features enabled (default)
+// NOTE: Infrastructure supports adding a third mode later if needed (e.g., 'explore' for even more features)
+// NOTE: Always default to 'learn' on site load for consistent educational experience
+// MIGRATION: 'guided' and 'explore' are treated as 'learn' for backward compatibility
+let experienceMode = 'learn';
 
 // Getters and Setters for currentTab
 export function getCurrentTab() {
@@ -135,30 +136,47 @@ export function setNumOctaves(value) {
 
 // Getters and Setters for experienceMode
 export function getExperienceMode() {
-    // Always return the in-memory value (defaults to 'guided' on page load)
-    // Mode does NOT persist across sessions per design - always starts at 'guided'
+    // Always return the in-memory value (defaults to 'learn' on page load)
+    // Mode does NOT persist across sessions per design - always starts at 'learn'
     return experienceMode;
 }
 
 export function setExperienceMode(mode) {
-    if (['focus', 'guided', 'explore'].includes(mode)) {
-        console.log(`[globalState] setExperienceMode: changing from ${experienceMode} to ${mode}`);
-        experienceMode = mode;
-        localStorage.setItem('experienceMode', mode);
+    // Normalize legacy mode names to new names
+    // 'guided' and 'explore' both map to 'learn' for backward compatibility
+    let normalizedMode = mode;
+    if (mode === 'guided' || mode === 'explore') {
+        normalizedMode = 'learn';
+    }
+
+    if (['focus', 'learn'].includes(normalizedMode)) {
+        console.log(`[globalState] setExperienceMode: changing from ${experienceMode} to ${normalizedMode}`);
+        experienceMode = normalizedMode;
+        localStorage.setItem('experienceMode', normalizedMode);
         // Emit event for listeners to react to mode changes
         console.log('[globalState] Dispatching experienceModeChanged event');
-        window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode } }));
+        window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode: normalizedMode } }));
     }
 }
 
 /**
  * Check if current experience mode allows a feature
- * @param {string} featureLevel - 'focus' | 'guided' | 'explore' - minimum mode required
+ * @param {string} featureLevel - 'focus' | 'learn' - minimum mode required
  * @returns {boolean} - true if feature should be shown
+ *
+ * For backward compatibility, 'guided' and 'explore' are treated as 'learn'
  */
 export function isFeatureEnabled(featureLevel) {
-    const levels = { focus: 0, guided: 1, explore: 2 };
-    return levels[experienceMode] >= levels[featureLevel];
+    // Normalize legacy feature levels
+    let normalizedLevel = featureLevel;
+    if (featureLevel === 'guided' || featureLevel === 'explore') {
+        normalizedLevel = 'learn';
+    }
+
+    const levels = { focus: 0, learn: 1 };
+    const currentLevel = levels[experienceMode] ?? 1; // Default to learn if unknown
+    const requiredLevel = levels[normalizedLevel] ?? 1;
+    return currentLevel >= requiredLevel;
 }
 
 // Get complete global state
@@ -194,9 +212,9 @@ export function initializeGlobalState() {
     isDarkModeOn = false;
     isFretboardModeOn = false;
     g_NumOctaves = 4;
-    // Always reset to 'guided' on page load for consistent educational experience
+    // Always reset to 'learn' on page load for consistent educational experience
     // Mode does NOT persist across sessions per design
-    experienceMode = 'guided';
+    experienceMode = 'learn';
 }
 
 // Reset global state to defaults

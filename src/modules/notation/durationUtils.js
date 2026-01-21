@@ -20,14 +20,27 @@
 
 /**
  * Duration to beats mapping (base durations without dots)
+ * Supports both Tone.js format ('1n', '2n') and VexFlow format ('w', 'h', 'q')
  */
 export const DURATION_TO_BEATS = {
+  // Tone.js format
   '1n': 4,      // whole note
   '2n': 2,      // half note
   '4n': 1,      // quarter note
   '8n': 0.5,    // eighth note
   '16n': 0.25,  // sixteenth note
   '32n': 0.125, // thirty-second note
+  // VexFlow format
+  'w': 4,       // whole note
+  'h': 2,       // half note
+  'q': 1,       // quarter note
+  '8': 0.5,     // eighth note (VexFlow uses '8', not '8n')
+  '16': 0.25,   // sixteenth note
+  '32': 0.125,  // thirty-second note
+  // Also support numeric formats sometimes used
+  '1': 4,
+  '2': 2,
+  '4': 1,
 };
 
 /**
@@ -51,6 +64,18 @@ export const DOTTED_BEATS = {
   1.5: { duration: '4n', dotted: true },  // dotted quarter
   0.75: { duration: '8n', dotted: true }, // dotted eighth
   0.375: { duration: '16n', dotted: true }, // dotted sixteenth
+};
+
+/**
+ * Tuplet ratios - how many notes in the time of how many normal notes
+ * triplet: 3 notes in the time of 2 (3:2)
+ * quintuplet: 5 notes in the time of 4 (5:4)
+ * sextuplet: 6 notes in the time of 4 (6:4)
+ */
+export const TUPLET_RATIOS = {
+  triplet: { actual: 3, normal: 2 },
+  quintuplet: { actual: 5, normal: 4 },
+  sextuplet: { actual: 6, normal: 4 },
 };
 
 // ============================================================================
@@ -110,21 +135,44 @@ export function isDotted(note) {
 }
 
 /**
- * Get the base duration without any dot suffix
+ * Get the base duration without any dot suffix or tuplet suffix
+ * Handles both Tone.js format ('4n', '4n.') and VexFlow format ('q', 'qd', 'hd')
  *
- * @param {string} duration - Duration string (e.g., '4n' or '4n.')
- * @returns {string} Base duration without dot
+ * @param {string} duration - Duration string (e.g., '4n' or '4n.' or '8t' or 'qd')
+ * @returns {string} Base duration without dot or tuplet suffix
  */
 export function getBaseDuration(duration) {
   if (!duration) return '4n';
-  // Remove dot suffix and tuplet suffixes (t=triplet, q=quintuplet, x=sextuplet)
-  // e.g., '8n.' → '8n', '8t' → '8n', '8q' → '8n', '8x' → '8n'
+  // Remove Tone.js dot suffix '.' and VexFlow dot suffix 'd' (but not from '8d' meaning dotted eighth)
+  // e.g., '8n.' → '8n', '8t' → '8n', 'qd' → 'q', 'hd' → 'h'
   let base = duration.replace('.', '');
+  // Handle VexFlow 'd' suffix for dotted notes (e.g., 'hd', 'qd', '8d')
+  // VexFlow dotted: ends with 'd' but is not just a number (to avoid stripping '8d' to '8')
+  if (base.endsWith('d') && /^[whq]d$/.test(base)) {
+    base = base.slice(0, -1);
+  } else if (base.endsWith('d') && /^\d+d$/.test(base)) {
+    // Handle '8d', '16d' - strip the 'd'
+    base = base.slice(0, -1);
+  }
   // Handle tuplet suffixes - convert to normal duration
   if (base.endsWith('t') || base.endsWith('q') || base.endsWith('x')) {
     base = base.slice(0, -1) + 'n';
   }
   return base;
+}
+
+/**
+ * Get tuplet type from duration string suffix
+ *
+ * @param {string} duration - Duration string (e.g., '8t', '8q', '8x')
+ * @returns {string|null} Tuplet type ('triplet', 'quintuplet', 'sextuplet') or null
+ */
+export function getTupletTypeFromDuration(duration) {
+  if (!duration || typeof duration !== 'string') return null;
+  if (duration.endsWith('t') && /^\d+t$/.test(duration)) return 'triplet';
+  if (duration.endsWith('q') && /^\d+q$/.test(duration)) return 'quintuplet';
+  if (duration.endsWith('x') && /^\d+x$/.test(duration)) return 'sextuplet';
+  return null;
 }
 
 // ============================================================================
@@ -272,41 +320,67 @@ export function beatsToDurationString(beats) {
 
 /**
  * Convert duration to beats
- * Handles both formats: '4n.' (dot in string) and separate dotted flag
+ * Handles:
+ * - Dotted durations: '4n.' (dot in string) or separate dotted flag
+ * - Tuplet durations: '8t' (triplet), '8q' (quintuplet), '8x' (sextuplet)
+ * - Tuplet type from separate parameter for note objects
  *
  * @param {string} duration - Duration string
  * @param {boolean} [dotted=false] - Whether the note is dotted (if not in string)
+ * @param {string|null} [tupletType=null] - Tuplet type ('triplet', 'quintuplet', 'sextuplet')
  * @returns {number} Number of beats
  *
  * @example
  * durationToBeats('4n') // 1
  * durationToBeats('4n.') // 1.5
  * durationToBeats('4n', true) // 1.5
+ * durationToBeats('8t') // 0.333... (triplet eighth)
+ * durationToBeats('8n', false, 'triplet') // 0.333... (triplet eighth)
  */
-export function durationToBeats(duration, dotted = false) {
+export function durationToBeats(duration, dotted = false, tupletType = null) {
   if (!duration) return 1;
 
-  const hasDotInString = duration.endsWith('.');
-  const baseDuration = getBaseDuration(duration);
-  const baseBeats = DURATION_TO_BEATS[baseDuration] || 1;
+  // Check for dotted in string: Tone.js '.' suffix or VexFlow 'd' suffix
+  const hasDotInString = duration.endsWith('.') || duration.endsWith('d');
 
-  // Apply dotted multiplier if either format indicates dotted
-  if (hasDotInString || dotted) {
-    return baseBeats * 1.5;
+  // Check for tuplet suffix in duration string
+  const tupletFromString = getTupletTypeFromDuration(duration);
+  const effectiveTupletType = tupletType || tupletFromString;
+
+  const baseDuration = getBaseDuration(duration);
+  let beats = DURATION_TO_BEATS[baseDuration] || 1;
+
+  // Apply tuplet ratio if this is a tuplet note
+  if (effectiveTupletType && TUPLET_RATIOS[effectiveTupletType]) {
+    const ratio = TUPLET_RATIOS[effectiveTupletType];
+    beats = beats * (ratio.normal / ratio.actual);
   }
 
-  return baseBeats;
+  // Apply dotted multiplier if either format indicates dotted
+  // (dotted flag takes precedence if duration string already has dot accounted)
+  if (hasDotInString || dotted) {
+    beats = beats * 1.5;
+  }
+
+  return beats;
 }
 
 /**
- * Get beats for a note object (handles all formats)
+ * Get beats for a note object (handles all formats including tuplets)
  *
- * @param {Object} note - Note object with duration and possibly dotted property
+ * @param {Object} note - Note object with duration, dotted, and possibly tuplet properties
  * @returns {number} Number of beats
  */
 export function getNoteDurationInBeats(note) {
   if (!note) return 1;
-  return durationToBeats(note.duration, note.dotted);
+
+  // Get tuplet type from note object (supports multiple formats)
+  // Format 1: note.tupletType = 'triplet'
+  // Format 2: note.tuplet = { type: 'triplet', ... }
+  // Format 3: tuplet suffix in duration string '8t'
+  const tupletType = note.tupletType || note.tuplet?.type || null;
+
+  return durationToBeats(note.duration, note.dotted, tupletType);
 }
 
 // ============================================================================
@@ -361,6 +435,18 @@ export function fromVexFlowDuration(vexDuration) {
     duration: toneMap[baseVex] || '4n',
     dotted: isDottedVex,
   };
+}
+
+/**
+ * Convert beats directly to VexFlow duration string
+ * Combines beatsToDuration and toVexFlowDuration for convenience
+ *
+ * @param {number} beats - Number of beats
+ * @returns {string} VexFlow duration (e.g., 'q', 'qd', 'h', 'hd', 'w', 'wd')
+ */
+export function beatsToVexFlowDuration(beats) {
+  const { duration, dotted } = beatsToDuration(beats);
+  return toVexFlowDuration(duration, dotted);
 }
 
 // ============================================================================

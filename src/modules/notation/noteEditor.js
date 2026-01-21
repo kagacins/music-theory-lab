@@ -1587,7 +1587,7 @@ export class NoteEditor {
     const voice0 = measure.notation[staff]?.voices?.[0];
     if (voice0 && voice0.notes[lastNote.noteIndex]) {
       const lastBeat = voice0.notes[lastNote.noteIndex].beat || 0;
-      const lastDuration = this.durationToBeats(
+      const lastDuration = durationToBeats(
         voice0.notes[lastNote.noteIndex].duration || '4n',
         voice0.notes[lastNote.noteIndex].dotted
       );
@@ -1648,7 +1648,7 @@ export class NoteEditor {
     const staff = staffPosition.staff;
 
     // Calculate beats for this note
-    const noteBeats = this.durationToBeats(this.currentDuration, this.isDotted);
+    const noteBeats = durationToBeats(this.currentDuration, this.isDotted);
     const remainingBeats = this.getRemainingBeats(targetMeasureIndex, staff);
 
     // NEW: Check if we should insert at a specific position (between existing notes)
@@ -1680,7 +1680,7 @@ export class NoteEditor {
 
       let usedBeats = 0;
       for (const note of voice.notes) {
-        let beats = this.durationToBeats(note.duration || '4n', note.dotted);
+        let beats = durationToBeats(note.duration || '4n', note.dotted);
         // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
         if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
           const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -1690,7 +1690,7 @@ export class NoteEditor {
       }
 
       // Calculate requested beats, accounting for tuplet insert mode
-      let requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
+      let requestedBeats = durationToBeats(this.currentDuration, this.isDotted);
       if (this.tupletInsertMode && TUPLET_RATIOS[this.tupletInsertMode]) {
         // In tuplet mode, the note takes up fewer beats (e.g., triplet: 3 notes in time of 2)
         const ratio = TUPLET_RATIOS[this.tupletInsertMode];
@@ -1764,7 +1764,7 @@ export class NoteEditor {
               // Calculate the beat position where we're inserting
               let insertBeat = 0;
               for (let i = 0; i < targetIndex; i++) {
-                let beats = this.durationToBeats(voice.notes[i].duration || '4n', voice.notes[i].dotted);
+                let beats = durationToBeats(voice.notes[i].duration || '4n', voice.notes[i].dotted);
                 insertBeat += beats;
               }
 
@@ -1781,7 +1781,7 @@ export class NoteEditor {
               if (newNoteBeats > spaceAfterInsertPoint) {
                 newNoteBeats = spaceAfterInsertPoint;
               }
-              const fitDuration = this.beatsToDuration(newNoteBeats);
+              const fitDuration = beatsToDuration(newNoteBeats);
 
               // Remove all notes from the insert position onward (they get truncated out)
               voice.notes.splice(targetIndex);
@@ -1831,7 +1831,7 @@ export class NoteEditor {
 
       if (requestedBeats > availableBeats) {
         // Reduce duration to fit available space
-        const fitDuration = this.beatsToDuration(availableBeats);
+        const fitDuration = beatsToDuration(availableBeats);
         durationToUse = fitDuration.duration;
         dottedToUse = fitDuration.dotted;
         const context = staff === 'bass' ? 'building block' : 'measure';
@@ -1917,7 +1917,7 @@ export class NoteEditor {
 
           if (choice === 'truncate') {
             // Truncate: add note with reduced duration to fit measure
-            const fitDuration = this.beatsToDuration(effectiveRemainingBeats);
+            const fitDuration = beatsToDuration(effectiveRemainingBeats);
             const truncatedNote = {
               type: this.isRestMode ? 'rest' : 'note',
               ...noteDataForCallback,
@@ -1992,7 +1992,7 @@ export class NoteEditor {
         const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
         // Truncate to fit remaining space in building block
         const truncatedBeats = Math.min(noteBeats, effectiveRemainingBeats);
-        const fitDuration = this.beatsToDuration(truncatedBeats);
+        const fitDuration = beatsToDuration(truncatedBeats);
         // Apply key signature to pitch when no explicit accidental is selected
         const bassCompositionState = window.getCompositionState?.();
         const effectivePitch = this.getEffectivePitch(staffPosition.pitch, bassCompositionState);
@@ -2031,7 +2031,7 @@ export class NoteEditor {
     // Add first part to fill current measure
     if (effectiveRemainingBeats > 0) {
       const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
-      const firstPartDuration = this.beatsToDuration(effectiveRemainingBeats);
+      const firstPartDuration = beatsToDuration(effectiveRemainingBeats);
       const firstPartNote = {
         type: this.isRestMode ? 'rest' : 'note',
         pitch: effectivePitch,
@@ -2059,7 +2059,7 @@ export class NoteEditor {
     // Add tied notes to subsequent measures
     while (remainingNoteBeats > 0.001) {
       const beatsToAdd = Math.min(remainingNoteBeats, 4); // Max 4 beats per measure
-      const tiedDuration = this.beatsToDuration(beatsToAdd);
+      const tiedDuration = beatsToDuration(beatsToAdd);
       const beatPosition = this.getCurrentBeat(currentMeasureIndex, staff);
 
       const tiedNote = {
@@ -2164,7 +2164,7 @@ export class NoteEditor {
       } else {
         // "after" a tied note - we need to insert after the tied note ends
         // The tied note takes up some beats in this measure
-        let beats = this.durationToBeats(targetNote.duration || '4n', targetNote.dotted);
+        let beats = durationToBeats(targetNote.duration || '4n', targetNote.dotted);
         beatPosition = beats; // Insert after the tied note's portion in this measure
       }
     } else {
@@ -2172,7 +2172,7 @@ export class NoteEditor {
       const targetIndex = insertionPoint.action === 'before' ? insertionPoint.noteIndex : insertionPoint.noteIndex + 1;
       for (let i = 0; i < targetIndex && i < voice.notes.length; i++) {
         const note = voice.notes[i];
-        let beats = this.durationToBeats(note.duration || '4n', note.dotted);
+        let beats = durationToBeats(note.duration || '4n', note.dotted);
         beatPosition += beats;
       }
     }
@@ -2182,7 +2182,7 @@ export class NoteEditor {
     // MULTI-VOICE: Use extract → insert → rebuild (NO SYNC algorithm)
     if (hasMultipleVoices) {
       // Calculate note duration in beats
-      let durationBeats = this.durationToBeats(noteData.duration || '4n', noteData.dotted);
+      let durationBeats = durationToBeats(noteData.duration || '4n', noteData.dotted);
 
       console.log('[SHIFT-INSERT] MULTI-VOICE path: using extract→rebuild algorithm');
       console.log('[SHIFT-INSERT] Inserting at measure', measureIndex, 'beat', beatPosition, 'duration', durationBeats);
@@ -2224,7 +2224,7 @@ export class NoteEditor {
 
     // SINGLE-VOICE: Also use extract → rebuild for consistency (NO SYNC)
     const singleNoteDur = noteData.duration || '4n';
-    let durationBeats = this.durationToBeats(singleNoteDur, noteData.dotted);
+    let durationBeats = durationToBeats(singleNoteDur, noteData.dotted);
 
     console.log('[SHIFT-INSERT] SINGLE-VOICE path: using extract→rebuild algorithm');
     console.log('[SHIFT-INSERT] Inserting at measure', measureIndex, 'beat', beatPosition, 'duration', durationBeats);
@@ -2279,7 +2279,7 @@ export class NoteEditor {
     const voiceIndex = this.getVoiceIndexForStaff('treble');
 
     // Calculate note duration in beats
-    let durationBeats = this.durationToBeats(noteData.duration || '4n', noteData.dotted);
+    let durationBeats = durationToBeats(noteData.duration || '4n', noteData.dotted);
 
     console.log('[SHIFT-INSERT-END] Using extract→rebuild algorithm');
     console.log('[SHIFT-INSERT-END] Inserting at measure', measureIndex, 'beat', usedBeats, 'duration', durationBeats);
@@ -2357,7 +2357,7 @@ export class NoteEditor {
     const targetIndex = insertionPoint.action === 'before' ? insertionPoint.noteIndex : insertionPoint.noteIndex + 1;
     for (let i = 0; i < targetIndex && i < voice.notes.length; i++) {
       const note = voice.notes[i];
-      let beats = this.durationToBeats(note.duration || '4n', note.dotted);
+      let beats = durationToBeats(note.duration || '4n', note.dotted);
       beatPositionInMeasure += beats;
     }
 
@@ -2381,7 +2381,7 @@ export class NoteEditor {
     const blockStartBeat = blockInfo.blockStartBeat;
     const blockEndBeat = blockStartBeat + blockInfo.block.beats;
     const insertBeatInBlock = absoluteBeat - blockStartBeat;
-    const durationBeats = this.durationToBeats(noteData.duration || '4n', noteData.dotted);
+    const durationBeats = durationToBeats(noteData.duration || '4n', noteData.dotted);
 
     console.log(`[SHIFT-INSERT-BASS] Insert at beat ${insertBeatInBlock} within block [0, ${blockInfo.block.beats})`);
 
@@ -2482,7 +2482,7 @@ export class NoteEditor {
         // Mark for removal
         notesToRemove.push(note);
 
-        const durationBeats = this.durationToBeats(note.duration || '4n', note.dotted);
+        const durationBeats = durationToBeats(note.duration || '4n', note.dotted);
 
         if (note.isTied && logicalNotes.length > 0) {
           // Continuation of previous note
@@ -2630,7 +2630,7 @@ export class NoteEditor {
     console.log('[SHIFT-INSERT-BASS] Inserting at measure', measureIndex, 'beat', beatPosition);
 
     const voiceIndex = insertionPoint.voiceIndex ?? this.getVoiceIndexForStaff('bass');
-    let durationBeats = this.durationToBeats(noteData.duration || '4n', noteData.dotted);
+    let durationBeats = durationToBeats(noteData.duration || '4n', noteData.dotted);
 
     // 1. Extract all notes from insertion point onward (this also removes them)
     const logicalNotes = this.extractLogicalNotes('bass', voiceIndex, measureIndex, beatPosition, compositionState, beatsPerMeasure);
@@ -3134,7 +3134,7 @@ export class NoteEditor {
     // Calculate current beats used in measure
     let usedBeats = 0;
     for (const note of voice.notes) {
-      let beats = this.durationToBeats(note.duration || '4n', note.dotted);
+      let beats = durationToBeats(note.duration || '4n', note.dotted);
       // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
       if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
         const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -3145,7 +3145,7 @@ export class NoteEditor {
 
     const maxBeats = beatsPerMeasure; // Use time signature
     // Calculate requested beats, accounting for tuplet insert mode
-    let requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
+    let requestedBeats = durationToBeats(this.currentDuration, this.isDotted);
     if (this.tupletInsertMode && TUPLET_RATIOS[this.tupletInsertMode]) {
       const ratio = TUPLET_RATIOS[this.tupletInsertMode];
       requestedBeats = requestedBeats * (ratio.normal / ratio.actual);
@@ -3197,7 +3197,7 @@ export class NoteEditor {
             for (let i = 0; i < noteIndex; i++) {
               const dur = voice.notes[i].duration || '4n';
               const hasDot = dur.includes('.');
-              let beats = this.durationToBeats(dur);
+              let beats = durationToBeats(dur);
               if (voice.notes[i].dotted && !hasDot) beats *= 1.5;
               insertBeat += beats;
             }
@@ -3215,7 +3215,7 @@ export class NoteEditor {
               if (newNoteBeats > spaceAfterInsertPoint) {
                 newNoteBeats = spaceAfterInsertPoint;
               }
-              const fitDuration = this.beatsToDuration(newNoteBeats);
+              const fitDuration = beatsToDuration(newNoteBeats);
 
               // Remove all notes from the insert position onward (they get truncated out)
               voice.notes.splice(noteIndex);
@@ -3339,7 +3339,7 @@ export class NoteEditor {
     // Calculate current beats used in measure
     let usedBeats = 0;
     for (const note of voice.notes) {
-      let beats = this.durationToBeats(note.duration || '4n', note.dotted);
+      let beats = durationToBeats(note.duration || '4n', note.dotted);
       // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
       if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
         const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -3350,7 +3350,7 @@ export class NoteEditor {
 
     const maxBeats = beatsPerMeasure; // Use time signature
     // Calculate requested beats, accounting for tuplet insert mode
-    let requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
+    let requestedBeats = durationToBeats(this.currentDuration, this.isDotted);
     if (this.tupletInsertMode && TUPLET_RATIOS[this.tupletInsertMode]) {
       const ratio = TUPLET_RATIOS[this.tupletInsertMode];
       requestedBeats = requestedBeats * (ratio.normal / ratio.actual);
@@ -3411,7 +3411,7 @@ export class NoteEditor {
             for (let i = 0; i <= noteIndex; i++) {
               const dur = voice.notes[i].duration || '4n';
               const hasDot = dur.includes('.');
-              let beats = this.durationToBeats(dur);
+              let beats = durationToBeats(dur);
               if (voice.notes[i].dotted && !hasDot) beats *= 1.5;
               insertBeat += beats;
             }
@@ -3429,7 +3429,7 @@ export class NoteEditor {
             if (newNoteBeats > spaceAfterInsertPoint) {
               newNoteBeats = spaceAfterInsertPoint;
             }
-            const fitDuration = this.beatsToDuration(newNoteBeats);
+            const fitDuration = beatsToDuration(newNoteBeats);
 
             // Calculate which notes need to be removed to make room for the new note
             // Only remove notes that would overlap with the new note's duration
@@ -3442,7 +3442,7 @@ export class NoteEditor {
             for (let i = insertPosition; i < voice.notes.length; i++) {
               const dur = voice.notes[i].duration || '4n';
               const hasDot = dur.includes('.');
-              let noteBeats = this.durationToBeats(dur);
+              let noteBeats = durationToBeats(dur);
               if (voice.notes[i].dotted && !hasDot) noteBeats *= 1.5;
 
               // If this note starts before the new note would end, it needs to be removed
@@ -3521,70 +3521,6 @@ export class NoteEditor {
   }
 
   /**
-   * Convert Tone.js duration to beats (quarter notes)
-   * @param {string} duration - Tone.js duration (e.g., '4n', '2n')
-   * @param {boolean} dotted - Whether the note is dotted
-   * @returns {number} - Number of beats
-   */
-  durationToBeats(duration, dotted = false) {
-    const durationMap = {
-      '1n': 4,    // Whole note = 4 beats
-      '2n': 2,    // Half note = 2 beats
-      '4n': 1,    // Quarter note = 1 beat
-      '8n': 0.5,  // Eighth note = 0.5 beats
-      '16n': 0.25, // Sixteenth note = 0.25 beats
-      '32n': 0.125 // Thirty-second note = 0.125 beats
-    };
-
-    // Tuplet ratios - actual notes in time of normal
-    const tupletRatios = {
-      triplet: { actual: 3, normal: 2 },      // 3 notes in time of 2
-      quintuplet: { actual: 5, normal: 4 },   // 5 notes in time of 4
-      sextuplet: { actual: 6, normal: 4 },    // 6 notes in time of 4
-    };
-
-    let baseDuration = duration;
-    let tupletType = null;
-    let dottedFromString = false;
-
-    if (duration && typeof duration === 'string') {
-      // Check for dotted notation in string (e.g., '2n.' -> '2n' + dotted)
-      // IMPORTANT: Strip the dot FIRST before checking tuplet suffixes
-      if (duration.includes('.')) {
-        baseDuration = duration.replace('.', '');
-        dottedFromString = true;
-      }
-
-      // Check for tuplet duration suffix (t=triplet, q=quintuplet, x=sextuplet)
-      if (baseDuration.endsWith('t') && /^\d+t$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('t', 'n');
-        tupletType = 'triplet';
-      } else if (baseDuration.endsWith('q') && /^\d+q$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('q', 'n');
-        tupletType = 'quintuplet';
-      } else if (baseDuration.endsWith('x') && /^\d+x$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('x', 'n');
-        tupletType = 'sextuplet';
-      }
-    }
-
-    let beats = durationMap[baseDuration] || 1;
-
-    // Apply tuplet ratio if this is a tuplet note
-    if (tupletType && tupletRatios[tupletType]) {
-      const ratio = tupletRatios[tupletType];
-      beats = beats * (ratio.normal / ratio.actual);
-    }
-
-    // Apply dotted multiplier - use dottedFromString OR dotted parameter
-    // but NOT both (avoid double-counting)
-    if (dottedFromString || dotted) {
-      beats *= 1.5;
-    }
-    return beats;
-  }
-
-  /**
    * Recalculate beat positions for all notes in a voice
    * @param {Array} notes - Array of notes in the voice
    */
@@ -3592,7 +3528,7 @@ export class NoteEditor {
     let currentBeat = 0;
     notes.forEach((note, index) => {
       note.beat = currentBeat;
-      const noteBeats = this.durationToBeats(note.duration, note.dotted || false);
+      const noteBeats = durationToBeats(note.duration, note.dotted || false);
       currentBeat += noteBeats;
     });
   }
@@ -3655,8 +3591,8 @@ export class NoteEditor {
             continue;
           }
 
-          const currentBeats = this.durationToBeats(currentDuration, currentDotted);
-          const newBeats = this.durationToBeats(newDuration, newDotted);
+          const currentBeats = durationToBeats(currentDuration, currentDotted);
+          const newBeats = durationToBeats(newDuration, newDotted);
 
           // Calculate current measure beats used (excluding this note)
           let usedBeats = 0;
@@ -3664,7 +3600,7 @@ export class NoteEditor {
             if (i !== noteIndex) {
               const dur = voice.notes[i].duration || '4n';
               const hasDot = dur.includes('.');
-              let beats = this.durationToBeats(dur);
+              let beats = durationToBeats(dur);
               if (voice.notes[i].dotted && !hasDot) beats *= 1.5;
               usedBeats += beats;
             }
@@ -3717,7 +3653,7 @@ export class NoteEditor {
               );
             } else {
               // TREBLE: Truncate the note itself to fit available space
-              const fitDuration = this.beatsToDuration(overflow.availableBeats);
+              const fitDuration = beatsToDuration(overflow.availableBeats);
               this.applyDurationChange(newDuration, fitDuration.duration, fitDuration.dotted, [overflow.noteId]);
             }
           } else if (choice === 'shift') {
@@ -3927,7 +3863,7 @@ export class NoteEditor {
 
     // Calculate durations - pass dotted flag for canonical format support
     const currentBeats = this.getDurationInBeats(note.duration || '4n', note.dotted);
-    let newBeats = this.durationToBeats(newDuration);
+    let newBeats = durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
 
     // Check if there are downstream notes that would be affected
@@ -3996,7 +3932,7 @@ export class NoteEditor {
 
     // Calculate durations - pass dotted flag for canonical format support
     const currentBeats = this.getDurationInBeats(note.duration || '4n', note.dotted);
-    let newBeats = this.durationToBeats(newDuration);
+    let newBeats = durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
 
     // Check if there are downstream notes that would be affected
@@ -4070,7 +4006,7 @@ export class NoteEditor {
     const noteBeat = note.beat || 0;
 
     // Calculate new duration in beats
-    let newBeats = this.durationToBeats(newDuration);
+    let newBeats = durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
 
     // Get block info for this note
@@ -4092,7 +4028,7 @@ export class NoteEditor {
     console.log(`[DURATION-TRUNCATE-BASS] Block ${blockInfo.chordIndex}, range [${blockStartBeat}, ${blockEndBeat}), note at beat ${absoluteBeat}`);
 
     // Check if there are any notes after this one in the block that would be affected
-    const currentNoteBeats = this.durationToBeats(note.duration || '4n', note.dotted);
+    const currentNoteBeats = durationToBeats(note.duration || '4n', note.dotted);
     const currentNoteEndBeat = absoluteBeat + currentNoteBeats;
 
     // If the new duration is shorter or equal AND doesn't overlap subsequent notes, just apply directly
@@ -5516,7 +5452,7 @@ export class NoteEditor {
       // Only check overflow when ADDING a dot (toggling from false to true)
       if (!currentDotted) {
         const currentDuration = note.duration || '4n';
-        const currentBeats = this.durationToBeats(currentDuration, false);
+        const currentBeats = durationToBeats(currentDuration, false);
         const newBeats = currentBeats * 1.5; // Adding dot increases by 50%
 
         // Calculate current measure beats used (excluding this note)
@@ -5524,7 +5460,7 @@ export class NoteEditor {
         for (let i = 0; i < voice.notes.length; i++) {
           if (i !== noteIndex) {
             const dur = voice.notes[i].duration || '4n';
-            let beats = this.durationToBeats(dur, voice.notes[i].dotted || false);
+            let beats = durationToBeats(dur, voice.notes[i].dotted || false);
             usedBeats += beats;
           }
         }
@@ -5650,7 +5586,7 @@ export class NoteEditor {
 
     const note = voice.notes[noteIndex];
     const currentDuration = note.duration || '4n';
-    const currentBeats = this.durationToBeats(currentDuration, false);
+    const currentBeats = durationToBeats(currentDuration, false);
     const dottedBeats = currentBeats * 1.5;
 
     // Check if dotted note would fit in available space
@@ -5660,12 +5596,12 @@ export class NoteEditor {
     } else {
       // Dotted doesn't fit even as the only note change
       // Find the largest duration that fits with dotted, or without dotted
-      const fitResult = this.beatsToDuration(availableBeats);
-      if (fitResult.dotted && this.durationToBeats(fitResult.duration, true) <= availableBeats) {
+      const fitResult = beatsToDuration(availableBeats);
+      if (fitResult.dotted && durationToBeats(fitResult.duration, true) <= availableBeats) {
         // A smaller dotted duration fits
         note.duration = fitResult.duration;
         note.dotted = true;
-      } else if (this.durationToBeats(fitResult.duration, false) <= availableBeats) {
+      } else if (durationToBeats(fitResult.duration, false) <= availableBeats) {
         // Non-dotted duration fits
         note.duration = fitResult.duration;
         note.dotted = false;
@@ -5677,12 +5613,12 @@ export class NoteEditor {
     }
 
     // Calculate how much space we need after the change
-    const noteBeats = this.durationToBeats(note.duration || '4n', note.dotted || false);
+    const noteBeats = durationToBeats(note.duration || '4n', note.dotted || false);
 
     // Calculate beat position of this note
     let noteBeat = 0;
     for (let i = 0; i < noteIndex; i++) {
-      noteBeat += this.durationToBeats(voice.notes[i].duration || '4n', voice.notes[i].dotted || false);
+      noteBeat += durationToBeats(voice.notes[i].duration || '4n', voice.notes[i].dotted || false);
     }
 
     // Remove notes that overflow
@@ -5692,7 +5628,7 @@ export class NoteEditor {
 
     for (let i = 0; i < voice.notes.length; i++) {
       const n = voice.notes[i];
-      const nBeats = this.durationToBeats(n.duration || '4n', n.dotted || false);
+      const nBeats = durationToBeats(n.duration || '4n', n.dotted || false);
 
       if (i <= noteIndex) {
         // Keep notes up to and including the dotted note
@@ -5743,7 +5679,7 @@ export class NoteEditor {
     if (!voice || !voice.notes[noteIndex]) return;
 
     const note = voice.notes[noteIndex];
-    const oldBeats = this.durationToBeats(note.duration || '4n', false);
+    const oldBeats = durationToBeats(note.duration || '4n', false);
     const newBeats = oldBeats * 1.5;
     const shiftAmount = newBeats - oldBeats;
 
@@ -5988,19 +5924,7 @@ export class NoteEditor {
     }
 
     // Calculate the original total beats of selected notes
-    // Supports canonical format: duration='2n', dotted=true
-    const durationToBeats = (duration, dotted = false) => {
-      const map = { '1n': 4, '2n': 2, '4n': 1, '8n': 0.5, '16n': 0.25, '32n': 0.125 };
-      const hasDotInString = duration?.includes('.');
-      const baseDur = duration.replace(/[tqx.]$/, '');
-      let beats = map[baseDur] || 1;
-      // Apply dotted multiplier if dot in string OR separate dotted flag
-      if (hasDotInString || dotted) {
-        beats *= 1.5;
-      }
-      return beats;
-    };
-
+    // Uses canonical durationToBeats from durationUtils.js (imported at top of file)
     let originalTotalBeats = 0;
     for (let i = 0; i < parsedNotes.length; i++) {
       const noteData = voice.notes[parsedNotes[i].noteIndex];
@@ -6032,35 +5956,26 @@ export class NoteEditor {
 
     // If we saved beats, insert a rest after the tuplet to fill the gap
     if (savedBeats > 0.001) {
-      // Helper to convert beats to best-fit duration(s)
-      const beatsToDuration = (beats) => {
-        if (beats >= 4) return '1n';
-        if (beats >= 2) return '2n';
-        if (beats >= 1) return '4n';
-        if (beats >= 0.5) return '8n';
-        if (beats >= 0.25) return '16n';
-        return '32n';
-      };
-
+      // Uses canonical beatsToDuration from durationUtils.js (imported at top of file)
       const lastNoteIndex = parsedNotes[parsedNotes.length - 1].noteIndex;
       const nextNoteIndex = lastNoteIndex + 1;
 
       // Check if the next note after the tuplet is a rest - if so, combine them
       const nextNote = voice.notes[nextNoteIndex];
       if (nextNote && (nextNote.isRest || nextNote.type === 'rest')) {
-        // Calculate the existing rest's beats (uses local durationToBeats with dotted support)
+        // Calculate the existing rest's beats (uses canonical durationToBeats with dotted support)
         let existingRestBeats = durationToBeats(nextNote.duration || '4n', nextNote.dotted);
 
         // Combine the beats
         const combinedBeats = savedBeats + existingRestBeats;
-        const combinedDuration = beatsToDuration(combinedBeats);
+        const { duration: combinedDuration, dotted: combinedDotted } = beatsToDuration(combinedBeats);
 
-        // Update the existing rest with the combined duration
+        // Update the existing rest with the combined duration (canonical format)
         nextNote.duration = combinedDuration;
-        nextNote.dotted = false; // Reset dotted since we recalculated
+        nextNote.dotted = combinedDotted;
       } else {
         // No adjacent rest - insert a new rest
-        const restDuration = beatsToDuration(savedBeats);
+        const { duration: restDuration, dotted: restDotted } = beatsToDuration(savedBeats);
 
         const restData = {
           type: 'rest',
@@ -6068,7 +5983,7 @@ export class NoteEditor {
           pitches: [firstNote.staff === 'treble' ? 'B4' : 'D3'],
           duration: restDuration,
           isRest: true,
-          dotted: false,
+          dotted: restDotted,
         };
 
         voice.notes.splice(nextNoteIndex, 0, restData);
@@ -6882,69 +6797,6 @@ export class NoteEditor {
   // ============================================================================
 
   /**
-   * Convert duration string to beats (quarter notes) - with tuplet and dotted support
-   * @param {string} duration - Duration like "4n", "2n", "8n", "8t" (triplet), "2n." (dotted), etc.
-   * @returns {number} - Number of beats
-   */
-  durationToBeats(duration, dotted = false) {
-    const durationMap = {
-      '1n': 4,    // Whole note = 4 beats
-      '2n': 2,    // Half note = 2 beats
-      '4n': 1,    // Quarter note = 1 beat
-      '8n': 0.5,  // Eighth note = 0.5 beats
-      '16n': 0.25, // Sixteenth note = 0.25 beats
-      '32n': 0.125, // Thirty-second note = 0.125 beats
-    };
-
-    // Tuplet ratios
-    const tupletRatios = {
-      triplet: { actual: 3, normal: 2 },
-      quintuplet: { actual: 5, normal: 4 },
-      sextuplet: { actual: 6, normal: 4 },
-    };
-
-    let baseDuration = duration;
-    let tupletType = null;
-    // Check both: dot in string OR separate dotted parameter (canonical format)
-    let isDotted = dotted;
-
-    if (duration && typeof duration === 'string') {
-      // Check for dotted notation in string (e.g., '2n.' -> '2n' + dotted)
-      if (duration.includes('.')) {
-        baseDuration = duration.replace('.', '');
-        isDotted = true;
-      }
-
-      // Check for tuplet duration suffix
-      if (baseDuration.endsWith('t') && /^\d+t$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('t', 'n');
-        tupletType = 'triplet';
-      } else if (baseDuration.endsWith('q') && /^\d+q$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('q', 'n');
-        tupletType = 'quintuplet';
-      } else if (baseDuration.endsWith('x') && /^\d+x$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('x', 'n');
-        tupletType = 'sextuplet';
-      }
-    }
-
-    let beats = durationMap[baseDuration] || 1;
-
-    // Apply tuplet ratio if this is a tuplet note
-    if (tupletType && tupletRatios[tupletType]) {
-      const ratio = tupletRatios[tupletType];
-      beats = beats * (ratio.normal / ratio.actual);
-    }
-
-    // Apply dotted multiplier if duration string had a dot OR separate dotted flag
-    if (isDotted) {
-      beats *= 1.5;
-    }
-
-    return beats;
-  }
-
-  /**
    * Calculate total beats used in a measure
    * Uses compositionState as the source of truth (more accurate than noteRegions)
    * @param {number} measureIndex - Measure index
@@ -6963,7 +6815,7 @@ export class NoteEditor {
         if (voice && voice.notes) {
           let usedBeats = 0;
           for (const note of voice.notes) {
-            let beats = this.durationToBeats(note.duration || '4n', note.dotted);
+            let beats = durationToBeats(note.duration || '4n', note.dotted);
             // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
             if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
               const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -6986,7 +6838,7 @@ export class NoteEditor {
     // Calculate total beats from note durations
     // noteRegions should have duration info attached during rendering
     return notesInMeasure.reduce((total, region) => {
-      let beats = this.durationToBeats(region.duration || '4n', region.dotted);
+      let beats = durationToBeats(region.duration || '4n', region.dotted);
       return total + beats;
     }, 0);
   }
@@ -7017,7 +6869,7 @@ export class NoteEditor {
     const currentBeats = this.getMeasureBeatsUsed(measureIndex, staff);
 
     // Calculate new note beats
-    let newBeats = this.durationToBeats(duration);
+    let newBeats = durationToBeats(duration);
     if (isDotted) {
       newBeats *= 1.5;
     }
@@ -7049,109 +6901,6 @@ export class NoteEditor {
     const bpm = this.getBeatsPerMeasure();
     const remaining = this.getRemainingBeats(measureIndex, staff);
     return bpm - remaining;
-  }
-
-  /**
-   * Convert beats to closest duration string
-   * @param {number} beats - Number of beats
-   * @returns {Object} - {duration, dotted}
-   */
-  beatsToDuration(beats) {
-    // Map beats to durations (with dotted variants)
-    const durationMap = [
-      { beats: 4, duration: '1n', dotted: false },
-      { beats: 3, duration: '2n', dotted: true },
-      { beats: 2, duration: '2n', dotted: false },
-      { beats: 1.5, duration: '4n', dotted: true },
-      { beats: 1, duration: '4n', dotted: false },
-      { beats: 0.75, duration: '8n', dotted: true },
-      { beats: 0.5, duration: '8n', dotted: false },
-      { beats: 0.375, duration: '16n', dotted: true },
-      { beats: 0.25, duration: '16n', dotted: false },
-      { beats: 0.125, duration: '32n', dotted: false },
-    ];
-
-    // Find exact match or closest smaller duration
-    for (const entry of durationMap) {
-      if (Math.abs(entry.beats - beats) < 0.001) {
-        return { duration: entry.duration, dotted: entry.dotted };
-      }
-    }
-
-    // If no exact match, return closest smaller
-    for (const entry of durationMap) {
-      if (entry.beats <= beats) {
-        return { duration: entry.duration, dotted: entry.dotted };
-      }
-    }
-
-    // Fallback
-    return { duration: '4n', dotted: false };
-  }
-
-  /**
-   * Convert duration to beats (with tuplet support)
-   * Note: This is a duplicate method - the primary one is at line ~2628
-   * @param {string} duration - Duration like '4n', '8n', '8t' (triplet), '2n.' (dotted), etc.
-   * @param {boolean} dotted - Whether the note is dotted
-   * @returns {number} - Number of beats
-   */
-  durationToBeats(duration, dotted = false) {
-    const baseDurations = {
-      '1n': 4,
-      '2n': 2,
-      '4n': 1,
-      '8n': 0.5,
-      '16n': 0.25,
-      '32n': 0.125,
-    };
-
-    // Tuplet ratios - actual notes in time of normal
-    const tupletRatios = {
-      triplet: { actual: 3, normal: 2 },
-      quintuplet: { actual: 5, normal: 4 },
-      sextuplet: { actual: 6, normal: 4 },
-    };
-
-    let baseDuration = duration;
-    let tupletType = null;
-    let dottedFromString = false;
-
-    if (duration && typeof duration === 'string') {
-      // Check for dotted notation in string (e.g., '2n.' -> '2n' + dotted)
-      // IMPORTANT: Strip the dot FIRST before checking tuplet suffixes
-      if (duration.includes('.')) {
-        baseDuration = duration.replace('.', '');
-        dottedFromString = true;
-      }
-
-      // Check for tuplet duration suffix
-      if (baseDuration.endsWith('t') && /^\d+t$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('t', 'n');
-        tupletType = 'triplet';
-      } else if (baseDuration.endsWith('q') && /^\d+q$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('q', 'n');
-        tupletType = 'quintuplet';
-      } else if (baseDuration.endsWith('x') && /^\d+x$/.test(baseDuration)) {
-        baseDuration = baseDuration.replace('x', 'n');
-        tupletType = 'sextuplet';
-      }
-    }
-
-    let beats = baseDurations[baseDuration] || 1;
-
-    // Apply tuplet ratio if this is a tuplet note
-    if (tupletType && tupletRatios[tupletType]) {
-      const ratio = tupletRatios[tupletType];
-      beats = beats * (ratio.normal / ratio.actual);
-    }
-
-    // Apply dotted multiplier - use dottedFromString OR dotted parameter
-    // but NOT both (avoid double-counting)
-    if (dottedFromString || dotted) {
-      beats *= 1.5;
-    }
-    return beats;
   }
 
   /**
@@ -7232,7 +6981,7 @@ export class NoteEditor {
         const noteBeat = (note.beat || 0) + measureStartBeat;
         // Only count notes that fall within this segment's beat range
         if (noteBeat >= overlapStart && noteBeat < overlapEnd) {
-          let noteBeats = this.durationToBeats(note.duration || '4n', note.dotted);
+          let noteBeats = durationToBeats(note.duration || '4n', note.dotted);
           // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
           if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
             const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -8301,7 +8050,7 @@ export class NoteEditor {
         const firstNote = {
           ...item.note,
           beat: newBeat,
-          duration: this.beatsToDurationString(firstPartBeats),
+          duration: beatsToDurationString(firstPartBeats),
           tied: true,
         };
         voice.notes.push(firstNote);
@@ -8321,7 +8070,7 @@ export class NoteEditor {
           const secondNote = {
             ...item.note,
             beat: 0,
-            duration: this.beatsToDurationString(secondPartBeats),
+            duration: beatsToDurationString(secondPartBeats),
             isTied: true,
           };
           nextVoices[item.voiceIndex].notes.push(secondNote);
@@ -8493,7 +8242,7 @@ export class NoteEditor {
         const firstPartBeats = beatsPerMeasure - newBeat;
         const secondPartBeats = noteEndBeat - beatsPerMeasure;
 
-        console.log(`[shiftNotesBackward] SPLITTING: firstPartBeats=${firstPartBeats} -> ${this.beatsToDurationString(firstPartBeats)}, secondPartBeats=${secondPartBeats} -> ${this.beatsToDurationString(secondPartBeats)}`);
+        console.log(`[shiftNotesBackward] SPLITTING: firstPartBeats=${firstPartBeats} -> ${beatsToDurationString(firstPartBeats)}, secondPartBeats=${secondPartBeats} -> ${beatsToDurationString(secondPartBeats)}`);
 
         // Check if original note had forward tie (to preserve chain)
         const originalHadForwardTie = item.note.tied === true;
@@ -8503,7 +8252,7 @@ export class NoteEditor {
         const firstNote = {
           ...item.note,
           beat: newBeat,
-          duration: this.beatsToDurationString(firstPartBeats),
+          duration: beatsToDurationString(firstPartBeats),
           tied: true,  // Always ties forward to the second part
         };
         // Keep isTied if original had it (was tied FROM a previous note)
@@ -8528,7 +8277,7 @@ export class NoteEditor {
             const secondNote = {
               ...item.note,
               beat: 0,
-              duration: this.beatsToDurationString(secondPartBeats),
+              duration: beatsToDurationString(secondPartBeats),
               isTied: true,  // Always tied FROM the first part
             };
             // PRESERVE the forward tie if original had one (maintains chain to next note)
@@ -8712,7 +8461,7 @@ export class NoteEditor {
             // This ensures the total duration is preserved correctly through the shift
             {
               // Merge the notes!
-              const mergedDurationStr = this.beatsToDurationString(combinedDuration);
+              const mergedDurationStr = beatsToDurationString(combinedDuration);
               console.log(`[mergeTiedNotes] MERGING! Combined ${combinedDuration} beats -> duration string: "${mergedDurationStr}"`);
               console.log(`[mergeTiedNotes] First note isTied: ${note.isTied}, Continuation tied: ${continuation.note.tied}`);
 
@@ -9222,7 +8971,7 @@ export class NoteEditor {
         const firstNote = {
           ...JSON.parse(JSON.stringify(item.note)),
           beat: targetBeat,
-          duration: this.beatsToDurationString(firstPartBeats),
+          duration: beatsToDurationString(firstPartBeats),
           tied: true,
         };
         voice.notes.push(firstNote);
@@ -9237,7 +8986,7 @@ export class NoteEditor {
           const secondNote = {
             ...JSON.parse(JSON.stringify(item.note)),
             beat: 0,
-            duration: this.beatsToDurationString(secondPartBeats),
+            duration: beatsToDurationString(secondPartBeats),
             isTied: true,
           };
           nextVoice.notes.push(secondNote);
@@ -9283,25 +9032,6 @@ export class NoteEditor {
         this.onNoteSelect(Array.from(this.selectedNotes));
       }, 50);
     }
-  }
-
-  /**
-   * Convert beats to duration string
-   */
-  beatsToDurationString(beats) {
-    let result;
-    if (beats >= 4) result = '1n';
-    else if (beats >= 3) result = '2n.';
-    else if (beats >= 2) result = '2n';
-    else if (beats >= 1.5) result = '4n.';
-    else if (beats >= 1) result = '4n';
-    else if (beats >= 0.75) result = '8n.';
-    else if (beats >= 0.5) result = '8n';
-    else if (beats >= 0.25) result = '16n';
-    else result = '32n';
-
-    console.log(`[beatsToDurationString] ${beats} beats -> "${result}"`);
-    return result;
   }
 
   /**
@@ -9538,7 +9268,7 @@ export class NoteEditor {
           const firstNote = {
             ...JSON.parse(JSON.stringify(item.note)),
             beat: targetBeat,
-            duration: this.beatsToDurationString(firstPartBeats),
+            duration: beatsToDurationString(firstPartBeats),
             tied: true,
             chordIndex: insertChordIndex, // Set correct chordIndex for the pasted chord
           };
@@ -9552,7 +9282,7 @@ export class NoteEditor {
             const secondNote = {
               ...JSON.parse(JSON.stringify(item.note)),
               beat: 0,
-              duration: this.beatsToDurationString(secondPartBeats),
+              duration: beatsToDurationString(secondPartBeats),
               isTied: true,
               chordIndex: insertChordIndex, // Set correct chordIndex for the pasted chord
             };

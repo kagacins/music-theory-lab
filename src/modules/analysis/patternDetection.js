@@ -16,6 +16,8 @@
  * Part of Phase 3.4: Pattern Detection Enhancement
  */
 
+import { spellNoteInKey } from '../utils/noteUtils.js';
+
 // ============================================================================
 // PATTERN CATEGORY DEFINITIONS
 // ============================================================================
@@ -1192,17 +1194,20 @@ function detectAscendingBassContinuation(progressionData) {
  * @returns {string} Chord root note
  */
 export function romanToChordRoot(roman, key) {
+    // Guard against undefined/null roman numeral
+    if (!roman || typeof roman !== 'string') {
+        console.warn('[romanToChordRoot] Invalid roman numeral provided:', roman);
+        return 'C'; // Return sensible default
+    }
+
     const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-    // Enharmonic equivalents for edge cases like Cb, B#, E#, Fb
-    const ENHARMONIC_KEY_MAP = {
-        'Cb': 'B',   // Cb Major = B Major
-        'B#': 'C',   // B# = C
-        'E#': 'F',   // E# = F
-        'Fb': 'E',   // Fb = E
-        'Db': 'Db',  // Keep as is
-        'C#': 'C#',  // Keep as is
+    // Semitone mapping for finding key root index (handles all enharmonics)
+    const NOTE_TO_SEMITONE_MAP = {
+        'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'Fb': 4, 'E#': 5,
+        'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10,
+        'B': 11, 'Cb': 11, 'B#': 0
     };
 
     // Handle missing key - default to C Major
@@ -1212,24 +1217,12 @@ export function romanToChordRoot(roman, key) {
         return NOTE_NAMES[degree % 12];
     }
 
-    // Get key root
-    let keyRoot = key.replace(/\s*(Major|Minor|major|minor|m).*$/i, '').trim();
+    // Get key root (preserve original spelling for enharmonic preference)
+    const keyRoot = key.replace(/\s*(Major|Minor|major|minor|m).*$/i, '').trim();
 
-    // Handle enharmonic keys (Cb -> B, B# -> C, etc.)
-    if (ENHARMONIC_KEY_MAP[keyRoot]) {
-        keyRoot = ENHARMONIC_KEY_MAP[keyRoot];
-    }
-
-    const useFlats = keyRoot.includes('b') || ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'].includes(keyRoot);
-    const noteNames = useFlats ? FLAT_NAMES : NOTE_NAMES;
-
-    // Find key root index
-    let keyIndex = noteNames.findIndex(n => n === keyRoot);
-    if (keyIndex === -1) {
-        // Try the other array
-        keyIndex = (useFlats ? NOTE_NAMES : FLAT_NAMES).findIndex(n => n === keyRoot);
-    }
-    if (keyIndex === -1) {
+    // Find key root semitone value
+    let keyIndex = NOTE_TO_SEMITONE_MAP[keyRoot];
+    if (keyIndex === undefined) {
         console.warn(`[romanToChordRoot] Could not find key "${key}" (keyRoot="${keyRoot}"), defaulting to C`);
         keyIndex = 0; // Default to C
     }
@@ -1249,9 +1242,15 @@ export function romanToChordRoot(roman, key) {
         degree = (degree + 1) % 12;
     }
 
-    // Calculate chord root
-    const rootIndex = (keyIndex + degree) % 12;
-    return noteNames[rootIndex];
+    // Calculate chord root semitone
+    const rootSemitone = (keyIndex + degree) % 12;
+
+    // Get a temporary note name (using sharps as default)
+    const tempNote = NOTE_NAMES[rootSemitone];
+
+    // Use spellNoteInKey to get the correct enharmonic spelling for the key
+    // This ensures Cb major gets Ab instead of G#, etc.
+    return spellNoteInKey(tempNote, key);
 }
 
 /**
@@ -1262,6 +1261,16 @@ export function romanToChordRoot(roman, key) {
  * @returns {Object} Suggestion with voicing info
  */
 function calculateSuggestedVoicing(suggestion, progressionData, key) {
+    // Guard against invalid suggestion
+    if (!suggestion) {
+        return { suggestedInversion: 0, suggestedOctave: 4 };
+    }
+
+    // If suggestion has neither root nor suggestedRoman, we can't calculate voicing
+    if (!suggestion.root && !suggestion.suggestedRoman) {
+        return { ...suggestion, suggestedInversion: 0, suggestedOctave: 4 };
+    }
+
     if (!progressionData || progressionData.length === 0) {
         return { ...suggestion, suggestedInversion: 0, suggestedOctave: 4 };
     }

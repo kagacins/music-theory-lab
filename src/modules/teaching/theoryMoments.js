@@ -134,7 +134,7 @@ function handleExperienceModeChanged(event) {
  * Focus mode = disabled, Guided/Explore = enabled
  */
 function syncWithExperienceMode() {
-    const mode = getExperienceMode?.() || 'guided';
+    const mode = getExperienceMode?.() || 'learn';
     const shouldBeEnabled = mode !== 'focus';
 
     if (isEnabled !== shouldBeEnabled) {

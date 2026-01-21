@@ -10,6 +10,10 @@
 import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
+import {
+    durationToBeats as durationToBeatsCanonical,
+    beatsToDuration as beatsToDurationCanonical,
+} from '../notation/durationUtils.js';
 
 // Intervals for different chord types (in semitones from root)
 // Includes both canonical names (with spaces) and common aliases
@@ -316,9 +320,9 @@ function getChordNotesInBassRegister(chord, baseOctave = 2) {
     // Filter out omitted notes before processing
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
 
-    // If all notes are omitted, use root as fallback
+    // If all notes are omitted, return empty array (user explicitly omitted all notes)
     if (voicedNotes.length === 0) {
-        return [`${chord.root}${baseOctave}`, `${chord.root}${upperOctave}`];
+        return [];
     }
 
     // Remove octave numbers and add bass octaves
@@ -933,47 +937,10 @@ export function calculateVoiceLeadingScore(chord1, chord2) {
 // that may span multiple measures. They handle proper note duration splitting
 // and ties across measure boundaries.
 
-/**
- * Duration values in beats (for 4/4 time with quarter = 1 beat)
- */
-const DURATION_BEATS = {
-    '1n': 4,      // whole note
-    '2n.': 3,     // dotted half
-    '2n': 2,      // half note
-    '4n.': 1.5,   // dotted quarter
-    '4n': 1,      // quarter note
-    '8n.': 0.75,  // dotted eighth
-    '8n': 0.5,    // eighth note
-    '16n': 0.25,  // sixteenth note
-};
-
-/**
- * Convert beats to the best duration notation
- * @param {number} beats - Number of beats
- * @returns {object} { duration: string, dotted: boolean }
- */
-function beatsToDurationNotation(beats) {
-    if (beats >= 4) return { duration: '1n', dotted: false };
-    if (beats >= 3) return { duration: '2n', dotted: true };
-    if (beats >= 2) return { duration: '2n', dotted: false };
-    if (beats >= 1.5) return { duration: '4n', dotted: true };
-    if (beats >= 1) return { duration: '4n', dotted: false };
-    if (beats >= 0.75) return { duration: '8n', dotted: true };
-    if (beats >= 0.5) return { duration: '8n', dotted: false };
-    return { duration: '16n', dotted: false };
-}
-
-/**
- * Get the beat value of a duration string
- * @param {string} duration - Duration string (e.g., '4n', '2n.')
- * @returns {number} Number of beats
- */
-function getDurationBeats(duration) {
-    const dotted = duration.includes('.');
-    const baseDuration = duration.replace('.', '');
-    const baseBeats = DURATION_BEATS[baseDuration] || DURATION_BEATS[duration] || 1;
-    return dotted ? baseBeats * 1.5 : baseBeats;
-}
+// Duration utilities imported from durationUtils.js (canonical source)
+// Local aliases for backwards compatibility with existing code
+const beatsToDurationNotation = beatsToDurationCanonical;
+const getDurationBeats = durationToBeatsCanonical;
 
 /**
  * Generate bass pattern for an entire building block duration
@@ -1010,6 +977,12 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
     const effectiveOctave = bassOctave ?? getDefaultOctaveForPattern(bassPattern);
 
     const chordNotes = getChordNotesInBassRegister(chord, effectiveOctave);
+
+    // If all notes are omitted (user explicitly omitted all), return empty array
+    if (chordNotes.length === 0) {
+        return [];
+    }
+
     // Get the bass note based on inversion setting, using the effective octave
     const bassNote = getBassNoteForChord(chord, bassFollowsInversion, effectiveOctave);
     const fifth = findFifth(chord.root, chordNotes, effectiveOctave);

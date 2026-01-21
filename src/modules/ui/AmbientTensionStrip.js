@@ -61,8 +61,8 @@ export class AmbientTensionStrip {
         // Store context for re-rendering on mode change
         this._activeContexts.set(containerId, { container, progressionData, key });
 
-        // Check experience mode - hidden in Focus mode
-        const mode = getExperienceMode?.() || 'guided';
+        // Check experience mode - hidden in Focus mode, visible in Learn mode
+        const mode = getExperienceMode?.() || 'learn';
         if (mode === 'focus') {
             this.remove(container);
             return;

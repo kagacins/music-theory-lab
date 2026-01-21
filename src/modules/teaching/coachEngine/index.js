@@ -342,7 +342,7 @@ class CoachEngine {
      * Focus mode = disabled, Guided/Explore = enabled
      */
     _syncWithExperienceMode() {
-        const mode = getExperienceMode?.() || 'guided';
+        const mode = getExperienceMode?.() || 'learn';
         const shouldBeEnabled = mode !== 'focus';
 
         const wasEnabled = this.enabled;

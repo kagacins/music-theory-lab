@@ -31,6 +31,12 @@ import {
 
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
 import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
+import {
+  durationToBeats as durationToBeatsCanonical,
+  beatsToDuration as beatsToDurationCanonical,
+  toVexFlowDuration,
+  beatsToVexFlowDuration,
+} from './durationUtils.js';
 
 // VexFlow is loaded globally
 // Use a getter function to check at runtime, not at module load time
@@ -265,53 +271,16 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
   const [num, denom] = timeSignature.split('/').map(Number);
   const totalBeats = num || 4;
 
-  // Duration string to beats mapping
-  // Supports canonical format: duration='2n', dotted=true (separate parameter)
-  const durationToBeats = (duration, dotted = false) => {
-    if (!duration) return 1;
-    const baseDuration = duration.replace(/[dn.]/g, '');
-    // Check both: dot in string OR separate dotted flag (canonical format)
-    const isDotted = duration.includes('d') || duration.includes('.') || dotted;
-    let beats = 1;
-    switch (baseDuration) {
-      case '1': case 'w': beats = 4; break;
-      case '2': case 'h': beats = 2; break;
-      case '4': case 'q': beats = 1; break;
-      case '8': beats = 0.5; break;
-      case '16': beats = 0.25; break;
-      case '32': beats = 0.125; break;
-      default:
-        // Try parsing as '4n' format
-        if (baseDuration.endsWith('n')) {
-          const noteValue = parseInt(baseDuration.replace('n', ''), 10);
-          if (!isNaN(noteValue)) {
-            beats = 4 / noteValue;
-          }
-        }
-    }
-    return isDotted ? beats * 1.5 : beats;
-  };
-
-  // Beats to duration object mapping (returns { duration, dotted } for canonical format)
-  const beatsToDurationObj = (beats) => {
-    if (beats >= 4) return { duration: '1n', dotted: false };
-    if (beats >= 3) return { duration: '2n', dotted: true };   // dotted half
-    if (beats >= 2) return { duration: '2n', dotted: false };
-    if (beats >= 1.5) return { duration: '4n', dotted: true }; // dotted quarter
-    if (beats >= 1) return { duration: '4n', dotted: false };
-    if (beats >= 0.75) return { duration: '8n', dotted: true }; // dotted eighth
-    if (beats >= 0.5) return { duration: '8n', dotted: false };
-    if (beats >= 0.25) return { duration: '16n', dotted: false };
-    if (beats >= 0.125) return { duration: '32n', dotted: false };
-    return { duration: '4n', dotted: false };
-  };
+  // Use canonical duration utilities from durationUtils.js (imported at top of file)
+  // durationToBeatsCanonical handles both Tone.js ('4n') and VexFlow ('q', 'h') formats
+  // beatsToDurationCanonical returns { duration, dotted } in canonical Tone.js format
 
   // Build a map of occupied beat ranges
   // Include BOTH notes AND existing rests - we don't want to add rests where rests already exist
   const occupiedRanges = [];
   notes.forEach(note => {
     const start = note.beat ?? 0;
-    const duration = durationToBeats(note.duration, note.dotted);
+    const duration = durationToBeatsCanonical(note.duration, note.dotted);
     occupiedRanges.push({ start, end: start + duration });
   });
 
@@ -330,8 +299,8 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
 
       while (gapStart < gapEnd) {
         const gapDuration = gapEnd - gapStart;
-        const { duration: restDuration, dotted: restDotted } = beatsToDurationObj(gapDuration);
-        const restBeats = durationToBeats(restDuration, restDotted);
+        const { duration: restDuration, dotted: restDotted } = beatsToDurationCanonical(gapDuration);
+        const restBeats = durationToBeatsCanonical(restDuration, restDotted);
 
         rests.push({
           beat: gapStart,
@@ -353,8 +322,8 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
   // Fill any remaining gap at the end of the measure
   while (currentBeat < totalBeats) {
     const remainingBeats = totalBeats - currentBeat;
-    const { duration: restDuration, dotted: restDotted } = beatsToDurationObj(remainingBeats);
-    const restBeats = durationToBeats(restDuration, restDotted);
+    const { duration: restDuration, dotted: restDotted } = beatsToDurationCanonical(remainingBeats);
+    const restBeats = durationToBeatsCanonical(restDuration, restDotted);
 
     rests.push({
       beat: currentBeat,
@@ -2829,60 +2798,16 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // Helper to round beats for comparison (avoid floating point issues)
   const roundBeat = (beat) => Math.round((beat ?? 0) * 10000) / 10000;
 
-  // Helper to convert beats to VexFlow duration string
-  // Handles both regular and dotted durations for proper tick alignment
-  const beatsToDuration = (beats) => {
-    // Handle dotted durations first (1.5x base duration)
-    if (beats >= 6) return 'wd';      // 6 beats = dotted whole
-    if (beats >= 4) return 'w';       // 4 beats = whole
-    if (beats >= 3) return 'hd';      // 3 beats = dotted half
-    if (beats >= 2) return 'h';       // 2 beats = half
-    if (beats >= 1.5) return 'qd';    // 1.5 beats = dotted quarter
-    if (beats >= 1) return 'q';       // 1 beat = quarter
-    if (beats >= 0.75) return '8d';   // 0.75 beats = dotted eighth
-    if (beats >= 0.5) return '8';     // 0.5 beats = eighth
-    if (beats >= 0.375) return '16d'; // 0.375 beats = dotted sixteenth
-    if (beats >= 0.25) return '16';   // 0.25 beats = sixteenth
-    if (beats >= 0.125) return '32';  // 0.125 beats = thirty-second
-    // For triplet subdivisions, approximate to nearest duration
-    if (beats >= 0.667) return 'q';   // Triplet quarter ≈ quarter
-    if (beats >= 0.333) return '8';   // Triplet eighth ≈ eighth
-    return '16';
-  };
-
-  // Helper to get note duration in beats from note data or VexFlow duration string
-  // CANONICAL FORMAT: accepts optional dotted parameter for notes with duration='2n' and dotted=true
-  const getDurationInBeats = (durationStr, dotted = false) => {
-    if (!durationStr) return 1;
-    // Handle dotted: check duration string ('d' suffix, '.' suffix) OR separate dotted flag
-    const baseDuration = durationStr.replace(/[dn.]/g, '');
-    const isDotted = durationStr.includes('d') || durationStr.includes('.') || dotted;
-    let beats = 1;
-    switch (baseDuration) {
-      case '1': case 'w': beats = 4; break;
-      case '2': case 'h': beats = 2; break;
-      case '4': case 'q': beats = 1; break;
-      case '8': beats = 0.5; break;
-      case '16': beats = 0.25; break;
-      case '32': beats = 0.125; break;
-      default:
-        // Try parsing as '4n' format
-        if (baseDuration.endsWith('n')) {
-          const noteValue = parseInt(baseDuration.replace('n', ''), 10);
-          if (!isNaN(noteValue)) {
-            beats = 4 / noteValue;
-          }
-        }
-    }
-    return isDotted ? beats * 1.5 : beats;
-  };
+  // Use canonical utilities from durationUtils.js (imported at top of file):
+  // - beatsToVexFlowDuration: converts beats to VexFlow format ('q', 'qd', 'h', 'hd', etc.)
+  // - durationToBeatsCanonical: handles both Tone.js and VexFlow formats
 
   // Build a beat map from note data and corresponding VexFlow notes
   const buildBeatMap = (notesArray, vexArray) => {
     const map = new Map();
     notesArray.forEach((note, i) => {
       const beat = roundBeat(note.beat);
-      const duration = getDurationInBeats(note.duration, note.dotted);
+      const duration = durationToBeatsCanonical(note.duration, note.dotted);
       map.set(beat, { note, index: i, vexNote: vexArray[i], duration, endBeat: beat + duration });
     });
     return map;
@@ -2923,7 +2848,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       if (entry1) {
         aligned1.push(entry1.vexNote);
       } else if (gapBeats > 0 && !isBeatCoveredByPreviousNote(beatMap1, beat)) {
-        const ghostDuration = beatsToDuration(gapBeats);
+        const ghostDuration = beatsToVexFlowDuration(gapBeats);
         aligned1.push(new VF.GhostNote({ duration: ghostDuration }));
       }
 
@@ -2931,7 +2856,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       if (entry2) {
         aligned2.push(entry2.vexNote);
       } else if (gapBeats > 0 && !isBeatCoveredByPreviousNote(beatMap2, beat)) {
-        const ghostDuration = beatsToDuration(gapBeats);
+        const ghostDuration = beatsToVexFlowDuration(gapBeats);
         aligned2.push(new VF.GhostNote({ duration: ghostDuration }));
       }
     }
@@ -2993,7 +2918,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       alignedTrebleNotes.push(trebleEntry.vexNote);
     } else if (gapBeats > 0 && !isBeatCoveredByPreviousNote(trebleBeatMap, beat)) {
       // Insert GhostNote for treble only if not covered by a previous note's duration
-      const ghostDuration = beatsToDuration(gapBeats);
+      const ghostDuration = beatsToVexFlowDuration(gapBeats);
       const ghost = new VF.GhostNote({ duration: ghostDuration });
       alignedTrebleNotes.push(ghost);
     }
@@ -3003,7 +2928,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       alignedBassNotes.push(bassEntry.vexNote);
     } else if (gapBeats > 0 && !isBeatCoveredByPreviousNote(bassBeatMap, beat)) {
       // Insert GhostNote for bass only if not covered by a previous note's duration
-      const ghostDuration = beatsToDuration(gapBeats);
+      const ghostDuration = beatsToVexFlowDuration(gapBeats);
       const ghost = new VF.GhostNote({ duration: ghostDuration });
       alignedBassNotes.push(ghost);
     }

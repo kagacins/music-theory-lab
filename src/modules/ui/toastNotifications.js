@@ -41,7 +41,8 @@ function initToastContainer() {
 
   toastContainer = document.createElement('div');
   toastContainer.id = 'toast-container';
-  toastContainer.className = 'fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none';
+  // z-index 100003 ensures toasts appear above the UnifiedRecommendationModal (z-index 100000-100002)
+  toastContainer.className = 'fixed bottom-4 right-4 z-[100003] flex flex-col gap-2 pointer-events-none';
   toastContainer.setAttribute('aria-live', 'polite');
   toastContainer.setAttribute('aria-atomic', 'true');
   document.body.appendChild(toastContainer);

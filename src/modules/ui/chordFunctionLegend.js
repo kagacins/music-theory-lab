@@ -293,7 +293,7 @@ function createLegendHTML(compact = false) {
  */
 export function showLegend(expanded = true) {
     // Don't show in Focus mode
-    const mode = getExperienceMode?.() || 'guided';
+    const mode = getExperienceMode?.() || 'learn';
     if (mode === 'focus') {
         console.log('[ChordFunctionLegend] Legend hidden in Focus mode');
         return;
@@ -574,7 +574,7 @@ export function getChordCardFunctionStyleString(roman, options = {}) {
  * @returns {boolean}
  */
 export function shouldShowFunctionColors() {
-    // const mode = getExperienceMode?.() || 'guided';
+    // const mode = getExperienceMode?.() || 'learn';
     // return mode !== 'focus';  // Uncomment to hide colors in Focus mode
     return true; // Colors shown in all modes
 }

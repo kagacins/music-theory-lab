@@ -457,17 +457,11 @@ export class FullScreenNotationEditor {
                                         title="Focus Mode: Minimal UI for experienced composers">
                                     Focus
                                 </button>
-                                <button data-mode="guided"
-                                        class="experience-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-full transition-all ${this._getExperienceMode() === 'guided' ? 'bg-white text-indigo-700 shadow-sm' : 'text-white/80 hover:bg-white/10'}"
-                                        style="${this._getExperienceMode() === 'guided' ? 'color: #4338ca !important; -webkit-text-fill-color: #4338ca !important;' : '-webkit-text-fill-color: rgba(255,255,255,0.8) !important;'}"
-                                        title="Guided Mode: Balanced education + composition">
-                                    Guided
-                                </button>
-                                <button data-mode="explore"
-                                        class="experience-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-full transition-all ${this._getExperienceMode() === 'explore' ? 'bg-white text-indigo-700 shadow-sm' : 'text-white/80 hover:bg-white/10'}"
-                                        style="${this._getExperienceMode() === 'explore' ? 'color: #4338ca !important; -webkit-text-fill-color: #4338ca !important;' : '-webkit-text-fill-color: rgba(255,255,255,0.8) !important;'}"
-                                        title="Explore Mode: Maximum educational features">
-                                    Explore
+                                <button data-mode="learn"
+                                        class="experience-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-full transition-all ${this._getExperienceMode() === 'learn' ? 'bg-white text-indigo-700 shadow-sm' : 'text-white/80 hover:bg-white/10'}"
+                                        style="${this._getExperienceMode() === 'learn' ? 'color: #4338ca !important; -webkit-text-fill-color: #4338ca !important;' : '-webkit-text-fill-color: rgba(255,255,255,0.8) !important;'}"
+                                        title="Learn Mode: Educational features enabled">
+                                    Learn
                                 </button>
                             </div>
                         </div>
@@ -5368,26 +5362,35 @@ export class FullScreenNotationEditor {
             return globalState.getExperienceMode();
         }
         // Fallback: check localStorage directly
-        return localStorage.getItem('experienceMode') || 'guided';
+        const stored = localStorage.getItem('experienceMode');
+        // Normalize legacy values
+        if (stored === 'guided' || stored === 'explore') return 'learn';
+        return stored || 'learn';
     }
 
     /**
      * Set experience mode and update UI
      */
     _setExperienceMode(mode) {
-        if (!['focus', 'guided', 'explore'].includes(mode)) return;
+        // Normalize legacy mode names
+        let normalizedMode = mode;
+        if (mode === 'guided' || mode === 'explore') {
+            normalizedMode = 'learn';
+        }
+
+        if (!['focus', 'learn'].includes(normalizedMode)) return;
 
         // Update global state
         if (window.globalState?.setExperienceMode) {
-            window.globalState.setExperienceMode(mode);
+            window.globalState.setExperienceMode(normalizedMode);
         } else {
             // Fallback: set localStorage and dispatch event
-            localStorage.setItem('experienceMode', mode);
-            window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode } }));
+            localStorage.setItem('experienceMode', normalizedMode);
+            window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode: normalizedMode } }));
         }
 
         // Update button appearance
-        this._updateExperienceModeButtons(mode);
+        this._updateExperienceModeButtons(normalizedMode);
     }
 
     /**

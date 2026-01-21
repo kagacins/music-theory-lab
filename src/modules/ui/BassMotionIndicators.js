@@ -15,7 +15,7 @@
  *
  * This is a Layer 1 (Ambient) feature:
  * - Hidden in Focus mode
- * - Visible in Explore mode only (per roadmap matrix)
+ * - Visible in Learn mode
  * - Respects Experience Mode settings
  */
 
@@ -129,13 +129,13 @@ export class BassMotionIndicators {
 
     /**
      * Check if bass motion indicators should be displayed
-     * Per roadmap: Only visible in Explore mode
+     * Visible in Learn mode, hidden in Focus mode
      * @returns {boolean}
      */
     shouldShowIndicators() {
-        const mode = getExperienceMode?.() || 'guided';
-        // Per A3 roadmap matrix: Bass motion arrows visible only in Explore mode
-        return mode === 'explore';
+        const mode = getExperienceMode?.() || 'learn';
+        // Show in Learn mode (and legacy 'guided'/'explore'), hide in Focus mode
+        return mode !== 'focus';
     }
 
     /**

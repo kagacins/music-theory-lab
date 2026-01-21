@@ -24,7 +24,11 @@ import {
   getBaseDuration,
   beatsToDuration as beatsToDurationCanonical,
   durationToBeats as durationToBeatsCanonical,
+  getNoteDurationInBeats,
   normalizeDottedState,
+  DURATION_TO_BEATS as DURATION_TO_BEATS_CANONICAL,
+  BEATS_TO_DURATION as BEATS_TO_DURATION_CANONICAL,
+  beatsToDurationString as beatsToDurationStringCanonical,
 } from '../notation/durationUtils.js';
 
 // ============================================================================
@@ -359,66 +363,10 @@ export function getNotesOverflowTicks(notes, timeSignature = DEFAULT_TIME_SIGNAT
 // MULTI-VOICE TIME SIGNATURE REDISTRIBUTION HELPERS
 // ============================================================================
 
-/**
- * Convert beats to a duration string (Tone.js format)
- * @param {number} beats - Number of beats
- * @returns {string} - Duration string like '4n', '2n.', etc.
- */
-function beatsToDurationString(beats) {
-    // Map of beats to duration strings
-    const beatMap = [
-        { beats: 4, duration: '1n' },
-        { beats: 3, duration: '2n.' },
-        { beats: 2, duration: '2n' },
-        { beats: 1.5, duration: '4n.' },
-        { beats: 1, duration: '4n' },
-        { beats: 0.75, duration: '8n.' },
-        { beats: 0.5, duration: '8n' },
-        { beats: 0.375, duration: '16n.' },
-        { beats: 0.25, duration: '16n' },
-    ];
-
-    // Find the closest match
-    let closest = beatMap[0];
-    let closestDiff = Math.abs(beats - closest.beats);
-
-    for (const entry of beatMap) {
-        const diff = Math.abs(beats - entry.beats);
-        if (diff < closestDiff) {
-            closestDiff = diff;
-            closest = entry;
-        }
-    }
-
-    return closest.duration;
-}
-
-/**
- * Get the duration in beats from a duration string
- * @param {string} duration - Duration string like '4n', '2n.', etc.
- * @param {boolean} [dotted=false] - Whether the note is dotted (for canonical format)
- * @returns {number} - Duration in beats
- */
-function durationToBeats(duration, dotted = false) {
-    const map = {
-        '1n': 4,
-        '2n.': 3,
-        '2n': 2,
-        '4n.': 1.5,
-        '4n': 1,
-        '8n.': 0.75,
-        '8n': 0.5,
-        '16n.': 0.375,
-        '16n': 0.25,
-        '32n': 0.125,
-    };
-    const baseBeats = map[duration] || 1;
-    // CANONICAL FORMAT: If dotted flag set but duration doesn't have '.', multiply by 1.5
-    if (dotted && !duration?.includes('.')) {
-        return baseBeats * 1.5;
-    }
-    return baseBeats;
-}
+// Use canonical functions from durationUtils.js (imported at top of file)
+// Local aliases for backwards compatibility with existing code in this file
+const beatsToDurationString = beatsToDurationStringCanonical;
+const durationToBeats = durationToBeatsCanonical;
 
 /**
  * Collect all notes from all voices in a staff with their absolute beat positions
@@ -723,75 +671,17 @@ function fillGapsWithRests(compositionState, staff, timeSignature) {
 // CHORD SEGMENT MODEL
 // ============================================================================
 
-/**
- * Duration map for converting between duration strings and beats
- */
-const DURATION_TO_BEATS = {
-    '1n': 4,      // whole note
-    '2n.': 3,     // dotted half
-    '2n': 2,      // half note
-    '4n.': 1.5,   // dotted quarter
-    '4n': 1,      // quarter note
-    '8n.': 0.75,  // dotted eighth
-    '8n': 0.5,    // eighth note
-    '16n.': 0.375, // dotted sixteenth
-    '16n': 0.25,  // sixteenth note
-    '32n': 0.125, // thirty-second note
-};
+// Use canonical constants and functions from durationUtils.js (imported at top of file)
+// Local aliases for backwards compatibility with existing code in this file
+const DURATION_TO_BEATS = DURATION_TO_BEATS_CANONICAL;
+const BEATS_TO_DURATION = BEATS_TO_DURATION_CANONICAL;
+const getDurationInBeats = durationToBeatsCanonical;
 
-const BEATS_TO_DURATION = {
-    4: '1n',
-    3: '2n.',
-    2: '2n',
-    1.5: '4n.',
-    1: '4n',
-    0.75: '8n.',
-    0.5: '8n',
-    0.375: '16n.',
-    0.25: '16n',
-    0.125: '32n',
-};
-
-/**
- * Get duration in beats from duration string
- * @param {string} duration - Duration string like '4n', '2n.'
- * @param {boolean} [dotted=false] - Whether the note is dotted (for canonical format)
- * @returns {number} - Duration in beats
- */
-function getDurationInBeats(duration, dotted = false) {
-    if (!duration) return 1;
-    // Handle dotted: check both duration string AND dotted parameter (canonical format)
-    const hasDotInString = duration.includes('.');
-    const isDotted = hasDotInString || dotted;
-    const baseDuration = duration.replace('.', '');
-    const baseBeats = DURATION_TO_BEATS[baseDuration] || 1;
-    // Apply 1.5x multiplier if dotted (from either source)
-    return isDotted ? baseBeats * 1.5 : baseBeats;
-}
-
-/**
- * Get duration string from beats (finds closest standard duration)
- * @param {number} beats - Duration in beats
- * @returns {string} - Duration string
- */
+// beatsToDuration returns {duration, dotted} from canonical - create wrapper for string-only usage
 function beatsToDuration(beats) {
-    // Find exact match first
-    if (BEATS_TO_DURATION[beats]) {
-        return BEATS_TO_DURATION[beats];
-    }
-
-    // Find closest standard duration
-    const sortedBeats = Object.keys(BEATS_TO_DURATION)
-        .map(Number)
-        .sort((a, b) => b - a);
-
-    for (const standardBeats of sortedBeats) {
-        if (beats >= standardBeats) {
-            return BEATS_TO_DURATION[standardBeats];
-        }
-    }
-
-    return '16n'; // Minimum duration
+    const result = beatsToDurationCanonical(beats);
+    // Return string with dot suffix for backwards compatibility
+    return result.dotted ? result.duration + '.' : result.duration;
 }
 
 /**
@@ -4167,8 +4057,24 @@ export class CompositionState {
             });
         }
 
-        // Render the updated building blocks to measures
-        this.renderBassBlocksToMeasures();
+        // If all notes were omitted (empty blockBassNotes), directly clear the measure's bass
+        // This is needed because renderBassBlocksToMeasures won't create a measure for empty blocks
+        if (blockBassNotes.length === 0) {
+            const measure = this.getMeasure(chordIndex);
+            if (measure && measure.notation && measure.notation.bass) {
+                if (!measure.notation.bass.voices) {
+                    measure.notation.bass.voices = [{ notes: [] }];
+                }
+                if (!measure.notation.bass.voices[0]) {
+                    measure.notation.bass.voices[0] = { notes: [] };
+                }
+                measure.notation.bass.voices[0].notes = [];
+                measure.notation.bass.autoGenerated = false;
+            }
+        } else {
+            // Render the updated building blocks to measures
+            this.renderBassBlocksToMeasures();
+        }
 
         this.events.emit('bassUpdated', chordIndex);
     }

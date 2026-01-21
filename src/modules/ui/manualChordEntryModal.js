@@ -148,7 +148,7 @@ function createModal() {
 /**
  * Handle replace action from modal
  */
-function manualChordEntryReplace() {
+async function manualChordEntryReplace() {
     const input = document.getElementById('modal-chord-list-input');
     if (!input || !input.value.trim()) {
         showAlertModal({
@@ -165,19 +165,27 @@ function manualChordEntryReplace() {
         const oldInput = document.getElementById('chord-list-input');
         if (oldInput) {
             oldInput.value = input.value;
-            window.importChordList('replace');
+            // importChordList is async - await it so confirmation happens before modal closes
+            await window.importChordList('replace');
             oldInput.value = ''; // Clear after import
         }
     }
 
     // Close modal
     closeManualChordEntryModal();
+
+    // Switch to Chord Progression panel in fullscreen mode
+    const editor = window.getFullScreenNotationEditor?.();
+    if (editor?.bottomPanel?.toggle) {
+        // Open chords panel (this will close workbench if it was open)
+        editor.bottomPanel.toggle('chords');
+    }
 }
 
 /**
  * Handle append action from modal
  */
-function manualChordEntryAppend() {
+async function manualChordEntryAppend() {
     const input = document.getElementById('modal-chord-list-input');
     if (!input || !input.value.trim()) {
         showAlertModal({
@@ -194,13 +202,20 @@ function manualChordEntryAppend() {
         const oldInput = document.getElementById('chord-list-input');
         if (oldInput) {
             oldInput.value = input.value;
-            window.importChordList('append');
+            await window.importChordList('append');
             oldInput.value = ''; // Clear after import
         }
     }
 
     // Close modal
     closeManualChordEntryModal();
+
+    // Switch to Chord Progression panel in fullscreen mode
+    const editor = window.getFullScreenNotationEditor?.();
+    if (editor?.bottomPanel?.toggle) {
+        // Open chords panel (this will close workbench if it was open)
+        editor.bottomPanel.toggle('chords');
+    }
 }
 
 // Export functions to window for onclick handlers

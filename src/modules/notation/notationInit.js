@@ -14,6 +14,7 @@ import { getCurrentKey, getSelectedChordIndex, invalidateProgressionDataCache } 
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { initializeIntegratedSuggestions, FeatureFlags } from '../canvas/suggestions/index.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+import { durationToBeats, beatsToDuration as beatsToDurationCanonical, BEATS_TO_DURATION } from './durationUtils.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -740,68 +741,7 @@ export function initEnhancedNotation(options = {}) {
       // Dotted durations need to be split into multiple rests since VexFlow doesn't support dotted rests well
       // e.g., dotted half (3 beats) -> half rest + quarter rest
 
-      // Helper to convert duration to beats (with tuplet support)
-      // Supports canonical format: duration='2n', dotted=true
-      const durationToBeats = (dur, dotted = false) => {
-        const map = {
-          '1n': 4, '1n.': 6,
-          '2n': 2, '2n.': 3,
-          '4n': 1, '4n.': 1.5,
-          '8n': 0.5, '8n.': 0.75,
-          '16n': 0.25, '16n.': 0.375,
-          '32n': 0.125,
-        };
-
-        // Tuplet ratios
-        const tupletRatios = {
-          triplet: { actual: 3, normal: 2 },
-          quintuplet: { actual: 5, normal: 4 },
-          sextuplet: { actual: 6, normal: 4 },
-        };
-
-        // Check for tuplet duration suffix (t=triplet, q=quintuplet, x=sextuplet)
-        let baseDuration = dur;
-        let tupletType = null;
-        if (dur && typeof dur === 'string') {
-          if (dur.endsWith('t') && /^\d+t$/.test(dur)) {
-            baseDuration = dur.replace('t', 'n');
-            tupletType = 'triplet';
-          } else if (dur.endsWith('q') && /^\d+q$/.test(dur)) {
-            baseDuration = dur.replace('q', 'n');
-            tupletType = 'quintuplet';
-          } else if (dur.endsWith('x') && /^\d+x$/.test(dur)) {
-            baseDuration = dur.replace('x', 'n');
-            tupletType = 'sextuplet';
-          }
-        }
-
-        // Check for dotted in string format
-        const hasDotInString = dur?.includes('.');
-        let beats = map[baseDuration] || 1;
-
-        // Apply tuplet ratio if this is a tuplet note
-        if (tupletType && tupletRatios[tupletType]) {
-          const ratio = tupletRatios[tupletType];
-          beats = beats * (ratio.normal / ratio.actual);
-        }
-
-        // Apply dotted multiplier if dotted flag is true and not already in string
-        if (dotted && !hasDotInString) {
-          beats = beats * 1.5;
-        }
-
-        return beats;
-      };
-
-      // Helper to convert beats to duration string
-      const beatsToDuration = (beats) => {
-        if (beats >= 4) return '1n';
-        if (beats >= 2) return '2n';
-        if (beats >= 1) return '4n';
-        if (beats >= 0.5) return '8n';
-        if (beats >= 0.25) return '16n';
-        return '32n';
-      };
+      // durationToBeats and beatsToDuration are imported from durationUtils.js
 
       // Helper to split a dotted duration into multiple non-dotted rests
       // voiceIdx parameter ensures rests stay in the correct voice for multi-voice notation
@@ -837,7 +777,7 @@ export function initEnhancedNotation(options = {}) {
           rests.push({
             type: 'rest',
             isRest: true,
-            duration: beatsToDuration(dotBeats),
+            duration: beatsToDurationCanonical(dotBeats).duration,
             beat: startBeat + baseBeats,
             voiceIndex: voiceIdx, // Preserve voice for multi-voice support
             _userCreated: true,
@@ -1294,20 +1234,13 @@ export function initEnhancedNotation(options = {}) {
         });
 
         // Return info about the tuplet dissolution
-        const beatsToDurationMap = {
-          4: '1n',      // whole note
-          2: '2n',      // half note
-          1: '4n',      // quarter note
-          0.5: '8n',    // eighth note
-          0.25: '16n',  // 16th note
-          0.125: '32n', // 32nd note
-        };
+        // Using BEATS_TO_DURATION imported from durationUtils.js
 
         // Calculate where the repositioned notes end
         const newEndBeat = groupStartBeat + (remainingCount * baseDurationBeats);
 
         return {
-          duration: beatsToDurationMap[baseDurationBeats] || '8n',
+          duration: BEATS_TO_DURATION[baseDurationBeats] || '8n',
           baseDurationBeats,
           groupStartBeat,
           remainingCount,

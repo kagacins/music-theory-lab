@@ -214,7 +214,7 @@ function parseChordSymbol(chordSymbol) {
  * Import a chord list string into the progression
  * @param {string} mode - Either 'replace' or 'append'
  */
-export function importChordList(mode = 'replace') {
+export async function importChordList(mode = 'replace') {
     const input = document.getElementById('chord-list-input');
     if (!input) {
         return;
@@ -246,11 +246,26 @@ export function importChordList(mode = 'replace') {
     const notationPreference = getNotationPreference();
 
 
-    // Clear progression if replacing
+    // Clear progression if replacing - MUST await confirmation before proceeding
     if (mode === 'replace') {
-        // TODO: Import clearProgression from parent module
         if (window.clearProgression) {
-            window.clearProgression();
+            // clearProgression is async and shows confirmation - we must await it
+            // It returns early (undefined) if user cancels, and completes if confirmed
+            const progressionData = getProgressionData();
+            if (progressionData && progressionData.length > 0) {
+                // Use skipConfirmation=false and await the result
+                // clearProgression will show confirmation and return undefined if cancelled
+                await window.clearProgression(false);
+                // Check if progression was actually cleared (user confirmed)
+                const afterClear = getProgressionData();
+                if (afterClear && afterClear.length > 0) {
+                    // User cancelled - don't proceed with import
+                    return;
+                }
+            } else {
+                // No existing chords, skip confirmation
+                await window.clearProgression(true);
+            }
         }
         // Get fresh state after clearing
         trainerState = getTrainerState();
@@ -881,6 +896,12 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
         window.showToast(message, { type: 'success', duration: 3000 });
     }
 
+    // Switch to Chord Progression panel in fullscreen mode after loading template
+    const editor = window.getFullScreenNotationEditor?.();
+    if (editor?.bottomPanel?.toggle) {
+        // Open chords panel (this will close workbench if it was open)
+        editor.bottomPanel.toggle('chords');
+    }
 }
 
 // ============================================================================
