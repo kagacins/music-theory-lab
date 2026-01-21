@@ -2,7 +2,7 @@
 
 **Purpose:** Visual data flow diagrams and state synchronization patterns.
 
-**Last Updated:** 2026-01-08 (Added Community State Management section)
+**Last Updated:** 2026-01-20 (Added Coach Engine, Experience Modes, Pattern Detection state flows)
 
 ---
 
@@ -1133,6 +1133,525 @@ window.clearLoadedSubmissionContext && window.clearLoadedSubmissionContext();
 
 ---
 
+## 🎓 COACH ENGINE STATE MANAGEMENT
+
+### Coach Engine State Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Coach Engine State                        │
+│            (src/modules/teaching/coachEngine/)               │
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │ enabled: boolean         // Engine on/off            │    │
+│  │ scanResults: {           // Latest scan results      │    │
+│  │   patterns: PatternResult[]                          │    │
+│  │   opportunities: Opportunity[]                       │    │
+│  │   suggestions: Suggestion[]                          │    │
+│  │ }                                                    │    │
+│  │ nudgeQueue: NudgeData[]  // Pending nudges           │    │
+│  │ activeNudges: Map       // Currently displayed       │    │
+│  │ preferences: {          // User preferences          │    │
+│  │   verbosity: 'minimal' | 'moderate' | 'verbose'      │    │
+│  │   dismissedPatterns: Set                             │    │
+│  │ }                                                    │    │
+│  └────────────────────────────────────────────────────┘    │
+│                                                             │
+│  Triggers: 'progressionChanged', 'chordUpdated',            │
+│            'measureAdded', 'measureRemoved'                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Pattern 10: Coach Engine Scan Flow
+
+```
+┌──────────────────────────────────┐
+│  Progression Changes             │
+│  (compositionState event)        │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  isCoachEngineEnabled()?         │
+│  If no → skip                    │
+└─────────────────┬────────────────┘
+                  │ Yes
+                  ▼
+┌──────────────────────────────────┐
+│  Debounce (300ms)                │
+│  Avoid excessive scanning        │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  scanProgression()               │
+│  (coachEngine/index.js)          │
+└─────────────────┬────────────────┘
+                  │
+    ┌─────────────┼─────────────┐
+    │             │             │
+    ▼             ▼             ▼
+┌────────┐  ┌──────────┐  ┌──────────┐
+│ Detect │  │ Detect   │  │ Detect   │
+│Cadences│  │Sequences │  │Borrowed  │
+│        │  │          │  │ Chords   │
+└────┬───┘  └────┬─────┘  └────┬─────┘
+    │             │             │
+    └─────────────┼─────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  Merge & Prioritize Results      │
+│  Filter by user preferences      │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  generateSuggestions()           │
+│  Based on detected patterns      │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  Queue Nudges (3-tier system)    │
+│  - Tier 1: Floating nudges       │
+│  - Tier 2: Panel highlights      │
+│  - Tier 3: Modal deep links      │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  showNudge() (if appropriate)    │
+│  Based on experience mode        │
+└──────────────────────────────────┘
+```
+
+### Pattern 11: Nudge Presentation Flow
+
+```
+┌──────────────────────────────────┐
+│  Nudge Ready to Display          │
+│  (from scan results)             │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  Check Experience Mode           │
+│  - Focus: minimal nudges         │
+│  - Guided: moderate              │
+│  - Explore: all nudges           │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  Check Skill Level               │
+│  - Beginner: more explanations   │
+│  - Intermediate: balanced        │
+│  - Advanced: minimal explanation │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  floatingNudgePresenter.js       │
+│  - Position above chord card     │
+│  - Render nudge content          │
+│  - Set up dismiss handlers       │
+└─────────────────┬────────────────┘
+                  │
+          ┌───────┴───────┐
+          │               │
+          ▼               ▼
+┌─────────────────┐  ┌─────────────────┐
+│ User Dismisses  │  │ User Clicks     │
+│ (X or click     │  │ Action Button   │
+│  outside)       │  │                 │
+└────────┬────────┘  └────────┬────────┘
+         │                    │
+         ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐
+│ hideNudge()     │  │ Execute action  │
+│ Track dismissed │  │ (open modal,    │
+│                 │  │  apply change)  │
+└─────────────────┘  └─────────────────┘
+```
+
+---
+
+## 🎚️ EXPERIENCE MODES STATE
+
+### Experience Mode Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Experience Mode State                     │
+│                (src/modules/state/globalState.js)            │
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │ experienceMode: 'focus' | 'guided' | 'explore'      │    │
+│  │                                                     │    │
+│  │ theorySkillLevel: 'beginner' | 'intermediate' |     │    │
+│  │                   'advanced'                        │    │
+│  │   (persisted in localStorage: 'theorySkillLevel')   │    │
+│  └────────────────────────────────────────────────────┘    │
+│                                                             │
+│  Window Event: 'experienceModeChanged'                      │
+│  Payload: { mode, previousMode }                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Mode Feature Matrix
+
+```
+┌────────────┬──────────────────┬──────────────────┬──────────────────┐
+│  Feature   │      Focus       │     Guided       │     Explore      │
+├────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Tension    │     Hidden       │   Ambient only   │   Full + Detail  │
+│ Strip      │                  │                  │                  │
+├────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Bass       │     Hidden       │   On hover only  │   Always visible │
+│ Motion     │                  │                  │                  │
+├────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Coach      │   Errors only    │   Key moments    │   All insights   │
+│ Nudges     │                  │                  │                  │
+├────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Theory     │   Disabled       │   On request     │   Proactive      │
+│ Overlays   │                  │                  │                  │
+├────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Pattern    │   None           │   Cadences only  │   All patterns   │
+│ Detection  │                  │                  │                  │
+└────────────┴──────────────────┴──────────────────┴──────────────────┘
+```
+
+### Pattern 12: Experience Mode Change Flow
+
+```
+┌──────────────────────────────────┐
+│  User Changes Experience Mode    │
+│  (settings modal or header)      │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  setExperienceMode(newMode)      │
+│  (globalState.js)                │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  Dispatch Window Event           │
+│  'experienceModeChanged'         │
+│  { mode, previousMode }          │
+└─────────────────┬────────────────┘
+                  │
+    ┌─────────────┼─────────────┐
+    │             │             │
+    ▼             ▼             ▼
+┌────────────┐ ┌────────────┐ ┌────────────┐
+│ Ambient    │ │ Bass Motion│ │ Coach      │
+│ Tension    │ │ Indicators │ │ Engine     │
+│ Strip      │ │            │ │            │
+│            │ │            │ │            │
+│ setVisi-   │ │ setVisi-   │ │ update     │
+│ bility()   │ │ bility()   │ │ Verbosity  │
+└────────────┘ └────────────┘ └────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  Re-render affected UI           │
+│  - Hide/show ambient features    │
+│  - Adjust nudge presentation     │
+│  - Update detail levels          │
+└──────────────────────────────────┘
+```
+
+---
+
+## 📊 PATTERN DETECTION STATE
+
+### Pattern Detection Flow
+
+```
+┌──────────────────────────────────┐
+│  Request Pattern Analysis        │
+│  (from coach engine or UI)       │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  detectPatterns(progression, key)│
+│  (analysis/patternDetection.js)  │
+└─────────────────┬────────────────┘
+                  │
+    ┌─────────────┼─────────────┬─────────────┐
+    │             │             │             │
+    ▼             ▼             ▼             ▼
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│ Cadence │ │Sequence │ │ Modal   │ │Borrowed │
+│Detector │ │Detector │ │ Pattern │ │ Chord   │
+│         │ │         │ │Detector │ │Detector │
+└────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘
+    │             │             │             │
+    └─────────────┴──────┬──────┴─────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────┐
+│  Merge Results                               │
+│  - Calculate confidence scores               │
+│  - Remove overlapping patterns               │
+│  - Sort by relevance/confidence              │
+└─────────────────┬────────────────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────────────────┐
+│  Return PatternResult[]                      │
+│  [{ type, name, chordIndices,                │
+│     confidence, description }]               │
+└──────────────────────────────────────────────┘
+```
+
+### Cadence Detection Detail
+
+```
+┌──────────────────────────────────┐
+│  detectCadences(chords, key)     │
+│  (detectors/cadenceDetector.js)  │
+└─────────────────┬────────────────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  For each chord pair (i, i+1)    │
+│  - Get roman numerals            │
+│  - Check against CADENCE_PATTERNS│
+└─────────────────┬────────────────┘
+                  │
+          ┌───────┼───────┬───────┬───────┐
+          │       │       │       │       │
+          ▼       ▼       ▼       ▼       ▼
+      ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+      │V → I │ │IV → I│ │V → vi│ │* → V │ │ VII  │
+      │Auth. │ │Plagal│ │Decep.│ │ Half │ │Modal │
+      └──────┘ └──────┘ └──────┘ └──────┘ └──────┘
+                  │
+                  ▼
+┌──────────────────────────────────┐
+│  Calculate strength (0-1)        │
+│  - Position in phrase            │
+│  - Voice leading quality         │
+│  - Duration context              │
+└──────────────────────────────────┘
+```
+
+---
+
+## 🎹 CHORD LAB & SCALE EXPLORER STATE
+
+### Chord Lab State
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Chord Lab State                           │
+│        (src/modules/features/chordLab/)                      │
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │ currentChord: {                                     │    │
+│  │   root: string,                                     │    │
+│  │   type: string,                                     │    │
+│  │   inversion: number                                 │    │
+│  │ }                                                   │    │
+│  │ voicing: string[]  // Current displayed notes       │    │
+│  │ isPlaying: boolean // Playback state                │    │
+│  │ selectedPanel: string // Active bottom panel        │    │
+│  │ keyboardHighlights: Map // Highlighted keys         │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Scale Explorer State
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Scale Explorer State                       │
+│        (src/modules/features/scaleExplorer/)                 │
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │ currentScale: {                                     │    │
+│  │   root: string,                                     │    │
+│  │   type: string  // 'major', 'natural_minor', etc.   │    │
+│  │ }                                                   │    │
+│  │ scaleNotes: string[]  // Notes in current scale     │    │
+│  │ highlightedChord: Chord | null                      │    │
+│  │ playbackDirection: 'ascending' | 'descending'       │    │
+│  │ selectedPanel: string  // Active bottom panel       │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🧩 NEW SYNC SCENARIOS
+
+### Scenario 7: Coach Engine Pattern Detection
+
+```javascript
+// When progression changes, coach engine auto-scans
+compositionState.on('measureUpdated', () => {
+  if (isCoachEngineEnabled()) {
+    // Debounced scan
+    debouncedScan();
+  }
+});
+
+function debouncedScan() {
+  const progressionData = compositionState.exportToProgressionData();
+  const key = compositionState.getSettings().key;
+
+  // Scan for patterns
+  const results = scanProgression(progressionData, key);
+
+  // Generate suggestions
+  const suggestions = generateSuggestions({
+    progressionData,
+    key,
+    patterns: results.patterns
+  });
+
+  // Queue nudges based on experience mode
+  const mode = getExperienceMode();
+  const nudges = filterNudgesForMode(suggestions, mode);
+  queueNudges(nudges);
+}
+```
+
+### Scenario 8: Experience Mode Toggle
+
+```javascript
+// User changes experience mode
+setExperienceMode('guided');
+
+// This triggers event
+window.dispatchEvent(new CustomEvent('experienceModeChanged', {
+  detail: { mode: 'guided', previousMode: 'focus' }
+}));
+
+// Listeners update UI
+// AmbientTensionStrip.js
+window.addEventListener('experienceModeChanged', (e) => {
+  const { mode } = e.detail;
+  if (mode === 'focus') {
+    hideStrip();
+  } else if (mode === 'guided') {
+    showAmbientOnly();
+  } else {
+    showFull();
+  }
+});
+
+// BassMotionIndicators.js
+window.addEventListener('experienceModeChanged', (e) => {
+  const { mode } = e.detail;
+  setVisibility(mode !== 'focus');
+  setHoverOnly(mode === 'guided');
+});
+```
+
+### Scenario 9: Chord Context Menu Action
+
+```javascript
+// User right-clicks chord card
+showChordContextMenu(chordIndex, event);
+
+// User clicks "Find Alternatives"
+// → Opens UnifiedRecommendationModal to Chord tab
+
+// User clicks "Analyze Voice Leading"
+// → Opens UnifiedRecommendationModal with voice leading focus
+
+// User clicks "Why This Works"
+// → Opens Why This Works panel for chord
+
+// Action handlers preserve context
+handleContextMenuAction(action, chordIndex) {
+  switch(action) {
+    case 'alternatives':
+      showUnifiedRecommendationModal({
+        chordIndex,
+        activeTab: 'chord',
+        initialView: 'alternatives'
+      });
+      break;
+    case 'voiceLeading':
+      showUnifiedRecommendationModal({
+        chordIndex,
+        activeTab: 'chord',
+        initialView: 'voiceLeading'
+      });
+      break;
+    // ... more actions
+  }
+}
+```
+
+---
+
+## 📋 UPDATED STATE DEBUGGING
+
+### Debug Coach Engine State
+
+```javascript
+// In browser console:
+
+// Check coach engine status
+window.isCoachEngineEnabled && window.isCoachEngineEnabled();
+
+// Get scan results
+window.getCoachEngine && window.getCoachEngine().getScanResults();
+
+// Get active nudges
+window.getCoachEngine && window.getCoachEngine().getActiveNudges();
+
+// Force rescan
+window.getCoachEngine && window.getCoachEngine().rescan();
+```
+
+### Debug Experience Mode
+
+```javascript
+// Get current mode
+window.getExperienceMode && window.getExperienceMode();
+
+// Get skill level
+window.getTheorySkillLevel && window.getTheorySkillLevel();
+// Or check localStorage directly
+localStorage.getItem('theorySkillLevel');
+
+// Set mode (for testing)
+window.setExperienceMode && window.setExperienceMode('explore');
+```
+
+### Debug Pattern Detection
+
+```javascript
+// Run pattern detection manually
+import { detectPatterns } from './modules/analysis/patternDetection.js';
+const progressionData = window.getCompositionState().exportToProgressionData();
+const key = window.getCompositionState().getSettings().key;
+const patterns = detectPatterns(progressionData, key);
+console.log(patterns);
+```
+
+### Updated Common Issues Table
+
+| Issue | Symptom | Solution |
+|-------|---------|----------|
+| Nudges not showing | Coach engine disabled or Focus mode | Check `isCoachEngineEnabled()`, switch to Guided/Explore |
+| Ambient features missing | Focus mode active | Switch to Guided or Explore mode |
+| Pattern detection slow | Large progression | Patterns are debounced 300ms; consider reducing scan frequency |
+| Context menu not appearing | Right-click handler not initialized | Call `initChordContextMenu()` |
+| Skill level not persisting | localStorage issue | Check `localStorage.getItem('theorySkillLevel')` |
+| Coach suggestions wrong level | Skill level mismatch | Call `setTheorySkillLevel(level)` |
+
+---
+
 ## 🔗 RELATED DOCUMENTS
 
 - [MODULE_INDEX.md](MODULE_INDEX.md) - Find state-related modules
@@ -1163,4 +1682,4 @@ window.clearLoadedSubmissionContext && window.clearLoadedSubmissionContext();
 
 ---
 
-**Last Updated:** 2026-01-08
+**Last Updated:** 2026-01-20

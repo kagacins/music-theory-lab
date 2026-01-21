@@ -1123,26 +1123,47 @@ export class CompositionState {
         // Clean up empty sections first
         this._cleanupEmptySections();
 
-        // IMPORTANT: First, remove any ungrouped sections that now have stale boundaries
-        // This prevents duplicate ungrouped sections from accumulating
+        // IMPORTANT: First, remove any ungrouped sections that are stale
+        // An ungrouped section is stale if:
+        // 1. Its boundaries extend beyond the chord array
+        // 2. It overlaps with another section (ungrouped OR non-ungrouped)
+        // 3. It has chordCount === 0
         this.sections = this.sections.filter(s => {
             if (s.type !== 'ungrouped') return true; // Keep non-ungrouped sections
 
-            // Check if this ungrouped section's range is still a gap
-            // (i.e., not covered by any non-ungrouped section)
-            const isStillValid = !this.sections.some(other =>
+            // Check 1: Section boundaries must be valid
+            if (s.startIndex < 0 || s.startIndex >= totalChords) {
+                console.log(`[materializeUngroupedSections] Removing out-of-bounds ungrouped section ${s.id} (startIndex=${s.startIndex}, totalChords=${totalChords})`);
+                return false;
+            }
+
+            // Check 2: Section must have valid chordCount
+            if (s.chordCount <= 0) {
+                console.log(`[materializeUngroupedSections] Removing empty ungrouped section ${s.id} (chordCount=${s.chordCount})`);
+                return false;
+            }
+
+            // Check 3: Section end must not exceed chord array
+            if (s.startIndex + s.chordCount > totalChords) {
+                console.log(`[materializeUngroupedSections] Removing ungrouped section ${s.id} exceeding bounds (end=${s.startIndex + s.chordCount}, totalChords=${totalChords})`);
+                return false;
+            }
+
+            // Check 4: Check for overlap with ANY other section (including other ungrouped sections)
+            const overlapsWithOther = this.sections.some(other =>
                 other !== s &&
-                other.type !== 'ungrouped' &&
                 other.chordCount > 0 &&
                 // Check for overlap
                 !(other.startIndex >= s.startIndex + s.chordCount ||
                   other.startIndex + other.chordCount <= s.startIndex)
             );
 
-            if (!isStillValid) {
-                console.log(`[materializeUngroupedSections] Removing stale ungrouped section ${s.id}`);
+            if (overlapsWithOther) {
+                console.log(`[materializeUngroupedSections] Removing overlapping ungrouped section ${s.id}`);
+                return false;
             }
-            return isStillValid;
+
+            return true;
         });
 
         // Sort non-ungrouped sections by startIndex

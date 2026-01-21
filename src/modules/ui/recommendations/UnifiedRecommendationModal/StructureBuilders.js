@@ -27,6 +27,7 @@ import {
 import { switchTab } from './TabNavigation.js';
 import { createSeparator } from './UIHelpers.js';
 import { buildSectionsWithUngrouped } from './ProgressionHelpers.js';
+import { playChord, stopChord } from './AudioPlayback.js';
 import { CHORD_DEFINITIONS, INVERSION_NAMES } from '../../../../data/music-data.js';
 import { getProgressionData, getCurrentKey } from '../../../state/trainerState.js';
 import {
@@ -422,7 +423,7 @@ export function updatePersistentProgressionBar(bar) {
 
                 const chip = document.createElement('button');
                 chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
-                chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} (#${idx + 1}) - Click to select, Shift+click to select range`;
+                chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} (#${idx + 1}) - Click to select, Hold to play, Shift+click to select range`;
                 chip.className = 'rm-chord-chip' + (isInRange ? ' selected' : '');
                 chip.style.cssText = `
                     flex-shrink: 0;
@@ -432,7 +433,60 @@ export function updatePersistentProgressionBar(bar) {
                     ${isInRange ? 'outline: 2px solid var(--rm-primary); outline-offset: 1px;' : ''}
                 `;
 
+                // Hold-to-play state
+                let holdTimeout = null;
+                let isHolding = false;
+                const HOLD_THRESHOLD_MS = 150; // Time before hold-to-play triggers
+
+                const startHoldToPlay = (e) => {
+                    // Don't start hold-to-play on shift+click (selection range)
+                    if (e.shiftKey) return;
+
+                    holdTimeout = setTimeout(() => {
+                        isHolding = true;
+                        chip.style.transform = 'scale(0.95)';
+                        chip.style.opacity = '0.85';
+                        // Play the chord with full voicing data (notes array contains octave/inversion/omitted notes)
+                        playChord(chord);
+                    }, HOLD_THRESHOLD_MS);
+                };
+
+                const endHoldToPlay = () => {
+                    if (holdTimeout) {
+                        clearTimeout(holdTimeout);
+                        holdTimeout = null;
+                    }
+                    if (isHolding) {
+                        isHolding = false;
+                        chip.style.transform = '';
+                        chip.style.opacity = '';
+                        stopChord();
+                    }
+                };
+
+                // Mouse events for hold-to-play
+                chip.addEventListener('mousedown', startHoldToPlay);
+                chip.addEventListener('mouseup', endHoldToPlay);
+                chip.addEventListener('mouseleave', endHoldToPlay);
+
+                // Touch events for hold-to-play (mobile)
+                chip.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent scroll/zoom
+                    startHoldToPlay(e);
+                }, { passive: false });
+                chip.addEventListener('touchend', endHoldToPlay);
+                chip.addEventListener('touchcancel', endHoldToPlay);
+
+                // Prevent context menu on long press
+                chip.addEventListener('contextmenu', (e) => e.preventDefault());
+
                 chip.addEventListener('click', (e) => {
+                    // If we were holding, don't process the click as selection
+                    if (isHolding) {
+                        endHoldToPlay();
+                        return;
+                    }
+
                     if (e.shiftKey && modalState.selectedProgressionIndex >= 0) {
                         // Shift+click: extend selection range
                         const startIdx = modalState.selectedProgressionIndex;
@@ -452,14 +506,16 @@ export function updatePersistentProgressionBar(bar) {
                 });
 
                 chip.addEventListener('mouseenter', () => {
-                    if (!isInRange) {
+                    if (!isInRange && !isHolding) {
                         chip.style.transform = 'scale(1.05)';
                         chip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
                     }
                 });
                 chip.addEventListener('mouseleave', () => {
-                    chip.style.transform = '';
-                    chip.style.boxShadow = '';
+                    if (!isHolding) {
+                        chip.style.transform = '';
+                        chip.style.boxShadow = '';
+                    }
                 });
 
                 sectionChips.appendChild(chip);

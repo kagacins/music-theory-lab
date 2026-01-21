@@ -2,7 +2,7 @@
 
 **Purpose:** Quick navigation guide for Claude Code to find the right code without reading entire files.
 
-**Last Updated:** 2026-01-08 (Added Community, Admin, Backend API, Config, Import modules)
+**Last Updated:** 2026-01-20 (Added Coach Engine, Experience Modes, Chord Lab, Scale Explorer, Community enhancements, pattern detection)
 
 ---
 
@@ -11,7 +11,7 @@
 | File | Lines | Purpose | When to Use |
 |------|-------|---------|-------------|
 | [src/main.js](../src/main.js) | ~38 | **App entry point** - imports init modules, calls setupWindowExports() and DOMContentLoaded handler | Starting point for understanding app boot sequence |
-| [src/modules/state/compositionState.js](../src/modules/state/compositionState.js) | 8,212 | **Single source of truth** for all composition data | Any chord/measure/note state questions |
+| [src/modules/state/compositionState.js](../src/modules/state/compositionState.js) | 9,132 | **Single source of truth** for all composition data | Any chord/measure/note state questions |
 | [src/modules/features/progressionBuilder/index.js](../src/modules/features/progressionBuilder/index.js) | ~484 | Main progression coordinator | Progression builder tab features |
 
 ---
@@ -52,11 +52,11 @@
 
 | File | Lines | Purpose | Key Exports |
 |------|-------|---------|-------------|
-| `compositionState.js` ⭐ | 8,212 | Central state hub (chord progressions, measures, notes, sections) | `CompositionState` class, `getCompositionState()` |
+| `compositionState.js` ⭐ | 9,132 | Central state hub (chord progressions, measures, notes, sections) | `CompositionState` class, `getCompositionState()` |
 | `buildingBlock.js` | 1,146 | Musical time unit structure (48 units/beat) | `BuildingBlock`, `BuildingBlockSequence`, `Unit` |
 | `trainerState.js` | 650 | Progression Builder UI state (delegates data to compositionState) | `TrainerState` class, `getTrainerState()` |
 | `sectionIntentState.js` | 488 | Section intent/mood state | Various getters/setters |
-| `globalState.js` | 165 | App-wide settings (tabs, enharmonic, dark mode) | `GlobalState` class |
+| `globalState.js` | 165 | App-wide settings (tabs, enharmonic, dark mode, **experience mode**) | `GlobalState` class |
 | `builderState.js` | 162 | Chord Builder UI state | `BuilderState` class |
 | `scaleState.js` | 81 | Scale explorer state | Various getters/setters |
 
@@ -114,6 +114,23 @@
 | `rhythmPatternLibrary.js` | - | Rhythm pattern presets |
 | `songSearch.js` | 1,621 | Search songs by chord progression |
 
+#### Chord Lab (NEW - Fullscreen Interactive Exploration)
+**Location:** `src/modules/features/chordLab/`
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `FullScreenChordLabEditor.js` | 1,679 | Fullscreen chord exploration tab with interactive keyboard |
+| `ChordLabBottomPanel.js` | 2,333 | Bottom dock panel for chord lab (similar to Composition Studio) |
+
+#### Scale Explorer (NEW - Fullscreen Scale Visualization)
+**Location:** `src/modules/features/scaleExplorer/`
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `FullScreenScaleExplorer.js` | 1,143 | Fullscreen scale exploration with visual keyboard/fretboard |
+| `ScaleExplorerBottomPanel.js` | 174 | Bottom panel dock for scale explorer |
+| `index.js` | 15 | Module exports |
+
 **When to Read:**
 - Progression builder tab changes → `progressionBuilder/` subdirectory
   - State/CRUD operations → `ProgressionController.js`
@@ -124,6 +141,8 @@
   - Drag-and-drop → `ProgressionDragDrop.js`
 - Chord suggestions → `comprehensiveChordRecommendations.js`
 - Theory transformations → `theoryTools.js`
+- Chord Lab tab → `chordLab/FullScreenChordLabEditor.js`
+- Scale Explorer tab → `scaleExplorer/FullScreenScaleExplorer.js`
 
 ---
 
@@ -159,12 +178,13 @@
 - Optimal rest filling for empty slots
 - V2 rest handling: invisible when no content, cue rests when V2 has content
 
-#### Full-Screen Mode
+#### Full-Screen Mode (Composition Studio)
 **Location:** `src/modules/notation/fullScreen/`
 
 | File | Lines | Purpose |
 |------|-------|---------|
 | `FullScreenNotationEditor.js` | 3,375 | Full-screen notation editing mode with zoom, sidebar tools, chord cards panel |
+| `FullScreenBottomPanel.js` | 1,800+ | Bottom dock panel with Quick Add, Chord Progression, and other panels |
 
 **Key Features:**
 - Full-screen modal overlay with larger notation display
@@ -276,6 +296,13 @@ refreshNotationFromProgression();       // VexFlow sync
 | `UIHelpers.js` | 68 | UI helpers |
 | `VisualizationHelpers.js` | 39 | Visualization helpers |
 
+#### Ambient & Visual Features (NEW)
+| File | Lines | Purpose |
+|------|-------|---------|
+| `AmbientTensionStrip.js` | 654 | **NEW** - Minimal tension visualization (Layer 1 educational feature) |
+| `BassMotionIndicators.js` | 486 | **NEW** - Bass motion arrows between chord cards (►, ↗, ⇗, etc.) |
+| `ChordContextMenu.js` | 1,866 | **NEW** - Right-click context menu for chord cards |
+
 #### Specialized UI
 | File | Lines | Purpose |
 |------|-------|---------|
@@ -286,12 +313,15 @@ refreshNotationFromProgression();       // VexFlow sync
 | `presetUI.js` | - | Preset manager |
 | `toastNotifications.js` | - | Toast notification system |
 | `TensionArcUI.js` | - | Tension arc visualization |
+| `chordBracketEditor.js` | - | Chord bracket/grouping editor |
 
 **When to Read:**
 - Modal/panel UI bugs → Find specific modal file
 - Tab switching → `tabs.js`
 - Keyboard display → `keyboard.js`
 - Recommendation modal → `ui/recommendations/UnifiedRecommendationModal/`
+- Context menu on chords → `ChordContextMenu.js`
+- Ambient educational features → `AmbientTensionStrip.js`, `BassMotionIndicators.js`
 
 ---
 
@@ -323,25 +353,28 @@ chordTimeline.js → melodySuggestion.js → enhancedMelodyController.js
 
 ---
 
-### ANALYSIS - Music Theory Analysis (6 files)
+### ANALYSIS - Music Theory Analysis (7 files)
 **Location:** `src/modules/analysis/`
 
 **Purpose:** Harmonic analysis, pattern detection, tension planning
 
-| File | Purpose | Key Exports |
-|------|---------|-------------|
-| `harmonyAnalyzer.js` | Identifies progression patterns (I-IV-V, ii-V-I) | `HarmonyAnalyzer` class, `COMMON_PROGRESSIONS` |
-| `chordToneAnalyzer.js` | Analyzes notes relative to chord (for coloring) | `analyzeNoteAgainstChord()` |
-| `TensionArcPlanner.js` | Plans harmonic tension curves | `TensionArcPlanner` class |
-| `TensionOptimizer.js` | Optimizes tension flow | `TensionOptimizer` class |
-| `MultiDimensionalTension.js` | 4-dimension tension analysis (harmonic, rhythmic, melodic, dynamic) | `MultiDimensionalTensionAnalyzer` class, `DIMENSION_WEIGHTS` |
-| `patternDetection.js` | Generic pattern matching | `detectPattern()` |
+| File | Lines | Purpose | Key Exports |
+|------|-------|---------|-------------|
+| `harmonyAnalyzer.js` | - | Identifies progression patterns (I-IV-V, ii-V-I) | `HarmonyAnalyzer` class, `COMMON_PROGRESSIONS` |
+| `chordToneAnalyzer.js` | - | Analyzes notes relative to chord (for coloring) | `analyzeNoteAgainstChord()` |
+| `TensionArcPlanner.js` | - | Plans harmonic tension curves | `TensionArcPlanner` class |
+| `TensionOptimizer.js` | - | Optimizes tension flow | `TensionOptimizer` class |
+| `MultiDimensionalTension.js` | - | 4-dimension tension analysis (harmonic, rhythmic, melodic, dynamic) | `MultiDimensionalTensionAnalyzer` class, `DIMENSION_WEIGHTS` |
+| `patternDetection.js` | 1,406 | **Enhanced pattern detection** - cadences, sequences, modal patterns, borrowed chords | `PATTERN_CATEGORIES`, `CADENCE_PATTERNS`, `detectPatterns()` |
+| `melodyChordAnalyzer.js` | 474 | **NEW** - Melody-chord interaction analysis for context menus | `analyzeMelodyChordFit()`, chord fit scores |
 
 **When to Read:**
 - Progression analysis → `harmonyAnalyzer.js`
 - Note highlighting/labeling → `chordToneAnalyzer.js`
 - Tension optimization → `TensionArcPlanner.js`, `TensionOptimizer.js`
 - Multi-dimensional tension → `MultiDimensionalTension.js`
+- Pattern detection (cadences, sequences) → `patternDetection.js`
+- Melody-chord relationship → `melodyChordAnalyzer.js`
 
 ---
 
@@ -382,20 +415,66 @@ chordTimeline.js → melodySuggestion.js → enhancedMelodyController.js
 
 ---
 
-### TEACHING - Educational Features (7 files)
+### TEACHING - Educational Features (7+ files)
 **Location:** `src/modules/teaching/`
 
 **Purpose:** Learning progression and contextual teaching
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `letItBeTutorial.js` | 2,522 | "Let It Be" guided tutorial |
+| `letItBeTutorial.js` | 2,756 | "Let It Be" guided tutorial |
 | `whyThisWorksEnhanced.js` | 1,300 | Explanation system for suggestions |
 | `theoryMoments.js` | 724 | Contextual teaching popups |
 | `compositionInsights.js` | 656 | Learning analytics |
 | `theoryOverlay.js` | 596 | Visual theory overlays |
 | `theoryMomentsConfig.js` | 251 | Teaching content configuration |
 | `insightsStorage.js` | 216 | Persists insights data |
+
+#### Coach Engine (NEW - Proactive Educational System)
+**Location:** `src/modules/teaching/coachEngine/`
+
+**Purpose:** Proactive teaching system with pattern detection and contextual suggestions. Implements a 3-tier presentation model (nudges → panels → modals).
+
+| File | Lines | Purpose | Key Exports |
+|------|-------|---------|-------------|
+| `index.js` | 912 | Main coach engine coordinator | `CoachEngine` class, `initCoachEngine()` |
+| `types.js` | 1,195 | Type definitions and pattern categories | `PATTERN_TYPES`, `SUGGESTION_TYPES` |
+
+**Detectors (Pattern Recognition):**
+| File | Lines | Purpose |
+|------|-------|---------|
+| `detectors/comprehensivePatternDetector.js` | 1,032 | Main pattern detection orchestrator |
+| `detectors/advancedPatternDetector.js` | 672 | Advanced harmonic pattern detection |
+| `detectors/cadenceDetector.js` | 215 | Detects authentic, plagal, half, deceptive cadences |
+| `detectors/borrowedChordDetector.js` | 216 | Modal interchange and borrowed chord detection |
+| `detectors/sequenceDetector.js` | 471 | Descending fifths, ascending fourths, chromatic sequences |
+
+**Generators (Suggestion Creation):**
+| File | Lines | Purpose |
+|------|-------|---------|
+| `generators/harmonicSuggestions.js` | 452 | Generates chord alternatives and voice leading suggestions |
+| `generators/voiceLeadingSuggestions.js` | 704 | Smooth voice leading improvement suggestions |
+
+**Presenters (UI Display):**
+| File | Lines | Purpose |
+|------|-------|---------|
+| `presenters/floatingNudgePresenter.js` | 1,862 | Tier 1: Floating nudge popups over chord cards |
+
+**Scanners:**
+| File | Lines | Purpose |
+|------|-------|---------|
+| `scanners/opportunityScanner.js` | 455 | Scans progression for teaching opportunities |
+
+**3-Tier Presentation Model:**
+1. **Tier 1 (Floating Nudges):** Small, dismissable popups that appear over chord cards
+2. **Tier 2 (Panel Highlights):** Highlights in existing panels (recommendations sidebar)
+3. **Tier 3 (Modal Deep Links):** Opens Unified Recommendation Modal to specific tab/section
+
+**When to Read:**
+- Proactive teaching system → `coachEngine/index.js`
+- Pattern detection → `detectors/comprehensivePatternDetector.js`
+- Cadence detection → `detectors/cadenceDetector.js`
+- Floating nudge UI → `presenters/floatingNudgePresenter.js`
 
 ---
 
@@ -443,7 +522,7 @@ recommendations/
 
 ---
 
-### COMMUNITY - Social Features & Sharing (8 files, ~6,773 lines)
+### COMMUNITY - Social Features & Sharing (11 files, ~7,969 lines)
 **Location:** `src/modules/community/`
 
 **Purpose:** User authentication, progression sharing, community browsing, and social features
@@ -458,6 +537,9 @@ recommendations/
 | `duplicateDetection.js` | 353 | Check for duplicate submissions | `generateDuplicateDetectionData()`, `extractChordsFromComposition()` |
 | `loadedSubmissionContext.js` | 91 | Track loaded submission for editing | `setLoadedSubmissionContext()`, `getLoadedSubmissionContext()` |
 | `supabaseClient.js` | 31 | Supabase client initialization | `supabase` |
+| `commentsSection.js` | - | **NEW** - Comments on submissions | `initCommentsSection()` |
+| `bookmarkButton.js` | - | **NEW** - Bookmark submissions | `initBookmarkButton()` |
+| `userProfileModal.js` | - | **NEW** - User profile view/edit modal | `showUserProfileModal()` |
 
 **Data Flow:**
 ```
@@ -504,7 +586,7 @@ Community Features Enabled (browse, share, upvote)
 
 ---
 
-### BACKEND - Netlify Functions API (17 files, ~4,547 lines)
+### BACKEND - Netlify Functions API (20 files, ~5,848 lines)
 **Location:** `netlify/functions/`
 
 **Purpose:** Serverless API endpoints for community features, authentication, and admin operations
@@ -534,6 +616,13 @@ Community Features Enabled (browse, share, upvote)
 | `upvote.js` | 170 | Upvote submissions | `POST /api/upvote` |
 | `flags.js` | 455 | Content flagging/reporting | `GET/POST/PUT/DELETE /api/flags` |
 | `tags.js` | 94 | Submission tags | `GET /api/tags` |
+| `comments.js` | - | **NEW** - Comment threads | `GET/POST/DELETE /api/comments` |
+| `bookmarks.js` | - | **NEW** - User bookmarks | `GET/POST/DELETE /api/bookmarks` |
+
+#### User Profile
+| File | Lines | Purpose | Endpoint |
+|------|-------|---------|----------|
+| `user-profile.js` | - | **NEW** - Get/update user profiles | `GET/PUT /api/user-profile` |
 
 #### Utility
 | File | Lines | Purpose | Endpoint |
@@ -691,12 +780,15 @@ User selects chord → compositionState.updateChord()
 | **Melody generation** | `ai/melodySuggestion.js` | `ai/enhancedMelodyController.js` |
 | **Audio playback** | `audio/audioEngine.js` | `audio/melodyGenerator.js` |
 | **Theory analysis** | `analysis/harmonyAnalyzer.js` | `analysis/chordToneAnalyzer.js` |
+| **Pattern detection** | `analysis/patternDetection.js` | `teaching/coachEngine/detectors/` |
 | **Bass generation** | `integration/bassAutoFill.js` | `state/compositionState.js` |
 | **Window exports** | `init/windowExports.js` | (HTML event handlers) |
 | **Progression sync** | `integration/progressionNotationSync.js` | `integration/melodyComposerBridge.js` |
 | **Save/Load** | `storage/projectManager.js` | `storage/autoSave.js` |
 | **Undo/Redo** | `storage/versionHistory.js` | `progressionBuilder/ProgressionController.js` |
 | **Educational features** | `teaching/theoryMoments.js` | `teaching/whyThisWorksEnhanced.js` |
+| **Coach Engine** | `teaching/coachEngine/index.js` | `teaching/coachEngine/detectors/`, `presenters/` |
+| **Floating nudges** | `teaching/coachEngine/presenters/floatingNudgePresenter.js` | `coachEngine/index.js` |
 | **Sections** | `state/compositionState.js` | `progressionBuilder/ProgressionRenderer.js` |
 | **Authentication** | `community/authService.js` | `community/authButton.js` |
 | **Share to Community** | `community/shareModal.js` | `community/duplicateDetection.js` |
@@ -705,6 +797,10 @@ User selects chord → compositionState.updateChord()
 | **Admin Dashboard** | `admin/adminDashboardModal.js` | `admin/adminService.js` |
 | **Content Moderation** | `admin/adminService.js` | `netlify/functions/flags.js` |
 | **Backend API** | `netlify/functions/submissions.js` | All `netlify/functions/*.js` |
+| **Experience Modes** | `state/globalState.js` | `ui/AmbientTensionStrip.js`, `ui/BassMotionIndicators.js` |
+| **Chord Context Menu** | `ui/ChordContextMenu.js` | `analysis/melodyChordAnalyzer.js` |
+| **Chord Lab** | `features/chordLab/FullScreenChordLabEditor.js` | `ChordLabBottomPanel.js` |
+| **Scale Explorer** | `features/scaleExplorer/FullScreenScaleExplorer.js` | `ScaleExplorerBottomPanel.js` |
 
 ---
 
@@ -721,6 +817,9 @@ User selects chord → compositionState.updateChord()
 9. **For community features**, start with `community/authService.js` for auth, `community/shareModal.js` for sharing
 10. **For admin features**, check `admin/adminService.js` for API calls, `adminDashboardModal.js` for UI
 11. **For backend API**, check `netlify/functions/` - each file is one endpoint
+12. **For educational features**, check `teaching/coachEngine/` for proactive teaching, `teaching/theoryMoments.js` for contextual popups
+13. **For Experience Modes** (Focus/Guided/Explore), check `globalState.js` and ambient UI components
+14. **For fullscreen tabs**, Composition Studio is in `notation/fullScreen/`, Chord Lab and Scale Explorer are in `features/`
 
 ---
 
@@ -729,9 +828,9 @@ User selects chord → compositionState.updateChord()
 | File | Lines | Module |
 |------|-------|--------|
 | `noteEditor.js` | 9,038 | notation |
-| `compositionState.js` | 8,212 | state |
-| `ProgressionRenderer.js` | 7,214 | progressionBuilder |
-| `ChordTab.js` | 6,964 | UnifiedRecommendationModal |
+| `compositionState.js` | 9,132 | state |
+| `ProgressionRenderer.js` | 7,697 | progressionBuilder |
+| `ChordTab.js` | ~8,400 | UnifiedRecommendationModal |
 | `interactiveTutorial.js` | 5,486 | ui |
 | `grandStaff.js` | 5,248 | notation |
 | `ProgressionController.js` | 4,427 | progressionBuilder |
@@ -741,26 +840,47 @@ User selects chord → compositionState.updateChord()
 | `composerIntegration.js` | 3,170 | notation |
 | `MeasureIsolationEditor.js` | 3,009 | measureIsolation |
 | `songAnalyzer.js` | 2,977 | features |
+| `communityBrowser.js` | 2,943 | community |
 | `chordSequences.js` | 2,877 | features |
+| `letItBeTutorial.js` | 2,756 | teaching |
 | `lessonViewer.js` | 2,814 | ui |
+| `PolyphonyTab.js` | 2,722 | UnifiedRecommendationModal |
 | `songBuilder.js` | 2,704 | ui |
-| `letItBeTutorial.js` | 2,522 | teaching |
 | `notationInit.js` | 2,413 | notation |
 | `voiceLeadingOverlay.js` | 2,391 | notation |
-| `MelodyTab.js` | 2,352 | UnifiedRecommendationModal |
-| `PolyphonyTab.js` | 2,222 | UnifiedRecommendationModal |
+| `MelodyTab.js` | 2,383 | UnifiedRecommendationModal |
+| `ChordLabBottomPanel.js` | 2,333 | chordLab |
 | `windowExports.js` | 2,160 | init |
 | `lessonGuidedMode.js` | 2,098 | ui |
 | `chordExplorerModal.js` | 2,091 | ui |
 | `theoryInsightsPanel.js` | 2,068 | ui |
-| `communityBrowser.js` | 2,943 | community |
+| `floatingNudgePresenter.js` | 1,862 | coachEngine |
+| `ChordContextMenu.js` | 1,866 | ui |
+| `FullScreenBottomPanel.js` | 1,800+ | notation/fullScreen |
+| `FullScreenChordLabEditor.js` | 1,679 | chordLab |
 | `shareModal.js` | 1,640 | community |
 | `adminDashboardModal.js` | 1,537 | admin |
+| `MusicUtils.js` | 1,496 | UnifiedRecommendationModal |
+| `patternDetection.js` | 1,406 | analysis |
+| `types.js` | 1,195 | coachEngine |
+| `FullScreenScaleExplorer.js` | 1,143 | scaleExplorer |
+| `comprehensivePatternDetector.js` | 1,032 | coachEngine/detectors |
+| `coachEngine/index.js` | 912 | coachEngine |
 | `musicXmlImporter.js` | 926 | import |
 | `weightPresets.js` | 882 | config |
+| `StructureBuilders.js` | 879 | UnifiedRecommendationModal |
 | `submissions.js` | 841 | netlify/functions |
 | `mySubmissions.js` | 746 | community |
+| `voiceLeadingSuggestions.js` | 704 | coachEngine/generators |
+| `advancedPatternDetector.js` | 672 | coachEngine/detectors |
+| `AmbientTensionStrip.js` | 654 | ui |
+| `HarmonizeTab.js` | 616 | UnifiedRecommendationModal |
 | `authButton.js` | 542 | community |
+| `BassMotionIndicators.js` | 486 | ui |
+| `melodyChordAnalyzer.js` | 474 | analysis |
+| `sequenceDetector.js` | 471 | coachEngine/detectors |
 | `flags.js` | 455 | netlify/functions |
+| `opportunityScanner.js` | 455 | coachEngine/scanners |
+| `harmonicSuggestions.js` | 452 | coachEngine/generators |
 | `authService.js` | 427 | community |
 | `adminService.js` | 419 | admin |

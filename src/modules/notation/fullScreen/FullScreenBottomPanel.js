@@ -11,6 +11,7 @@
  */
 
 import { getCompositionState } from '../../state/compositionState.js';
+import { getCurrentKey } from '../../state/trainerState.js';
 import {
     SCALE_DEFINITIONS,
     SCALE_CATEGORIES,
@@ -20,7 +21,8 @@ import { isChordInScale } from '../../features/chordBuilder.js';
 import {
     detectAllPatterns,
     getTopPatterns,
-    PATTERN_CATEGORIES
+    PATTERN_CATEGORIES,
+    suggestPatternContinuation
 } from '../../analysis/patternDetection.js';
 import { HarmonyAnalyzer } from '../../analysis/harmonyAnalyzer.js';
 import { detectAllObservations } from '../../teaching/coachEngine/detectors/index.js';
@@ -394,9 +396,8 @@ export class FullScreenBottomPanel {
 
     _renderWorkbenchPanel(container) {
         const compState = getCompositionState();
-        // Key is stored in metadata (e.g., "C", "Gm", "F#", "Bbm")
-        // Just display the key as-is to match Classic studio behavior
-        const key = compState?.metadata?.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const key = getCurrentKey() || 'C';
 
         container.innerHTML = `
             <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 border-b border-violet-700">
@@ -537,7 +538,8 @@ export class FullScreenBottomPanel {
             const progressionData = compState?.exportToProgressionData?.();
             chords = Array.isArray(progressionData) ? progressionData : [];
         }
-        const key = compState?.getSettings?.()?.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const key = getCurrentKey() || 'C';
 
         // Header with view mode toggle and action buttons
         container.innerHTML = `
@@ -842,6 +844,14 @@ export class FullScreenBottomPanel {
             }
         });
 
+        // Add ghost card for pattern continuation suggestion (only if showing all sections)
+        if (this.selectedSectionIds.size === 0) {
+            const ghostCard = this._createFSPatternGhostCard(chords, key);
+            if (ghostCard) {
+                container.appendChild(ghostCard);
+            }
+        }
+
         // Initialize sortable for section containers
         this._initializeFSSectionContainerSortable(container);
     }
@@ -867,6 +877,12 @@ export class FullScreenBottomPanel {
                 }
             });
 
+            // Add ghost card for pattern continuation suggestion
+            const ghostCard = this._createFSPatternGhostCard(chords, key);
+            if (ghostCard) {
+                container.appendChild(ghostCard);
+            }
+
             // Initialize sortable for section containers
             this._initializeFSSectionContainerSortable(container);
         } else {
@@ -879,6 +895,12 @@ export class FullScreenBottomPanel {
                     container.appendChild(wrapper);
                 }
             });
+
+            // Add ghost card for pattern continuation suggestion
+            const ghostCard = this._createFSPatternGhostCard(chords, key);
+            if (ghostCard) {
+                container.appendChild(ghostCard);
+            }
 
             // Initialize sortable for flat cards
             this._initializeFSSimplifiedSortable(container);
@@ -1056,6 +1078,316 @@ export class FullScreenBottomPanel {
         // Remove expanded card view if present
         const expandedCard = wrapper.querySelector('.expanded-chord-card');
         if (expandedCard) expandedCard.remove();
+    }
+
+    /**
+     * Create a ghost card for pattern continuation suggestions
+     * Appears at the end of the chord progression when a pattern is detected
+     * @param {Array} chords - The current chord progression
+     * @param {string} key - Current musical key
+     * @returns {HTMLElement|null} Ghost card element or null if no pattern detected
+     */
+    _createFSPatternGhostCard(chords, key) {
+        if (!chords || chords.length < 2) return null;
+
+        const suggestion = suggestPatternContinuation(chords, key);
+        if (!suggestion) return null;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'fs-ghost-suggestion-card';
+        wrapper.style.cssText = `
+            width: 120px;
+            min-width: 120px;
+            padding: 8px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+            border: 2px dashed #a5b4fc;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            scroll-snap-align: start;
+        `;
+
+        // Get chord symbol for display
+        const chordDef = CHORD_DEFINITIONS[suggestion.type];
+        const symbol = chordDef?.symbol || '';
+        const displayName = `${suggestion.root}${symbol}`;
+
+        // Inversion indicator
+        const invNum = suggestion.inversion || 0;
+        const invText = invNum === 1 ? '¹' : invNum === 2 ? '²' : invNum === 3 ? '³' : invNum === 4 ? '⁴' : '';
+
+        wrapper.innerHTML = `
+            <div style="font-size: 10px; color: #6366f1; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                ${suggestion.pattern || 'Continue'}
+            </div>
+            <div style="font-size: 18px; font-weight: 700; color: #4f46e5;">
+                ${displayName}${invText}?
+            </div>
+            <div style="font-size: 10px; color: #64748b; text-align: center; line-height: 1.3; max-width: 100px;">
+                ${suggestion.reason}
+            </div>
+            <div style="display: flex; gap: 4px; margin-top: 4px;">
+                <button class="fs-ghost-add-btn" style="
+                    padding: 4px 10px;
+                    background: #4f46e5;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 10px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: background 0.15s;
+                ">+ Add</button>
+                ${suggestion.alternatives && suggestion.alternatives.length > 0 ? `
+                    <button class="fs-ghost-alt-btn" style="
+                        padding: 4px 8px;
+                        background: transparent;
+                        color: #6366f1;
+                        border: 1px solid #a5b4fc;
+                        border-radius: 6px;
+                        font-size: 10px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        transition: all 0.15s;
+                    " title="Show alternatives">⋯</button>
+                ` : ''}
+            </div>
+        `;
+
+        // Hover effects
+        wrapper.addEventListener('mouseenter', () => {
+            wrapper.style.borderColor = '#6366f1';
+            wrapper.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)';
+        });
+        wrapper.addEventListener('mouseleave', () => {
+            wrapper.style.borderColor = '#a5b4fc';
+            wrapper.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)';
+        });
+
+        // Add button click handler
+        const addBtn = wrapper.querySelector('.fs-ghost-add-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._addSuggestedChord(suggestion, key);
+            });
+            addBtn.addEventListener('mouseenter', () => addBtn.style.background = '#4338ca');
+            addBtn.addEventListener('mouseleave', () => addBtn.style.background = '#4f46e5');
+        }
+
+        // Alternatives button click handler
+        const altBtn = wrapper.querySelector('.fs-ghost-alt-btn');
+        if (altBtn && suggestion.alternatives) {
+            altBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._showFSPatternAlternatives(e, suggestion, key);
+            });
+            altBtn.addEventListener('mouseenter', () => {
+                altBtn.style.background = '#eef2ff';
+            });
+            altBtn.addEventListener('mouseleave', () => {
+                altBtn.style.background = 'transparent';
+            });
+        }
+
+        // Clicking the card itself adds the suggested chord
+        wrapper.addEventListener('click', () => {
+            this._addSuggestedChord(suggestion, key);
+        });
+
+        return wrapper;
+    }
+
+    /**
+     * Add suggested chord to progression (used by ghost card)
+     * @param {Object} suggestion - The suggestion object
+     * @param {string} key - Current key
+     */
+    _addSuggestedChord(suggestion, key) {
+        const compState = getCompositionState();
+        if (!compState) return;
+
+        const inversion = suggestion.inversion || 0;
+        const rootName = suggestion.root;
+        const type = suggestion.type;
+
+        // Build chord data using the app's helper (same pattern as _handleQuickAddChord)
+        let chordData = null;
+        if (window.getInvertedChordNotes) {
+            const result = window.getInvertedChordNotes(
+                rootName,
+                type,
+                inversion,
+                key,
+                0,  // octaveShift
+                window.getKeyBasedEnharmonic?.() || 'sharp',
+                window.getNotationPreference?.() || 'full'
+            );
+            const roman = window.noteToRomanNumeral?.(rootName, key, type) || suggestion.suggestedRoman || '';
+
+            // Get default beats based on time signature
+            const ts = compState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const defaultBeats = ts.num * (4 / ts.denom);
+
+            chordData = {
+                name: result?.name || `${rootName} ${type}`,
+                simpleName: result?.simpleName || rootName,
+                notes: result?.specificNotes || [],
+                root: rootName,
+                type: type,
+                inversion: inversion,
+                selectionMode: 'chord',
+                omittedNotes: [],
+                octaveShift: 0,
+                lhType: 'off',
+                lhInversion: 0,
+                lhOctaveShift: 0,
+                lhNotes: [],
+                lhOmittedNotes: [],
+                roman: roman,
+                beats: defaultBeats
+            };
+        }
+
+        if (!chordData) {
+            console.warn('Could not create chord data for ghost card suggestion');
+            return;
+        }
+
+        // Add chord at the end using compositionState
+        const insertAtIndex = compState.getChords?.()?.length || 0;
+        const success = compState.insertChord(insertAtIndex, chordData);
+
+        if (success) {
+            // Update roman numerals
+            if (window.updateRomanNumerals) {
+                window.updateRomanNumerals();
+            }
+
+            // Sync and re-render
+            if (window.syncProgressionToMelodyComposer) {
+                window.syncProgressionToMelodyComposer();
+            }
+            if (window.refreshNotationFromProgression) {
+                window.refreshNotationFromProgression();
+            }
+
+            // Re-render progression displays
+            if (window.renderProgressionDisplay) {
+                window.renderProgressionDisplay('melody-progression-visualization', true);
+            }
+
+            // Re-render this panel
+            const content = this.container?.querySelector('#fs-dock-panel-content');
+            if (content && this.activePanel === 'chords') {
+                this._renderChordsPanel(content);
+            } else if (content && this.activePanel === 'quick-add') {
+                this._renderQuickAddPanel(content);
+            }
+
+            // Show toast
+            if (window.toast) {
+                const chordDef = CHORD_DEFINITIONS[suggestion.type];
+                const symbol = chordDef?.symbol || '';
+                const invText = inversion > 0 ? ` (inv ${inversion})` : '';
+                window.toast.success(`Added ${rootName}${symbol}${invText} to complete the ${suggestion.pattern || 'pattern'}`);
+            }
+        }
+    }
+
+    /**
+     * Show popup with alternative pattern suggestions
+     * @param {Event} e - Click event
+     * @param {Object} suggestion - Main suggestion with alternatives array
+     * @param {string} key - Current key
+     */
+    _showFSPatternAlternatives(e, suggestion, key) {
+        // Remove any existing popup
+        const existingPopup = document.getElementById('fs-pattern-alternatives-popup');
+        if (existingPopup) existingPopup.remove();
+
+        const popup = document.createElement('div');
+        popup.id = 'fs-pattern-alternatives-popup';
+        popup.style.cssText = `
+            position: fixed;
+            z-index: 2147483647;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            min-width: 160px;
+            pointer-events: auto;
+            isolation: isolate;
+        `;
+
+        // Position near the button
+        const rect = e.target.getBoundingClientRect();
+        popup.style.left = `${rect.left}px`;
+        popup.style.bottom = `${window.innerHeight - rect.top + 4}px`; // Position above
+
+        // Build alternatives list
+        let html = `<div style="font-size: 10px; color: #64748b; padding: 4px 8px; font-weight: 600;">Other options:</div>`;
+
+        suggestion.alternatives.forEach(alt => {
+            const altDef = CHORD_DEFINITIONS[alt.type];
+            const altSymbol = altDef?.symbol || '';
+            const altDisplay = `${alt.root}${altSymbol}`;
+            const altInv = alt.inversion > 0 ? ` (inv ${alt.inversion})` : '';
+
+            html += `
+                <div class="fs-pattern-alt-option" data-root="${alt.root}" data-type="${alt.type}" data-inversion="${alt.inversion || 0}" data-octave="${alt.octave || 4}" style="
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    border-radius: 6px;
+                    transition: background 0.15s;
+                ">
+                    <div style="font-weight: 600; color: #1f2937;">${altDisplay}${altInv}</div>
+                    <div style="font-size: 10px; color: #64748b;">${alt.reason}</div>
+                </div>
+            `;
+        });
+
+        popup.innerHTML = html;
+
+        // Add click handlers for alternatives
+        popup.querySelectorAll('.fs-pattern-alt-option').forEach(opt => {
+            opt.addEventListener('mouseenter', () => opt.style.background = '#f1f5f9');
+            opt.addEventListener('mouseleave', () => opt.style.background = 'transparent');
+            opt.addEventListener('click', () => {
+                const altSuggestion = {
+                    root: opt.dataset.root,
+                    type: opt.dataset.type,
+                    inversion: parseInt(opt.dataset.inversion) || 0,
+                    octave: parseInt(opt.dataset.octave) || 4,
+                    pattern: suggestion.pattern
+                };
+                this._addSuggestedChord(altSuggestion, key);
+                popup.remove();
+            });
+        });
+
+        document.body.appendChild(popup);
+
+        // Close on click outside
+        const closeHandler = (evt) => {
+            // Use geometric bounds check for fullscreen popup reliability
+            const popupRect = popup.getBoundingClientRect();
+            const clickInPopupBounds =
+                evt.clientX >= popupRect.left && evt.clientX <= popupRect.right &&
+                evt.clientY >= popupRect.top && evt.clientY <= popupRect.bottom;
+
+            if (!clickInPopupBounds && !popup.contains(evt.target)) {
+                popup.remove();
+                document.removeEventListener('click', closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeHandler), 10);
     }
 
     /**
@@ -1363,7 +1695,8 @@ export class FullScreenBottomPanel {
 
     _renderQuickAddPanel(container) {
         const compState = getCompositionState();
-        const key = compState?.getSettings?.()?.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const key = getCurrentKey() || 'C';
 
         // Get chord progression data
         let chords = [];
@@ -1681,7 +2014,8 @@ export class FullScreenBottomPanel {
         }) : 'null (no section)');
 
         // Build chord data using the app's helper
-        const key = compState.metadata?.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const key = getCurrentKey() || 'C';
         let chordData = null;
         if (window.getInvertedChordNotes) {
             const result = window.getInvertedChordNotes(
@@ -2016,6 +2350,12 @@ export class FullScreenBottomPanel {
                 container.appendChild(wrapper);
             });
         }
+
+        // Add ghost card for pattern continuation suggestion
+        const ghostCard = this._createFSPatternGhostCard(chords, key);
+        if (ghostCard) {
+            container.appendChild(ghostCard);
+        }
     }
 
     /**
@@ -2044,6 +2384,14 @@ export class FullScreenBottomPanel {
                     container.appendChild(sectionContainer);
                 }
             });
+
+            // Add ghost card for pattern continuation suggestion (only if showing all sections)
+            if (this._quickAddSelectedSectionIds.size === 0) {
+                const ghostCard = this._createFSPatternGhostCard(chords, key);
+                if (ghostCard) {
+                    container.appendChild(ghostCard);
+                }
+            }
         } else {
             // No matching sections - show empty message
             container.innerHTML = '<div class="text-gray-400 text-sm p-4">No sections selected</div>';
@@ -2223,7 +2571,8 @@ export class FullScreenBottomPanel {
         const settings = compState?.getSettings?.() || {};
         const bassPattern = settings.bassPattern || 'root-fifth';
         const bassOctave = settings.bassOctave || 'auto';
-        const key = settings.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const key = getCurrentKey() || 'C';
 
         // Get chord progression data
         let chords = [];
@@ -3258,7 +3607,8 @@ export class FullScreenBottomPanel {
     _renderBorrowedPanel(container) {
         const compState = getCompositionState();
         const settings = compState?.getSettings?.() || {};
-        const rawKey = compState?.metadata?.key || settings.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const rawKey = getCurrentKey() || 'C';
         const mode = settings.mode || 'major';
 
         // Smart key display: if key already ends with 'm' (like "Dm"), don't append mode
@@ -3688,8 +4038,8 @@ export class FullScreenBottomPanel {
         // Save state for undo/redo BEFORE making changes
         window.saveStateBeforeChange?.();
 
-        // Get key for proper chord building
-        const key = compState.metadata?.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const key = getCurrentKey() || 'C';
 
         // Get selected chord index - prioritize chord bracket label click over measure selection
         // 1. First check if user clicked a chord bracket label (the pill under the staff)
@@ -3825,7 +4175,8 @@ export class FullScreenBottomPanel {
 
     _renderTheoryPanel(container) {
         const compState = getCompositionState();
-        const rawKey = compState?.metadata?.key || 'C';
+        // Get key from trainerState (the single source of truth for current key)
+        const rawKey = getCurrentKey() || 'C';
         const mode = compState?.getSettings?.()?.mode || 'major';
         // Handle keys that already have 'm' suffix (e.g., "Bbm" should display as "Bb Minor", not "Bbm Major")
         const keyEndsWithMinor = rawKey.endsWith('m') && rawKey.length > 1 && !rawKey.endsWith('dim');

@@ -2,7 +2,7 @@
 
 **Purpose:** Quick lookup for key function signatures without reading full files.
 
-**Last Updated:** 2026-01-08 (Added Community, Admin, Backend API sections)
+**Last Updated:** 2026-01-20 (Added Coach Engine, Pattern Detection, Experience Modes, Chord Lab, Scale Explorer APIs)
 
 ---
 
@@ -1005,6 +1005,358 @@ const chordData = {
 
 ---
 
+## 🎓 COACH ENGINE - Proactive Educational System
+**File:** [src/modules/teaching/coachEngine/index.js](../src/modules/teaching/coachEngine/index.js)
+
+### Initialization & Control
+
+```javascript
+initCoachEngine(options?) → CoachEngine
+// Initialize and return coach engine singleton
+// options: { autoScan: boolean, verbosity: 'minimal' | 'moderate' | 'verbose' }
+
+getCoachEngine() → CoachEngine | null
+// Get existing coach engine instance
+
+enableCoachEngine() → void
+// Enable coach engine scanning and suggestions
+
+disableCoachEngine() → void
+// Disable coach engine (stops scanning)
+
+isCoachEngineEnabled() → boolean
+// Check if coach engine is active
+```
+
+### Scanning & Detection
+
+```javascript
+scanProgression(progressionData, key) → ScanResults
+// Scan progression for patterns, opportunities, and suggestions
+// Returns: { patterns: [], opportunities: [], suggestions: [] }
+
+detectPatterns(progressionData, key) → PatternResult[]
+// Detect musical patterns in progression
+// Returns array of { type, name, chordIndices, confidence, description }
+
+detectCadences(progressionData, key) → CadenceResult[]
+// Detect cadence patterns (authentic, plagal, half, deceptive)
+// Returns array of { type, chordIndices, strength }
+
+detectSequences(progressionData, key) → SequenceResult[]
+// Detect harmonic sequences (descending fifths, chromatic, etc.)
+// Returns array of { type, chordIndices, description }
+
+detectBorrowedChords(progressionData, key) → BorrowedChordResult[]
+// Detect modal interchange / borrowed chords
+// Returns array of { chordIndex, borrowedFrom, romanNumeral }
+```
+
+### Suggestions
+
+```javascript
+generateSuggestions(context) → Suggestion[]
+// Generate improvement suggestions for current context
+// context: { progressionData, key, currentChordIndex }
+
+generateVoiceLeadingSuggestions(chord, nextChord, key) → VoiceLeadingSuggestion[]
+// Generate voice leading improvement suggestions
+
+generateHarmonicSuggestions(progressionData, chordIndex, key) → HarmonicSuggestion[]
+// Generate harmonic alternative suggestions
+```
+
+### Presentation (Nudges)
+
+```javascript
+showNudge(nudgeData) → void
+// Display floating nudge at chord card
+// nudgeData: { chordIndex, message, type, action? }
+
+hideNudge(chordIndex?) → void
+// Hide nudge (optionally for specific chord)
+
+hideAllNudges() → void
+// Hide all floating nudges
+
+getNudgeQueue() → NudgeData[]
+// Get queued nudges awaiting display
+```
+
+### Types (from types.js)
+
+```javascript
+PATTERN_TYPES = {
+  CADENCE: 'cadence',
+  SEQUENCE: 'sequence',
+  BORROWED: 'borrowed',
+  MODAL: 'modal',
+  PIVOT: 'pivot'
+}
+
+SUGGESTION_TYPES = {
+  VOICE_LEADING: 'voice_leading',
+  HARMONIC: 'harmonic',
+  RHYTHM: 'rhythm',
+  TEXTURE: 'texture'
+}
+
+CADENCE_TYPES = {
+  AUTHENTIC: 'authentic',
+  PERFECT_AUTHENTIC: 'perfect_authentic',
+  IMPERFECT_AUTHENTIC: 'imperfect_authentic',
+  PLAGAL: 'plagal',
+  HALF: 'half',
+  DECEPTIVE: 'deceptive'
+}
+```
+
+---
+
+## 📊 PATTERN DETECTION
+**File:** [src/modules/analysis/patternDetection.js](../src/modules/analysis/patternDetection.js)
+
+### Pattern Detection Functions
+
+```javascript
+detectPatterns(progressionData, key, options?) → DetectedPattern[]
+// Main pattern detection function
+// options: { includePartial: boolean, minConfidence: number }
+
+detectCadencePatterns(chords, key) → CadencePattern[]
+// Detect cadence patterns in chord array
+
+detectSequencePatterns(chords, key) → SequencePattern[]
+// Detect harmonic sequences
+
+detectModalPatterns(chords, key) → ModalPattern[]
+// Detect modal interchange patterns
+
+analyzeProgressionStructure(progressionData, key) → StructureAnalysis
+// Comprehensive structure analysis
+```
+
+### Constants
+
+```javascript
+PATTERN_CATEGORIES = {
+  CADENCES: 'cadences',
+  SEQUENCES: 'sequences',
+  MODAL: 'modal',
+  CHROMATIC: 'chromatic'
+}
+
+CADENCE_PATTERNS = {
+  'V-I': { name: 'Authentic Cadence', type: 'authentic' },
+  'V7-I': { name: 'Authentic Cadence (7th)', type: 'authentic' },
+  'IV-I': { name: 'Plagal Cadence', type: 'plagal' },
+  'V-vi': { name: 'Deceptive Cadence', type: 'deceptive' },
+  // ... more patterns
+}
+
+SEQUENCE_PATTERNS = {
+  'descending_fifths': { name: 'Circle of Fifths', interval: -5 },
+  'ascending_fourths': { name: 'Ascending Fourths', interval: 5 },
+  // ... more patterns
+}
+```
+
+---
+
+## 🎹 MELODY-CHORD ANALYZER
+**File:** [src/modules/analysis/melodyChordAnalyzer.js](../src/modules/analysis/melodyChordAnalyzer.js)
+
+### Analysis Functions
+
+```javascript
+analyzeMelodyChordFit(melody, chord, key) → FitAnalysis
+// Analyze how well melody notes fit with chord
+// Returns: { score, chordTones, tensions, avoid, suggestions }
+
+getChordFitScore(note, chord) → number
+// Get fit score for single note (0-1)
+// 1 = chord tone, 0.7 = available tension, 0.3 = avoid note
+
+analyzeLeadingTones(melody, chord, nextChord) → LeadingToneAnalysis
+// Analyze voice leading tendency tones
+// Returns: { leadingTones, resolutions, suggestions }
+
+getMelodyChordContext(measureIndex, noteIndex) → ChordContext
+// Get chord context for melody note at position
+```
+
+---
+
+## 🎚️ EXPERIENCE MODES
+**File:** [src/modules/state/globalState.js](../src/modules/state/globalState.js)
+
+### Mode Management
+
+```javascript
+getExperienceMode() → 'focus' | 'guided' | 'explore'
+// Get current experience mode
+
+setExperienceMode(mode) → void
+// Set experience mode
+// Emits 'experienceModeChanged' window event
+
+getTheorySkillLevel() → 'beginner' | 'intermediate' | 'advanced'
+// Get user's theory skill level (persisted in localStorage)
+
+setTheorySkillLevel(level) → void
+// Set theory skill level
+// Stored in localStorage as 'theorySkillLevel'
+```
+
+### Experience Mode Features
+
+| Mode | Ambient Features | Coach Nudges | Detail Level |
+|------|------------------|--------------|--------------|
+| Focus | Hidden | Minimal | Essential only |
+| Guided | Subtle | Moderate | Recommended |
+| Explore | Full | All | Everything visible |
+
+### Mode Events
+
+```javascript
+// Listen for mode changes
+window.addEventListener('experienceModeChanged', (e) => {
+  const { mode, previousMode } = e.detail;
+  // Update UI based on new mode
+});
+```
+
+---
+
+## 🎨 AMBIENT UI COMPONENTS
+
+### AmbientTensionStrip
+**File:** [src/modules/ui/AmbientTensionStrip.js](../src/modules/ui/AmbientTensionStrip.js)
+
+```javascript
+initAmbientTensionStrip(container) → AmbientTensionStrip
+// Initialize tension strip in container
+
+updateTensionData(progressionData, key) → void
+// Update tension visualization with new data
+
+setVisibility(visible) → void
+// Show/hide based on experience mode
+
+expandStrip() → void
+// Expand to show detailed view (click-to-expand)
+
+collapseStrip() → void
+// Collapse to minimal ambient view
+```
+
+### BassMotionIndicators
+**File:** [src/modules/ui/BassMotionIndicators.js](../src/modules/ui/BassMotionIndicators.js)
+
+```javascript
+initBassMotionIndicators(container) → BassMotionIndicators
+// Initialize bass motion arrows
+
+updateMotionIndicators(progressionData) → void
+// Update arrow indicators between chord cards
+
+setVisibility(visible) → void
+// Show/hide based on experience mode
+
+getMotionType(fromChord, toChord) → MotionType
+// Get bass motion type ('step_up', 'step_down', 'leap_up', etc.)
+
+getMotionArrow(motionType) → string
+// Get arrow character for motion type (►, ↗, ⇗, ←, etc.)
+```
+
+### ChordContextMenu
+**File:** [src/modules/ui/ChordContextMenu.js](../src/modules/ui/ChordContextMenu.js)
+
+```javascript
+showChordContextMenu(chordIndex, event) → void
+// Show context menu at chord card position
+
+hideChordContextMenu() → void
+// Hide context menu
+
+initChordContextMenu() → void
+// Initialize context menu system
+```
+
+---
+
+## 🎹 CHORD LAB
+**File:** [src/modules/features/chordLab/FullScreenChordLabEditor.js](../src/modules/features/chordLab/FullScreenChordLabEditor.js)
+
+### Fullscreen Chord Lab
+
+```javascript
+getFullScreenChordLabEditor() → FullScreenChordLabEditor
+// Get singleton instance
+
+openChordLab() → void
+// Open fullscreen chord lab tab
+
+closeChordLab() → void
+// Close chord lab
+
+setChordLabChord(root, type, inversion?) → void
+// Set current chord for exploration
+
+playChordLabChord() → void
+// Play current chord
+
+getChordLabState() → ChordLabState
+// Get current chord lab state
+```
+
+### ChordLabBottomPanel
+**File:** [src/modules/features/chordLab/ChordLabBottomPanel.js](../src/modules/features/chordLab/ChordLabBottomPanel.js)
+
+```javascript
+initChordLabBottomPanel(editor) → ChordLabBottomPanel
+// Initialize bottom panel for chord lab
+
+setActivePanel(panelId) → void
+// Switch active bottom panel
+
+togglePanel(panelId) → void
+// Toggle panel visibility
+```
+
+---
+
+## 🎵 SCALE EXPLORER
+**File:** [src/modules/features/scaleExplorer/FullScreenScaleExplorer.js](../src/modules/features/scaleExplorer/FullScreenScaleExplorer.js)
+
+### Fullscreen Scale Explorer
+
+```javascript
+getFullScreenScaleExplorer() → FullScreenScaleExplorer
+// Get singleton instance
+
+openScaleExplorer() → void
+// Open fullscreen scale explorer tab
+
+closeScaleExplorer() → void
+// Close scale explorer
+
+setScale(root, scaleType) → void
+// Set current scale for exploration
+
+playScale(direction?) → void
+// Play scale (ascending/descending)
+
+getScaleExplorerState() → ScaleExplorerState
+// Get current scale explorer state
+
+highlightChordTones(chord) → void
+// Highlight chord tones in current scale
+```
+
+---
+
 ## 🔐 AUTHENTICATION SERVICE
 **File:** [src/modules/community/authService.js](../src/modules/community/authService.js)
 
@@ -1368,6 +1720,68 @@ POST /api/submission-versions  - Restore a version
   submissionType: string,       // 'chord-progression' | 'full-composition'
   category: string,
   loadedAt: number              // Timestamp
+}
+```
+
+---
+
+---
+
+## 📦 NEW DATA STRUCTURES
+
+### Pattern Detection Result
+
+```javascript
+{
+  type: PATTERN_TYPES,           // 'cadence', 'sequence', 'borrowed', etc.
+  name: string,                  // Human-readable pattern name
+  chordIndices: number[],        // Indices of chords in pattern
+  confidence: number,            // 0-1 confidence score
+  description: string,           // Explanation of the pattern
+  suggestions: string[]          // Improvement suggestions
+}
+```
+
+### Coach Engine Nudge
+
+```javascript
+{
+  id: string,                    // Unique nudge ID
+  chordIndex: number,            // Target chord card
+  type: 'info' | 'suggestion' | 'warning',
+  message: string,               // Short message
+  detail: string,                // Expanded explanation
+  action: {                      // Optional action button
+    label: string,
+    callback: () => void
+  }
+}
+```
+
+### Experience Mode State
+
+```javascript
+{
+  mode: 'focus' | 'guided' | 'explore',
+  theorySkillLevel: 'beginner' | 'intermediate' | 'advanced',
+  showAmbientFeatures: boolean,
+  showCoachNudges: boolean,
+  detailLevel: 'minimal' | 'moderate' | 'full'
+}
+```
+
+### Chord Lab State
+
+```javascript
+{
+  currentChord: {
+    root: string,
+    type: string,
+    inversion: number
+  },
+  voicing: string[],             // Current note voicing
+  isPlaying: boolean,
+  selectedPanel: string          // Active bottom panel
 }
 ```
 

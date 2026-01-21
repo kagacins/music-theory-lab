@@ -19,7 +19,7 @@
 
 import { CHORD_DEFINITIONS, SHARP_NOTES, FLAT_NOTES, INVERSION_NAMES, ENHARMONIC_MAP } from '../../../data/music-data.js';
 import { HarmonyAnalyzer, COMMON_PROGRESSIONS } from '../../analysis/harmonyAnalyzer.js';
-import { PATTERN_CATEGORIES } from '../../analysis/patternDetection.js';
+import { PATTERN_CATEGORIES, suggestPatternContinuation } from '../../analysis/patternDetection.js';
 import {
     getTrainerState,
     getCurrentKey,
@@ -5377,6 +5377,14 @@ function renderSectionAwareCardsScroll(gridContainer, progressionData, key, opti
         }
     }
 
+    // Add "Continue This Pattern" ghost card if pattern is detected
+    const ghostCard = createPatternContinuationGhostCard(progressionData, key);
+    if (ghostCard) {
+        ghostCard.style.scrollSnapAlign = 'start';
+        ghostCard.style.flexShrink = '0';
+        gridContainer.appendChild(ghostCard);
+    }
+
     // Initialize Sortable for dragging entire section containers
     initializeSectionContainerSortable(gridContainer);
 }
@@ -5446,6 +5454,306 @@ function renderFlatCardsScroll(gridContainer, progressionData, key, options = {}
             gridContainer.appendChild(wrapper);
         }
     });
+
+    // Add "Continue This Pattern" ghost card if pattern is detected
+    const ghostCard = createPatternContinuationGhostCard(progressionData, key);
+    if (ghostCard) {
+        ghostCard.style.scrollSnapAlign = 'start';
+        ghostCard.style.flexShrink = '0';
+        gridContainer.appendChild(ghostCard);
+    }
+}
+
+// ============================================================================
+// PATTERN CONTINUATION GHOST CARD
+// ============================================================================
+
+/**
+ * Create a ghost card suggesting the next chord based on detected patterns
+ * @param {Array} progressionData - Progression data
+ * @param {string} key - Current key
+ * @returns {HTMLElement|null} Ghost card element or null if no pattern detected
+ */
+function createPatternContinuationGhostCard(progressionData, key) {
+    if (!progressionData || progressionData.length < 2) return null;
+
+    const suggestion = suggestPatternContinuation(progressionData, key);
+    if (!suggestion) return null;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ghost-suggestion-card';
+    wrapper.style.cssText = `
+        width: 120px;
+        padding: 8px;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+        border: 2px dashed #a5b4fc;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+
+    // Get chord symbol for display
+    const chordDef = CHORD_DEFINITIONS[suggestion.type];
+    const symbol = chordDef?.symbol || '';
+    const displayName = `${suggestion.root}${symbol}`;
+
+    // Inversion indicator
+    const invNum = suggestion.inversion || 0;
+    const invText = invNum === 1 ? '¹' : invNum === 2 ? '²' : invNum === 3 ? '³' : invNum === 4 ? '⁴' : '';
+
+    wrapper.innerHTML = `
+        <div style="font-size: 10px; color: #6366f1; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+            ${suggestion.pattern || 'Continue'}
+        </div>
+        <div style="font-size: 18px; font-weight: 700; color: #4f46e5;">
+            ${displayName}${invText}?
+        </div>
+        <div style="font-size: 10px; color: #64748b; text-align: center; line-height: 1.3;">
+            ${suggestion.reason}
+        </div>
+        <div style="display: flex; gap: 4px; margin-top: 4px;">
+            <button class="ghost-add-btn" style="
+                padding: 4px 10px;
+                background: #4f46e5;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 10px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background 0.15s;
+            ">+ Add</button>
+            ${suggestion.alternatives && suggestion.alternatives.length > 0 ? `
+                <button class="ghost-alt-btn" style="
+                    padding: 4px 8px;
+                    background: transparent;
+                    color: #6366f1;
+                    border: 1px solid #a5b4fc;
+                    border-radius: 6px;
+                    font-size: 10px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                " title="Show alternatives">⋯</button>
+            ` : ''}
+        </div>
+    `;
+
+    // Hover effects
+    wrapper.addEventListener('mouseenter', () => {
+        wrapper.style.borderColor = '#6366f1';
+        wrapper.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)';
+    });
+    wrapper.addEventListener('mouseleave', () => {
+        wrapper.style.borderColor = '#a5b4fc';
+        wrapper.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)';
+    });
+
+    // Add button click handler
+    const addBtn = wrapper.querySelector('.ghost-add-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            addSuggestedChordToProgression(suggestion, key);
+        });
+        addBtn.addEventListener('mouseenter', () => addBtn.style.background = '#4338ca');
+        addBtn.addEventListener('mouseleave', () => addBtn.style.background = '#4f46e5');
+    }
+
+    // Alternatives button click handler
+    const altBtn = wrapper.querySelector('.ghost-alt-btn');
+    if (altBtn && suggestion.alternatives) {
+        altBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showPatternAlternatives(e, suggestion, key);
+        });
+        altBtn.addEventListener('mouseenter', () => {
+            altBtn.style.background = '#eef2ff';
+        });
+        altBtn.addEventListener('mouseleave', () => {
+            altBtn.style.background = 'transparent';
+        });
+    }
+
+    // Clicking the card itself adds the suggested chord
+    wrapper.addEventListener('click', () => {
+        addSuggestedChordToProgression(suggestion, key);
+    });
+
+    return wrapper;
+}
+
+/**
+ * Add the suggested chord to the progression
+ * @param {Object} suggestion - Suggestion object with root, type, etc.
+ * @param {string} key - Current key
+ */
+function addSuggestedChordToProgression(suggestion, key) {
+    const compState = getCompositionState();
+    if (!compState) return;
+
+    const inversion = suggestion.inversion || 0;
+    const rootName = suggestion.root;
+    const type = suggestion.type;
+
+    // Build chord data using the app's helper (same pattern as quick add)
+    let chordData = null;
+    if (window.getInvertedChordNotes) {
+        const result = window.getInvertedChordNotes(
+            rootName,
+            type,
+            inversion,
+            key,
+            0,  // octaveShift
+            getKeyBasedEnharmonic() || 'sharp',
+            getNotationPreference() || 'full'
+        );
+        const roman = window.noteToRomanNumeral?.(rootName, key, type) || suggestion.suggestedRoman || '';
+
+        // Get default beats based on time signature
+        const ts = compState.metadata?.timeSignature || { num: 4, denom: 4 };
+        const defaultBeats = ts.num * (4 / ts.denom);
+
+        chordData = {
+            name: result?.name || `${rootName} ${type}`,
+            simpleName: result?.simpleName || rootName,
+            notes: result?.specificNotes || [],
+            root: rootName,
+            type: type,
+            inversion: inversion,
+            selectionMode: 'chord',
+            omittedNotes: [],
+            octaveShift: 0,
+            lhType: 'off',
+            lhInversion: 0,
+            lhOctaveShift: 0,
+            lhNotes: [],
+            lhOmittedNotes: [],
+            roman: roman,
+            beats: defaultBeats
+        };
+    }
+
+    if (!chordData) {
+        console.warn('Could not create chord data for ghost card suggestion');
+        return;
+    }
+
+    // Add chord at the end using compositionState
+    const insertAtIndex = compState.getChords?.()?.length || 0;
+    const success = compState.insertChord(insertAtIndex, chordData);
+
+    if (success) {
+        // Update roman numerals
+        if (window.updateRomanNumerals) {
+            window.updateRomanNumerals();
+        }
+
+        // Sync and re-render
+        if (window.syncProgressionToMelodyComposer) {
+            window.syncProgressionToMelodyComposer();
+        }
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        }
+
+        // Re-render progression display
+        renderProgressionDisplay('melody-progression-visualization', true);
+
+        // Show toast notification
+        if (window.toast) {
+            const chordDef = CHORD_DEFINITIONS[suggestion.type];
+            const symbol = chordDef?.symbol || '';
+            const invText = inversion > 0 ? ` (inv ${inversion})` : '';
+            window.toast.success(`Added ${rootName}${symbol}${invText} to complete the ${suggestion.pattern || 'pattern'}`);
+        }
+    }
+}
+
+/**
+ * Show a small popup with alternative suggestions
+ * @param {Event} e - Click event
+ * @param {Object} suggestion - Main suggestion with alternatives array
+ * @param {string} key - Current key
+ */
+function showPatternAlternatives(e, suggestion, key) {
+    // Remove any existing popup
+    const existingPopup = document.getElementById('pattern-alternatives-popup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'pattern-alternatives-popup';
+    popup.style.cssText = `
+        position: fixed;
+        z-index: 9999;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        min-width: 160px;
+    `;
+
+    // Position near the button
+    const rect = e.target.getBoundingClientRect();
+    popup.style.left = `${rect.left}px`;
+    popup.style.top = `${rect.bottom + 4}px`;
+
+    // Build alternatives list
+    let html = `<div style="font-size: 10px; color: #64748b; padding: 4px 8px; font-weight: 600;">Other options:</div>`;
+
+    suggestion.alternatives.forEach(alt => {
+        const altDef = CHORD_DEFINITIONS[alt.type];
+        const altSymbol = altDef?.symbol || '';
+        const altDisplay = `${alt.root}${altSymbol}`;
+        const altInv = alt.inversion > 0 ? ` (inv ${alt.inversion})` : '';
+
+        html += `
+            <div class="pattern-alt-option" data-root="${alt.root}" data-type="${alt.type}" data-inversion="${alt.inversion || 0}" data-octave="${alt.octave || 4}" style="
+                padding: 8px 12px;
+                cursor: pointer;
+                border-radius: 6px;
+                transition: background 0.15s;
+            ">
+                <div style="font-weight: 600; color: #1f2937;">${altDisplay}${altInv}</div>
+                <div style="font-size: 10px; color: #64748b;">${alt.reason}</div>
+            </div>
+        `;
+    });
+
+    popup.innerHTML = html;
+
+    // Add click handlers for alternatives
+    popup.querySelectorAll('.pattern-alt-option').forEach(opt => {
+        opt.addEventListener('mouseenter', () => opt.style.background = '#f1f5f9');
+        opt.addEventListener('mouseleave', () => opt.style.background = 'transparent');
+        opt.addEventListener('click', () => {
+            const altSuggestion = {
+                root: opt.dataset.root,
+                type: opt.dataset.type,
+                inversion: parseInt(opt.dataset.inversion) || 0,
+                octave: parseInt(opt.dataset.octave) || 4,
+                pattern: suggestion.pattern
+            };
+            addSuggestedChordToProgression(altSuggestion, key);
+            popup.remove();
+        });
+    });
+
+    document.body.appendChild(popup);
+
+    // Close on click outside
+    const closeHandler = (evt) => {
+        if (!popup.contains(evt.target)) {
+            popup.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 10);
 }
 
 
