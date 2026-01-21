@@ -1,6 +1,18 @@
 /**
- * Enhanced Pattern Detection Module
- * Detects cadences, sequences, modal patterns, and borrowed chords
+ * Enhanced Pattern Detection Module (CONSOLIDATED)
+ *
+ * This is the SINGLE SOURCE OF TRUTH for all pattern detection in the application.
+ *
+ * Detects:
+ * - Cadences (PAC, HC, PC, DC, PHC, deceptive, plagal variants, backdoor)
+ * - Sequences (descending 5ths, ii-V chains, stepwise motion)
+ * - Modal patterns (Dorian, Mixolydian, Phrygian, Lydian, Aeolian)
+ * - Borrowed chords (bVI, bVII, bIII, iv, bII, #iv°)
+ * - Pop/rock progression patterns (15+ named patterns)
+ * - Advanced patterns (harmonic rhythm, leading tone, tritone, cadential 6/4,
+ *   augmented 6th, retrogression, palindrome, suspension, ostinato,
+ *   chromatic voice motion, voice range extremes)
+ *
  * Part of Phase 3.4: Pattern Detection Enhancement
  */
 
@@ -1403,4 +1415,916 @@ export function suggestPatternContinuation(progression, key) {
     }
 
     return suggestion;
+}
+
+// ============================================================================
+// ADVANCED PATTERN DETECTION (Consolidated from comprehensivePatternDetector.js)
+// ============================================================================
+
+/**
+ * Get semitone value for a note (stripping octave if present)
+ * @param {string} note - Note with or without octave (e.g., 'C#4' or 'C#')
+ * @returns {number} Semitone value (0-11) or -1 if invalid
+ */
+function getNoteValue(note) {
+    if (!note) return -1;
+    const noteName = note.replace(/\d+$/, '');
+    return NOTE_TO_SEMITONE[noteName] ?? -1;
+}
+
+/**
+ * Calculate interval in semitones between two notes
+ * @param {string} note1 - First note
+ * @param {string} note2 - Second note
+ * @returns {number|null} Interval in semitones (0-11) or null if invalid
+ */
+function getInterval(note1, note2) {
+    const v1 = getNoteValue(note1);
+    const v2 = getNoteValue(note2);
+    if (v1 === -1 || v2 === -1) return null;
+    return ((v2 - v1) + 12) % 12;
+}
+
+/**
+ * Get chord symbol for display
+ * @param {Object} chord - Chord object with root and type
+ * @returns {string} Chord symbol (e.g., 'Cmaj7')
+ */
+function getChordSymbol(chord) {
+    if (!chord) return '';
+    const typeSymbols = {
+        'Major': '',
+        'Minor': 'm',
+        'Diminished': '°',
+        'Augmented': '+',
+        'Dominant 7th': '7',
+        'Major 7th': 'maj7',
+        'Minor 7th': 'm7',
+        'Diminished 7th': '°7',
+        'Half-Diminished 7th': 'ø7',
+        'Sus4': 'sus4',
+        'Sus2': 'sus2'
+    };
+    return chord.root + (typeSymbols[chord.type] || '');
+}
+
+/**
+ * Get leading tone for a key
+ * @param {string} key - Current key
+ * @returns {string|null} Leading tone note name
+ */
+function getLeadingTone(key) {
+    const keyRoot = key?.replace(/\s*(major|minor|min|m)$/i, '').trim() || 'C';
+    const keyValue = getNoteValue(keyRoot);
+    if (keyValue === -1) return null;
+    const leadingToneValue = (keyValue + 11) % 12;
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    return noteNames[leadingToneValue];
+}
+
+/**
+ * Get tonic for a key
+ * @param {string} key - Current key
+ * @returns {string} Tonic note name
+ */
+function getTonic(key) {
+    return key?.replace(/\s*(major|minor|min|m)$/i, '').trim() || 'C';
+}
+
+/**
+ * Check if chord contains a tritone interval (6 semitones)
+ * @param {Object} chord - Chord object with notes array
+ * @returns {Object} { hasTritone: boolean, notes?: [note1, note2] }
+ */
+function containsTritone(chord) {
+    if (!chord.notes || chord.notes.length < 2) return { hasTritone: false };
+    const noteValues = chord.notes.map(n => getNoteValue(n)).filter(v => v !== -1);
+    for (let i = 0; i < noteValues.length; i++) {
+        for (let j = i + 1; j < noteValues.length; j++) {
+            const interval = Math.abs(noteValues[i] - noteValues[j]) % 12;
+            if (interval === 6) {
+                return { hasTritone: true, notes: [chord.notes[i], chord.notes[j]] };
+            }
+        }
+    }
+    return { hasTritone: false };
+}
+
+/**
+ * Check if a roman numeral represents a minor chord (lowercase)
+ * @param {string} roman - Roman numeral string
+ * @returns {boolean} True if minor
+ */
+function isMinorRoman(roman) {
+    if (!roman) return false;
+    const match = roman.match(/[b#♭♯]?([ivIV]+)/);
+    if (!match) return false;
+    const numeral = match[1];
+    return numeral === numeral.toLowerCase();
+}
+
+/**
+ * Check if a chord is inverted
+ * @param {Object} chord - Chord object
+ * @returns {boolean} True if chord is inverted (inversion > 0)
+ */
+function isInverted(chord) {
+    return chord && (chord.inversion > 0);
+}
+
+// ============================================================================
+// HARMONIC RHYTHM CHANGE DETECTION
+// ============================================================================
+
+/**
+ * Detect changes in harmonic rhythm (chord duration patterns)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected harmonic rhythm changes
+ */
+export function detectHarmonicRhythmChange(progression) {
+    const items = [];
+    if (!progression || progression.length < 4) return items;
+
+    const durations = progression.map(c => c.beats || 4);
+
+    for (let i = 2; i < durations.length; i++) {
+        const prevAvg = (durations[i-2] + durations[i-1]) / 2;
+        const currAvg = (durations[i-1] + durations[i]) / 2;
+
+        if (Math.abs(currAvg - prevAvg) / prevAvg >= 0.5) {
+            const direction = currAvg < prevAvg ? 'faster' : 'slower';
+            items.push({
+                type: 'harmonic-rhythm-change',
+                name: 'Harmonic Rhythm Change',
+                description: `Harmonic rhythm becomes ${direction}`,
+                chordIndex: i,
+                direction,
+                fromRate: `${prevAvg} beats`,
+                toRate: `${currAvg} beats`,
+                chord: progression[i]
+            });
+            break;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// LEADING TONE RESOLUTION DETECTION
+// ============================================================================
+
+/**
+ * Detect leading tone resolving to tonic
+ * @param {Array} progression - Array of chord objects
+ * @param {string} key - Current key
+ * @returns {Array} Detected leading tone resolutions
+ */
+export function detectLeadingToneResolution(progression, key) {
+    const items = [];
+    if (!progression || progression.length < 2) return items;
+
+    const leadingTone = getLeadingTone(key);
+    const tonic = getTonic(key);
+    if (!leadingTone || !tonic) return items;
+
+    for (let i = 1; i < progression.length; i++) {
+        const prevChord = progression[i - 1];
+        const currChord = progression[i];
+        if (!prevChord.notes || !currChord.notes) continue;
+
+        const hasLeadingTone = prevChord.notes.some(n => getNoteValue(n) === getNoteValue(leadingTone));
+        const hasTonic = currChord.notes.some(n => getNoteValue(n) === getNoteValue(tonic));
+
+        const prevRoman = normalizeRoman(prevChord.roman || prevChord.romanNumeral);
+        const currRoman = normalizeRoman(currChord.roman || currChord.romanNumeral);
+
+        if (hasLeadingTone && hasTonic &&
+            (prevRoman === 'V' || prevRoman === 'v' || prevRoman === 'vii' || prevRoman === 'VII') &&
+            (currRoman === 'I' || currRoman === 'i')) {
+
+            const leadingToneNote = prevChord.notes.find(n => getNoteValue(n) === getNoteValue(leadingTone));
+            const tonicNote = currChord.notes.find(n => getNoteValue(n) === getNoteValue(tonic));
+
+            let resolutionDirection = 'to';
+            let interval = 0;
+
+            if (leadingToneNote && tonicNote) {
+                const leadingToneOctave = parseInt(leadingToneNote.match(/(\d+)$/)?.[1] || '4');
+                const tonicOctave = parseInt(tonicNote.match(/(\d+)$/)?.[1] || '4');
+                const leadingTonePitch = getNoteValue(leadingTone) + (leadingToneOctave * 12);
+                const tonicPitch = getNoteValue(tonic) + (tonicOctave * 12);
+                interval = tonicPitch - leadingTonePitch;
+
+                if (interval === 1) resolutionDirection = 'up';
+                else if (interval === -11) resolutionDirection = 'down-octave';
+                else if (interval > 1) resolutionDirection = 'up-leap';
+                else if (interval < -11) resolutionDirection = 'down-leap';
+                else if (interval < 0) resolutionDirection = 'down';
+            }
+
+            items.push({
+                type: 'leading-tone-resolution',
+                name: 'Leading Tone Resolution',
+                description: `Leading tone (${leadingTone}) resolves ${resolutionDirection} to tonic (${tonic})`,
+                chordIndex: i,
+                leadingTone,
+                tonic,
+                leadingToneNote,
+                tonicNote,
+                resolutionDirection,
+                fromChord: prevChord,
+                toChord: currChord
+            });
+            break;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// TRITONE USAGE DETECTION
+// ============================================================================
+
+/**
+ * Detect explicit tritone intervals in chords (excluding expected ones in Dom7/Dim)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected tritone usages
+ */
+export function detectTritoneUsage(progression) {
+    const items = [];
+    if (!progression || progression.length < 1) return items;
+
+    for (let i = 0; i < progression.length; i++) {
+        const chord = progression[i];
+        const result = containsTritone(chord);
+
+        if (result.hasTritone) {
+            const type = chord.type || '';
+            // Skip expected tritones
+            if (type.includes('Dominant 7th') || type === '7' || type.includes('Diminished')) {
+                continue;
+            }
+
+            items.push({
+                type: 'tritone-usage',
+                name: 'Tritone Interval',
+                description: `Unexpected tritone between ${result.notes[0]} and ${result.notes[1]}`,
+                chordIndex: i,
+                chord: getChordSymbol(chord),
+                notes: result.notes.join(' and '),
+                chordData: chord
+            });
+            break;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// CADENTIAL 6-4 DETECTION
+// ============================================================================
+
+/**
+ * Detect cadential 6/4 pattern (I⁶₄ → V)
+ * @param {Array} progression - Array of chord objects
+ * @param {string} key - Current key
+ * @returns {Array} Detected cadential 6/4 patterns
+ */
+export function detectCadential64(progression, key) {
+    const items = [];
+    if (!progression || progression.length < 2) return items;
+
+    const tonic = getTonic(key);
+    const tonicValue = getNoteValue(tonic);
+    if (tonicValue === -1) return items;
+
+    const dominantValue = (tonicValue + 7) % 12;
+
+    for (let i = 1; i < progression.length; i++) {
+        const prevChord = progression[i - 1];
+        const currChord = progression[i];
+
+        const prevRootValue = getNoteValue(prevChord.root);
+        const isTonicChord = prevRootValue === tonicValue;
+        const isSecondInversion = prevChord.inversion === 2;
+
+        const currRootValue = getNoteValue(currChord.root);
+        const isDominant = currRootValue === dominantValue;
+        const currRoman = normalizeRoman(currChord.roman || currChord.romanNumeral);
+        const isVChord = currRoman === 'V' || currRoman === 'v' || isDominant;
+
+        if (isTonicChord && isSecondInversion && isVChord) {
+            items.push({
+                type: 'cadential-64',
+                name: 'Cadential 6/4',
+                description: 'I⁶₄ → V cadential preparation',
+                chordIndex: i - 1,
+                i64Chord: prevChord,
+                vChord: currChord
+            });
+            break;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// AUGMENTED 6TH CHORD DETECTION
+// ============================================================================
+
+/**
+ * Detect augmented 6th chords (Italian, French, German)
+ * @param {Array} progression - Array of chord objects
+ * @param {string} key - Current key
+ * @returns {Array} Detected augmented 6th chords
+ */
+export function detectAugmentedSixth(progression, key) {
+    const items = [];
+    if (!progression || progression.length < 1) return items;
+
+    const tonic = getTonic(key);
+    const tonicValue = getNoteValue(tonic);
+    if (tonicValue === -1) return items;
+
+    const flatSixValue = (tonicValue + 8) % 12;
+    const sharpFourValue = (tonicValue + 6) % 12;
+
+    for (let i = 0; i < progression.length; i++) {
+        const chord = progression[i];
+        if (!chord.notes || chord.notes.length < 3) continue;
+
+        const noteValues = chord.notes.map(n => getNoteValue(n));
+        const hasFlat6 = noteValues.includes(flatSixValue);
+        const hasSharp4 = noteValues.includes(sharpFourValue);
+
+        if (hasFlat6 && hasSharp4) {
+            let type = 'Italian';
+            if (noteValues.length >= 4 && noteValues.includes((flatSixValue + 4) % 12)) {
+                type = 'French';
+            } else if (noteValues.length >= 4 && noteValues.includes((tonicValue + 7) % 12)) {
+                type = 'German';
+            }
+
+            items.push({
+                type: 'augmented-sixth',
+                name: `${type} Augmented 6th`,
+                description: `${type} 6th chord with augmented 6th interval`,
+                chordIndex: i,
+                sixthType: type,
+                notes: chord.notes.join(', '),
+                chord: chord
+            });
+            break;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// RETROGRESSION DETECTION
+// ============================================================================
+
+/**
+ * Detect retrogressions (backwards functional motion: D → S)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected retrogressions
+ */
+export function detectRetrogression(progression) {
+    const items = [];
+    if (!progression || progression.length < 2) return items;
+
+    const getFunction = (roman) => {
+        const r = normalizeRoman(roman).toUpperCase();
+        if (r === 'I' || r === 'VI' || r === 'III') return 'T';
+        if (r === 'IV' || r === 'II') return 'S';
+        if (r === 'V' || r === 'VII') return 'D';
+        if (r.includes('B')) return 'C';
+        return null;
+    };
+
+    for (let i = 1; i < progression.length; i++) {
+        const prev = progression[i - 1];
+        const curr = progression[i];
+        const prevRoman = prev.roman || prev.romanNumeral || '';
+        const currRoman = curr.roman || curr.romanNumeral || '';
+        const prevFunc = getFunction(prevRoman);
+        const currFunc = getFunction(currRoman);
+
+        if (!prevFunc || !currFunc) continue;
+
+        if (prevFunc === 'D' && currFunc === 'S') {
+            items.push({
+                type: 'retrogression',
+                name: 'Retrogression',
+                description: `Dominant to Subdominant motion (${prevRoman} → ${currRoman})`,
+                chordIndex: i,
+                from: prevRoman,
+                to: currRoman,
+                fromChord: prev,
+                toChord: curr
+            });
+            break;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// PALINDROMIC PROGRESSION DETECTION
+// ============================================================================
+
+/**
+ * Detect palindromic progressions (reads same forwards and backwards)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected palindromic progressions
+ */
+export function detectPalindromicProgression(progression) {
+    const items = [];
+    if (!progression || progression.length < 5) return items;
+
+    const chordIds = progression.map(c => `${c.root}${c.type}`);
+
+    const isPalindrome = (arr) => {
+        const len = arr.length;
+        for (let i = 0; i < Math.floor(len / 2); i++) {
+            if (arr[i] !== arr[len - 1 - i]) return false;
+        }
+        return true;
+    };
+
+    if (isPalindrome(chordIds)) {
+        const pattern = progression.map(c => getChordSymbol(c)).join(' → ');
+        items.push({
+            type: 'palindromic-progression',
+            name: 'Palindromic Progression',
+            description: 'Progression reads the same forwards and backwards',
+            pattern,
+            length: progression.length
+        });
+        return items;
+    }
+
+    for (let start = 0; start <= progression.length - 5; start++) {
+        for (let len = 5; len <= progression.length - start; len++) {
+            const subIds = chordIds.slice(start, start + len);
+            if (isPalindrome(subIds)) {
+                const subChords = progression.slice(start, start + len);
+                const pattern = subChords.map(c => getChordSymbol(c)).join(' → ');
+                items.push({
+                    type: 'palindromic-progression',
+                    name: 'Palindromic Progression',
+                    description: 'Palindromic subsequence detected',
+                    pattern,
+                    length: len,
+                    startIndex: start
+                });
+                return items;
+            }
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// SUSPENSION RESOLUTION DETECTION
+// ============================================================================
+
+/**
+ * Detect suspension chord resolving to major/minor chord
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected suspension resolutions
+ */
+export function detectSuspensionResolution(progression) {
+    const items = [];
+    if (!progression || progression.length < 2) return items;
+
+    for (let i = 1; i < progression.length; i++) {
+        const prevChord = progression[i - 1];
+        const currChord = progression[i];
+
+        const prevType = prevChord.type || '';
+        const isSus4 = prevType.includes('Sus4') || prevType.includes('sus4');
+        const isSus2 = prevType.includes('Sus2') || prevType.includes('sus2');
+
+        if (!isSus4 && !isSus2) continue;
+        if (prevChord.root !== currChord.root) continue;
+
+        const currType = currChord.type || '';
+        const isResolved = currType === 'Major' || currType === 'Minor' ||
+                          currType.includes('7th') || currType === '';
+
+        if (isResolved) {
+            const susType = isSus4 ? 'sus4' : 'sus2';
+            const suspendedNote = isSus4 ? '4th' : '2nd';
+
+            items.push({
+                type: 'suspension-resolution',
+                name: 'Suspension Resolution',
+                description: `${getChordSymbol(prevChord)} (${susType}) resolves to ${getChordSymbol(currChord)}`,
+                chordIndex: i,
+                susChord: getChordSymbol(prevChord),
+                resolvedChord: getChordSymbol(currChord),
+                suspendedNote,
+                resolvedNote: '3rd',
+                fromChord: prevChord,
+                toChord: currChord
+            });
+            break;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// OSTINATO PATTERN DETECTION
+// ============================================================================
+
+/**
+ * Detect ostinato patterns (repeated chord sequences)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected ostinato patterns
+ */
+export function detectOstinatoPattern(progression) {
+    const items = [];
+    if (!progression || progression.length < 6) return items;
+
+    for (let patternLen = 2; patternLen <= 4; patternLen++) {
+        const chordIds = progression.map(c => `${c.root}${c.type}`);
+
+        for (let start = 0; start <= progression.length - patternLen * 2; start++) {
+            const pattern = chordIds.slice(start, start + patternLen);
+            let repetitions = 1;
+
+            for (let pos = start + patternLen; pos <= progression.length - patternLen; pos += patternLen) {
+                const nextPattern = chordIds.slice(pos, pos + patternLen);
+                if (pattern.every((c, i) => c === nextPattern[i])) {
+                    repetitions++;
+                } else {
+                    break;
+                }
+            }
+
+            if (repetitions >= 2) {
+                const patternChords = progression.slice(start, start + patternLen);
+                const patternStr = patternChords.map(c => getChordSymbol(c)).join(' → ');
+
+                items.push({
+                    type: 'ostinato-pattern',
+                    name: 'Ostinato Pattern',
+                    description: `${patternStr} repeats ${repetitions} times`,
+                    pattern: patternStr,
+                    count: repetitions,
+                    length: patternLen,
+                    startIndex: start
+                });
+                return items;
+            }
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// CHROMATIC VOICE MOTION DETECTION
+// ============================================================================
+
+/**
+ * Detect chromatic motion in inner voices (not bass)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected chromatic voice motion
+ */
+export function detectChromaticVoiceMotion(progression) {
+    const items = [];
+    if (!progression || progression.length < 3) return items;
+
+    for (let voiceIdx = 1; voiceIdx < 4; voiceIdx++) {
+        const voiceNotes = [];
+
+        for (const chord of progression) {
+            if (chord.notes && chord.notes.length > voiceIdx) {
+                voiceNotes.push(chord.notes[voiceIdx]);
+            } else {
+                voiceNotes.push(null);
+            }
+        }
+
+        let chromaticRun = [];
+        let runStart = -1;
+
+        for (let i = 1; i < voiceNotes.length; i++) {
+            if (!voiceNotes[i] || !voiceNotes[i-1]) {
+                if (chromaticRun.length >= 3) break;
+                chromaticRun = [];
+                runStart = -1;
+                continue;
+            }
+
+            const interval = getInterval(voiceNotes[i-1], voiceNotes[i]);
+            const isChromatic = interval === 1 || interval === 11;
+
+            if (isChromatic) {
+                if (runStart === -1) {
+                    runStart = i - 1;
+                    chromaticRun = [voiceNotes[i-1], voiceNotes[i]];
+                } else {
+                    chromaticRun.push(voiceNotes[i]);
+                }
+            } else {
+                if (chromaticRun.length >= 3) break;
+                chromaticRun = [];
+                runStart = -1;
+            }
+        }
+
+        if (chromaticRun.length >= 3) {
+            items.push({
+                type: 'chromatic-voice-motion',
+                name: 'Chromatic Voice Motion',
+                description: `Chromatic line in voice ${voiceIdx}: ${chromaticRun.join(' → ')}`,
+                notes: chromaticRun.join(' → '),
+                voiceIndex: voiceIdx,
+                startIndex: runStart,
+                length: chromaticRun.length
+            });
+            return items;
+        }
+    }
+    return items;
+}
+
+// ============================================================================
+// VOICE RANGE EXTREME DETECTION
+// ============================================================================
+
+/**
+ * Detect when voices reach extreme registers
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected voice range extremes
+ */
+export function detectVoiceRangeExtreme(progression) {
+    const items = [];
+    if (!progression || progression.length < 1) return items;
+
+    const ranges = {
+        soprano: { low: 60, high: 79 },
+        alto: { low: 53, high: 72 },
+        tenor: { low: 48, high: 67 },
+        bass: { low: 40, high: 60 }
+    };
+
+    const getOctave = (note) => {
+        const match = note.match(/(\d+)$/);
+        return match ? parseInt(match[1]) : 4;
+    };
+
+    const noteToMidi = (note) => {
+        const value = getNoteValue(note);
+        if (value === -1) return null;
+        const octave = getOctave(note);
+        return value + (octave + 1) * 12;
+    };
+
+    let highestNote = null;
+    let highestMidi = -Infinity;
+    let highestChordIdx = -1;
+
+    for (let i = 0; i < progression.length; i++) {
+        const chord = progression[i];
+        if (!chord.notes || chord.notes.length === 0) continue;
+
+        for (const note of chord.notes) {
+            const midi = noteToMidi(note);
+            if (midi && midi > highestMidi) {
+                highestMidi = midi;
+                highestNote = note;
+                highestChordIdx = i;
+            }
+        }
+    }
+
+    if (highestMidi > ranges.soprano.high) {
+        items.push({
+            type: 'voice-range-extreme',
+            name: 'Extreme High Register',
+            description: `Very high soprano note: ${highestNote}`,
+            voice: 'soprano',
+            direction: 'high',
+            extreme: 'very high',
+            note: highestNote,
+            chordIndex: highestChordIdx
+        });
+    }
+
+    let lowestNote = null;
+    let lowestMidi = Infinity;
+    let lowestChordIdx = -1;
+
+    for (let i = 0; i < progression.length; i++) {
+        const chord = progression[i];
+        if (!chord.notes || chord.notes.length === 0) continue;
+
+        for (const note of chord.notes) {
+            const midi = noteToMidi(note);
+            if (midi && midi < lowestMidi) {
+                lowestMidi = midi;
+                lowestNote = note;
+                lowestChordIdx = i;
+            }
+        }
+    }
+
+    if (lowestMidi < ranges.bass.low) {
+        items.push({
+            type: 'voice-range-extreme',
+            name: 'Extreme Low Register',
+            description: `Very low bass note: ${lowestNote}`,
+            voice: 'bass',
+            direction: 'low',
+            extreme: 'very low',
+            note: lowestNote,
+            chordIndex: lowestChordIdx
+        });
+    }
+
+    return items;
+}
+
+// ============================================================================
+// ENHANCED CADENCE DETECTION (for Coach Engine)
+// Detects cadences with additional detail for UI display
+// ============================================================================
+
+/**
+ * Detect detailed cadences for coach engine display
+ * @param {Array} progression - Array of chord objects
+ * @param {string} key - Current key
+ * @returns {Array} Detected cadences with full detail
+ */
+export function detectDetailedCadences(progression, key) {
+    const items = [];
+    if (!progression || progression.length < 2) return items;
+
+    for (let i = 1; i < progression.length; i++) {
+        const prevChord = progression[i - 1];
+        const currChord = progression[i];
+
+        const prevRoman = normalizeRoman(prevChord.roman || prevChord.romanNumeral);
+        const currRoman = normalizeRoman(currChord.roman || currChord.romanNumeral);
+        const prevRomanRaw = prevChord.roman || prevChord.romanNumeral || '';
+        const currRomanRaw = currChord.roman || currChord.romanNumeral || '';
+
+        if (!prevRoman || !currRoman) continue;
+
+        // Deceptive Cadence: V → vi
+        if ((prevRoman === 'V' || prevRoman === 'V7') &&
+            (currRoman === 'vi' || currRoman === 'VI')) {
+            items.push({
+                type: 'deceptive-cadence',
+                name: 'Deceptive Cadence',
+                description: 'V → vi surprise resolution',
+                from: prevRomanRaw,
+                to: currRomanRaw,
+                startIndex: i - 1,
+                endIndex: i,
+                chordIndices: [i],
+                chordIndex: i,
+                chord: currChord,
+                fromChord: prevChord,
+                toChord: currChord
+            });
+        }
+
+        // Plagal Cadences: IV/iv → I
+        if ((prevRoman === 'IV' || prevRoman === 'iv') &&
+            (currRoman === 'I' || currRoman === 'i')) {
+            const prevIsMinor = isMinorRoman(prevRomanRaw);
+            const prevInverted = isInverted(prevChord);
+            const currInverted = isInverted(currChord);
+
+            if (prevInverted || currInverted) {
+                items.push({
+                    type: 'inverted-plagal-cadence',
+                    name: 'Inverted Plagal Cadence',
+                    description: 'IV → I with inversion',
+                    from: prevRomanRaw,
+                    to: currRomanRaw,
+                    startIndex: i - 1,
+                    endIndex: i,
+                    chordIndices: [i],
+                    chordIndex: i,
+                    fromChord: prevChord,
+                    toChord: currChord,
+                    prevInverted,
+                    currInverted
+                });
+            } else if (prevIsMinor) {
+                items.push({
+                    type: 'minor-plagal-cadence',
+                    name: 'Minor Plagal Cadence',
+                    description: 'iv → I "Amen" cadence',
+                    from: prevRomanRaw,
+                    to: currRomanRaw,
+                    startIndex: i - 1,
+                    endIndex: i,
+                    chordIndices: [i],
+                    chordIndex: i,
+                    fromChord: prevChord,
+                    toChord: currChord
+                });
+            } else {
+                items.push({
+                    type: 'plagal-cadence',
+                    name: 'Plagal Cadence',
+                    description: 'IV → I "Amen" cadence',
+                    from: prevRomanRaw,
+                    to: currRomanRaw,
+                    startIndex: i - 1,
+                    endIndex: i,
+                    chordIndices: [i],
+                    chordIndex: i,
+                    fromChord: prevChord,
+                    toChord: currChord
+                });
+            }
+        }
+
+        // Backdoor Cadence: ♭VII → I
+        if ((prevRoman === 'bVII' || prevRoman === 'bvii') &&
+            (currRoman === 'I' || currRoman === 'i')) {
+            items.push({
+                type: 'backdoor-cadence',
+                name: 'Backdoor Cadence',
+                description: '♭VII → I jazz resolution',
+                from: prevRomanRaw,
+                to: currRomanRaw,
+                startIndex: i - 1,
+                endIndex: i,
+                chordIndices: [i],
+                chordIndex: i,
+                fromChord: prevChord,
+                toChord: currChord
+            });
+        }
+
+        // Perfect Authentic Cadence: V → I
+        if ((prevRoman === 'V' || prevRoman === 'V7') &&
+            (currRoman === 'I' || currRoman === 'i')) {
+            items.push({
+                type: 'perfect-cadence',
+                name: 'Perfect Authentic Cadence',
+                description: 'V → I strong resolution',
+                from: prevRomanRaw,
+                to: currRomanRaw,
+                startIndex: i - 1,
+                endIndex: i,
+                chordIndices: [i],
+                chordIndex: i,
+                fromChord: prevChord,
+                toChord: currChord
+            });
+        }
+
+        // Half Cadence: ends on V (only at end of progression)
+        if (i === progression.length - 1 &&
+            (currRoman === 'V' || currRoman === 'V7')) {
+            items.push({
+                type: 'half-cadence',
+                name: 'Half Cadence',
+                description: 'Progression ends on V',
+                to: currRomanRaw,
+                chordIndex: i,
+                chord: currChord,
+                toChord: currChord
+            });
+        }
+    }
+
+    return items;
+}
+
+// ============================================================================
+// COMBINED ADVANCED PATTERN DETECTOR
+// ============================================================================
+
+/**
+ * Detect all advanced patterns
+ * @param {Array} progression - Array of chord objects
+ * @param {string} key - Current key
+ * @returns {Object} All detected advanced patterns categorized
+ */
+export function detectAdvancedPatterns(progression, key) {
+    return {
+        harmonicRhythm: detectHarmonicRhythmChange(progression),
+        leadingTone: detectLeadingToneResolution(progression, key),
+        tritone: detectTritoneUsage(progression),
+        cadential64: detectCadential64(progression, key),
+        augmentedSixth: detectAugmentedSixth(progression, key),
+        retrogression: detectRetrogression(progression),
+        palindromic: detectPalindromicProgression(progression),
+        suspension: detectSuspensionResolution(progression),
+        ostinato: detectOstinatoPattern(progression),
+        chromaticVoice: detectChromaticVoiceMotion(progression),
+        voiceRange: detectVoiceRangeExtreme(progression),
+        detailedCadences: detectDetailedCadences(progression, key)
+    };
 }

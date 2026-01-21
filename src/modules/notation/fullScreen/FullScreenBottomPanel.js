@@ -4631,6 +4631,9 @@ export class FullScreenBottomPanel {
             });
         }
 
+        // Extract location information from insight data
+        const locationInfo = this._getInsightLocation(insight);
+
         // Determine styling based on type
         const typeStyles = {
             [COACH_ITEM_TYPES.OBSERVATION]: {
@@ -4668,6 +4671,7 @@ export class FullScreenBottomPanel {
                         <div class="flex items-center gap-1.5 flex-wrap">
                             <span class="font-medium text-xs ${style.text}">${title}</span>
                             <span class="text-[8px] px-1.5 py-0.5 rounded-full text-white ${style.labelBg}">${style.label}</span>
+                            ${locationInfo ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">${locationInfo}</span>` : ''}
                         </div>
                         <div class="text-[10px] ${style.text} opacity-80 leading-tight mt-0.5">${message}</div>
                         ${insight.data?.suggestion ? `
@@ -4677,6 +4681,53 @@ export class FullScreenBottomPanel {
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * Extract location information from insight data for display
+     * @param {Object} insight - Coach insight item
+     * @returns {string|null} Human-readable location string or null
+     */
+    _getInsightLocation(insight) {
+        const data = insight?.data;
+        if (!data) return null;
+
+        // For tension climax - use the position field if available, or build from peakIndex
+        if (data.position) {
+            return data.position;
+        }
+
+        // For patterns with a peak index (tension climax)
+        if (typeof data.peakIndex === 'number') {
+            const chordInfo = data.peakChord ? ` (${data.peakChord})` : '';
+            return `chord ${data.peakIndex + 1}${chordInfo}`;
+        }
+
+        // For patterns with a start index (sequences, pedal points, chromatic bass, parallel harmony)
+        if (typeof data.startIndex === 'number') {
+            const endIndex = data.endIndex ?? data.startIndex;
+            if (endIndex > data.startIndex) {
+                return `chords ${data.startIndex + 1}-${endIndex + 1}`;
+            }
+            return `chord ${data.startIndex + 1}`;
+        }
+
+        // For patterns with a single chord index
+        if (typeof data.chordIndex === 'number') {
+            return `chord ${data.chordIndex + 1}`;
+        }
+
+        // For patterns with chord indices array
+        if (Array.isArray(data.chordIndices) && data.chordIndices.length > 0) {
+            if (data.chordIndices.length === 1) {
+                return `chord ${data.chordIndices[0] + 1}`;
+            }
+            const first = data.chordIndices[0] + 1;
+            const last = data.chordIndices[data.chordIndices.length - 1] + 1;
+            return `chords ${first}-${last}`;
+        }
+
+        return null;
     }
 
     // ========================================================================
