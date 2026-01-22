@@ -232,23 +232,23 @@ export class ChordLabBottomPanel {
 
                 return `
                     <button onclick="window.fsChordLabOpenPanel && window.fsChordLabOpenPanel('${id}')"
-                            class="fs-chordlab-dock-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+                            class="fs-chordlab-dock-btn flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
                                    text-white bg-gradient-to-r ${gradient} shadow-lg border border-white/20"
                             data-panel="${id}"
                             title="${config.label}">
                         <span class="text-sm">${config.icon}</span>
-                        <span>${config.label}</span>
+                        <span class="hidden sm:inline">${config.label}</span>
                     </button>
                 `;
             } else {
                 return `
                     <button onclick="window.fsChordLabOpenPanel && window.fsChordLabOpenPanel('${id}')"
-                            class="fs-chordlab-dock-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+                            class="fs-chordlab-dock-btn flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
                                    text-gray-300 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 hover:border-white/25 shadow-sm"
                             data-panel="${id}"
                             title="${config.label}">
                         <span class="text-sm">${config.icon}</span>
-                        <span>${config.label}</span>
+                        <span class="hidden sm:inline">${config.label}</span>
                     </button>
                 `;
             }

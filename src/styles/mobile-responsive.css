@@ -530,7 +530,20 @@ button:active:not(.key) {
     .backdrop-blur-lg {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
+    }
+
+    /* Apply white background to blur elements EXCEPT buttons on dark backgrounds */
+    .backdrop-blur-sm:not(button):not(.bg-white\/10),
+    .backdrop-blur:not(button):not(.bg-white\/10),
+    .backdrop-blur-lg:not(button):not(.bg-white\/10) {
         background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+
+    /* Keep dark buttons dark on mobile */
+    button.backdrop-blur,
+    button.backdrop-blur-sm,
+    .bg-white\/10.backdrop-blur {
+        background-color: rgba(255, 255, 255, 0.1) !important;
     }
 }
 
@@ -1284,7 +1297,19 @@ button:active:not(.key) {
     .backdrop-blur {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
+    }
+
+    /* Apply white background to blur elements EXCEPT buttons on dark backgrounds */
+    .backdrop-blur-sm:not(button):not(.bg-white\/10),
+    .backdrop-blur:not(button):not(.bg-white\/10) {
         background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+
+    /* Keep dark buttons dark on mobile */
+    button.backdrop-blur,
+    button.backdrop-blur-sm,
+    .bg-white\/10.backdrop-blur {
+        background-color: rgba(255, 255, 255, 0.1) !important;
     }
 
     /* Disable hover animations on touch devices - they feel janky */
