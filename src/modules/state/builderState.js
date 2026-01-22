@@ -16,6 +16,7 @@ let builderLHOmittedNotes = [];
 let chordLibraryMode = 'chromatic'; // 'chromatic' or 'diatonic'
 let lastDiatonicChord = null; // Stores {root: 'D', type: 'Minor'} for diatonic mode highlighting
 let scaleFilter = null; // Scale name from SCALE_DEFINITIONS to filter chords (e.g., 'Major Pentatonic')
+let paletteFilter = null; // Palette ID from CHORD_PALETTES to filter chords (e.g., 'jazz-essentials')
 
 // Getters and Setters for builderRootIndex
 export function getBuilderRootIndex() {
@@ -136,6 +137,16 @@ export function setScaleFilter(value) {
     if (window) window.scaleFilter = value;
 }
 
+// Getters and Setters for paletteFilter
+export function getPaletteFilter() {
+    return paletteFilter;
+}
+
+export function setPaletteFilter(value) {
+    paletteFilter = value;
+    if (window) window.paletteFilter = value;
+}
+
 // Get all builder state
 export function getBuilderState() {
     return {
@@ -149,7 +160,8 @@ export function getBuilderState() {
         builderOmittedNotes,
         builderLHOmittedNotes,
         chordLibraryMode,
-        scaleFilter
+        scaleFilter,
+        paletteFilter
     };
 }
 
@@ -167,6 +179,7 @@ export function initializeBuilderState() {
     chordLibraryMode = 'chromatic';
     lastDiatonicChord = null;
     scaleFilter = null;
+    paletteFilter = null;
 }
 
 // Reset builder state to defaults

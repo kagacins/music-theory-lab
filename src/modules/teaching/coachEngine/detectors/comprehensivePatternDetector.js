@@ -19,6 +19,16 @@
  * - Ostinato patterns
  * - Chromatic voice motion
  * - Voice range extremes
+ * - Common tone preservation (NEW)
+ * - Functional harmony cycles (NEW)
+ * - Phrase elision (NEW)
+ * - Sequence continuation opportunities (NEW)
+ * - Stepwise bass lines (NEW)
+ * - Harmonic anticipation (NEW)
+ * - Plagal extension (NEW)
+ * - Mode mixture (NEW)
+ * - Harmonic density changes (NEW)
+ * - Extended fifth chains (NEW)
  */
 
 import { OBSERVATION_TYPES } from '../types.js';
@@ -33,7 +43,18 @@ import {
     detectSuspensionResolution,
     detectOstinatoPattern,
     detectChromaticVoiceMotion,
-    detectVoiceRangeExtreme
+    detectVoiceRangeExtreme,
+    // NEW: Additional coaching patterns
+    detectCommonTonePreservation,
+    detectFunctionalCycle,
+    detectPhraseElision,
+    detectSequenceContinuationOpportunity,
+    detectStepwiseBassLine,
+    detectHarmonicAnticipation,
+    detectPlagalExtension,
+    detectModeMixture,
+    detectHarmonicDensityChange,
+    detectExtendedFifthChain
 } from '../../../analysis/patternDetection.js';
 
 // Re-export the original functions for other files that import from this module
@@ -48,7 +69,18 @@ export {
     detectSuspensionResolution,
     detectOstinatoPattern,
     detectChromaticVoiceMotion,
-    detectVoiceRangeExtreme
+    detectVoiceRangeExtreme,
+    // NEW: Additional coaching patterns
+    detectCommonTonePreservation,
+    detectFunctionalCycle,
+    detectPhraseElision,
+    detectSequenceContinuationOpportunity,
+    detectStepwiseBassLine,
+    detectHarmonicAnticipation,
+    detectPlagalExtension,
+    detectModeMixture,
+    detectHarmonicDensityChange,
+    detectExtendedFifthChain
 } from '../../../analysis/patternDetection.js';
 
 // ============================================================================
@@ -209,6 +241,120 @@ export function detectVoiceRangeExtremeWrapper(context) {
 }
 
 // ============================================================================
+// NEW PATTERN WRAPPERS
+// ============================================================================
+
+/**
+ * Detect common tone preservation (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectCommonTonePreservationWrapper(context) {
+    const { progression } = context;
+    const results = detectCommonTonePreservation(progression);
+    return results.map(r => formatForCoachEngine(r, 'common-tone-preservation'));
+}
+
+/**
+ * Detect functional harmony cycle (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectFunctionalCycleWrapper(context) {
+    const { progression } = context;
+    const results = detectFunctionalCycle(progression);
+    return results.map(r => formatForCoachEngine(r, 'functional-cycle-complete'));
+}
+
+/**
+ * Detect phrase elision (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectPhraseElisionWrapper(context) {
+    const { progression, key } = context;
+    const results = detectPhraseElision(progression, key);
+    return results.map(r => formatForCoachEngine(r, 'phrase-elision'));
+}
+
+/**
+ * Detect sequence continuation opportunity (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectSequenceContinuationOpportunityWrapper(context) {
+    const { progression } = context;
+    const results = detectSequenceContinuationOpportunity(progression);
+    return results.map(r => formatForCoachEngine(r, 'incomplete-sequence'));
+}
+
+/**
+ * Detect stepwise bass line (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectStepwiseBassLineWrapper(context) {
+    const { progression } = context;
+    const results = detectStepwiseBassLine(progression);
+    return results.map(r => formatForCoachEngine(r, 'stepwise-bass-line'));
+}
+
+/**
+ * Detect harmonic anticipation (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectHarmonicAnticipationWrapper(context) {
+    const { progression } = context;
+    const results = detectHarmonicAnticipation(progression);
+    return results.map(r => formatForCoachEngine(r, 'harmonic-anticipation'));
+}
+
+/**
+ * Detect plagal extension (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectPlagalExtensionWrapper(context) {
+    const { progression } = context;
+    const results = detectPlagalExtension(progression);
+    return results.map(r => formatForCoachEngine(r, 'plagal-extension'));
+}
+
+/**
+ * Detect mode mixture (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectModeMixtureWrapper(context) {
+    const { progression, key } = context;
+    const results = detectModeMixture(progression, key);
+    return results.map(r => formatForCoachEngine(r, 'major-minor-mixture'));
+}
+
+/**
+ * Detect harmonic density change (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectHarmonicDensityChangeWrapper(context) {
+    const { progression } = context;
+    const results = detectHarmonicDensityChange(progression);
+    return results.map(r => formatForCoachEngine(r, 'harmonic-density-shift'));
+}
+
+/**
+ * Detect extended fifth chain (wrapper)
+ * @param {Object} context - Analysis context
+ * @returns {Array} Coach items
+ */
+export function detectExtendedFifthChainWrapper(context) {
+    const { progression } = context;
+    const results = detectExtendedFifthChain(progression);
+    return results.map(r => formatForCoachEngine(r, 'extended-fifth-chain'));
+}
+
+// ============================================================================
 // COMBINED DETECTOR
 // ============================================================================
 
@@ -219,6 +365,10 @@ export function detectVoiceRangeExtremeWrapper(context) {
  */
 export function detectComprehensivePatterns(context) {
     const items = [];
+
+    // ========================================================================
+    // ORIGINAL PATTERN DETECTORS
+    // ========================================================================
 
     try {
         items.push(...detectHarmonicRhythmChangeWrapper(context));
@@ -284,6 +434,70 @@ export function detectComprehensivePatterns(context) {
         items.push(...detectVoiceRangeExtremeWrapper(context));
     } catch (e) {
         console.warn('[ComprehensivePatternDetector] Voice range error:', e);
+    }
+
+    // ========================================================================
+    // NEW COACHING PATTERN DETECTORS
+    // ========================================================================
+
+    try {
+        items.push(...detectCommonTonePreservationWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Common tone error:', e);
+    }
+
+    try {
+        items.push(...detectFunctionalCycleWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Functional cycle error:', e);
+    }
+
+    try {
+        items.push(...detectPhraseElisionWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Phrase elision error:', e);
+    }
+
+    try {
+        items.push(...detectSequenceContinuationOpportunityWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Sequence continuation error:', e);
+    }
+
+    try {
+        items.push(...detectStepwiseBassLineWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Stepwise bass error:', e);
+    }
+
+    try {
+        items.push(...detectHarmonicAnticipationWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Anticipation error:', e);
+    }
+
+    try {
+        items.push(...detectPlagalExtensionWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Plagal extension error:', e);
+    }
+
+    try {
+        items.push(...detectModeMixtureWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Mode mixture error:', e);
+    }
+
+    try {
+        items.push(...detectHarmonicDensityChangeWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Harmonic density error:', e);
+    }
+
+    try {
+        items.push(...detectExtendedFifthChainWrapper(context));
+    } catch (e) {
+        console.warn('[ComprehensivePatternDetector] Extended fifth chain error:', e);
     }
 
     return items;

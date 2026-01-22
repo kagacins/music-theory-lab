@@ -27,9 +27,17 @@ import {
     setScaleFilter,
     getLastDiatonicChord,
     setLastDiatonicChord,
-    setBuilderRootIndex
+    setBuilderRootIndex,
+    getPaletteFilter,
+    setPaletteFilter
 } from '../../state/builderState.js';
-import { SHARP_NOTES, FLAT_NOTES, CHORD_DEFINITIONS, CHORD_GROUPS, INTERVAL_DEFINITIONS, INTERVAL_GROUPS, SCALE_DEFINITIONS, SCALE_CATEGORIES, generateDiatonicChords, generateScaleDiatonicChords } from '../../../data/music-data.js';
+import {
+    SHARP_NOTES, FLAT_NOTES, CHORD_DEFINITIONS, CHORD_GROUPS,
+    INTERVAL_DEFINITIONS, INTERVAL_GROUPS, SCALE_DEFINITIONS, SCALE_CATEGORIES,
+    generateDiatonicChords, generateScaleDiatonicChords,
+    CHORD_PALETTE_CATEGORIES, CHORD_PALETTES, getPalettesByCategory, isChordInPalette,
+    SUBSTITUTION_TYPES, calculateChordSubstitutions, getSubstitutionType
+} from '../../../data/music-data.js';
 import { isChordInScale } from '../chordBuilder.js';
 import { FUNCTION_LEGEND, getHarmonicFunctionFromRoman, shouldShowFunctionColors } from '../../ui/chordFunctionLegend.js';
 import { renderBassMotionIndicators } from '../../ui/BassMotionIndicators.js';
@@ -38,7 +46,7 @@ import { renderBassMotionIndicators } from '../../ui/BassMotionIndicators.js';
 // CONSTANTS
 // ============================================================================
 
-const PANEL_IDS = ['library', 'intervals', 'progression', 'identifier'];
+const PANEL_IDS = ['library', 'intervals', 'substitutions', 'progression', 'identifier'];
 
 const PANEL_CONFIG = {
     library: {
@@ -52,6 +60,12 @@ const PANEL_CONFIG = {
         label: 'Intervals',
         activeColor: 'bg-emerald-600',
         hoverColor: 'hover:bg-emerald-700'
+    },
+    substitutions: {
+        icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>`,
+        label: 'Substitutions',
+        activeColor: 'bg-amber-600',
+        hoverColor: 'hover:bg-amber-700'
     },
     progression: {
         icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>`,
@@ -86,6 +100,8 @@ export class ChordLabBottomPanel {
         // Progression panel state
         this.viewMode = this._loadFromStorage(STORAGE_KEYS.VIEW_MODE, 'scroll');
         this.selectedSectionIds = new Set();
+        // Substitutions panel state - locks to chord selected when opening panel
+        this.lockedSubstitutionChord = null; // { root, rootIndex, chordType, symbol }
     }
 
     _loadFromStorage(key, defaultValue) {
@@ -118,6 +134,21 @@ export class ChordLabBottomPanel {
         if (this.currentPanel === panelId) {
             // Don't close - just keep it selected
             return;
+        }
+
+        // When opening Substitutions panel, lock to current chord from builder
+        if (panelId === 'substitutions') {
+            const enhPref = getEnharmonicPreference();
+            const notes = enhPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+            const rootIndex = getBuilderRootIndex();
+            const chordType = getBuilderChordType();
+            const chordDef = CHORD_DEFINITIONS[chordType];
+            this.lockedSubstitutionChord = {
+                root: notes[rootIndex],
+                rootIndex: rootIndex,
+                chordType: chordType,
+                symbol: chordDef?.symbol || ''
+            };
         }
 
         this.currentPanel = panelId;
@@ -193,6 +224,7 @@ export class ChordLabBottomPanel {
                 const gradientMap = {
                     'bg-indigo-600': 'from-indigo-500 to-blue-600',
                     'bg-emerald-600': 'from-emerald-500 to-teal-500',
+                    'bg-amber-600': 'from-amber-500 to-orange-500',
                     'bg-violet-600': 'from-violet-500 to-purple-500',
                     'bg-cyan-600': 'from-cyan-500 to-sky-500'
                 };
@@ -245,6 +277,9 @@ export class ChordLabBottomPanel {
             case 'intervals':
                 this._renderIntervalsContent(mainContent);
                 break;
+            case 'substitutions':
+                this._renderSubstitutionsContent(mainContent);
+                break;
             case 'progression':
                 this._renderProgressionContent(mainContent);
                 break;
@@ -261,28 +296,35 @@ export class ChordLabBottomPanel {
     _renderLibraryContent(container) {
         const libraryMode = getChordLibraryMode();
         const scaleOptions = this._generateScaleOptionsWithIcons();
+        const paletteOptions = this._generatePaletteOptions();
         const currentScale = getScaleFilter();
+        const currentPalette = getPaletteFilter();
         const enhPref = getEnharmonicPreference();
         const notes = enhPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
         const rootNote = notes[getBuilderRootIndex()];
 
-        // Build header text based on mode
+        // Build header text based on mode and filters
         let headerText = 'Chord Library';
-        if (libraryMode === 'diatonic' && currentScale) {
-            headerText = `Diatonic to ${rootNote} ${currentScale}`;
-        } else if (libraryMode === 'diatonic') {
-            headerText = `Diatonic to ${rootNote} Major`;
+        const filters = [];
+        if (libraryMode === 'diatonic') {
+            filters.push(currentScale ? `Diatonic to ${rootNote} ${currentScale}` : `Diatonic to ${rootNote} Major`);
         } else if (currentScale) {
-            headerText = `Filtered by ${rootNote} ${currentScale}`;
+            filters.push(`${rootNote} ${currentScale}`);
+        }
+        if (currentPalette && CHORD_PALETTES[currentPalette]) {
+            filters.push(CHORD_PALETTES[currentPalette].label);
+        }
+        if (filters.length > 0) {
+            headerText = filters.join(' + ');
         }
 
         // Build header HTML
         container.innerHTML = `
             <div class="h-full flex flex-col">
                 <!-- Library controls bar -->
-                <div class="flex items-center px-3 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 flex-shrink-0">
+                <div class="flex items-center flex-wrap px-3 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 flex-shrink-0 gap-y-1">
                     <span class="text-white font-semibold text-sm mr-4">${headerText}</span>
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <!-- Chromatic/Diatonic toggle (wider, matches classic style) -->
                         <div class="flex items-center gap-1.5 px-2 py-1 bg-white/20 rounded-full" title="Toggle: Chromatic (all chords) ↔ Diatonic (scale chords)">
                             <span class="text-[10px] font-semibold ${libraryMode === 'chromatic' ? 'text-white' : 'text-white/60'}">Chromatic</span>
@@ -305,6 +347,19 @@ export class ChordLabBottomPanel {
                                     class="px-1.5 py-0.5 bg-white/30 text-white text-[10px] rounded border-none outline-none cursor-pointer" style="max-width: 120px;">
                                 <option value="" style="color: #374151; background: white;">All Scales</option>
                                 ${scaleOptions}
+                            </select>
+                        </div>
+
+                        <!-- Palette filter (NEW) -->
+                        <div class="flex items-center gap-1.5 px-2 py-1 bg-white/20 rounded-full" title="Filter chords by style palette">
+                            <svg class="w-3.5 h-3.5 text-white/80" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-[10px] font-semibold text-white/80">Palette:</span>
+                            <select id="fs-library-palette"
+                                    class="px-1.5 py-0.5 bg-white/30 text-white text-[10px] rounded border-none outline-none cursor-pointer" style="max-width: 130px;">
+                                <option value="" style="color: #374151; background: white;">All Chords</option>
+                                ${paletteOptions}
                             </select>
                         </div>
 
@@ -349,6 +404,14 @@ export class ChordLabBottomPanel {
                 if (setScaleFilter) {
                     setScaleFilter(e.target.value || null);
                 }
+                this._renderLibraryContent(container);
+            });
+        }
+
+        const paletteSelect = container.querySelector('#fs-library-palette');
+        if (paletteSelect) {
+            paletteSelect.addEventListener('change', (e) => {
+                setPaletteFilter(e.target.value || null);
                 this._renderLibraryContent(container);
             });
         }
@@ -703,6 +766,7 @@ export class ChordLabBottomPanel {
 
         if (mode === 'diatonic') {
             // DIATONIC MODE: Render scale-degree based chords with Roman numerals
+            const paletteFilter = getPaletteFilter();
             let diatonicChords;
             if (scaleFilter && SCALE_DEFINITIONS[scaleFilter]) {
                 // Scale-aware diatonic mode: generate chords from the selected scale
@@ -713,18 +777,29 @@ export class ChordLabBottomPanel {
             }
 
             diatonicChords.forEach(group => {
+                // Apply palette filter to diatonic chords if active
+                let filteredChords = group.chords;
+                if (paletteFilter) {
+                    filteredChords = filteredChords.filter(chord =>
+                        isChordInPalette(chord.type, paletteFilter)
+                    );
+                }
+
+                // Skip empty groups when palette filtering
+                if (paletteFilter && filteredChords.length === 0) return;
+
                 const groupContainer = document.createElement('div');
                 groupContainer.className = 'border border-gray-200 rounded-lg p-2 flex flex-col bg-white';
 
                 const title = document.createElement('h4');
                 title.className = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 text-center';
-                title.textContent = group.title;
+                title.textContent = paletteFilter ? `${group.title} (${filteredChords.length})` : group.title;
                 groupContainer.appendChild(title);
 
                 const buttonGrid = document.createElement('div');
                 buttonGrid.className = 'grid grid-cols-1 gap-1.5';
 
-                group.chords.forEach(chord => {
+                filteredChords.forEach(chord => {
                     if (!CHORD_DEFINITIONS[chord.type]) return;
 
                     const chordRootIndex = notes.indexOf(chord.root);
@@ -838,24 +913,37 @@ export class ChordLabBottomPanel {
                 grid.appendChild(groupContainer);
             });
         } else {
-            // CHROMATIC MODE: Show all chords (optionally filtered by scale)
+            // CHROMATIC MODE: Show all chords (optionally filtered by scale and/or palette)
+            const paletteFilter = getPaletteFilter();
+            const hasFilters = scaleFilter || paletteFilter;
+
             CHORD_GROUPS.forEach(group => {
-                // Filter chord types by scale if a scale filter is active
-                const filteredTypes = scaleFilter
-                    ? group.types.filter(chordType =>
+                // Filter chord types by scale AND palette if active
+                let filteredTypes = group.types;
+
+                // Apply scale filter
+                if (scaleFilter) {
+                    filteredTypes = filteredTypes.filter(chordType =>
                         CHORD_DEFINITIONS[chordType] && isChordInScale(chordType, rootNote, scaleFilter, rootNote)
-                    )
-                    : group.types;
+                    );
+                }
+
+                // Apply palette filter (combines with scale filter)
+                if (paletteFilter) {
+                    filteredTypes = filteredTypes.filter(chordType =>
+                        isChordInPalette(chordType, paletteFilter)
+                    );
+                }
 
                 // Skip empty groups when filtering
-                if (scaleFilter && filteredTypes.length === 0) return;
+                if (hasFilters && filteredTypes.length === 0) return;
 
                 const groupContainer = document.createElement('div');
                 groupContainer.className = 'border border-gray-200 rounded-lg p-2 flex flex-col bg-white';
 
                 const title = document.createElement('h4');
                 title.className = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 text-center';
-                title.textContent = scaleFilter ? `${group.title} (${filteredTypes.length})` : group.title;
+                title.textContent = hasFilters ? `${group.title} (${filteredTypes.length})` : group.title;
                 groupContainer.appendChild(title);
 
                 const buttonGrid = document.createElement('div');
@@ -1151,6 +1239,40 @@ export class ChordLabBottomPanel {
         return options;
     }
 
+    /**
+     * Generate HTML options for the palette filter dropdown
+     * Groups palettes by category (Genre, Mood, Function)
+     */
+    _generatePaletteOptions() {
+        const currentPalette = getPaletteFilter();
+
+        // Category display order and styling
+        const categoryConfig = {
+            genre: { label: 'Genre', icon: '🎵' },
+            mood: { label: 'Mood', icon: '✨' },
+            function: { label: 'Function', icon: '🧩' }
+        };
+
+        let options = '';
+
+        // Generate options grouped by category
+        Object.entries(categoryConfig).forEach(([categoryKey, config]) => {
+            const palettes = getPalettesByCategory(categoryKey);
+            if (palettes.length > 0) {
+                options += `<optgroup label="${config.icon} ${config.label}" style="color: #1f2937; font-weight: bold; background: #f3f4f6;">`;
+
+                palettes.forEach(palette => {
+                    const isSelected = palette.id === currentPalette;
+                    options += `<option value="${palette.id}" style="color: #374151; background: white;" ${isSelected ? 'selected' : ''}>${palette.label}</option>`;
+                });
+
+                options += `</optgroup>`;
+            }
+        });
+
+        return options;
+    }
+
     // ========================================================================
     // INTERVALS CONTENT (rendered to main area)
     // ========================================================================
@@ -1250,6 +1372,273 @@ export class ChordLabBottomPanel {
 
         html += '</div>';
         return html;
+    }
+
+    // ========================================================================
+    // SUBSTITUTIONS CONTENT (rendered to main area)
+    // Shows chord substitution options with educational descriptions
+    // ========================================================================
+
+    _renderSubstitutionsContent(container) {
+        const enhPref = getEnharmonicPreference();
+        const notes = enhPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+
+        // Use locked chord if available, otherwise capture from builder state
+        if (!this.lockedSubstitutionChord) {
+            const rootIndex = getBuilderRootIndex();
+            const chordType = getBuilderChordType();
+            const chordDef = CHORD_DEFINITIONS[chordType];
+            this.lockedSubstitutionChord = {
+                root: notes[rootIndex],
+                rootIndex: rootIndex,
+                chordType: chordType,
+                symbol: chordDef?.symbol || ''
+            };
+        }
+
+        const rootNote = this.lockedSubstitutionChord.root;
+        const chordType = this.lockedSubstitutionChord.chordType;
+        const chordSymbol = this.lockedSubstitutionChord.symbol;
+
+        // Calculate substitutions for the locked chord
+        const substitutions = calculateChordSubstitutions(rootNote, chordType, notes);
+
+        // Group substitutions by type
+        const groupedSubs = {};
+        substitutions.forEach(sub => {
+            if (!groupedSubs[sub.type]) {
+                groupedSubs[sub.type] = [];
+            }
+            groupedSubs[sub.type].push(sub);
+        });
+
+        container.innerHTML = `
+            <div class="h-full flex flex-col">
+                <!-- Header bar -->
+                <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-600 to-orange-600 flex-shrink-0">
+                    <div class="flex items-center gap-3">
+                        <span class="text-white font-semibold text-sm" style="-webkit-text-fill-color: white;">Substitutions for</span>
+                        <span class="px-3 py-1 bg-white/20 rounded-full text-white font-bold text-lg" style="-webkit-text-fill-color: white;">${rootNote}${chordSymbol}</span>
+                        <span class="text-white/70 text-xs" style="-webkit-text-fill-color: rgba(255,255,255,0.7);">(${chordType})</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-white/60 text-xs hidden sm:inline" style="-webkit-text-fill-color: rgba(255,255,255,0.6);">Click chord buttons to preview • Locked to selected chord</span>
+                        <button id="update-locked-chord-btn" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium flex items-center gap-1.5 transition-all" title="Update to current chord in builder">
+                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+                            </svg>
+                            <span style="-webkit-text-fill-color: white;">Update Chord</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Substitutions grid (scrollable) -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    ${substitutions.length === 0 ? `
+                        <div class="flex items-center justify-center h-full text-gray-500">
+                            <div class="text-center">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/>
+                                </svg>
+                                <p class="font-medium">No substitutions available</p>
+                                <p class="text-sm">Try selecting a different chord type</p>
+                            </div>
+                        </div>
+                    ` : this._renderSubstitutionGroups(groupedSubs, rootNote, chordType)}
+                </div>
+            </div>
+        `;
+
+        // Attach event handlers for substitution buttons
+        this._attachSubstitutionHandlers(container);
+
+        // "Update Chord" button handler - updates the locked chord from current builder state
+        const updateBtn = container.querySelector('#update-locked-chord-btn');
+        if (updateBtn) {
+            updateBtn.addEventListener('click', () => {
+                const enhPref = getEnharmonicPreference();
+                const notesArr = enhPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+                const newRootIndex = getBuilderRootIndex();
+                const newChordType = getBuilderChordType();
+                const chordDef = CHORD_DEFINITIONS[newChordType];
+
+                this.lockedSubstitutionChord = {
+                    root: notesArr[newRootIndex],
+                    rootIndex: newRootIndex,
+                    chordType: newChordType,
+                    symbol: chordDef?.symbol || ''
+                };
+
+                // Re-render with new chord
+                this._renderSubstitutionsContent(container);
+            });
+        }
+    }
+
+    /**
+     * Render grouped substitution sections
+     */
+    _renderSubstitutionGroups(groupedSubs, originalRoot, originalType) {
+        const originalSymbol = CHORD_DEFINITIONS[originalType]?.symbol || '';
+        const originalLabel = `${originalRoot}${originalSymbol}`;
+
+        let html = '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">';
+
+        // Define display order for substitution types
+        const typeOrder = ['tritoneSub', 'relativeMinor', 'diatonicThird', 'secondaryDominant', 'parallelMode', 'qualityChange', 'diminishedPassing', 'commonTone'];
+
+        typeOrder.forEach(typeId => {
+            const subs = groupedSubs[typeId];
+            if (!subs || subs.length === 0) return;
+
+            const typeInfo = getSubstitutionType(typeId);
+            if (!typeInfo) return;
+
+            html += `
+                <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                    <!-- Section header with gradient -->
+                    <div class="px-4 py-3 bg-gradient-to-r ${typeInfo.color} text-white">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">${typeInfo.icon}</span>
+                                <span class="font-semibold">${typeInfo.label}</span>
+                            </div>
+                            <!-- Play Original button -->
+                            <button class="play-original-btn px-2 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
+                                    data-root="${originalRoot}"
+                                    data-type="${originalType}"
+                                    title="Play original chord ${originalLabel}">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>${originalLabel}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                        <p class="text-xs text-gray-600 leading-relaxed">${typeInfo.description}</p>
+                    </div>
+
+                    <!-- How to use -->
+                    <div class="px-4 py-2 bg-amber-50 border-b border-amber-100">
+                        <p class="text-xs text-amber-800"><strong>How to use:</strong> ${typeInfo.howToUse}</p>
+                    </div>
+
+                    <!-- Substitution chord buttons -->
+                    <div class="p-3">
+                        <div class="flex flex-wrap gap-2">
+                            ${subs.map(sub => this._renderSubstitutionButton(sub, typeInfo)).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * Render a single substitution chord button
+     */
+    _renderSubstitutionButton(sub, typeInfo) {
+        const isPrefix = sub.isPrefix ? '→' : '';
+        const prefixLabel = sub.isPrefix ? '<span class="text-[9px] text-amber-600 block">Use before target</span>' : '';
+
+        return `
+            <div class="substitution-chord-btn flex flex-col items-center p-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md min-w-[70px]"
+                 data-root="${sub.root}"
+                 data-type="${sub.chordType}"
+                 data-sub-type="${sub.type}"
+                 title="${sub.reason}">
+                <span class="text-sm font-bold text-gray-800">${sub.label}</span>
+                ${prefixLabel}
+                <span class="text-[10px] text-gray-500 mt-1 text-center leading-tight max-w-[100px]">${sub.reason.split(' - ')[0]}</span>
+            </div>
+        `;
+    }
+
+    /**
+     * Attach event handlers for substitution buttons (preview-only, no state changes)
+     */
+    _attachSubstitutionHandlers(container) {
+        // Helper function to play a chord preview
+        // Note: This changes the builder state to play the chord, which updates the sidebar.
+        // The substitution panel itself stays locked to the original chord.
+        // The sidebar showing the previewed chord is helpful feedback for the user.
+        const playChordPreview = (root, chordType) => {
+            const enhPref = getEnharmonicPreference();
+            const notes = enhPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+            const rootIndex = notes.indexOf(root);
+
+            if (rootIndex !== -1) {
+                setBuilderRootIndex(rootIndex);
+                if (window.selectBuilderChordType) {
+                    window.selectBuilderChordType(chordType, true); // true = play
+                }
+
+                // Sync sidebar to show the previewed chord
+                if (this.editor && this.editor._syncFromBuilderState) {
+                    this.editor._syncFromBuilderState();
+                }
+            }
+        };
+
+        // Substitution chord buttons - preview only
+        const buttons = container.querySelectorAll('.substitution-chord-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                playChordPreview(btn.dataset.root, btn.dataset.type);
+            });
+
+            btn.addEventListener('mouseup', () => {
+                if (window.stopBuilderChord) window.stopBuilderChord();
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                if (window.stopBuilderChord) window.stopBuilderChord();
+            });
+
+            // Touch events
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                playChordPreview(btn.dataset.root, btn.dataset.type);
+            }, { passive: false });
+
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (window.stopBuilderChord) window.stopBuilderChord();
+            }, { passive: false });
+        });
+
+        // "Play Original" buttons - play the locked chord
+        const originalButtons = container.querySelectorAll('.play-original-btn');
+        originalButtons.forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                playChordPreview(btn.dataset.root, btn.dataset.type);
+            });
+
+            btn.addEventListener('mouseup', () => {
+                if (window.stopBuilderChord) window.stopBuilderChord();
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                if (window.stopBuilderChord) window.stopBuilderChord();
+            });
+
+            // Touch events
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                playChordPreview(btn.dataset.root, btn.dataset.type);
+            }, { passive: false });
+
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (window.stopBuilderChord) window.stopBuilderChord();
+            }, { passive: false });
+        });
     }
 
     // ========================================================================

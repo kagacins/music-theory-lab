@@ -124,6 +124,543 @@ const CHORD_GROUPS = [
     { title: 'Altered', types: ['Augmented 7th', '7b5', '7#5', '7b9', '7#9'] },
 ];
 
+// ============ CHORD PALETTES ============
+// Curated chord collections for different styles, moods, and functions
+// These work as filters that can be combined with Chromatic/Diatonic modes
+
+const CHORD_PALETTE_CATEGORIES = {
+    genre: {
+        label: 'Genre',
+        icon: 'music-note', // Will map to SVG
+        description: 'Chords commonly used in specific musical styles'
+    },
+    mood: {
+        label: 'Mood',
+        icon: 'sparkles',
+        description: 'Chords grouped by emotional quality'
+    },
+    function: {
+        label: 'Function',
+        icon: 'puzzle',
+        description: 'Chords grouped by harmonic role'
+    }
+};
+
+const CHORD_PALETTES = {
+    // ============ GENRE PALETTES ============
+    'jazz-essentials': {
+        category: 'genre',
+        label: 'Jazz Essentials',
+        description: 'Core jazz voicings for ii-V-I progressions and standards',
+        color: 'from-amber-500 to-orange-600',
+        chordTypes: [
+            'Major 7th', 'Minor 7th', 'Dominant 7th', 'Half-Diminished 7th',
+            'Diminished 7th', 'Major 9th', 'Minor 9th', 'Dominant 9th',
+            '6/9', 'Minor 6th', 'Major 6th'
+        ]
+    },
+    'jazz-altered': {
+        category: 'genre',
+        label: 'Jazz Altered',
+        description: 'Altered dominants and colorful extensions for bebop and modern jazz',
+        color: 'from-orange-500 to-red-600',
+        chordTypes: [
+            '7b5', '7#5', '7b9', '7#9', 'Augmented 7th',
+            'Dominant 11th', 'Dominant 13th', 'Major 7th #11',
+            'Minor-Major 7th', 'Half-Diminished 7th'
+        ]
+    },
+    'pop-essentials': {
+        category: 'genre',
+        label: 'Pop Essentials',
+        description: 'The building blocks of modern pop music',
+        color: 'from-pink-500 to-rose-600',
+        chordTypes: [
+            'Major', 'Minor', 'Sus2', 'Sus4',
+            'Add9', 'Major 7th', 'Minor 7th', 'Dominant 7th'
+        ]
+    },
+    'rock-power': {
+        category: 'genre',
+        label: 'Rock & Power',
+        description: 'Powerful chords for rock, metal, and punk',
+        color: 'from-slate-600 to-zinc-800',
+        chordTypes: [
+            'Power Chord', 'Major', 'Minor', 'Sus4',
+            'Dominant 7th', 'Add9', 'Augmented', 'Diminished'
+        ]
+    },
+    'blues': {
+        category: 'genre',
+        label: 'Blues',
+        description: 'Classic blues chord vocabulary with dominant and altered sounds',
+        color: 'from-blue-600 to-indigo-700',
+        chordTypes: [
+            'Dominant 7th', 'Dominant 9th', '7#9', 'Minor 7th',
+            'Major', 'Minor', '7b5', 'Diminished 7th'
+        ]
+    },
+    'rnb-soul': {
+        category: 'genre',
+        label: 'R&B / Soul',
+        description: 'Smooth chord colors for R&B, neo-soul, and gospel',
+        color: 'from-purple-600 to-violet-700',
+        chordTypes: [
+            'Major 7th', 'Minor 7th', 'Major 9th', 'Minor 9th',
+            'Dominant 9th', '6/9', 'Minor 6th', 'Add9',
+            'Minor 11th', 'Dominant 13th'
+        ]
+    },
+    'folk-acoustic': {
+        category: 'genre',
+        label: 'Folk / Acoustic',
+        description: 'Open voicings perfect for acoustic guitar',
+        color: 'from-amber-600 to-yellow-700',
+        chordTypes: [
+            'Major', 'Minor', 'Sus2', 'Sus4', 'Add9',
+            'Major 7th', 'Minor 7th', '6/9'
+        ]
+    },
+
+    // ============ MOOD PALETTES ============
+    'bright-happy': {
+        category: 'mood',
+        label: 'Bright & Happy',
+        description: 'Uplifting major-based chords that convey joy and energy',
+        color: 'from-yellow-400 to-amber-500',
+        chordTypes: [
+            'Major', 'Major 7th', 'Major 9th', 'Add9',
+            '6/9', 'Major 6th', 'Sus2', 'Dominant 7th'
+        ]
+    },
+    'melancholic': {
+        category: 'mood',
+        label: 'Melancholic',
+        description: 'Minor and emotional chords for sad or reflective moments',
+        color: 'from-slate-500 to-gray-600',
+        chordTypes: [
+            'Minor', 'Minor 7th', 'Minor 9th', 'Minor 6th',
+            'Minor-Major 7th', 'Half-Diminished 7th', 'Diminished'
+        ]
+    },
+    'tense-dramatic': {
+        category: 'mood',
+        label: 'Tense & Dramatic',
+        description: 'Dissonant chords that create suspense and intensity',
+        color: 'from-red-600 to-rose-800',
+        chordTypes: [
+            'Diminished', 'Diminished 7th', 'Augmented', 'Augmented 7th',
+            '7b5', '7#5', '7b9', '7#9', 'Minor-Major 7th'
+        ]
+    },
+    'dreamy-ambient': {
+        category: 'mood',
+        label: 'Dreamy & Ambient',
+        description: 'Floating, ethereal chords for atmospheric textures',
+        color: 'from-cyan-400 to-teal-500',
+        chordTypes: [
+            'Major 7th', 'Major 9th', 'Major 7th #11', 'Add9',
+            'Sus2', 'Sus4', '6/9', 'Minor 9th', 'Minor 11th'
+        ]
+    },
+    'mysterious': {
+        category: 'mood',
+        label: 'Mysterious',
+        description: 'Ambiguous and intriguing harmonic colors',
+        color: 'from-indigo-600 to-purple-800',
+        chordTypes: [
+            'Augmented', 'Diminished', 'Half-Diminished 7th', 'Minor-Major 7th',
+            'Major 7th #11', '7b5', 'Sus4', 'Minor 6th'
+        ]
+    },
+    'triumphant': {
+        category: 'mood',
+        label: 'Triumphant',
+        description: 'Bold, powerful chords for climactic moments',
+        color: 'from-amber-500 to-orange-600',
+        chordTypes: [
+            'Major', 'Power Chord', 'Sus4', 'Add9',
+            'Dominant 7th', 'Major 7th', 'Augmented'
+        ]
+    },
+
+    // ============ FUNCTION PALETTES ============
+    'tonic-stable': {
+        category: 'function',
+        label: 'Tonic (Stable)',
+        description: 'Chords that feel "home" - I and vi chord types',
+        color: 'from-emerald-500 to-green-600',
+        chordTypes: [
+            'Major', 'Major 7th', 'Major 9th', 'Major 6th', '6/9', 'Add9',
+            'Minor', 'Minor 7th', 'Minor 9th', 'Minor 6th'
+        ]
+    },
+    'subdominant-moving': {
+        category: 'function',
+        label: 'Subdominant (Moving)',
+        description: 'Chords that create motion away from tonic - ii and IV types',
+        color: 'from-cyan-500 to-blue-600',
+        chordTypes: [
+            'Major', 'Minor', 'Minor 7th', 'Minor 9th', 'Minor 11th',
+            'Major 7th', 'Sus2', 'Sus4', 'Add9'
+        ]
+    },
+    'dominant-tension': {
+        category: 'function',
+        label: 'Dominant (Tension)',
+        description: 'Chords that create strong pull back to tonic - V chord types',
+        color: 'from-yellow-500 to-amber-600',
+        chordTypes: [
+            'Dominant 7th', 'Dominant 9th', 'Dominant 11th', 'Dominant 13th',
+            '7b5', '7#5', '7b9', '7#9', 'Augmented 7th', 'Sus4'
+        ]
+    },
+    'diminished-passing': {
+        category: 'function',
+        label: 'Diminished (Passing)',
+        description: 'Transitional chords that connect other harmonies',
+        color: 'from-gray-500 to-slate-600',
+        chordTypes: [
+            'Diminished', 'Diminished 7th', 'Half-Diminished 7th',
+            'Augmented', 'Minor-Major 7th'
+        ]
+    }
+};
+
+/**
+ * Get all palettes in a specific category
+ * @param {string} category - 'genre', 'mood', or 'function'
+ * @returns {Array} Array of {id, ...palette} objects
+ */
+function getPalettesByCategory(category) {
+    return Object.entries(CHORD_PALETTES)
+        .filter(([_, palette]) => palette.category === category)
+        .map(([id, palette]) => ({ id, ...palette }));
+}
+
+/**
+ * Get a specific palette by ID
+ * @param {string} paletteId - The palette identifier
+ * @returns {Object|null} The palette object or null if not found
+ */
+function getPalette(paletteId) {
+    return CHORD_PALETTES[paletteId] || null;
+}
+
+/**
+ * Check if a chord type is in a specific palette
+ * @param {string} chordType - The chord type to check
+ * @param {string} paletteId - The palette identifier
+ * @returns {boolean} True if the chord type is in the palette
+ */
+function isChordInPalette(chordType, paletteId) {
+    const palette = CHORD_PALETTES[paletteId];
+    if (!palette) return false;
+    return palette.chordTypes.includes(chordType);
+}
+
+/**
+ * Get all chord types that match the current filters
+ * @param {string|null} paletteId - Optional palette filter
+ * @param {string|null} scaleFilter - Optional scale filter
+ * @param {string} rootNote - The root note for scale calculations
+ * @returns {Array} Array of chord type strings
+ */
+function getFilteredChordTypes(paletteId, scaleFilter, rootNote) {
+    // Start with all chord types from CHORD_GROUPS
+    let types = CHORD_GROUPS.flatMap(group => group.types);
+
+    // Filter by palette if specified
+    if (paletteId && CHORD_PALETTES[paletteId]) {
+        const paletteTypes = CHORD_PALETTES[paletteId].chordTypes;
+        types = types.filter(type => paletteTypes.includes(type));
+    }
+
+    // Scale filter is applied separately in the UI (isChordInScale)
+    // This function just handles palette filtering
+
+    return types;
+}
+
+// ============ CHORD SUBSTITUTION TYPES ============
+// Educational descriptions explaining when and why each substitution works
+
+const SUBSTITUTION_TYPES = {
+    tritoneSub: {
+        label: 'Tritone Substitution',
+        shortLabel: 'Tritone Sub',
+        color: 'from-purple-500 to-indigo-600',
+        icon: '🔄',
+        description: 'Replace a dominant 7th chord with another dominant 7th a tritone (6 semitones) away. Both chords share the same tritone interval (3rd and 7th are swapped), creating the same tension that resolves similarly.',
+        howToUse: 'Works best with dominant 7th chords. G7 → Db7 both resolve smoothly to C.',
+        example: 'Instead of G7 → C, try Db7 → C for a jazzy chromatic bass line.',
+        appliesTo: ['Dominant 7th', 'Dominant 9th', 'Dominant 11th', 'Dominant 13th', '7b5', '7#5', '7b9', '7#9']
+    },
+    relativeMinor: {
+        label: 'Relative Minor/Major',
+        shortLabel: 'Relative',
+        color: 'from-emerald-500 to-teal-600',
+        icon: '👥',
+        description: 'Major and minor chords built on notes 3 semitones apart share many common tones. The relative minor of a major chord has the same key signature and similar harmonic function.',
+        howToUse: 'Substitute vi for I (Am for C) or I for vi. Both have tonic function and share 2 of 3 notes.',
+        example: 'C major (C-E-G) shares E and G with A minor (A-C-E). Try Am instead of C for a darker color.',
+        appliesTo: ['Major', 'Minor', 'Major 7th', 'Minor 7th', 'Major 9th', 'Minor 9th']
+    },
+    diatonicThird: {
+        label: 'Diatonic Third Substitution',
+        shortLabel: 'Third Sub',
+        color: 'from-blue-500 to-cyan-600',
+        icon: '3️⃣',
+        description: 'Chords a third apart in a key share 2 common tones. iii can substitute for I, vi for IV, etc. This creates subtle harmonic variety while maintaining similar function.',
+        howToUse: 'Replace a chord with the diatonic chord a 3rd above or below. Em for C, Am for F, Dm for F.',
+        example: 'In C major: Em (E-G-B) shares G and E with C (C-E-G). Use Em for a more delicate sound.',
+        appliesTo: ['Major', 'Minor', 'Major 7th', 'Minor 7th', 'Diminished', 'Half-Diminished 7th']
+    },
+    parallelMode: {
+        label: 'Parallel Mode (Modal Interchange)',
+        shortLabel: 'Modal',
+        color: 'from-violet-500 to-purple-600',
+        icon: '🎭',
+        description: 'Borrow chords from the parallel major or minor key. If you\'re in C major, you can use chords from C minor (and vice versa) for color and surprise.',
+        howToUse: 'In a major key, try bVII, iv, or bVI from the parallel minor. In minor, try IV or I from parallel major.',
+        example: 'In C major, use Bb (bVII from C minor) or Fm (iv) for an unexpected emotional shift.',
+        appliesTo: ['Major', 'Minor', 'Major 7th', 'Minor 7th', 'Dominant 7th']
+    },
+    secondaryDominant: {
+        label: 'Secondary Dominant',
+        shortLabel: 'V of',
+        color: 'from-amber-500 to-orange-600',
+        icon: '🎯',
+        description: 'Any chord can be preceded by its own V7 chord. This "dominant of the dominant" creates strong forward motion by temporarily tonicizing the target chord.',
+        howToUse: 'Before any diatonic chord, insert the dominant 7th a fifth above it. Before Dm, use A7. Before Am, use E7.',
+        example: 'C → A7 → Dm → G7 → C. The A7 is the V7 of Dm, creating a stronger pull.',
+        appliesTo: ['Major', 'Minor', 'Major 7th', 'Minor 7th', 'Dominant 7th']
+    },
+    diminishedPassing: {
+        label: 'Diminished Passing Chord',
+        shortLabel: 'Dim Pass',
+        color: 'from-gray-500 to-slate-600',
+        icon: '📍',
+        description: 'Diminished 7th chords can connect chords a whole step apart. Their symmetrical structure means they function like rootless dominant 7b9 chords from 4 different roots.',
+        howToUse: 'Insert a dim7 between chords a step apart. The dim7 is built on the note between them.',
+        example: 'C → C#dim7 → Dm. The C#dim7 acts like A7b9 (V7 of Dm) without the root.',
+        appliesTo: ['Diminished 7th']
+    },
+    qualityChange: {
+        label: 'Quality Change',
+        shortLabel: 'Quality',
+        color: 'from-rose-500 to-pink-600',
+        icon: '🎨',
+        description: 'Keep the same root but change the chord quality (major↔minor, add 7th, etc.). This creates harmonic interest while maintaining the same bass note.',
+        howToUse: 'Try major instead of minor (or vice versa), or add/remove 7ths. Same root, different color.',
+        example: 'C → Cm → C7 → Cmaj7. The root stays on C but the mood shifts dramatically.',
+        appliesTo: ['Major', 'Minor', 'Major 7th', 'Minor 7th', 'Dominant 7th', 'Diminished', 'Augmented']
+    },
+    commonTone: {
+        label: 'Common Tone Substitution',
+        shortLabel: 'Common Tone',
+        color: 'from-teal-500 to-emerald-600',
+        icon: '🔗',
+        description: 'Any chord that shares one or more important notes (especially the 3rd or 7th) can potentially substitute. The shared tones create a smooth voice-leading connection.',
+        howToUse: 'Look for chords sharing the melody note or a characteristic tone. Eb maj7 and C min7 both contain G and Bb.',
+        example: 'Cmaj7 (C-E-G-B) shares E and B with Emaj. Use E or Em for an unexpected but smooth change.',
+        appliesTo: ['Major', 'Minor', 'Major 7th', 'Minor 7th', 'Major 9th', 'Minor 9th', 'Add9']
+    }
+};
+
+/**
+ * Calculate all possible substitutions for a given chord
+ * @param {string} root - The chord root note (e.g., 'C', 'F#')
+ * @param {string} chordType - The chord type (e.g., 'Dominant 7th', 'Major')
+ * @param {Array} noteArray - Array of note names to use for calculations
+ * @returns {Array} Array of substitution objects with type, chord info, and explanation
+ */
+function calculateChordSubstitutions(root, chordType, noteArray) {
+    const substitutions = [];
+    const rootIndex = noteArray.indexOf(root);
+    if (rootIndex === -1) return substitutions;
+
+    const chordDef = CHORD_DEFINITIONS[chordType];
+    if (!chordDef) return substitutions;
+
+    // 1. TRITONE SUBSTITUTION (for dominant chords)
+    if (SUBSTITUTION_TYPES.tritoneSub.appliesTo.includes(chordType)) {
+        const tritoneIndex = (rootIndex + 6) % 12;
+        const tritoneRoot = noteArray[tritoneIndex];
+        substitutions.push({
+            type: 'tritoneSub',
+            root: tritoneRoot,
+            chordType: chordType, // Same type
+            label: `${tritoneRoot}${chordDef.symbol}`,
+            reason: `Shares the same tritone interval (guide tones). Both resolve to the same target.`
+        });
+    }
+
+    // 2. RELATIVE MINOR/MAJOR
+    if (SUBSTITUTION_TYPES.relativeMinor.appliesTo.includes(chordType)) {
+        if (chordType.includes('Major') && !chordType.includes('Minor')) {
+            // Major chord → relative minor (down 3 semitones)
+            const relMinorIndex = (rootIndex + 9) % 12; // Same as -3
+            const relMinorRoot = noteArray[relMinorIndex];
+            const relMinorType = chordType.replace('Major', 'Minor');
+            const relMinorDef = CHORD_DEFINITIONS[relMinorType];
+            if (relMinorDef) {
+                substitutions.push({
+                    type: 'relativeMinor',
+                    root: relMinorRoot,
+                    chordType: relMinorType,
+                    label: `${relMinorRoot}${relMinorDef.symbol}`,
+                    reason: `Relative minor - shares 2 common tones and has similar tonic function.`
+                });
+            }
+        } else if (chordType.includes('Minor') && !chordType.includes('Major')) {
+            // Minor chord → relative major (up 3 semitones)
+            const relMajorIndex = (rootIndex + 3) % 12;
+            const relMajorRoot = noteArray[relMajorIndex];
+            const relMajorType = chordType.replace('Minor', 'Major');
+            const relMajorDef = CHORD_DEFINITIONS[relMajorType];
+            if (relMajorDef) {
+                substitutions.push({
+                    type: 'relativeMinor',
+                    root: relMajorRoot,
+                    chordType: relMajorType,
+                    label: `${relMajorRoot}${relMajorDef.symbol}`,
+                    reason: `Relative major - shares 2 common tones and has similar tonic function.`
+                });
+            }
+        }
+    }
+
+    // 3. DIATONIC THIRD SUBSTITUTION (chord a 3rd up or down)
+    if (SUBSTITUTION_TYPES.diatonicThird.appliesTo.includes(chordType)) {
+        // Third up (4 semitones for major third, 3 for minor)
+        const thirdUpIndex = (rootIndex + 4) % 12;
+        const thirdUpRoot = noteArray[thirdUpIndex];
+        // Use minor if original is major, for diatonic compatibility
+        const thirdUpType = chordType.includes('Major') ? chordType.replace('Major', 'Minor') :
+                           chordType.includes('Minor') ? chordType : 'Minor';
+        const thirdUpDef = CHORD_DEFINITIONS[thirdUpType];
+        if (thirdUpDef) {
+            substitutions.push({
+                type: 'diatonicThird',
+                root: thirdUpRoot,
+                chordType: thirdUpType,
+                label: `${thirdUpRoot}${thirdUpDef.symbol}`,
+                reason: `Third above - shares 2 common tones for smooth voice leading.`
+            });
+        }
+
+        // Third down (8 semitones up = 4 down)
+        const thirdDownIndex = (rootIndex + 8) % 12;
+        const thirdDownRoot = noteArray[thirdDownIndex];
+        const thirdDownType = chordType.includes('Major') ? chordType.replace('Major', 'Minor') :
+                             chordType.includes('Minor') ? chordType : 'Minor';
+        const thirdDownDef = CHORD_DEFINITIONS[thirdDownType];
+        if (thirdDownDef) {
+            substitutions.push({
+                type: 'diatonicThird',
+                root: thirdDownRoot,
+                chordType: thirdDownType,
+                label: `${thirdDownRoot}${thirdDownDef.symbol}`,
+                reason: `Third below - shares 2 common tones for smooth voice leading.`
+            });
+        }
+    }
+
+    // 4. PARALLEL MODE (modal interchange)
+    if (SUBSTITUTION_TYPES.parallelMode.appliesTo.includes(chordType)) {
+        // If major, suggest parallel minor and borrowed chords
+        if (chordType === 'Major' || chordType === 'Major 7th') {
+            const minorType = chordType === 'Major' ? 'Minor' : 'Minor 7th';
+            const minorDef = CHORD_DEFINITIONS[minorType];
+            substitutions.push({
+                type: 'parallelMode',
+                root: root,
+                chordType: minorType,
+                label: `${root}${minorDef.symbol}`,
+                reason: `Parallel minor - same root, borrowed from parallel minor key for darker color.`
+            });
+
+            // bVII chord (borrowed from parallel minor)
+            const bVIIIndex = (rootIndex + 10) % 12;
+            const bVIIRoot = noteArray[bVIIIndex];
+            substitutions.push({
+                type: 'parallelMode',
+                root: bVIIRoot,
+                chordType: 'Major',
+                label: `${bVIIRoot}`,
+                reason: `bVII chord - borrowed from parallel minor, creates a rock/pop sound.`
+            });
+        } else if (chordType === 'Minor' || chordType === 'Minor 7th') {
+            const majorType = chordType === 'Minor' ? 'Major' : 'Major 7th';
+            const majorDef = CHORD_DEFINITIONS[majorType];
+            substitutions.push({
+                type: 'parallelMode',
+                root: root,
+                chordType: majorType,
+                label: `${root}${majorDef.symbol}`,
+                reason: `Parallel major - same root, borrowed from parallel major for brighter color.`
+            });
+        }
+    }
+
+    // 5. SECONDARY DOMINANT (V7 of this chord)
+    if (SUBSTITUTION_TYPES.secondaryDominant.appliesTo.includes(chordType)) {
+        // The V7 of this chord is a perfect 5th above (7 semitones)
+        const secDomIndex = (rootIndex + 7) % 12;
+        const secDomRoot = noteArray[secDomIndex];
+        substitutions.push({
+            type: 'secondaryDominant',
+            root: secDomRoot,
+            chordType: 'Dominant 7th',
+            label: `${secDomRoot}7`,
+            reason: `Secondary dominant - the V7 of ${root}, use BEFORE ${root} to create strong pull.`,
+            isPrefix: true // This goes BEFORE the original chord
+        });
+    }
+
+    // 6. QUALITY CHANGE (same root, different quality)
+    if (SUBSTITUTION_TYPES.qualityChange.appliesTo.includes(chordType)) {
+        const qualityOptions = [];
+
+        if (chordType === 'Major') {
+            qualityOptions.push('Minor', 'Major 7th', 'Dominant 7th', 'Sus4', 'Add9');
+        } else if (chordType === 'Minor') {
+            qualityOptions.push('Major', 'Minor 7th', 'Minor 9th', 'Sus2');
+        } else if (chordType === 'Major 7th') {
+            qualityOptions.push('Dominant 7th', 'Major 9th', '6/9');
+        } else if (chordType === 'Minor 7th') {
+            qualityOptions.push('Minor 9th', 'Minor 6th', 'Minor 11th');
+        } else if (chordType === 'Dominant 7th') {
+            qualityOptions.push('Dominant 9th', '7#9', '7b9', 'Sus4');
+        }
+
+        qualityOptions.forEach(newType => {
+            const def = CHORD_DEFINITIONS[newType];
+            if (def) {
+                substitutions.push({
+                    type: 'qualityChange',
+                    root: root,
+                    chordType: newType,
+                    label: `${root}${def.symbol}`,
+                    reason: `Same root with ${newType} quality - different color, same bass note.`
+                });
+            }
+        });
+    }
+
+    return substitutions;
+}
+
+/**
+ * Get the substitution type info
+ * @param {string} typeId - The substitution type ID
+ * @returns {Object} The substitution type definition
+ */
+function getSubstitutionType(typeId) {
+    return SUBSTITUTION_TYPES[typeId] || null;
+}
+
 const INTERVAL_GROUPS = [
     { title: '2nds', types: ['Major 2nd', 'Minor 2nd'] }, { title: '3rds', types: ['Major 3rd', 'Minor 3rd'] },
     { title: '4ths & 5ths', types: ['Perfect 4th', 'Tritone', 'Perfect 5th'] }, { title: '6ths', types: ['Major 6th', 'Minor 6th'] },
@@ -811,5 +1348,16 @@ export {
     DEFAULT_TIME_SIGNATURE,
     // Chord ID utilities for bass preservation system
     generateChordId,
-    ensureChordId
+    ensureChordId,
+    // Chord Palettes
+    CHORD_PALETTE_CATEGORIES,
+    CHORD_PALETTES,
+    getPalettesByCategory,
+    getPalette,
+    isChordInPalette,
+    getFilteredChordTypes,
+    // Chord Substitutions
+    SUBSTITUTION_TYPES,
+    calculateChordSubstitutions,
+    getSubstitutionType
 };

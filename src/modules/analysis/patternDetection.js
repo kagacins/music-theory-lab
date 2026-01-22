@@ -2119,6 +2119,7 @@ export function detectVoiceRangeExtreme(progression) {
             voice: 'soprano',
             direction: 'high',
             extreme: 'very high',
+            registerLabel: 'climax', // Pre-computed for message template
             note: highestNote,
             chordIndex: highestChordIdx
         });
@@ -2150,8 +2151,876 @@ export function detectVoiceRangeExtreme(progression) {
             voice: 'bass',
             direction: 'low',
             extreme: 'very low',
+            registerLabel: 'depth', // Pre-computed for message template
             note: lowestNote,
             chordIndex: lowestChordIdx
+        });
+    }
+
+    return items;
+}
+
+// ============================================================================
+// COMMON TONE PRESERVATION DETECTION
+// ============================================================================
+
+/**
+ * Extract actual pitches from a chord's notes array (without octave)
+ * Handles inversions, omitted notes, and different voicings
+ * @param {Object} chord - Chord object with notes array
+ * @returns {Set<string>} Set of pitch classes (e.g., {'C', 'E', 'G'})
+ */
+function getChordPitchClasses(chord) {
+    const pitches = new Set();
+    if (!chord || !chord.notes || chord.notes.length === 0) return pitches;
+
+    for (const note of chord.notes) {
+        // Extract pitch class (remove octave number)
+        const pitch = note.replace(/\d+$/, '');
+        // Normalize enharmonics for comparison
+        const normalized = normalizeEnharmonic(pitch);
+        pitches.add(normalized);
+    }
+    return pitches;
+}
+
+/**
+ * Normalize enharmonic equivalents for comparison
+ * @param {string} pitch - Pitch name (e.g., 'C#', 'Db')
+ * @returns {string} Normalized pitch
+ */
+function normalizeEnharmonic(pitch) {
+    const enharmonics = {
+        'C#': 'Db', 'Db': 'Db',
+        'D#': 'Eb', 'Eb': 'Eb',
+        'F#': 'Gb', 'Gb': 'Gb',
+        'G#': 'Ab', 'Ab': 'Ab',
+        'A#': 'Bb', 'Bb': 'Bb',
+        'E#': 'F', 'Fb': 'E',
+        'B#': 'C', 'Cb': 'B'
+    };
+    return enharmonics[pitch] || pitch;
+}
+
+/**
+ * Get the bass note from a chord considering inversion and actual notes
+ * @param {Object} chord - Chord object
+ * @returns {string|null} Bass note with octave
+ */
+function getChordBassNote(chord) {
+    if (!chord) return null;
+
+    // If chord has notes array, the first note is the bass (lowest)
+    if (chord.notes && chord.notes.length > 0) {
+        return chord.notes[0];
+    }
+
+    // Fallback to root if no notes array
+    return chord.root ? chord.root + '3' : null;
+}
+
+/**
+ * Detect common tone preservation between adjacent chords
+ * Considers actual voicing, inversions, and omitted notes
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected common tone preservations
+ */
+export function detectCommonTonePreservation(progression) {
+    const items = [];
+    if (!progression || progression.length < 2) return items;
+
+    for (let i = 1; i < progression.length; i++) {
+        const prevChord = progression[i - 1];
+        const currChord = progression[i];
+
+        // Skip if same chord
+        if (prevChord.root === currChord.root && prevChord.type === currChord.type) continue;
+
+        // Get actual pitch classes from the voiced chords
+        const prevPitches = getChordPitchClasses(prevChord);
+        const currPitches = getChordPitchClasses(currChord);
+
+        if (prevPitches.size === 0 || currPitches.size === 0) continue;
+
+        // Find common tones
+        const commonTones = [];
+        for (const pitch of prevPitches) {
+            if (currPitches.has(pitch)) {
+                commonTones.push(pitch);
+            }
+            // Also check enharmonic equivalents
+            const sharp = pitch.replace('b', '#');
+            const flat = pitch.replace('#', 'b');
+            if (pitch !== sharp && currPitches.has(sharp)) commonTones.push(pitch);
+            if (pitch !== flat && currPitches.has(flat)) commonTones.push(pitch);
+        }
+
+        // Only report if there are common tones AND they're meaningful (not just roots that happen to match)
+        if (commonTones.length >= 1) {
+            // Check if this is parsimonious voice leading (most voices stay still or move by step)
+            const prevBass = getChordBassNote(prevChord);
+            const currBass = getChordBassNote(currChord);
+            const bassInterval = prevBass && currBass ? getInterval(prevBass, currBass) : null;
+            const isSmoothBass = bassInterval !== null && (bassInterval <= 2 || bassInterval >= 10);
+
+            // Pre-compute display strings for message templates
+            const commonToneCount = commonTones.length;
+            const commonTonesDisplay = commonTones.join(commonToneCount === 2 ? ' and ' : ', ');
+            const noteLabel = commonToneCount === 1 ? 'note' : 'notes';
+            const commonToneLabel = commonToneCount === 1 ? 'the common tone' : 'common tones';
+            const chord1Inv = prevChord.inversion || 0;
+            const chord2Inv = currChord.inversion || 0;
+            const chord1InvLabel = chord1Inv > 0 ? ` (inv. ${chord1Inv})` : '';
+            const chord2InvLabel = chord2Inv > 0 ? ` (inv. ${chord2Inv})` : '';
+            const smoothBassNote = isSmoothBass ? ' The bass moves smoothly too!' : '';
+
+            items.push({
+                type: 'common-tone-preservation',
+                name: 'Common Tone Held',
+                description: `${commonTonesDisplay} held between ${getChordSymbol(prevChord)} and ${getChordSymbol(currChord)}`,
+                commonTones: commonTones,
+                commonToneCount: commonToneCount,
+                commonTonesDisplay: commonTonesDisplay,
+                noteLabel: noteLabel,
+                commonToneLabel: commonToneLabel,
+                chord1: getChordSymbol(prevChord),
+                chord2: getChordSymbol(currChord),
+                chord1Inversion: chord1Inv,
+                chord2Inversion: chord2Inv,
+                chord1InvLabel: chord1InvLabel,
+                chord2InvLabel: chord2InvLabel,
+                smoothBass: isSmoothBass,
+                smoothBassNote: smoothBassNote,
+                startIndex: i - 1,
+                endIndex: i,
+                chordIndices: [i - 1, i],
+                fromChord: prevChord,
+                toChord: currChord
+            });
+        }
+    }
+
+    // Return the best example (most common tones)
+    if (items.length > 0) {
+        items.sort((a, b) => b.commonToneCount - a.commonToneCount);
+        return [items[0]];
+    }
+    return items;
+}
+
+// ============================================================================
+// FUNCTIONAL HARMONY CYCLE DETECTION
+// ============================================================================
+
+/**
+ * Classify a chord's function (Tonic, Subdominant, Dominant, or other)
+ * @param {string} roman - Roman numeral
+ * @returns {string} Function: 'T', 'S', 'D', or 'O' (other)
+ */
+function classifyHarmonicFunction(roman) {
+    if (!roman) return 'O';
+    const base = normalizeRoman(roman).toUpperCase();
+
+    // Tonic function: I, i, vi, VI, iii, III
+    if (['I', 'VI', 'III'].includes(base)) return 'T';
+
+    // Subdominant function: IV, iv, ii, II
+    if (['IV', 'II'].includes(base)) return 'S';
+
+    // Dominant function: V, vii°, VII
+    if (['V', 'VII'].includes(base)) return 'D';
+
+    return 'O';
+}
+
+/**
+ * Detect complete functional harmony cycles (T→S→D→T)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected functional cycles
+ */
+export function detectFunctionalCycle(progression) {
+    const items = [];
+    if (!progression || progression.length < 4) return items;
+
+    // Build function sequence
+    const functions = progression.map(chord => {
+        const roman = chord.roman || chord.romanNumeral || '';
+        return classifyHarmonicFunction(roman);
+    });
+
+    // Look for T→S→D→T pattern
+    for (let i = 0; i <= functions.length - 4; i++) {
+        // Check for the full cycle
+        if (functions[i] === 'T' &&
+            functions[i + 1] === 'S' &&
+            functions[i + 2] === 'D' &&
+            functions[i + 3] === 'T') {
+
+            const chords = progression.slice(i, i + 4);
+            const chordNames = chords.map(c => getChordSymbol(c)).join(' → ');
+            const romans = chords.map(c => c.roman || c.romanNumeral || getChordSymbol(c)).join(' → ');
+
+            items.push({
+                type: 'functional-cycle-complete',
+                name: 'Complete Functional Cycle',
+                description: `T→S→D→T: ${chordNames}`,
+                pattern: 'T→S→D→T',
+                chords: chordNames,
+                romans: romans,
+                startIndex: i,
+                endIndex: i + 3,
+                chordIndices: [i, i + 1, i + 2, i + 3],
+                cycleChords: chords.map(c => ({
+                    symbol: getChordSymbol(c),
+                    roman: c.roman || c.romanNumeral,
+                    inversion: c.inversion || 0,
+                    notes: c.notes || []
+                }))
+            });
+
+            // Only report one cycle per analysis
+            return items;
+        }
+    }
+
+    return items;
+}
+
+// ============================================================================
+// PHRASE ELISION DETECTION
+// ============================================================================
+
+/**
+ * Detect phrase elision (where a cadential chord also starts the next phrase)
+ * @param {Array} progression - Array of chord objects
+ * @param {string} key - Current key
+ * @returns {Array} Detected elisions
+ */
+export function detectPhraseElision(progression, key) {
+    const items = [];
+    if (!progression || progression.length < 5) return items;
+
+    // Look for cadential patterns followed by continuation
+    for (let i = 1; i < progression.length - 2; i++) {
+        const prevChord = progression[i - 1];
+        const currChord = progression[i];
+        const nextChord = progression[i + 1];
+
+        const prevRoman = normalizeRoman(prevChord.roman || prevChord.romanNumeral);
+        const currRoman = normalizeRoman(currChord.roman || currChord.romanNumeral);
+        const nextRoman = normalizeRoman(nextChord.roman || nextChord.romanNumeral);
+
+        // Check if current chord is a cadential arrival (I or i after V)
+        const isAuthentic = (prevRoman === 'V' || prevRoman === 'V7') &&
+                           (currRoman === 'I' || currRoman === 'i');
+        const isPlagal = (prevRoman === 'IV' || prevRoman === 'iv') &&
+                        (currRoman === 'I' || currRoman === 'i');
+
+        if (!isAuthentic && !isPlagal) continue;
+
+        // Check if the arrival chord also functions as a new phrase beginning
+        // (followed by typical phrase-starting motion like I→IV, I→ii, I→vi)
+        const startsNewPhrase =
+            (currRoman === 'I' && ['IV', 'ii', 'vi', 'V', 'II'].includes(nextRoman.toUpperCase())) ||
+            (currRoman === 'i' && ['iv', 'ii', 'VI', 'III', 'v'].includes(nextRoman.toLowerCase()));
+
+        if (startsNewPhrase) {
+            // Pre-compute display labels
+            const elisionInv = currChord.inversion || 0;
+            const elisionInvLabel = elisionInv > 0 ? ` (inv. ${elisionInv})` : '';
+
+            items.push({
+                type: 'phrase-elision',
+                name: 'Phrase Elision',
+                description: `${getChordSymbol(currChord)} serves as both cadential arrival and new phrase start`,
+                elisionChord: getChordSymbol(currChord),
+                elisionRoman: currChord.roman || currChord.romanNumeral,
+                elisionInversion: elisionInv,
+                elisionInvLabel: elisionInvLabel,
+                cadenceType: isAuthentic ? 'authentic' : 'plagal',
+                fromChord: getChordSymbol(prevChord),
+                toChord: getChordSymbol(nextChord),
+                chordIndex: i,
+                chordIndices: [i - 1, i, i + 1],
+                measure: Math.floor(i / 2) + 1 // Approximate measure
+            });
+            return items; // One elision per analysis
+        }
+    }
+
+    return items;
+}
+
+// ============================================================================
+// SEQUENCE CONTINUATION OPPORTUNITY DETECTION
+// ============================================================================
+
+/**
+ * Detect incomplete sequences that could be continued
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected sequence opportunities
+ */
+export function detectSequenceContinuationOpportunity(progression) {
+    const items = [];
+    if (!progression || progression.length < 4) return items;
+
+    // Check for started but not completed patterns
+    const roots = progression.map(c => c.root);
+
+    // Look for two repetitions of a pattern that could have a third
+    for (let patternLen = 2; patternLen <= 3; patternLen++) {
+        if (progression.length < patternLen * 2) continue;
+
+        // Get intervals between successive roots for first pattern
+        const firstPattern = [];
+        for (let j = 1; j < patternLen; j++) {
+            firstPattern.push(getInterval(roots[j - 1] + '4', roots[j] + '4'));
+        }
+
+        // Check if second pattern matches
+        const secondPattern = [];
+        for (let j = patternLen + 1; j < patternLen * 2; j++) {
+            if (j >= roots.length) break;
+            secondPattern.push(getInterval(roots[j - 1] + '4', roots[j] + '4'));
+        }
+
+        // If patterns match and there's no third repetition, it's an opportunity
+        if (firstPattern.length === secondPattern.length &&
+            firstPattern.every((v, i) => v === secondPattern[i])) {
+
+            // Check if there's already a third repetition
+            const thirdStart = patternLen * 2;
+            let hasThird = false;
+
+            if (thirdStart + patternLen <= progression.length) {
+                const thirdPattern = [];
+                for (let j = thirdStart + 1; j < thirdStart + patternLen; j++) {
+                    thirdPattern.push(getInterval(roots[j - 1] + '4', roots[j] + '4'));
+                }
+                hasThird = thirdPattern.length === firstPattern.length &&
+                          thirdPattern.every((v, i) => v === firstPattern[i]);
+            }
+
+            if (!hasThird) {
+                // Calculate what the next chord would be
+                const lastRoot = roots[patternLen * 2 - 1];
+                const intervalToNext = firstPattern[0] || 0;
+
+                const chordNames = progression.slice(0, patternLen * 2).map(c => getChordSymbol(c));
+                const pattern = chordNames.slice(0, patternLen).join(' → ');
+
+                items.push({
+                    type: 'incomplete-sequence',
+                    name: 'Continue the Pattern?',
+                    description: `Pattern "${pattern}" repeats twice - a third repetition would strengthen it`,
+                    pattern: pattern,
+                    repetitions: 2,
+                    patternLength: patternLen,
+                    startIndex: 0,
+                    endIndex: patternLen * 2 - 1,
+                    chordIndices: Array.from({ length: patternLen * 2 }, (_, i) => i),
+                    suggestion: 'Consider adding one more repetition (Rule of Three)'
+                });
+                return items;
+            }
+        }
+    }
+
+    return items;
+}
+
+// ============================================================================
+// STEPWISE BASS LINE DETECTION
+// ============================================================================
+
+/**
+ * Detect stepwise bass motion (melodic bass lines)
+ * Considers actual bass notes from inversions and voicing
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected stepwise bass patterns
+ */
+export function detectStepwiseBassLine(progression) {
+    const items = [];
+    if (!progression || progression.length < 3) return items;
+
+    // Extract bass notes from each chord
+    const bassNotes = progression.map(chord => {
+        if (chord.notes && chord.notes.length > 0) {
+            return chord.notes[0]; // First note is bass
+        }
+        // Fallback: if no notes array, use root
+        return chord.root ? chord.root + '3' : null;
+    });
+
+    // Find stepwise runs
+    let runStart = 0;
+    let runDirection = 0; // 1 = ascending, -1 = descending, 0 = not set
+    let runLength = 1;
+    let longestRun = { start: 0, length: 1, direction: 0, notes: [] };
+
+    for (let i = 1; i < bassNotes.length; i++) {
+        if (!bassNotes[i] || !bassNotes[i - 1]) {
+            // Reset run
+            if (runLength > longestRun.length) {
+                longestRun = { start: runStart, length: runLength, direction: runDirection, notes: bassNotes.slice(runStart, runStart + runLength) };
+            }
+            runStart = i;
+            runLength = 1;
+            runDirection = 0;
+            continue;
+        }
+
+        const interval = getInterval(bassNotes[i - 1], bassNotes[i]);
+        const isStep = interval === 1 || interval === 2 || interval === 10 || interval === 11;
+        const direction = (interval <= 2) ? 1 : -1; // 1 or 2 = ascending, 10 or 11 = descending
+
+        if (isStep && (runDirection === 0 || runDirection === direction)) {
+            runDirection = direction;
+            runLength++;
+        } else {
+            // Save longest run so far
+            if (runLength > longestRun.length) {
+                longestRun = { start: runStart, length: runLength, direction: runDirection, notes: bassNotes.slice(runStart, runStart + runLength) };
+            }
+            runStart = i;
+            runLength = 1;
+            runDirection = 0;
+        }
+    }
+
+    // Check final run
+    if (runLength > longestRun.length) {
+        longestRun = { start: runStart, length: runLength, direction: runDirection, notes: bassNotes.slice(runStart, runStart + runLength) };
+    }
+
+    // Report if we found a significant stepwise line (3+ notes)
+    if (longestRun.length >= 3) {
+        const directionLabel = longestRun.direction === 1 ? 'ascending' : 'descending';
+        const bassNotePitches = longestRun.notes.map(n => n.replace(/\d+$/, ''));
+        // Pre-compute direction-specific explanation for advanced message
+        const directionExplanation = directionLabel === 'descending'
+            ? 'Descending bass lines often create tension/release patterns.'
+            : 'Ascending bass lines typically build energy.';
+
+        items.push({
+            type: 'stepwise-bass-line',
+            name: 'Melodic Bass Line',
+            description: `${directionLabel.charAt(0).toUpperCase() + directionLabel.slice(1)} stepwise bass: ${bassNotePitches.join(' → ')}`,
+            direction: directionLabel,
+            directionExplanation: directionExplanation,
+            bassNotes: bassNotePitches.join(' → '),
+            bassNotesWithOctave: longestRun.notes.join(' → '),
+            length: longestRun.length,
+            startIndex: longestRun.start,
+            endIndex: longestRun.start + longestRun.length - 1,
+            chordIndices: Array.from({ length: longestRun.length }, (_, i) => longestRun.start + i),
+            chords: progression.slice(longestRun.start, longestRun.start + longestRun.length).map(c => ({
+                symbol: getChordSymbol(c),
+                inversion: c.inversion || 0,
+                bass: c.notes?.[0] || c.root
+            }))
+        });
+    }
+
+    return items;
+}
+
+// ============================================================================
+// HARMONIC ANTICIPATION DETECTION
+// ============================================================================
+
+/**
+ * Detect when a note from the next chord appears early
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected anticipations
+ */
+export function detectHarmonicAnticipation(progression) {
+    const items = [];
+    if (!progression || progression.length < 2) return items;
+
+    for (let i = 0; i < progression.length - 1; i++) {
+        const currChord = progression[i];
+        const nextChord = progression[i + 1];
+
+        if (!currChord.notes || !nextChord.notes) continue;
+        if (currChord.notes.length === 0 || nextChord.notes.length === 0) continue;
+
+        const currPitches = getChordPitchClasses(currChord);
+        const nextPitches = getChordPitchClasses(nextChord);
+
+        // Look for notes in current chord that aren't in its expected spelling
+        // but ARE in the next chord (could be added tones functioning as anticipations)
+        const currType = currChord.type || 'Major';
+        const expectedIntervals = getExpectedChordIntervals(currType);
+
+        // Get actual intervals in current chord from root
+        const currRoot = currChord.root;
+        const currActualNotes = currChord.notes.map(n => n.replace(/\d+$/, ''));
+
+        for (const note of currActualNotes) {
+            const normalizedNote = normalizeEnharmonic(note);
+            const normalizedRoot = normalizeEnharmonic(currRoot);
+
+            // Check if this note is NOT a standard chord tone of current chord
+            // but IS a chord tone of the next chord
+            if (!currPitches.has(normalizedRoot) && nextPitches.has(normalizedNote)) {
+                // This could be an anticipation
+                const interval = getInterval(currRoot + '4', note + '4');
+                const isAddedTone = !expectedIntervals.includes(interval);
+
+                if (isAddedTone) {
+                    // Pre-compute display labels
+                    const currInv = currChord.inversion || 0;
+                    const nextInv = nextChord.inversion || 0;
+                    const currInvLabel = currInv > 0 ? ` (inv. ${currInv})` : '';
+                    const nextInvLabel = nextInv > 0 ? ` (inv. ${nextInv})` : '';
+
+                    items.push({
+                        type: 'harmonic-anticipation',
+                        name: 'Anticipation',
+                        description: `${note} anticipates the upcoming ${getChordSymbol(nextChord)} chord`,
+                        anticipatedNote: note,
+                        currentChord: getChordSymbol(currChord),
+                        nextChord: getChordSymbol(nextChord),
+                        currentInversion: currInv,
+                        nextInversion: nextInv,
+                        currentInvLabel: currInvLabel,
+                        nextInvLabel: nextInvLabel,
+                        chordIndex: i,
+                        chordIndices: [i, i + 1]
+                    });
+                    return items; // One per analysis
+                }
+            }
+        }
+    }
+
+    return items;
+}
+
+/**
+ * Get expected intervals for a chord type
+ * @param {string} type - Chord type
+ * @returns {Array<number>} Array of semitone intervals
+ */
+function getExpectedChordIntervals(type) {
+    const intervals = {
+        'Major': [0, 4, 7],
+        'Minor': [0, 3, 7],
+        'Diminished': [0, 3, 6],
+        'Augmented': [0, 4, 8],
+        'Dominant 7th': [0, 4, 7, 10],
+        'Major 7th': [0, 4, 7, 11],
+        'Minor 7th': [0, 3, 7, 10],
+        'Diminished 7th': [0, 3, 6, 9],
+        'Half-Diminished 7th': [0, 3, 6, 10],
+        'Sus4': [0, 5, 7],
+        'Sus2': [0, 2, 7]
+    };
+    return intervals[type] || [0, 4, 7];
+}
+
+// ============================================================================
+// PLAGAL EXTENSION DETECTION
+// ============================================================================
+
+/**
+ * Detect plagal extension (IV→I after V→I)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected plagal extensions
+ */
+export function detectPlagalExtension(progression) {
+    const items = [];
+    if (!progression || progression.length < 4) return items;
+
+    for (let i = 2; i < progression.length; i++) {
+        const chord1 = progression[i - 2];
+        const chord2 = progression[i - 1];
+        const chord3 = progression[i];
+
+        const roman1 = normalizeRoman(chord1.roman || chord1.romanNumeral);
+        const roman2 = normalizeRoman(chord2.roman || chord2.romanNumeral);
+        const roman3 = normalizeRoman(chord3.roman || chord3.romanNumeral);
+
+        // Check for V → I → IV → I pattern (authentic followed by plagal)
+        if (i < progression.length - 1) {
+            const chord4 = progression[i + 1];
+            const roman4 = normalizeRoman(chord4.roman || chord4.romanNumeral);
+
+            // V → I → IV → I
+            if ((roman1 === 'V' || roman1 === 'V7') &&
+                (roman2 === 'I' || roman2 === 'i') &&
+                (roman3 === 'IV' || roman3 === 'iv') &&
+                (roman4 === 'I' || roman4 === 'i')) {
+
+                items.push({
+                    type: 'plagal-extension',
+                    name: 'Plagal Extension',
+                    description: `V→I followed by IV→I ("Amen" extension)`,
+                    authenticCadence: `${getChordSymbol(chord1)} → ${getChordSymbol(chord2)}`,
+                    plagalCadence: `${getChordSymbol(chord3)} → ${getChordSymbol(chord4)}`,
+                    chords: [chord1, chord2, chord3, chord4].map(c => ({
+                        symbol: getChordSymbol(c),
+                        roman: c.roman || c.romanNumeral,
+                        inversion: c.inversion || 0
+                    })),
+                    startIndex: i - 2,
+                    endIndex: i + 1,
+                    chordIndices: [i - 2, i - 1, i, i + 1]
+                });
+                return items;
+            }
+        }
+
+        // Also check for simpler V → I → IV pattern (plagal tag beginning)
+        if ((roman1 === 'V' || roman1 === 'V7') &&
+            (roman2 === 'I' || roman2 === 'i') &&
+            (roman3 === 'IV' || roman3 === 'iv')) {
+
+            items.push({
+                type: 'plagal-extension',
+                name: 'Plagal Extension Starting',
+                description: `Authentic cadence V→I followed by subdominant IV`,
+                authenticCadence: `${getChordSymbol(chord1)} → ${getChordSymbol(chord2)}`,
+                subdominant: getChordSymbol(chord3),
+                chords: [chord1, chord2, chord3].map(c => ({
+                    symbol: getChordSymbol(c),
+                    roman: c.roman || c.romanNumeral,
+                    inversion: c.inversion || 0
+                })),
+                startIndex: i - 2,
+                endIndex: i,
+                chordIndices: [i - 2, i - 1, i]
+            });
+            return items;
+        }
+    }
+
+    return items;
+}
+
+// ============================================================================
+// MODE MIXTURE AWARENESS DETECTION
+// ============================================================================
+
+/**
+ * Detect awareness of mode mixture (mixing major and minor elements)
+ * @param {Array} progression - Array of chord objects
+ * @param {string} key - Current key
+ * @returns {Array} Detected mode mixture patterns
+ */
+export function detectModeMixture(progression, key) {
+    const items = [];
+    if (!progression || progression.length < 3) return items;
+
+    let majorChords = 0;
+    let minorChords = 0;
+    let borrowedFromMinor = 0;
+    let borrowedFromMajor = 0;
+
+    const borrowedMinorRomans = ['iv', 'bVI', 'bVII', 'bIII', 'ii°'];
+    const borrowedMajorRomans = ['IV', 'V', 'V7'];
+
+    for (const chord of progression) {
+        const type = chord.type || '';
+        const roman = chord.roman || chord.romanNumeral || '';
+
+        // Count chord qualities
+        if (type === 'Major' || type.includes('Major')) majorChords++;
+        if (type === 'Minor' || type.includes('Minor')) minorChords++;
+
+        // Check for borrowed chords
+        const normalizedRoman = normalizeRoman(roman);
+        if (borrowedMinorRomans.some(r => normalizedRoman.includes(r))) {
+            borrowedFromMinor++;
+        }
+        if (borrowedMinorRomans.some(r => normalizedRoman.toLowerCase().includes(r.toLowerCase()))) {
+            borrowedFromMinor++;
+        }
+    }
+
+    // Report if there's significant mixture
+    const totalChords = progression.length;
+    const mixRatio = Math.min(majorChords, minorChords) / Math.max(majorChords, minorChords);
+
+    if (mixRatio > 0.3 && borrowedFromMinor >= 1) {
+        // Significant mode mixture detected
+        const borrowedChords = progression.filter(c => {
+            const roman = normalizeRoman(c.roman || c.romanNumeral);
+            return borrowedMinorRomans.some(r => roman.includes(r));
+        });
+
+        // Pre-compute display strings for message templates
+        const borrowedLabel = borrowedFromMinor === 1 ? 'borrowed element' : 'borrowed elements';
+
+        items.push({
+            type: 'major-minor-mixture',
+            name: 'Mode Mixture',
+            description: `Mixing ${majorChords} major and ${minorChords} minor chords with borrowed elements`,
+            majorCount: majorChords,
+            minorCount: minorChords,
+            borrowedCount: borrowedFromMinor,
+            borrowedLabel: borrowedLabel,
+            borrowedChords: borrowedChords.map(c => ({
+                symbol: getChordSymbol(c),
+                roman: c.roman || c.romanNumeral,
+                inversion: c.inversion || 0,
+                notes: c.notes || []
+            })),
+            mixRatio: Math.round(mixRatio * 100),
+            chordIndices: progression.map((_, i) => i).filter(i => {
+                const roman = normalizeRoman(progression[i].roman || progression[i].romanNumeral);
+                return borrowedMinorRomans.some(r => roman.includes(r));
+            })
+        });
+    }
+
+    return items;
+}
+
+// ============================================================================
+// HARMONIC DENSITY CHANGES DETECTION
+// ============================================================================
+
+/**
+ * Detect significant changes in harmonic rhythm (density)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected harmonic density shifts
+ */
+export function detectHarmonicDensityChange(progression) {
+    const items = [];
+    if (!progression || progression.length < 4) return items;
+
+    // Get beat durations for each chord
+    const durations = progression.map(c => c.beats || 4);
+
+    // Look for significant changes in duration
+    for (let i = 1; i < durations.length; i++) {
+        const prevDuration = durations[i - 1];
+        const currDuration = durations[i];
+
+        // Detect doubling or halving
+        const ratio = prevDuration / currDuration;
+
+        if (ratio >= 1.8) {
+            // Speeding up (chords getting shorter)
+            const atChordInv = progression[i].inversion || 0;
+            const atChordInvLabel = atChordInv > 0 ? ` (inv. ${atChordInv})` : '';
+
+            items.push({
+                type: 'harmonic-density-shift',
+                name: 'Harmonic Rhythm Speeds Up',
+                description: `Chord changes become faster at ${getChordSymbol(progression[i])}`,
+                direction: 'faster',
+                fromBeats: prevDuration,
+                toBeats: currDuration,
+                ratio: Math.round(ratio * 10) / 10,
+                atChord: getChordSymbol(progression[i]),
+                atChordInversion: atChordInv,
+                atChordInvLabel: atChordInvLabel,
+                chordIndex: i,
+                chordIndices: [i - 1, i]
+            });
+            return items;
+        } else if (ratio <= 0.55) {
+            // Slowing down (chords getting longer)
+            const atChordInv = progression[i].inversion || 0;
+            const atChordInvLabel = atChordInv > 0 ? ` (inv. ${atChordInv})` : '';
+
+            items.push({
+                type: 'harmonic-density-shift',
+                name: 'Harmonic Rhythm Slows Down',
+                description: `Chord changes become slower at ${getChordSymbol(progression[i])}`,
+                direction: 'slower',
+                fromBeats: prevDuration,
+                toBeats: currDuration,
+                ratio: Math.round((1 / ratio) * 10) / 10,
+                atChord: getChordSymbol(progression[i]),
+                atChordInversion: atChordInv,
+                atChordInvLabel: atChordInvLabel,
+                chordIndex: i,
+                chordIndices: [i - 1, i]
+            });
+            return items;
+        }
+    }
+
+    return items;
+}
+
+// ============================================================================
+// EXTENDED FIFTH CHAIN DETECTION
+// ============================================================================
+
+/**
+ * Detect extended chains of descending fifths (longer than ii-V-I)
+ * @param {Array} progression - Array of chord objects
+ * @returns {Array} Detected extended fifth chains
+ */
+export function detectExtendedFifthChain(progression) {
+    const items = [];
+    if (!progression || progression.length < 4) return items;
+
+    // Check intervals between successive roots
+    let chainStart = 0;
+    let chainLength = 1;
+    let longestChain = { start: 0, length: 1 };
+
+    for (let i = 1; i < progression.length; i++) {
+        const prevRoot = progression[i - 1].root;
+        const currRoot = progression[i].root;
+
+        if (!prevRoot || !currRoot) {
+            if (chainLength > longestChain.length) {
+                longestChain = { start: chainStart, length: chainLength };
+            }
+            chainStart = i;
+            chainLength = 1;
+            continue;
+        }
+
+        // Check if this is a descending fifth (or ascending fourth = same thing)
+        const interval = getInterval(prevRoot + '4', currRoot + '4');
+        const isFifth = interval === 5 || interval === 7; // Perfect 5th down or Perfect 4th up
+
+        if (isFifth) {
+            chainLength++;
+        } else {
+            if (chainLength > longestChain.length) {
+                longestChain = { start: chainStart, length: chainLength };
+            }
+            chainStart = i;
+            chainLength = 1;
+        }
+    }
+
+    // Check final chain
+    if (chainLength > longestChain.length) {
+        longestChain = { start: chainStart, length: chainLength };
+    }
+
+    // Report if chain is longer than standard ii-V-I (4+ chords)
+    if (longestChain.length >= 4) {
+        const chainChords = progression.slice(longestChain.start, longestChain.start + longestChain.length);
+        const chordNames = chainChords.map(c => getChordSymbol(c)).join(' → ');
+        const romans = chainChords.map(c => c.roman || c.romanNumeral || getChordSymbol(c)).join(' → ');
+
+        items.push({
+            type: 'extended-fifth-chain',
+            name: 'Extended Circle of Fifths',
+            description: `${longestChain.length}-chord fifth chain: ${chordNames}`,
+            length: longestChain.length,
+            chords: chordNames,
+            romans: romans,
+            startIndex: longestChain.start,
+            endIndex: longestChain.start + longestChain.length - 1,
+            chordIndices: Array.from({ length: longestChain.length }, (_, i) => longestChain.start + i),
+            chainChords: chainChords.map(c => ({
+                symbol: getChordSymbol(c),
+                roman: c.roman || c.romanNumeral,
+                inversion: c.inversion || 0,
+                bass: c.notes?.[0] || c.root
+            }))
         });
     }
 
@@ -2334,6 +3203,17 @@ export function detectAdvancedPatterns(progression, key) {
         ostinato: detectOstinatoPattern(progression),
         chromaticVoice: detectChromaticVoiceMotion(progression),
         voiceRange: detectVoiceRangeExtreme(progression),
-        detailedCadences: detectDetailedCadences(progression, key)
+        detailedCadences: detectDetailedCadences(progression, key),
+        // NEW: Additional coaching patterns
+        commonTone: detectCommonTonePreservation(progression),
+        functionalCycle: detectFunctionalCycle(progression),
+        phraseElision: detectPhraseElision(progression, key),
+        sequenceContinuation: detectSequenceContinuationOpportunity(progression),
+        stepwiseBass: detectStepwiseBassLine(progression),
+        anticipation: detectHarmonicAnticipation(progression),
+        plagalExtension: detectPlagalExtension(progression),
+        modeMixture: detectModeMixture(progression, key),
+        harmonicDensity: detectHarmonicDensityChange(progression),
+        extendedFifthChain: detectExtendedFifthChain(progression)
     };
 }

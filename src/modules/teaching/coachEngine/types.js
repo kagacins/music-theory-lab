@@ -32,18 +32,18 @@ export const COACH_CATEGORIES = {
     VOICE_LEADING: 'voice-leading',
     TENSION: 'tension',
     MOTIF: 'motif',
+    RHYTHM: 'rhythm',        // Harmonic rhythm patterns
+    STRUCTURE: 'structure',  // Phrase structure patterns
 
     // Suggestion categories
     INVERSION: 'inversion',
     VOICE_LEADING_FIX: 'voice-leading-fix',
     HARMONIC_ENRICHMENT: 'harmonic-enrichment',
     RESOLUTION: 'resolution',
-    RHYTHM: 'rhythm',
 
     // Opportunity categories
     MISSING_PATTERN: 'missing-pattern',
-    VARIETY: 'variety',
-    STRUCTURE: 'structure'
+    VARIETY: 'variety'
 };
 
 // ============================================================================
@@ -709,13 +709,210 @@ export const OBSERVATION_TYPES = {
         title: 'Register Expansion',
         message: {
             simple: "Wide range! Your {{voice}} voice is reaching {{direction}} - adds drama!",
-            intermediate: "{{voice}} voice reaches {{extreme}} ({{note}}). This register {{direction === 'high' ? 'climax' : 'depth'}} adds emotional weight.",
+            intermediate: "{{voice}} voice reaches {{extreme}} ({{note}}). This register {{registerLabel}} adds emotional weight.",
             advanced: "Register extreme in {{voice}} ({{note}}) creates textural expansion. Consider this as a dramatic high/low point in your voicing."
         },
         actions: {
             explorePanel: 'voice-leading'
         },
         cooldown: 180000
+    },
+
+    // ========================================================================
+    // NEW COACHING PATTERNS (Voice-aware)
+    // ========================================================================
+
+    // Common Tone Preservation
+    'common-tone-preservation': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'common-tone-preservation',
+        priority: 65,
+        emoji: '🎵',
+        title: 'Common Tone Held',
+        message: {
+            simple: "Nice! You kept the {{noteLabel}} {{commonTonesDisplay}} between these chords - sounds smooth!",
+            intermediate: "Good voice leading: you preserved {{commonToneLabel}} {{commonTonesDisplay}} between {{chord1}} and {{chord2}}.{{smoothBassNote}}",
+            advanced: "Parsimonious voice leading: {{commonToneCount}} common tones ({{commonTonesDisplay}}) held between {{chord1}}{{chord1InvLabel}} and {{chord2}}{{chord2InvLabel}}. Minimal voice motion creates smooth connection."
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 90000
+    },
+
+    // Functional Harmony Cycle
+    'functional-cycle-complete': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.SEQUENCE,
+        id: 'functional-cycle-complete',
+        priority: 78,
+        emoji: '🏠',
+        title: 'Complete Functional Cycle',
+        message: {
+            simple: "You created a perfect musical 'story' - home → away → tension → home! ({{chords}})",
+            intermediate: "Complete functional harmony cycle detected: Tonic → Subdominant → Dominant → Tonic. ({{romans}})",
+            advanced: "Textbook T-S-D-T functional progression: {{chords}}. This demonstrates classical harmonic syntax with full functional circuit."
+        },
+        actions: {
+            learnMore: 'lesson-functional-harmony',
+            explorePanel: 'theory'
+        },
+        cooldown: 120000
+    },
+
+    // Phrase Elision
+    'phrase-elision': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.STRUCTURE,
+        id: 'phrase-elision',
+        priority: 72,
+        emoji: '🔗',
+        title: 'Phrase Elision',
+        message: {
+            simple: "Clever! Your ending chord ({{elisionChord}}) also starts the next section - keeps things moving!",
+            intermediate: "Phrase elision detected: {{elisionChord}} serves as both the {{cadenceType}} cadence arrival and the beginning of a new phrase.",
+            advanced: "Elision at {{elisionRoman}}{{elisionInvLabel}}: the resolution chord functions as both structural close and anacrusis to the following phrase. Common in continuous musical forms."
+        },
+        actions: {
+            explorePanel: 'theory'
+        },
+        cooldown: 180000
+    },
+
+    // Sequence Continuation Opportunity
+    'incomplete-sequence': {
+        type: COACH_ITEM_TYPES.OPPORTUNITY,
+        category: COACH_CATEGORIES.MISSING_PATTERN,
+        id: 'incomplete-sequence',
+        priority: 55,
+        emoji: '📐',
+        title: 'Continue the Pattern?',
+        message: {
+            simple: "You started a pattern ({{pattern}})! Want to keep going with it? Patterns often sound best in threes.",
+            intermediate: "Sequence started: \"{{pattern}}\" repeats {{repetitions}} times. The Rule of Three suggests completing the pattern for stronger effect.",
+            advanced: "Harmonic sequence initiated ({{pattern}} × {{repetitions}}). Consider extending to 3 repetitions - sequential patterns derive power from predictable continuation."
+        },
+        actions: {
+            deepDive: { tab: 'chord', intent: 'sequence' }
+        },
+        cooldown: 120000
+    },
+
+    // Stepwise Bass Line
+    'stepwise-bass-line': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'stepwise-bass-line',
+        priority: 70,
+        emoji: '🎸',
+        title: 'Melodic Bass Line',
+        message: {
+            simple: "Your bass notes make a nice melody going {{direction}}! ({{bassNotes}})",
+            intermediate: "{{length}}-note {{direction}} stepwise bass motion ({{bassNotes}}) creates a strong sense of direction and momentum.",
+            advanced: "Linear bass progression ({{bassNotesWithOctave}}) creates contrapuntal interest below the harmonic progression. {{directionExplanation}}"
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 90000
+    },
+
+    // Harmonic Anticipation
+    'harmonic-anticipation': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.VOICE_LEADING,
+        id: 'harmonic-anticipation',
+        priority: 60,
+        emoji: '⏳',
+        title: 'Anticipation',
+        message: {
+            simple: "You played {{anticipatedNote}} early - it 'belongs' to the next chord ({{nextChord}}) - creates excitement!",
+            intermediate: "The note {{anticipatedNote}} in {{currentChord}} anticipates the upcoming {{nextChord}} chord, creating rhythmic tension.",
+            advanced: "Harmonic anticipation: {{anticipatedNote}} in {{currentChord}}{{currentInvLabel}} functions as a non-chord tone that resolves through rhythmic displacement into {{nextChord}}{{nextInvLabel}}."
+        },
+        actions: {
+            explorePanel: 'voice-leading'
+        },
+        cooldown: 120000
+    },
+
+    // Plagal Extension
+    'plagal-extension': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.CADENCE,
+        id: 'plagal-extension',
+        priority: 68,
+        emoji: '🙏',
+        title: 'Plagal Extension',
+        message: {
+            simple: "You added an 'Amen' ending after the main ending - very hymn-like! ({{plagalCadence}})",
+            intermediate: "Plagal extension: {{authenticCadence}} followed by {{plagalCadence}}. This 'Amen' figure provides additional closure.",
+            advanced: "Double cadence structure: Authentic cadence ({{authenticCadence}}) extended with plagal motion ({{plagalCadence}}). Common in sacred music, anthems, and songs seeking emphatic closure."
+        },
+        actions: {
+            learnMore: 'lesson-cadences',
+            explorePanel: 'theory'
+        },
+        cooldown: 120000
+    },
+
+    // Mode Mixture
+    'major-minor-mixture': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.BORROWED_CHORD,
+        id: 'major-minor-mixture',
+        priority: 65,
+        emoji: '🎨',
+        title: 'Mode Mixture',
+        message: {
+            simple: "You're mixing major and minor sounds - adds color and emotion! ({{majorCount}} major, {{minorCount}} minor chords)",
+            intermediate: "Modal mixture detected: {{majorCount}} major and {{minorCount}} minor chords with {{borrowedCount}} {{borrowedLabel}}. This creates expressive contrast.",
+            advanced: "Mode mixture: simultaneous use of parallel major/minor scale degrees ({{mixRatio}}% mixture ratio). Chromatic inflection without modulation adds harmonic color."
+        },
+        actions: {
+            explorePanel: 'borrowed'
+        },
+        cooldown: 120000
+    },
+
+    // Harmonic Density Shift
+    'harmonic-density-shift': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.RHYTHM,
+        id: 'harmonic-density-shift',
+        priority: 58,
+        emoji: '📊',
+        title: 'Pace Change',
+        message: {
+            simple: "The chord changes got {{direction}} at {{atChord}} - creates drama!",
+            intermediate: "Harmonic rhythm shift: chords now change {{direction}} ({{fromBeats}} beats → {{toBeats}} beats), creating contrast at {{atChord}}.",
+            advanced: "Harmonic rhythm shift ({{ratio}}x) at {{atChord}}{{atChordInvLabel}} creates textural variety and formal articulation."
+        },
+        actions: {
+            explorePanel: 'theory'
+        },
+        cooldown: 180000
+    },
+
+    // Extended Fifth Chain
+    'extended-fifth-chain': {
+        type: COACH_ITEM_TYPES.OBSERVATION,
+        category: COACH_CATEGORIES.SEQUENCE,
+        id: 'extended-fifth-chain',
+        priority: 75,
+        emoji: '🔗',
+        title: 'Extended Circle of Fifths',
+        message: {
+            simple: "Wow! You made a long chain of {{length}} chords that all lead to each other! ({{chords}})",
+            intermediate: "Extended circle-of-fifths motion: {{length}} chords in descending fifth sequence ({{chords}}). The strongest root motion pattern!",
+            advanced: "Sustained descending fifths sequence ({{romans}}) spanning {{length}} chords - the strongest root motion pattern in tonal harmony. Each chord's root is the dominant of the next."
+        },
+        actions: {
+            learnMore: 'lesson-circle-of-fifths',
+            explorePanel: 'theory'
+        },
+        cooldown: 120000
     }
 };
 
