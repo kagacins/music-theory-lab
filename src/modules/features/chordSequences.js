@@ -1218,8 +1218,8 @@ const TENSION_ARC_CONFIG = {
     // Tolerance for matching target tension
     tensionTolerance: 0.15,
 
-    // Weight of tension arc matching in scoring
-    tensionWeight: 0.2
+    // Weight of tension arc matching in scoring (0.5 = equal weight with chord progression quality)
+    tensionWeight: 0.5
 };
 
 /**

@@ -94,6 +94,16 @@ export class FullScreenBottomPanel {
         this._borrowedSelectedProgressionIndex = -1;  // -1 = add at end
         this._borrowedSelectedSectionIds = new Set(); // Empty = show all chords
         this._borrowedPickerCollapsed = false;  // Progression picker collapse state
+
+        // Compact view state for panels (toggleable summary view)
+        // Default to false (standard card view) as per user request
+        this._chordsCompactView = false;
+        this._quickAddCompactView = false;
+        this._autoBassCompactView = false;
+        // Separate section ID tracking for compact views
+        this._chordsCompactSectionIds = new Set();
+        this._quickAddCompactSectionIds = new Set();
+        this._autoBassCompactSectionIds = new Set();
     }
 
     // ========================================================================
@@ -548,32 +558,48 @@ export class FullScreenBottomPanel {
         // Get key from trainerState (the single source of truth for current key)
         const key = getCurrentKey() || 'C';
 
+        // Determine if compact view is active
+        const isCompactView = this._chordsCompactView;
+
         // Header with view mode toggle and action buttons
         container.innerHTML = `
             <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 border-b border-purple-700">
                 <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Chord Progression</span>
                 <div class="flex items-center gap-1.5">
-                    <!-- Action Buttons -->
-                    <button id="fs-chords-add-section-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Select adjacent chords, then add to a section">
+                    <!-- Progression Summary/Details Slider Toggle (first/leftmost) -->
+                    <div class="flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full" title="Toggle between progression summary and detailed card view">
+                        <span class="text-[8px] font-medium ${isCompactView ? 'text-white' : 'text-white/50'}" style="-webkit-text-fill-color: ${isCompactView ? 'white' : 'rgba(255,255,255,0.5)'};">Progression Summary</span>
+                        <label class="relative inline-flex items-center cursor-pointer mx-0.5">
+                            <input type="checkbox" id="fs-chords-compact-toggle" class="sr-only peer" ${isCompactView ? '' : 'checked'}>
+                            <div class="w-7 h-4 bg-indigo-300 peer-focus:outline-none rounded-full peer
+                                        peer-checked:after:translate-x-full peer-checked:after:border-white
+                                        after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                        after:bg-white after:border-gray-300 after:border after:rounded-full
+                                        after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500"></div>
+                        </label>
+                        <span class="text-[8px] font-medium ${isCompactView ? 'text-white/50' : 'text-white'}" style="-webkit-text-fill-color: ${isCompactView ? 'rgba(255,255,255,0.5)' : 'white'};">Progression Details</span>
+                    </div>
+                    <!-- Action Buttons (hidden in compact view) -->
+                    <button id="fs-chords-add-section-btn" class="${isCompactView ? 'hidden' : ''} px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Select adjacent chords, then add to a section">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                         <span>+Section</span>
                     </button>
-                    <button id="fs-chords-clear-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Clear all chords">
+                    <button id="fs-chords-clear-btn" class="${isCompactView ? 'hidden' : ''} px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="Clear all chords">
                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
                         </svg>
                         <span>Clear</span>
                     </button>
-                    <button id="fs-chords-colors-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
+                    <button id="fs-chords-colors-btn" class="${isCompactView ? 'hidden' : ''} px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
                         <span class="text-[8px]" style="-webkit-text-fill-color: #86efac;">●</span>
                         <span class="text-[8px]" style="-webkit-text-fill-color: #7dd3fc;">●</span>
                         <span class="text-[8px]" style="-webkit-text-fill-color: #fcd34d;">●</span>
                         <span>Legend</span>
                     </button>
-                    <!-- View Mode Toggle -->
-                    <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
+                    <!-- View Mode Toggle (hidden in compact view) -->
+                    <div class="${isCompactView ? 'hidden' : 'flex'} gap-0.5 bg-white/20 rounded-lg p-0.5">
                         <button class="fs-view-mode-btn px-2 py-1 text-xs font-medium rounded-md transition-all ${this.viewMode === 'scroll' ? 'bg-white shadow text-indigo-600' : 'text-white/80 hover:text-white'}"
                                 data-mode="scroll" style="${this.viewMode === 'scroll' ? '-webkit-text-fill-color: #4f46e5;' : ''}">
                             Scroll
@@ -590,29 +616,34 @@ export class FullScreenBottomPanel {
                     </button>
                 </div>
             </div>
-            <!-- Section picker bar (visible in section view mode when sections exist) -->
-            <div id="fs-section-picker" class="${this.viewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
-            <!-- Cards container -->
-            <div id="fs-chord-cards-container" class="flex flex-nowrap items-start gap-1 pl-4 pr-2 mt-2" style="width: 100%; height: calc(100% - ${this.viewMode === 'section' && hasSections ? '120px' : '58px'}); scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overflow-x: auto; overflow-y: visible; padding-bottom: 24px; padding-top: 4px;">
-            </div>
-            <style>
-                #fs-chord-cards-container::-webkit-scrollbar { height: 10px; }
-                #fs-chord-cards-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; margin: 0 8px; }
-                #fs-chord-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #8b5cf6, #6366f1); border-radius: 5px; }
-                #fs-chord-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #7c3aed, #4f46e5); }
-                #fs-chord-cards-container { scrollbar-width: auto; scrollbar-color: #8b5cf6 #f1f5f9; }
+            ${isCompactView ? `
+                <!-- Compact progression view -->
+                <div id="fs-chords-compact-container"></div>
+            ` : `
+                <!-- Section picker bar (visible in section view mode when sections exist) -->
+                <div id="fs-section-picker" class="${this.viewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
+                <!-- Cards container -->
+                <div id="fs-chord-cards-container" class="flex flex-nowrap items-start gap-1 pl-4 pr-2 mt-2" style="width: 100%; height: calc(100% - ${this.viewMode === 'section' && hasSections ? '120px' : '58px'}); scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overflow-x: auto; overflow-y: visible; padding-bottom: 24px; padding-top: 4px;">
+                </div>
+                <style>
+                    #fs-chord-cards-container::-webkit-scrollbar { height: 10px; }
+                    #fs-chord-cards-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 5px; margin: 0 8px; }
+                    #fs-chord-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #8b5cf6, #6366f1); border-radius: 5px; }
+                    #fs-chord-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #7c3aed, #4f46e5); }
+                    #fs-chord-cards-container { scrollbar-width: auto; scrollbar-color: #8b5cf6 #f1f5f9; }
 
-                /* Selection styling - remove double outline, use contained border like Quick Add/Auto Bass */
-                #fs-chord-cards-container .chord-card-wrapper {
-                    outline: none !important;
-                    outline-offset: 0 !important;
-                }
-                #fs-chord-cards-container .simplified-card[data-selected="true"],
-                #fs-chord-cards-container .detailed-card[data-selected="true"] {
-                    border: 3px solid #a855f7 !important;
-                    box-sizing: border-box !important;
-                }
-            </style>
+                    /* Selection styling - remove double outline, use contained border like Quick Add/Auto Bass */
+                    #fs-chord-cards-container .chord-card-wrapper {
+                        outline: none !important;
+                        outline-offset: 0 !important;
+                    }
+                    #fs-chord-cards-container .simplified-card[data-selected="true"],
+                    #fs-chord-cards-container .detailed-card[data-selected="true"] {
+                        border: 3px solid #a855f7 !important;
+                        box-sizing: border-box !important;
+                    }
+                </style>
+            `}
         `;
 
         // Attach view mode handlers
@@ -673,6 +704,61 @@ export class FullScreenBottomPanel {
                 window.toast.info('Color legend shows chord functions: Tonic (I, vi), Subdominant (IV, ii), Dominant (V, vii°)');
             }
         });
+
+        // Attach Summary/Details toggle handler (checkbox: unchecked = Summary, checked = Details)
+        container.querySelector('#fs-chords-compact-toggle')?.addEventListener('change', (e) => {
+            this._chordsCompactView = !e.target.checked; // checked = Details (not compact), unchecked = Summary (compact)
+            this._renderChordsPanel(container);
+        });
+
+        // Handle compact view rendering
+        if (isCompactView) {
+            const compactContainer = container.querySelector('#fs-chords-compact-container');
+            if (compactContainer) {
+                // Render the compact progression view
+                compactContainer.innerHTML = this._renderCompactProgressionView('fs-chords-compact', {
+                    selectedSectionIds: this._chordsCompactSectionIds,
+                    selectedChordIndex: window.getSelectedChordIndex?.() ?? -1,
+                    accentColor: '#8b5cf6',
+                    showGhostCard: true
+                });
+
+                // Attach compact view handlers
+                this._attachCompactProgressionHandlers(compactContainer, 'fs-chords-compact', {
+                    onSectionChange: () => {
+                        this._renderChordsPanel(container);
+                    },
+                    onChordClick: (idx) => {
+                        if (window.setSelectedChordIndex) {
+                            window.setSelectedChordIndex(idx);
+                        }
+                        this._renderChordsPanel(container);
+                    },
+                    onChordHold: (idx, chord) => {
+                        // Play chord on hold
+                        if (chord.notes && chord.notes.length > 0 && window.getPiano) {
+                            const piano = window.getPiano();
+                            if (piano) {
+                                piano.triggerAttack(chord.notes);
+                            }
+                        }
+                    },
+                    onChordRelease: () => {
+                        // Stop playing
+                        if (window.getPiano) {
+                            const piano = window.getPiano();
+                            if (piano) {
+                                piano.releaseAll();
+                            }
+                        }
+                    },
+                    onGhostCardClick: (suggestion) => {
+                        this._addSuggestedChord(suggestion, key);
+                    }
+                }, this._chordsCompactSectionIds);
+            }
+            return;
+        }
 
         const cardsContainer = container.querySelector('#fs-chord-cards-container');
         const sectionPicker = container.querySelector('#fs-section-picker');
@@ -1397,6 +1483,275 @@ export class FullScreenBottomPanel {
         setTimeout(() => document.addEventListener('click', closeHandler), 10);
     }
 
+    // ========================================================================
+    // REUSABLE COMPACT PROGRESSION VIEW
+    // ========================================================================
+
+    /**
+     * Render a compact progression view (chord chips grouped by section)
+     * This is a read-only view for quick overview of the progression
+     * @param {string} panelId - Unique ID prefix for this panel's elements
+     * @param {Object} options - Configuration options
+     * @param {Set} options.selectedSectionIds - Currently selected section IDs
+     * @param {number} options.selectedChordIndex - Currently selected chord index (-1 for none)
+     * @param {string} options.accentColor - Accent color for the panel (e.g., '#a855f7')
+     * @param {boolean} options.showGhostCard - Whether to show the pattern ghost card
+     * @returns {string} HTML string for the compact progression view
+     */
+    _renderCompactProgressionView(panelId, options = {}) {
+        const {
+            selectedSectionIds = new Set(),
+            selectedChordIndex = -1,
+            accentColor = '#6366f1',
+            showGhostCard = true
+        } = options;
+
+        const progressionData = getProgressionData() || [];
+        const compositionState = getCompositionState();
+        const sections = compositionState?.getSections?.() || [];
+        const key = getCurrentKey() || 'C';
+
+        // Build sections with ungrouped chords
+        const allSectionsWithPseudo = buildSectionsWithUngrouped(sections, progressionData.length);
+
+        // Helper to get chord symbol suffix
+        const getChordSymbol = (type) => {
+            const chordDef = CHORD_DEFINITIONS[type];
+            return chordDef?.symbol || '';
+        };
+
+        // Helper for inversion superscript
+        const getInversionLabel = (inversion) => {
+            return { 1: '¹', 2: '²', 3: '³', 4: '⁴' }[inversion] || '';
+        };
+
+        if (progressionData.length === 0) {
+            return `
+                <div class="px-3 py-4 text-center">
+                    <div class="text-xs text-slate-400 italic">No chords in progression yet.</div>
+                </div>
+            `;
+        }
+
+        // Section picker row
+        let sectionPickerHTML = '';
+        if (allSectionsWithPseudo.length > 0) {
+            const isAllSelected = selectedSectionIds.size === 0;
+            sectionPickerHTML = `
+                <div class="flex items-center gap-1.5 overflow-x-auto pt-1 pb-2 px-3" style="scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;">
+                    <span class="text-[9px] text-slate-500 flex-shrink-0">Sections:</span>
+                    <button data-section-id="all" class="${panelId}-section-pill px-2.5 py-1.5 rounded-full text-[9px] font-semibold transition-all flex-shrink-0
+                        ${isAllSelected ? 'text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}"
+                        style="${isAllSelected ? `background: ${accentColor};` : ''}"
+                        title="Show all chords">All</button>
+                    ${allSectionsWithPseudo.map(section => {
+                        const isSelected = selectedSectionIds.has(section.id);
+                        const color = section.color || '#9ca3af';
+                        return `
+                            <button data-section-id="${section.id}" class="${panelId}-section-pill px-2.5 py-1.5 rounded-full text-[9px] font-semibold transition-all flex-shrink-0"
+                                style="background: ${isSelected ? color : hexToRgba(color, 0.15)}; color: ${isSelected ? 'white' : color}; border: 1px solid ${color};"
+                                title="${section.label} (${section.chordIndices.length} chords)">
+                                ${section.label}
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        // Determine visible sections based on selection
+        let visibleSections = [];
+        if (selectedSectionIds.size === 0) {
+            visibleSections = [...allSectionsWithPseudo];
+        } else {
+            visibleSections = allSectionsWithPseudo.filter(s => selectedSectionIds.has(s.id));
+        }
+
+        // If no sections defined at all, show all chords in a single flat list
+        if (allSectionsWithPseudo.length === 0) {
+            visibleSections = [{
+                id: 'all',
+                label: 'All Chords',
+                color: accentColor,
+                chordIndices: progressionData.map((_, i) => i),
+                isPseudoSection: true
+            }];
+        }
+
+        // Build chord chips grouped by section
+        const chordChipsHTML = visibleSections.map(section => {
+            const sectionColor = section.color || '#9ca3af';
+            const chipsHTML = section.chordIndices.map(idx => {
+                if (idx >= progressionData.length) return '';
+                const chord = progressionData[idx];
+                const symbol = getChordSymbol(chord.type);
+                const invLabel = getInversionLabel(chord.inversion);
+                const isSelected = selectedChordIndex === idx;
+
+                return `
+                    <button class="${panelId}-chord-chip flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all"
+                        data-chord-idx="${idx}"
+                        style="background: ${isSelected ? hexToRgba(sectionColor, 0.4) : hexToRgba(sectionColor, 0.18)};
+                               color: ${sectionColor};
+                               border: 1px solid ${sectionColor};
+                               ${isSelected ? `outline: 2px solid ${accentColor}; outline-offset: 1px;` : ''}"
+                        title="${chord.root} ${chord.type}${chord.inversion ? ' (inv ' + chord.inversion + ')' : ''} — Click to select, hold to play">
+                        ${chord.root}${symbol}${invLabel}
+                    </button>
+                `;
+            }).join('');
+
+            return `
+                <div class="flex-shrink-0 rounded overflow-hidden border" style="border-color: ${hexToRgba(sectionColor, 0.3)}; background: ${hexToRgba(sectionColor, 0.05)};">
+                    <div class="text-[9px] font-semibold text-white px-2 py-1 text-center whitespace-nowrap" style="background: ${sectionColor};">${section.label}</div>
+                    <div class="flex items-center gap-0.5 p-1.5">${chipsHTML}</div>
+                </div>
+            `;
+        }).join('');
+
+        // Ghost card HTML for pattern suggestions
+        let ghostCardHTML = '';
+        if (showGhostCard && selectedSectionIds.size === 0) {
+            const suggestion = suggestPatternContinuation(progressionData, key);
+            if (suggestion) {
+                const chordDef = CHORD_DEFINITIONS[suggestion.type];
+                const symbol = chordDef?.symbol || '';
+                const displayName = `${suggestion.root}${symbol}`;
+                const invNum = suggestion.inversion || 0;
+                const invText = invNum === 1 ? '¹' : invNum === 2 ? '²' : invNum === 3 ? '³' : invNum === 4 ? '⁴' : '';
+
+                ghostCardHTML = `
+                    <div class="${panelId}-ghost-card flex-shrink-0 rounded overflow-hidden border-2 border-dashed cursor-pointer transition-all hover:border-solid"
+                         style="border-color: ${accentColor}; background: ${hexToRgba(accentColor, 0.08)};"
+                         data-suggestion='${JSON.stringify(suggestion).replace(/'/g, "&#39;")}'
+                         title="Click to add ${displayName} to complete the ${suggestion.pattern || 'pattern'}">
+                        <div class="text-[8px] font-semibold text-white px-2 py-0.5 text-center whitespace-nowrap" style="background: ${accentColor};">
+                            ${suggestion.pattern || 'Continue'}
+                        </div>
+                        <div class="flex items-center justify-center gap-1 p-1.5">
+                            <span class="text-[11px] font-bold" style="color: ${accentColor};">${displayName}${invText}</span>
+                            <span class="text-[9px]" style="color: ${accentColor};">+</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        return `
+            <div class="border-b border-slate-200 bg-slate-50/50">
+                ${sectionPickerHTML}
+                <div class="flex items-center gap-1.5 overflow-x-auto px-3 py-2" style="scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;">
+                    ${chordChipsHTML}
+                    ${ghostCardHTML}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Attach event handlers for the compact progression view
+     * @param {HTMLElement} container - The panel container
+     * @param {string} panelId - Unique ID prefix matching the render call
+     * @param {Object} callbacks - Callback functions
+     * @param {Function} callbacks.onSectionChange - Called when section selection changes (sectionId, selectedSectionIds)
+     * @param {Function} callbacks.onChordClick - Called when a chord chip is clicked (chordIndex)
+     * @param {Function} callbacks.onChordHold - Called when a chord chip is held (chordIndex, chord)
+     * @param {Function} callbacks.onChordRelease - Called when a chord chip hold is released
+     * @param {Function} callbacks.onGhostCardClick - Called when ghost card is clicked (suggestion)
+     * @param {Set} selectedSectionIds - Reference to the selected section IDs set
+     */
+    _attachCompactProgressionHandlers(container, panelId, callbacks, selectedSectionIds) {
+        const progressionData = getProgressionData() || [];
+        const key = getCurrentKey() || 'C';
+
+        // Section pill click handlers
+        container.querySelectorAll(`.${panelId}-section-pill`).forEach(pill => {
+            pill.addEventListener('click', () => {
+                const sectionId = pill.dataset.sectionId;
+                if (sectionId === 'all') {
+                    selectedSectionIds.clear();
+                } else {
+                    if (selectedSectionIds.has(sectionId)) {
+                        selectedSectionIds.delete(sectionId);
+                    } else {
+                        selectedSectionIds.clear();
+                        selectedSectionIds.add(sectionId);
+                    }
+                }
+                if (callbacks.onSectionChange) {
+                    callbacks.onSectionChange(sectionId, selectedSectionIds);
+                }
+            });
+        });
+
+        // Chord chip click and hold handlers
+        // Audio plays IMMEDIATELY on mousedown (no delay), click selects on release if hold was short
+        container.querySelectorAll(`.${panelId}-chord-chip`).forEach(chip => {
+            let holdStartTime = 0;
+            let isHolding = false;
+            const HOLD_THRESHOLD = 150; // ms - if held longer than this, it's a "hold" not a "click"
+
+            const startHold = (e) => {
+                e.preventDefault();
+                holdStartTime = Date.now();
+                isHolding = true;
+                // Play audio IMMEDIATELY (no delay) - same as unified modal behavior
+                const idx = parseInt(chip.dataset.chordIdx, 10);
+                if (!isNaN(idx) && idx < progressionData.length && callbacks.onChordHold) {
+                    callbacks.onChordHold(idx, progressionData[idx]);
+                }
+            };
+
+            const endHold = () => {
+                const holdDuration = Date.now() - holdStartTime;
+                if (isHolding && callbacks.onChordRelease) {
+                    callbacks.onChordRelease();
+                }
+                // If it was a short hold (quick tap), also trigger click for selection
+                if (isHolding && holdDuration < HOLD_THRESHOLD && callbacks.onChordClick) {
+                    const idx = parseInt(chip.dataset.chordIdx, 10);
+                    if (!isNaN(idx)) {
+                        callbacks.onChordClick(idx);
+                    }
+                }
+                isHolding = false;
+            };
+
+            chip.addEventListener('mousedown', startHold);
+            chip.addEventListener('mouseup', endHold);
+            chip.addEventListener('mouseleave', () => {
+                // Only release audio if still holding, but don't trigger click
+                if (isHolding && callbacks.onChordRelease) {
+                    callbacks.onChordRelease();
+                }
+                isHolding = false;
+            });
+            chip.addEventListener('touchstart', startHold, { passive: false });
+            chip.addEventListener('touchend', endHold);
+            chip.addEventListener('touchcancel', () => {
+                if (isHolding && callbacks.onChordRelease) {
+                    callbacks.onChordRelease();
+                }
+                isHolding = false;
+            });
+        });
+
+        // Ghost card click handler
+        container.querySelectorAll(`.${panelId}-ghost-card`).forEach(ghost => {
+            ghost.addEventListener('click', () => {
+                try {
+                    const suggestionStr = ghost.dataset.suggestion;
+                    if (suggestionStr && callbacks.onGhostCardClick) {
+                        const suggestion = JSON.parse(suggestionStr.replace(/&#39;/g, "'"));
+                        callbacks.onGhostCardClick(suggestion);
+                    }
+                } catch (e) {
+                    console.warn('Error parsing ghost card suggestion:', e);
+                }
+            });
+        });
+    }
+
     /**
      * Initialize Sortable on section containers (for reordering entire sections AND receiving cards from sections)
      * MIRRORS Composition Studio's initializeSimplifiedSortable
@@ -1755,6 +2110,9 @@ export class FullScreenBottomPanel {
             this._quickAddViewMode = 'scroll';
         }
 
+        // Determine if compact view is active
+        const isCompactView = this._quickAddCompactView;
+
         // Combined layout: Quick Add controls on top, chord progression below
         // Using forest/moss green theme (#4d7c0f = lime-700, #3f6212 = lime-800)
         container.innerHTML = `
@@ -1767,15 +2125,28 @@ export class FullScreenBottomPanel {
                     </span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <!-- Legend button -->
-                    <button id="fs-quickadd-legend-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
+                    <!-- Progression Summary/Details Slider Toggle (first/leftmost) -->
+                    <div class="flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full" title="Toggle between progression summary and detailed card view">
+                        <span class="text-[8px] font-medium ${isCompactView ? 'text-white' : 'text-white/50'}" style="-webkit-text-fill-color: ${isCompactView ? 'white' : 'rgba(255,255,255,0.5)'};">Progression Summary</span>
+                        <label class="relative inline-flex items-center cursor-pointer mx-0.5">
+                            <input type="checkbox" id="fs-quickadd-compact-toggle" class="sr-only peer" ${isCompactView ? '' : 'checked'}>
+                            <div class="w-7 h-4 bg-lime-300 peer-focus:outline-none rounded-full peer
+                                        peer-checked:after:translate-x-full peer-checked:after:border-white
+                                        after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                        after:bg-white after:border-gray-300 after:border after:rounded-full
+                                        after:h-3 after:w-3 after:transition-all peer-checked:bg-lime-600"></div>
+                        </label>
+                        <span class="text-[8px] font-medium ${isCompactView ? 'text-white/50' : 'text-white'}" style="-webkit-text-fill-color: ${isCompactView ? 'rgba(255,255,255,0.5)' : 'white'};">Progression Details</span>
+                    </div>
+                    <!-- Legend button (hidden in compact view) -->
+                    <button id="fs-quickadd-legend-btn" class="${isCompactView ? 'hidden' : ''} px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
                         <span class="text-[8px]" style="-webkit-text-fill-color: #86efac;">●</span>
                         <span class="text-[8px]" style="-webkit-text-fill-color: #7dd3fc;">●</span>
                         <span class="text-[8px]" style="-webkit-text-fill-color: #fcd34d;">●</span>
                         <span>Legend</span>
                     </button>
-                    <!-- View mode toggle -->
-                    <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
+                    <!-- View mode toggle (hidden in compact view) -->
+                    <div class="${isCompactView ? 'hidden' : 'flex'} gap-0.5 bg-white/20 rounded-lg p-0.5">
                         <button class="fs-qa-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._quickAddViewMode === 'scroll' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
                                 data-mode="scroll" style="${this._quickAddViewMode === 'scroll' ? 'color: #3f6212; -webkit-text-fill-color: #3f6212;' : ''}">
                             Scroll
@@ -1836,34 +2207,39 @@ export class FullScreenBottomPanel {
                     </button>
                 </div>
             </div>
-            <!-- Section picker bar (visible in section view mode when sections exist) -->
-            <div id="fs-qa-section-picker" class="${this._quickAddViewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
-            <!-- Chord Progression Cards -->
-            <div id="fs-quick-add-cards-container" class="flex flex-nowrap items-start gap-1 px-4 py-2" style="height: calc(100% - ${this._quickAddViewMode === 'section' && hasSections ? '130px' : '97px'}); overflow-x: auto; overflow-y: hidden;">
-            </div>
-            <style>
-                /* Scrollbar styling - forest green theme */
-                #fs-quick-add-cards-container::-webkit-scrollbar { height: 10px; }
-                #fs-quick-add-cards-container::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; margin: 0 8px; }
-                #fs-quick-add-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #4d7c0f, #3f6212); border-radius: 5px; border: 1px solid #365314; }
-                #fs-quick-add-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #3f6212, #365314); }
-                #fs-quick-add-cards-container { scrollbar-width: auto; scrollbar-color: #4d7c0f #e2e8f0; }
+            ${isCompactView ? `
+                <!-- Compact progression view -->
+                <div id="fs-quickadd-compact-container"></div>
+            ` : `
+                <!-- Section picker bar (visible in section view mode when sections exist) -->
+                <div id="fs-qa-section-picker" class="${this._quickAddViewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
+                <!-- Chord Progression Cards -->
+                <div id="fs-quick-add-cards-container" class="flex flex-nowrap items-start gap-1 px-4 py-2" style="height: calc(100% - ${this._quickAddViewMode === 'section' && hasSections ? '130px' : '97px'}); overflow-x: auto; overflow-y: hidden;">
+                </div>
+                <style>
+                    /* Scrollbar styling - forest green theme */
+                    #fs-quick-add-cards-container::-webkit-scrollbar { height: 10px; }
+                    #fs-quick-add-cards-container::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; margin: 0 8px; }
+                    #fs-quick-add-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #4d7c0f, #3f6212); border-radius: 5px; border: 1px solid #365314; }
+                    #fs-quick-add-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #3f6212, #365314); }
+                    #fs-quick-add-cards-container { scrollbar-width: auto; scrollbar-color: #4d7c0f #e2e8f0; }
 
-                /* CRITICAL FIX: The selection outline is on .chord-card-wrapper, NOT the card itself.
-                   The outline with outlineOffset causes it to extend outside the wrapper bounds.
-                   Remove the outline from wrappers and use a contained border on the card instead. */
-                #fs-quick-add-cards-container .chord-card-wrapper {
-                    outline: none !important;
-                    outline-offset: 0 !important;
-                }
+                    /* CRITICAL FIX: The selection outline is on .chord-card-wrapper, NOT the card itself.
+                       The outline with outlineOffset causes it to extend outside the wrapper bounds.
+                       Remove the outline from wrappers and use a contained border on the card instead. */
+                    #fs-quick-add-cards-container .chord-card-wrapper {
+                        outline: none !important;
+                        outline-offset: 0 !important;
+                    }
 
-                /* Add selection indicator as a border on the card itself (stays contained) */
-                #fs-quick-add-cards-container .simplified-card[data-selected="true"],
-                #fs-quick-add-cards-container .detailed-card[data-selected="true"] {
-                    border: 3px solid #a855f7 !important;
-                    box-sizing: border-box !important;
-                }
-            </style>
+                    /* Add selection indicator as a border on the card itself (stays contained) */
+                    #fs-quick-add-cards-container .simplified-card[data-selected="true"],
+                    #fs-quick-add-cards-container .detailed-card[data-selected="true"] {
+                        border: 3px solid #a855f7 !important;
+                        box-sizing: border-box !important;
+                    }
+                </style>
+            `}
         `;
 
         // Populate dropdowns
@@ -1888,28 +2264,85 @@ export class FullScreenBottomPanel {
             }
         });
 
-        // Render section picker if in section view
-        if (this._quickAddViewMode === 'section' && hasSections) {
+        // Attach Summary/Details toggle handler (checkbox: unchecked = Summary, checked = Details)
+        container.querySelector('#fs-quickadd-compact-toggle')?.addEventListener('change', (e) => {
+            this._quickAddCompactView = !e.target.checked; // checked = Details (not compact), unchecked = Summary (compact)
+            this._renderQuickAddPanel(container);
+        });
+
+        // Handle compact view rendering
+        if (isCompactView) {
+            const compactContainer = container.querySelector('#fs-quickadd-compact-container');
+            if (compactContainer) {
+                // Render the compact progression view
+                compactContainer.innerHTML = this._renderCompactProgressionView('fs-quickadd-compact', {
+                    selectedSectionIds: this._quickAddCompactSectionIds,
+                    selectedChordIndex: selectedIndex,
+                    accentColor: '#4d7c0f',
+                    showGhostCard: true
+                });
+
+                // Attach compact view handlers
+                this._attachCompactProgressionHandlers(compactContainer, 'fs-quickadd-compact', {
+                    onSectionChange: () => {
+                        this._renderQuickAddPanel(container);
+                    },
+                    onChordClick: (idx) => {
+                        if (window.setSelectedChordIndex) {
+                            window.setSelectedChordIndex(idx);
+                        }
+                        this._renderQuickAddPanel(container);
+                    },
+                    onChordHold: (idx, chord) => {
+                        // Play chord on hold
+                        if (chord.notes && chord.notes.length > 0 && window.getPiano) {
+                            const piano = window.getPiano();
+                            if (piano) {
+                                piano.triggerAttack(chord.notes);
+                            }
+                        }
+                    },
+                    onChordRelease: () => {
+                        // Stop playing
+                        if (window.getPiano) {
+                            const piano = window.getPiano();
+                            if (piano) {
+                                piano.releaseAll();
+                            }
+                        }
+                    },
+                    onGhostCardClick: (suggestion) => {
+                        this._addSuggestedChord(suggestion, key);
+                    }
+                }, this._quickAddCompactSectionIds);
+            }
+            // Don't return - still need to set up dropdown handlers etc.
+        }
+
+        // Render section picker if in section view (only when not compact)
+        if (!isCompactView && this._quickAddViewMode === 'section' && hasSections) {
             this._renderQuickAddSectionPicker(container.querySelector('#fs-qa-section-picker'), sections);
         }
 
-        // Render chord cards
+        // Render chord cards (only when not compact)
         const cardsContainer = container.querySelector('#fs-quick-add-cards-container');
-        if (cardsContainer && chords.length > 0) {
+        if (!isCompactView && cardsContainer && chords.length > 0) {
             if (this._quickAddViewMode === 'section' && hasSections) {
                 this._renderQuickAddSectionViewCards(cardsContainer, chords, key, sections, selectedIndex);
             } else {
                 this._renderQuickAddScrollViewCards(cardsContainer, chords, key, sections, selectedIndex);
             }
-        } else if (cardsContainer) {
+        } else if (!isCompactView && cardsContainer) {
             cardsContainer.innerHTML = '<div class="text-gray-400 text-sm p-4">No chords yet. Add your first chord above!</div>';
         }
 
-        // Render ambient tension strip (respects Experience Mode internally)
-        renderAmbientTensionStrip(container, chords, key);
+        // Render ambient tension strip (respects Experience Mode internally) - only in card view
+        if (!isCompactView) {
+            renderAmbientTensionStrip(container, chords, key);
+        }
 
-        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only)
-        if (cardsContainer) {
+        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only) - only in card view
+        if (!isCompactView && cardsContainer) {
             renderBassMotionIndicators(cardsContainer, chords, key);
         }
 
@@ -2603,6 +3036,9 @@ export class FullScreenBottomPanel {
             this._autoBassViewMode = 'scroll';
         }
 
+        // Determine if compact view is active
+        const isCompactView = this._autoBassCompactView;
+
         // Helper to check if pattern is selected
         const sel = (val) => bassPattern === val ? 'selected' : '';
 
@@ -2610,15 +3046,28 @@ export class FullScreenBottomPanel {
             <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-amber-700 to-amber-600 border-b border-amber-800">
                 <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Auto-Bass Patterns</span>
                 <div class="flex items-center gap-2">
-                    <!-- Legend button -->
-                    <button id="fs-autobass-legend-btn" class="px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
+                    <!-- Progression Summary/Details Slider Toggle (first/leftmost) -->
+                    <div class="flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full" title="Toggle between progression summary and detailed card view">
+                        <span class="text-[8px] font-medium ${isCompactView ? 'text-white' : 'text-white/50'}" style="-webkit-text-fill-color: ${isCompactView ? 'white' : 'rgba(255,255,255,0.5)'};">Progression Summary</span>
+                        <label class="relative inline-flex items-center cursor-pointer mx-0.5">
+                            <input type="checkbox" id="fs-autobass-compact-toggle" class="sr-only peer" ${isCompactView ? '' : 'checked'}>
+                            <div class="w-7 h-4 bg-amber-300 peer-focus:outline-none rounded-full peer
+                                        peer-checked:after:translate-x-full peer-checked:after:border-white
+                                        after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                        after:bg-white after:border-gray-300 after:border after:rounded-full
+                                        after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-600"></div>
+                        </label>
+                        <span class="text-[8px] font-medium ${isCompactView ? 'text-white/50' : 'text-white'}" style="-webkit-text-fill-color: ${isCompactView ? 'rgba(255,255,255,0.5)' : 'white'};">Progression Details</span>
+                    </div>
+                    <!-- Legend button (hidden in compact view) -->
+                    <button id="fs-autobass-legend-btn" class="${isCompactView ? 'hidden' : ''} px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition flex items-center gap-1" title="View chord function color legend">
                         <span class="text-[8px]" style="-webkit-text-fill-color: #86efac;">●</span>
                         <span class="text-[8px]" style="-webkit-text-fill-color: #7dd3fc;">●</span>
                         <span class="text-[8px]" style="-webkit-text-fill-color: #fcd34d;">●</span>
                         <span>Legend</span>
                     </button>
-                    <!-- View mode toggle -->
-                    <div class="flex gap-0.5 bg-white/20 rounded-lg p-0.5">
+                    <!-- View mode toggle (hidden in compact view) -->
+                    <div class="${isCompactView ? 'hidden' : 'flex'} gap-0.5 bg-white/20 rounded-lg p-0.5">
                         <button class="fs-ab-view-mode-btn px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${this._autoBassViewMode === 'scroll' ? 'bg-white shadow' : 'text-white/80 hover:text-white'}"
                                 data-mode="scroll" style="${this._autoBassViewMode === 'scroll' ? 'color: #92400e; -webkit-text-fill-color: #92400e;' : ''}">
                             Scroll
@@ -2736,30 +3185,35 @@ export class FullScreenBottomPanel {
                     </button>
                 </div>
             </div>
-            <!-- Section picker bar (visible in section view mode when sections exist) -->
-            <div id="fs-ab-section-picker" class="${this._autoBassViewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
-            <!-- Chord Progression Cards -->
-            <div id="fs-auto-bass-cards-container" class="flex flex-nowrap items-start gap-1 px-4 py-2" style="height: calc(100% - ${this._autoBassViewMode === 'section' && hasSections ? '133px' : '100px'}); overflow-x: auto; overflow-y: hidden;">
-            </div>
-            <style>
-                /* Scrollbar styling - muted amber/bronze theme */
-                #fs-auto-bass-cards-container::-webkit-scrollbar { height: 10px; }
-                #fs-auto-bass-cards-container::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; margin: 0 8px; }
-                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #b45309, #92400e); border-radius: 5px; border: 1px solid #78350f; }
-                #fs-auto-bass-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #92400e, #78350f); }
-                #fs-auto-bass-cards-container { scrollbar-width: auto; scrollbar-color: #b45309 #e2e8f0; }
+            ${isCompactView ? `
+                <!-- Compact progression view -->
+                <div id="fs-autobass-compact-container"></div>
+            ` : `
+                <!-- Section picker bar (visible in section view mode when sections exist) -->
+                <div id="fs-ab-section-picker" class="${this._autoBassViewMode === 'section' && hasSections ? '' : 'hidden'}"></div>
+                <!-- Chord Progression Cards -->
+                <div id="fs-auto-bass-cards-container" class="flex flex-nowrap items-start gap-1 px-4 py-2" style="height: calc(100% - ${this._autoBassViewMode === 'section' && hasSections ? '133px' : '100px'}); overflow-x: auto; overflow-y: hidden;">
+                </div>
+                <style>
+                    /* Scrollbar styling - muted amber/bronze theme */
+                    #fs-auto-bass-cards-container::-webkit-scrollbar { height: 10px; }
+                    #fs-auto-bass-cards-container::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 5px; margin: 0 8px; }
+                    #fs-auto-bass-cards-container::-webkit-scrollbar-thumb { background: linear-gradient(to right, #b45309, #92400e); border-radius: 5px; border: 1px solid #78350f; }
+                    #fs-auto-bass-cards-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(to right, #92400e, #78350f); }
+                    #fs-auto-bass-cards-container { scrollbar-width: auto; scrollbar-color: #b45309 #e2e8f0; }
 
-                /* Selection styling - same as Quick Add */
-                #fs-auto-bass-cards-container .chord-card-wrapper {
-                    outline: none !important;
-                    outline-offset: 0 !important;
-                }
-                #fs-auto-bass-cards-container .simplified-card[data-selected="true"],
-                #fs-auto-bass-cards-container .detailed-card[data-selected="true"] {
-                    border: 3px solid #a855f7 !important;
-                    box-sizing: border-box !important;
-                }
-            </style>
+                    /* Selection styling - same as Quick Add */
+                    #fs-auto-bass-cards-container .chord-card-wrapper {
+                        outline: none !important;
+                        outline-offset: 0 !important;
+                    }
+                    #fs-auto-bass-cards-container .simplified-card[data-selected="true"],
+                    #fs-auto-bass-cards-container .detailed-card[data-selected="true"] {
+                        border: 3px solid #a855f7 !important;
+                        box-sizing: border-box !important;
+                    }
+                </style>
+            `}
         `;
 
         // Attach view mode handlers
@@ -2780,28 +3234,87 @@ export class FullScreenBottomPanel {
             }
         });
 
-        // Render section picker if in section view
-        if (this._autoBassViewMode === 'section' && hasSections) {
+        // Attach Summary/Details toggle handler (checkbox: unchecked = Summary, checked = Details)
+        container.querySelector('#fs-autobass-compact-toggle')?.addEventListener('change', (e) => {
+            this._autoBassCompactView = !e.target.checked; // checked = Details (not compact), unchecked = Summary (compact)
+            this._renderAutoBassPanel(container);
+        });
+
+        // Handle compact view rendering
+        if (isCompactView) {
+            const compactContainer = container.querySelector('#fs-autobass-compact-container');
+            if (compactContainer) {
+                // Render the compact progression view
+                compactContainer.innerHTML = this._renderCompactProgressionView('fs-autobass-compact', {
+                    selectedSectionIds: this._autoBassCompactSectionIds,
+                    selectedChordIndex: selectedIndex,
+                    accentColor: '#b45309',
+                    showGhostCard: true
+                });
+
+                // Attach compact view handlers
+                this._attachCompactProgressionHandlers(compactContainer, 'fs-autobass-compact', {
+                    onSectionChange: () => {
+                        this._renderAutoBassPanel(container);
+                    },
+                    onChordClick: (idx) => {
+                        if (window.setSelectedChordIndex) {
+                            window.setSelectedChordIndex(idx);
+                        }
+                        this._renderAutoBassPanel(container);
+                        // Ensure Apply to Selected button state is updated after re-render
+                        setTimeout(() => this._updateApplyToSelectedButton(), 100);
+                    },
+                    onChordHold: (idx, chord) => {
+                        // Play chord on hold
+                        if (chord.notes && chord.notes.length > 0 && window.getPiano) {
+                            const piano = window.getPiano();
+                            if (piano) {
+                                piano.triggerAttack(chord.notes);
+                            }
+                        }
+                    },
+                    onChordRelease: () => {
+                        // Stop playing
+                        if (window.getPiano) {
+                            const piano = window.getPiano();
+                            if (piano) {
+                                piano.releaseAll();
+                            }
+                        }
+                    },
+                    onGhostCardClick: (suggestion) => {
+                        this._addSuggestedChord(suggestion, key);
+                    }
+                }, this._autoBassCompactSectionIds);
+            }
+            // Don't return - still need to set up control handlers
+        }
+
+        // Render section picker if in section view (only when not compact)
+        if (!isCompactView && this._autoBassViewMode === 'section' && hasSections) {
             this._renderAutoBassSectionPicker(container.querySelector('#fs-ab-section-picker'), sections);
         }
 
-        // Render chord cards
+        // Render chord cards (only when not compact)
         const cardsContainer = container.querySelector('#fs-auto-bass-cards-container');
-        if (cardsContainer && chords.length > 0) {
+        if (!isCompactView && cardsContainer && chords.length > 0) {
             if (this._autoBassViewMode === 'section' && hasSections) {
                 this._renderAutoBassSectionViewCards(cardsContainer, chords, key, sections, selectedIndex);
             } else {
                 this._renderAutoBassScrollViewCards(cardsContainer, chords, key, sections, selectedIndex);
             }
-        } else if (cardsContainer) {
+        } else if (!isCompactView && cardsContainer) {
             cardsContainer.innerHTML = '<div class="text-gray-400 text-sm p-4">No chords yet. Add chords to generate bass patterns.</div>';
         }
 
-        // Render ambient tension strip (respects Experience Mode internally)
-        renderAmbientTensionStrip(container, chords, key);
+        // Render ambient tension strip (respects Experience Mode internally) - only in card view
+        if (!isCompactView) {
+            renderAmbientTensionStrip(container, chords, key);
+        }
 
-        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only)
-        if (cardsContainer) {
+        // Render bass motion indicators between chord cards (respects Experience Mode - Explore only) - only in card view
+        if (!isCompactView && cardsContainer) {
             renderBassMotionIndicators(cardsContainer, chords, key);
         }
 
@@ -2854,33 +3367,60 @@ export class FullScreenBottomPanel {
 
         // Apply to Selected button - applies to ALL selected chord cards
         container.querySelector('#fs-bass-apply-selected')?.addEventListener('click', async () => {
-            // Find all selected chord cards and get their indices
-            const selectedCards = document.querySelectorAll('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
-            if (selectedCards.length === 0) return;
+            // Get selected chord indices from multiple sources:
+            // 1. Cards with data-selected="true" (card view)
+            // 2. Global selection state (compact/summary view)
+            const selectedChordIndices = [];
 
-            // Get indices from data-chord-index on the wrapper (not the card itself)
-            const selectedIndices = [];
+            // Method 1: Check for cards with data-selected attribute
+            const selectedCards = document.querySelectorAll('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
             selectedCards.forEach(card => {
                 const wrapper = card.closest('.chord-card-wrapper');
-                const index = wrapper ? parseInt(wrapper.dataset.chordIndex, 10) : NaN;
-                if (!isNaN(index) && !selectedIndices.includes(index)) {
-                    selectedIndices.push(index);
+                const chordIndex = wrapper ? parseInt(wrapper.dataset.chordIndex, 10) : NaN;
+                if (!isNaN(chordIndex) && !selectedChordIndices.includes(chordIndex)) {
+                    selectedChordIndices.push(chordIndex);
                 }
             });
 
-            if (selectedIndices.length === 0) return;
+            // Method 2: Fall back to global selection state (for compact view where cards don't exist)
+            if (selectedChordIndices.length === 0) {
+                // Check for multi-select array
+                const globalIndices = window.getSelectedChordIndicesArray ? window.getSelectedChordIndicesArray() : [];
+                if (globalIndices.length > 0) {
+                    globalIndices.forEach(idx => {
+                        if (!selectedChordIndices.includes(idx)) {
+                            selectedChordIndices.push(idx);
+                        }
+                    });
+                } else {
+                    // Check for single selection
+                    const singleIdx = window.getSelectedChordIndex ? window.getSelectedChordIndex() : -1;
+                    if (singleIdx >= 0 && !selectedChordIndices.includes(singleIdx)) {
+                        selectedChordIndices.push(singleIdx);
+                    }
+                }
+            }
+
+            if (selectedChordIndices.length === 0) return;
 
             const confirmed = await showConfirmModal({
                 title: 'Apply Bass Pattern to Selected',
-                message: `This will replace the bass line for ${selectedIndices.length} selected chord(s) with the current pattern. Continue?`,
+                message: `This will replace the bass line for ${selectedChordIndices.length} selected chord(s) with the current pattern. Continue?`,
                 confirmText: 'Apply to Selected',
                 danger: false
             });
             if (!confirmed) return;
 
-            // Apply bass pattern to each selected chord
-            if (window.regenerateBassForMeasure) {
-                for (const index of selectedIndices) {
+            // Apply bass pattern to each selected chord using chord-index-aware function
+            // This properly handles chords that span multiple measures
+            const compState = getCompositionState();
+            if (compState && typeof compState.regenerateAutoBassByChordIndex === 'function') {
+                for (const chordIndex of selectedChordIndices) {
+                    compState.regenerateAutoBassByChordIndex(chordIndex);
+                }
+            } else if (window.regenerateBassForMeasure) {
+                // Fallback to measure-based regeneration if chord-aware function unavailable
+                for (const index of selectedChordIndices) {
                     window.regenerateBassForMeasure(index);
                 }
             }
@@ -3017,6 +3557,12 @@ export class FullScreenBottomPanel {
                 container.appendChild(wrapper);
             });
         }
+
+        // Add ghost card for pattern continuation suggestion
+        const ghostCard = this._createFSPatternGhostCard(chords, key);
+        if (ghostCard) {
+            container.appendChild(ghostCard);
+        }
     }
 
     /**
@@ -3045,6 +3591,14 @@ export class FullScreenBottomPanel {
                     container.appendChild(sectionContainer);
                 }
             });
+
+            // Add ghost card for pattern continuation suggestion (only if showing all sections)
+            if (this._autoBassSelectedSectionIds.size === 0) {
+                const ghostCard = this._createFSPatternGhostCard(chords, key);
+                if (ghostCard) {
+                    container.appendChild(ghostCard);
+                }
+            }
         } else {
             // No matching sections - show empty message
             container.innerHTML = '<div class="text-gray-400 text-sm p-4">No sections selected</div>';
@@ -3112,13 +3666,21 @@ export class FullScreenBottomPanel {
 
     /**
      * Update Apply to Selected and Revert Selected button visibility/state
-     * Checks if any chord card anywhere in the document has visual selection
+     * Checks both card selection (data-selected) and global selection state (for compact view)
      */
     _updateApplyToSelectedButton() {
-        // Check if any chord card anywhere has data-selected="true"
-        // The main app sets this on cards in the progression visualization
+        // Check multiple selection sources:
+        // 1. Cards with data-selected="true" attribute
         const selectedCard = document.querySelector('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
-        const hasVisualSelection = selectedCard !== null;
+        const hasCardSelection = selectedCard !== null;
+
+        // 2. Global selection state (for compact/summary view)
+        const globalIndices = window.getSelectedChordIndicesArray ? window.getSelectedChordIndicesArray() : [];
+        const singleIdx = window.getSelectedChordIndex ? window.getSelectedChordIndex() : -1;
+        const hasGlobalSelection = globalIndices.length > 0 || singleIdx >= 0;
+
+        // Enable button if either selection method has a selection
+        const hasSelection = hasCardSelection || hasGlobalSelection;
 
         // Update Apply to Selected button
         let applyBtn = this.container?.querySelector('#fs-bass-apply-selected');
@@ -3126,8 +3688,8 @@ export class FullScreenBottomPanel {
             applyBtn = document.querySelector('#fs-bass-apply-selected');
         }
         if (applyBtn) {
-            applyBtn.disabled = !hasVisualSelection;
-            applyBtn.style.opacity = hasVisualSelection ? '1' : '0.5';
+            applyBtn.disabled = !hasSelection;
+            applyBtn.style.opacity = hasSelection ? '1' : '0.5';
         }
 
         // Update Revert Selected button
@@ -3136,8 +3698,8 @@ export class FullScreenBottomPanel {
             revertBtn = document.querySelector('#fs-bass-revert-selected');
         }
         if (revertBtn) {
-            revertBtn.disabled = !hasVisualSelection;
-            revertBtn.style.opacity = hasVisualSelection ? '1' : '0.5';
+            revertBtn.disabled = !hasSelection;
+            revertBtn.style.opacity = hasSelection ? '1' : '0.5';
         }
     }
 

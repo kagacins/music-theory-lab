@@ -601,33 +601,51 @@ export class ChordLabBottomPanel {
             if (!this.tooltipsEnabled) return;
 
             const rect = button.getBoundingClientRect();
-            const tooltipHeight = 160;
+            const gap = 12;
+            const edgePadding = 10;
 
-            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-            tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
+            // Make tooltip temporarily visible to measure actual dimensions
+            tooltip.style.visibility = 'hidden';
+            tooltip.style.opacity = '0';
+            tooltip.style.display = 'block';
+            tooltip.style.transform = 'none'; // Reset transform to measure true width
+            const actualHeight = tooltip.offsetHeight;
+            const actualWidth = tooltip.offsetWidth;
 
-            // Ensure it stays in viewport
-            requestAnimationFrame(() => {
-                const tooltipRect = tooltip.getBoundingClientRect();
-                if (tooltipRect.top < 10) {
-                    tooltip.style.top = (rect.bottom + 12) + 'px';
-                }
-                if (tooltipRect.left < 10) {
-                    tooltip.style.left = '10px';
-                    tooltip.style.transform = 'none';
-                }
-                if (tooltipRect.right > window.innerWidth - 10) {
-                    tooltip.style.left = (window.innerWidth - tooltipRect.width - 10) + 'px';
-                    tooltip.style.transform = 'none';
-                }
-            });
+            // Calculate horizontal position - center over button but shift if it would overflow
+            let leftPos = rect.left + rect.width / 2;
+            let transformX = 'translateX(-50%)'; // Default: center over button
+
+            // Check if tooltip would overflow right edge
+            const tooltipRightEdge = leftPos + (actualWidth / 2);
+            if (tooltipRightEdge > window.innerWidth - edgePadding) {
+                // Shift left to fit within screen
+                leftPos = window.innerWidth - actualWidth - edgePadding;
+                transformX = 'none'; // No centering transform needed
+            }
+            // Check if tooltip would overflow left edge
+            const tooltipLeftEdge = leftPos - (actualWidth / 2);
+            if (tooltipLeftEdge < edgePadding && transformX === 'translateX(-50%)') {
+                leftPos = edgePadding;
+                transformX = 'none';
+            }
+
+            // Calculate vertical position - prefer above, fall back to below
+            let topPos = rect.top - actualHeight - gap;
+            if (topPos < edgePadding) {
+                // Not enough space above, show below
+                topPos = rect.bottom + gap;
+            }
+
+            tooltip.style.left = leftPos + 'px';
+            tooltip.style.top = topPos + 'px';
+            tooltip.style.transform = transformX;
 
             // Update inversion highlighting when tooltip opens
             updateInversionHighlight();
 
-            tooltip.style.opacity = '1';
             tooltip.style.visibility = 'visible';
+            tooltip.style.opacity = '1';
         };
 
         // Hide tooltip function

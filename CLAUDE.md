@@ -518,15 +518,22 @@ Tailwind's `text-white` class will NOT work due to the `-webkit-text-fill-color`
 
 ---
 
-## CRITICAL: Popup/Modal Click Events in Fullscreen Tabs (Composition Studio & Chord Lab)
+## CRITICAL: Popup/Modal Click Events in Fullscreen Tabs (Composition Studio, Chord Lab & Scale Explorer)
 
-**When creating ANY overlay (popups, modals, legends, floating panels) that appears over the tabbed Composition Studio (New) or Chord Lab tabs, you MUST set `pointer-events: auto`.**
+**When creating ANY overlay (popups, modals, legends, floating panels) that appears over the tabbed Composition Studio (New), Chord Lab, or Scale Explorer tabs, you MUST set `pointer-events: auto`.**
 
-Both the Composition Studio and Chord Lab use complex layered canvas systems where click events can "pass through" overlaid elements to the canvas beneath them. This causes popups to close immediately when clicking their buttons because the click registers on the canvas instead of the button.
+These fullscreen tabbed interfaces use complex layered canvas systems where click events can "pass through" overlaid elements to the canvas beneath them. This causes popups to close immediately when clicking their buttons because the click registers on the canvas instead of the button.
+
+### Affected Areas:
+- **Composition Studio** (`studio-new` tab) - Notation canvases
+- **Chord Lab** (`chord-lab` tab) - Chord visualization canvases
+- **Scale Explorer** (`scale-explorer` tab) - Scale visualization canvases
+- **Unified Recommendations Modal** - Opens over these tabs
 
 ### This applies to ALL overlays including:
 - Floating nudges/notifications (coach engine)
 - Legend popups (chord function colors)
+- Info popups (? help buttons in Unified Recommendations Modal)
 - Context menus
 - Modal dialogs
 - Floating panels
@@ -562,13 +569,18 @@ if (clickInPopupBounds) {
 ```
 
 ### Why This Happens:
-The Composition Studio's notation canvases may have event handlers or CSS properties that interfere with normal event bubbling. The combination of:
+The fullscreen tab canvases (Composition Studio, Chord Lab, Scale Explorer) may have event handlers or CSS properties that interfere with normal event bubbling. The combination of:
 1. Maximum z-index (2147483647)
 2. `pointer-events: auto`
 3. `isolation: isolate`
 4. Geometric bounds checking
 
 ...ensures popups work reliably regardless of the underlying canvas structure.
+
+### Recent Fixes Using This Pattern:
+- `ModalHelpers.js` - `showSectionInfo()` for Unified Recommendations Modal info popups
+- `FullScreenBottomPanel.js` - Various popup elements in dock panels
+- `coachEngine/index.js` - Coach nudge popups
 
 ---
 

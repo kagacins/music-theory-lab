@@ -86,7 +86,7 @@ import {
 } from './MusicUtils.js';
 import { setupHoldToPlay, playChord, stopChord } from './AudioPlayback.js';
 import { updatePersistentProgressionBar } from './StructureBuilders.js';
-import { createSeparator } from './UIHelpers.js';
+import { createSeparator, showLoadingSplash } from './UIHelpers.js';
 import { renderActiveTab } from './TabNavigation.js';
 
 // ============================================================================

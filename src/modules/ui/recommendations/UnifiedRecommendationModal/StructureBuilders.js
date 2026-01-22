@@ -846,6 +846,7 @@ export function createDurationToggle() {
  */
 export function createWeightsButton() {
     const btn = document.createElement('button');
+    btn.id = 'unified-weights-btn';
     btn.innerHTML = '⚙️';
     btn.title = 'Adjust recommendation scoring weights';
     btn.style.cssText = `

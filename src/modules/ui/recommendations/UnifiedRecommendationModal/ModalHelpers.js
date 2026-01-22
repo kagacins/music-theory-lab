@@ -58,6 +58,8 @@ export function showSectionInfo(sectionId, title, description) {
     // Remove existing info popup if any
     const existing = document.getElementById('section-info-popup');
     if (existing) existing.remove();
+    const existingBackdrop = document.getElementById('section-info-backdrop');
+    if (existingBackdrop) existingBackdrop.remove();
 
     const popup = document.createElement('div');
     popup.id = 'section-info-popup';
@@ -71,29 +73,50 @@ export function showSectionInfo(sectionId, title, description) {
         box-shadow: 0 20px 40px rgba(0,0,0,0.3);
         padding: 24px;
         max-width: 400px;
-        z-index: 100001;
+        z-index: 2147483647;
+        pointer-events: auto;
+        isolation: isolate;
     `;
     popup.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
             <h3 style="margin: 0; font-size: 18px; color: #374151;">${title}</h3>
-            <button id="close-section-info" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #9ca3af; padding: 4px;">&times;</button>
+            <button id="close-section-info" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #9ca3af; padding: 4px; pointer-events: auto;">&times;</button>
         </div>
         <p style="margin: 0; color: #6b7280; line-height: 1.6; font-size: 14px;">${description}</p>
     `;
 
-    // Backdrop
+    // Backdrop - must also have pointer-events: auto to capture clicks
     const backdrop = document.createElement('div');
     backdrop.id = 'section-info-backdrop';
-    backdrop.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100000;';
-    backdrop.onclick = () => { popup.remove(); backdrop.remove(); };
+    backdrop.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.3);
+        z-index: 2147483646;
+        pointer-events: auto;
+        isolation: isolate;
+    `;
+
+    // Close on backdrop click
+    backdrop.onclick = (e) => {
+        if (e.target === backdrop) {
+            popup.remove();
+            backdrop.remove();
+        }
+    };
 
     document.body.appendChild(backdrop);
     document.body.appendChild(popup);
 
-    popup.querySelector('#close-section-info').onclick = () => {
-        popup.remove();
-        backdrop.remove();
-    };
+    // Close button handler
+    const closeBtn = popup.querySelector('#close-section-info');
+    if (closeBtn) {
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            popup.remove();
+            backdrop.remove();
+        };
+    }
 }
 
 /**

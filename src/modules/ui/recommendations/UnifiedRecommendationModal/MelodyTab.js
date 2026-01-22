@@ -582,13 +582,14 @@ function renderMelodyPhrasesView(container, currentChord, key) {
         { id: 'decelerating', label: 'Decelerating' }
     ];
 
+    // Ordered to reflect typical song structure from beginning to end
     const sectionTypes = [
+        { id: 'intro', label: 'Intro' },
         { id: 'verse', label: 'Verse' },
+        { id: 'prechorus', label: 'Pre-Chorus' },
         { id: 'chorus', label: 'Chorus' },
         { id: 'bridge', label: 'Bridge' },
-        { id: 'intro', label: 'Intro' },
-        { id: 'outro', label: 'Outro' },
-        { id: 'prechorus', label: 'Pre-Chorus' }
+        { id: 'outro', label: 'Outro' }
     ];
 
     const densityOptions = [

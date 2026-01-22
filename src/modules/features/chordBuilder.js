@@ -429,30 +429,51 @@ function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = 
         const spaceAbove = rect.top;
         const spaceBelow = window.innerHeight - rect.bottom;
         const gap = 12; // Gap between button and tooltip
+        const edgePadding = 8; // Minimum padding from screen edges
 
-        // Make tooltip temporarily visible to measure actual height
+        // Make tooltip temporarily visible to measure actual dimensions
         tooltip.style.visibility = 'hidden';
         tooltip.style.opacity = '0';
         tooltip.style.display = 'block';
+        tooltip.style.transform = 'none'; // Reset transform to measure true width
         const actualHeight = tooltip.offsetHeight;
+        const actualWidth = tooltip.offsetWidth;
+
+        // Calculate horizontal position - center over button but shift if it would overflow
+        let leftPos = rect.left + rect.width / 2;
+        let transformX = '-50%'; // Default: center over button
+
+        // Check if tooltip would overflow right edge
+        const tooltipRightEdge = leftPos + (actualWidth / 2);
+        if (tooltipRightEdge > window.innerWidth - edgePadding) {
+            // Shift left to fit within screen
+            leftPos = window.innerWidth - actualWidth - edgePadding;
+            transformX = '0'; // No centering transform needed
+        }
+        // Check if tooltip would overflow left edge
+        const tooltipLeftEdge = leftPos - (actualWidth / 2);
+        if (tooltipLeftEdge < edgePadding && transformX === '-50%') {
+            leftPos = edgePadding;
+            transformX = '0';
+        }
 
         // Prefer showing above if there's enough space
         if (spaceAbove >= actualHeight + gap) {
             // Show above
-            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.left = leftPos + 'px';
             tooltip.style.top = (rect.top - actualHeight - gap) + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
+            tooltip.style.transform = `translateX(${transformX})`;
         } else if (spaceBelow >= actualHeight + gap) {
             // Show below if not enough space above
-            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.left = leftPos + 'px';
             tooltip.style.top = (rect.bottom + gap) + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
+            tooltip.style.transform = `translateX(${transformX})`;
         } else {
             // Show above anyway if neither has enough space, but adjust to fit
             const topPosition = Math.max(gap, rect.top - actualHeight - gap);
-            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.left = leftPos + 'px';
             tooltip.style.top = topPosition + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
+            tooltip.style.transform = `translateX(${transformX})`;
         }
 
         // Now make it visible with animation
