@@ -38,7 +38,7 @@ import { showWhatIfSandbox } from '../modules/ui/whatIfSandbox.js';
 import { initChordFunctionLegend, showLegend as showChordFunctionLegend, hideLegend as hideChordFunctionLegend, toggleLegend as toggleChordFunctionLegend } from '../modules/ui/chordFunctionLegend.js';
 // Phase 3: Guided Learning Journeys
 // Learn tab is lazy loaded when user clicks the tab (see tabs.js)
-import { dispatchBuilderEvent } from '../modules/ui/lessonGuidedMode.js';
+import { dispatchBuilderEvent, showSpotlight } from '../modules/ui/lessonGuidedMode.js';
 import { startLetItBeTutorial } from '../modules/teaching/letItBeTutorial.js';
 // Tier 1: Teaching-Composition Integration
 import { initTheoryMoments, toggleTheoryMoments, recallTheoryMoment } from '../modules/teaching/theoryMoments.js';
@@ -2430,6 +2430,7 @@ export function setupWindowExports() {
     // Let It Be Tutorial
     window.startLetItBeTutorial = startLetItBeTutorial;
     window.dispatchBuilderEvent = dispatchBuilderEvent;
+    window.showSpotlight = showSpotlight;
 
     // Builder state getters (for other modules)
     window.getBuilderRootIndex = getBuilderRootIndex;

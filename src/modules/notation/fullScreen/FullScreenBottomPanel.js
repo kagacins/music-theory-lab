@@ -128,6 +128,10 @@ export class FullScreenBottomPanel {
         } else {
             // Open the new panel
             this.activePanel = panelId;
+            // Dispatch event for tutorial system
+            window.dispatchEvent(new CustomEvent('fsDockPanelOpened', {
+                detail: { panelId }
+            }));
         }
         this._saveToStorage(STORAGE_KEYS.ACTIVE_PANEL, this.activePanel || '');
         this._updateUI();
@@ -1942,6 +1946,11 @@ export class FullScreenBottomPanel {
                     window.refreshNotationFromProgression?.();
                     window.renderProgressionDisplay?.('melody-progression-visualization', false);
                     this._renderChordsPanel(this.container.querySelector('#fs-dock-panel-content'));
+
+                    // Dispatch chordReordered event for tutorial system
+                    window.dispatchEvent(new CustomEvent('chordReordered', {
+                        detail: { fromIndex: oldIndex, toIndex: newIndex }
+                    }));
                 }
             },
             onAdd: (evt) => {
@@ -2600,6 +2609,19 @@ export class FullScreenBottomPanel {
                     shutter.start();
                 }
             }
+
+            // Dispatch progressionChordAdded event for tutorial system
+            // This is the same event dispatched by addChordToProgressionByParams in ProgressionController.js
+            window.dispatchEvent(new CustomEvent('progressionChordAdded', {
+                detail: {
+                    chord: `${rootName} ${type}`,
+                    root: rootName,
+                    type: type,
+                    inversion: inversion,
+                    position: insertAtIndex,
+                    key: key
+                }
+            }));
         } else {
             // Even if insert failed, refresh panel to show current state
             const panelContent = this.container?.querySelector('#fs-dock-panel-content');

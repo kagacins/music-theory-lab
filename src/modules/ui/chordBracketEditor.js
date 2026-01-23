@@ -857,6 +857,11 @@ export function showChordBracketEditor(chordIndex, region, event) {
     currentEditorIndex = chordIndex;
     lastSelectedChordIndex = chordIndex;  // Remember for insertion even after editor closes
 
+    // Dispatch event for tutorial system
+    window.dispatchEvent(new CustomEvent('chordBracketEditorOpened', {
+        detail: { chordIndex, chord }
+    }));
+
     // Create the editor element
     editorElement = document.createElement('div');
     editorElement.id = 'chord-bracket-editor-popup';
@@ -1198,6 +1203,11 @@ function attachEditorEventListeners(editor, chordIndex, key) {
             if (window.updateChordInversion) {
                 window.updateChordInversion(chordIndex, inversion, true, false);
             }
+
+            // Dispatch event for tutorial system
+            window.dispatchEvent(new CustomEvent('chordBracketInversionChanged', {
+                detail: { chordIndex, inversion }
+            }));
 
             // Update button highlighting immediately
             inversionBtns.forEach(b => {

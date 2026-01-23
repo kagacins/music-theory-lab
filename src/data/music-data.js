@@ -1096,6 +1096,32 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
     const intervals = scaleDef.intervals;
     const numDegrees = intervals.length;
 
+    // Build a set of scale note indices (0-11) for validation
+    const scaleNoteIndices = new Set(intervals.map(interval => (rootIndex + interval) % 12));
+
+    /**
+     * Check if all notes of a chord are in the scale
+     * @param {string} chordRoot - Root note of the chord
+     * @param {string} chordType - Chord type from CHORD_DEFINITIONS
+     * @returns {boolean} True if all chord notes are in the scale
+     */
+    const isChordInScale = (chordRoot, chordType) => {
+        const chordDef = CHORD_DEFINITIONS[chordType];
+        if (!chordDef || !chordDef.intervals) return false;
+
+        const chordRootIndex = noteArray.indexOf(chordRoot);
+        if (chordRootIndex === -1) return false;
+
+        // Check each interval in the chord
+        for (const interval of chordDef.intervals) {
+            const noteIndex = (chordRootIndex + interval) % 12;
+            if (!scaleNoteIndices.has(noteIndex)) {
+                return false; // This chord note is not in the scale
+            }
+        }
+        return true;
+    };
+
     // For scales with fewer than 7 notes (pentatonic, blues, etc.),
     // we still generate chords but with limited degrees
     const triads = [];
@@ -1129,13 +1155,15 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
             : ROMAN_NUMERALS[degree];
         const romanSuffix = quality.romanSuffix || '';
 
-        // Add triad
-        triads.push({
-            root: chordRoot,
-            type: quality.triad,
-            roman: romanBase + romanSuffix,
-            degree: degree + 1
-        });
+        // Only add triad if all its notes are in the scale
+        if (isChordInScale(chordRoot, quality.triad)) {
+            triads.push({
+                root: chordRoot,
+                type: quality.triad,
+                roman: romanBase + romanSuffix,
+                degree: degree + 1
+            });
+        }
 
         // Calculate 6th, 7th, 9th, and 11th intervals for extended chords
         // 6th is 5 scale degrees up (same as 13th in jazz, but we use 6th for simpler chords)
@@ -1160,15 +1188,18 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
 
         // === 6th Chords ===
         // Only add 6th chords for Major and Minor triads (not diminished/augmented)
+        // and only if all chord notes are in the scale
         if (quality.triad === 'Major' || quality.triad === 'Minor') {
             const sixthType = quality.triad === 'Major' ? 'Major 6th' : 'Minor 6th';
-            const sixthRoman = romanBase + '6';
-            sixths.push({
-                root: chordRoot,
-                type: sixthType,
-                roman: sixthRoman,
-                degree: degree + 1
-            });
+            if (isChordInScale(chordRoot, sixthType)) {
+                const sixthRoman = romanBase + '6';
+                sixths.push({
+                    root: chordRoot,
+                    type: sixthType,
+                    roman: sixthRoman,
+                    degree: degree + 1
+                });
+            }
         }
 
         // === 7th Chords ===
@@ -1207,12 +1238,15 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
                 seventhRoman += '7';
             }
 
-            sevenths.push({
-                root: chordRoot,
-                type: seventhType,
-                roman: seventhRoman,
-                degree: degree + 1
-            });
+            // Only add 7th chord if all its notes are in the scale
+            if (isChordInScale(chordRoot, seventhType)) {
+                sevenths.push({
+                    root: chordRoot,
+                    type: seventhType,
+                    roman: seventhRoman,
+                    degree: degree + 1
+                });
+            }
 
             // === 9th Chords ===
             // 9th chords are 7th chords + the 9th
@@ -1239,26 +1273,29 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
                     ninthRoman += '9';
                 }
 
-                ninths.push({
-                    root: chordRoot,
-                    type: ninthType,
-                    roman: ninthRoman,
-                    degree: degree + 1
-                });
+                // Only add 9th chord if all its notes are in the scale
+                if (isChordInScale(chordRoot, ninthType)) {
+                    ninths.push({
+                        root: chordRoot,
+                        type: ninthType,
+                        roman: ninthRoman,
+                        degree: degree + 1
+                    });
+                }
             }
 
             // === 11th Chords ===
             // 11th chords extend 9th chords
             // Typically used on minor chords and dominant chords
             // Major chords with natural 11 clash (major 3rd vs perfect 4th), so we include #11 versions
-            if (quality.triad === 'Minor') {
+            if (quality.triad === 'Minor' && isChordInScale(chordRoot, 'Minor 11th')) {
                 elevenths.push({
                     root: chordRoot,
                     type: 'Minor 11th',
                     roman: romanBase + '11',
                     degree: degree + 1
                 });
-            } else if (seventhType === 'Dominant 7th') {
+            } else if (seventhType === 'Dominant 7th' && isChordInScale(chordRoot, 'Dominant 11th')) {
                 elevenths.push({
                     root: chordRoot,
                     type: 'Dominant 11th',
@@ -1270,7 +1307,8 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
 
         // === Add9 Extensions ===
         // Add9 = triad + 9th (no 7th) - works on Major and Minor triads
-        if (quality.triad === 'Major' || quality.triad === 'Minor') {
+        // Only add if all chord notes are in the scale
+        if ((quality.triad === 'Major' || quality.triad === 'Minor') && isChordInScale(chordRoot, 'Add9')) {
             extensions.push({
                 root: chordRoot,
                 type: 'Add9',

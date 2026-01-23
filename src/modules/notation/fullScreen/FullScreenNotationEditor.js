@@ -52,6 +52,9 @@ if (typeof window !== 'undefined') {
     }
 }
 
+// Import guided mode event dispatcher for tutorial integration
+import { dispatchBuilderEvent, isGuidedModeActive } from '../../ui/lessonGuidedMode.js';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -2385,8 +2388,16 @@ export class FullScreenNotationEditor {
             if (!isOpen) {
                 closeAllSubmenus();
                 hideCategoryLabels();
+                // Dispatch event for guided mode tutorials when FAB is closed
+                if (isGuidedModeActive()) {
+                    dispatchBuilderEvent('fabClosed', { tab: 'studio-new' });
+                }
             } else {
                 showCategoryLabels();
+                // Dispatch event for guided mode tutorials when FAB is opened
+                if (isGuidedModeActive()) {
+                    dispatchBuilderEvent('fabOpened', { tab: 'studio-new' });
+                }
             }
         });
 
@@ -2394,6 +2405,7 @@ export class FullScreenNotationEditor {
         categories.forEach(category => {
             const categoryBtn = category.querySelector('.fs-fab-category-btn');
             const submenu = category.querySelector('.fs-fab-submenu');
+            const categoryType = category.dataset.category;
 
             categoryBtn?.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2407,6 +2419,15 @@ export class FullScreenNotationEditor {
                     closeAllSubmenus();
                     submenu?.classList.remove('hidden');
                     activeSubmenu = submenu;
+
+                    // Dispatch events for guided mode tutorials
+                    if (isGuidedModeActive()) {
+                        if (categoryType === 'settings') {
+                            dispatchBuilderEvent('settingsSectionClicked', {});
+                        } else if (categoryType === 'playback') {
+                            dispatchBuilderEvent('playbackSectionClicked', {});
+                        }
+                    }
                 }
             });
         });
@@ -2451,6 +2472,10 @@ export class FullScreenNotationEditor {
                 const bpm = parseInt(e.target.value);
                 bpmValue.textContent = bpm;
                 window.setBPM?.(bpm);
+                // Dispatch event for guided mode tutorials
+                if (isGuidedModeActive()) {
+                    dispatchBuilderEvent('bpmChanged', { bpm });
+                }
             });
         }
 

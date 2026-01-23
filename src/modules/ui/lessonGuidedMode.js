@@ -175,22 +175,34 @@ function disableNewTabButtons() {
         btn.style.pointerEvents = 'none';
     });
 
-    console.log('[GuidedMode] Disabled New tab buttons for tutorial');
+    // Disable the tooltips toggle in Chord Lab during tutorial
+    // This prevents users from accidentally enabling tooltips which can interfere with the tutorial flow
+    const tooltipsToggle = document.querySelector('#fs-library-tooltips');
+    if (tooltipsToggle) {
+        const toggleContainer = tooltipsToggle.closest('.flex.items-center');
+        if (toggleContainer) {
+            toggleContainer.dataset.tutorialDisabled = 'true';
+            toggleContainer.style.opacity = '0.4';
+            toggleContainer.style.pointerEvents = 'none';
+        }
+    }
+
+    console.log('[GuidedMode] Disabled New tab buttons and tooltips toggle for tutorial');
 }
 
 /**
- * Re-enable "New" mode tab buttons after the tutorial ends
+ * Re-enable "New" mode tab buttons and other disabled elements after the tutorial ends
  */
 function enableNewTabButtons() {
-    // Re-enable all buttons we disabled
-    const disabledBtns = document.querySelectorAll('[data-tutorial-disabled="true"]');
-    disabledBtns.forEach(btn => {
-        btn.removeAttribute('data-tutorial-disabled');
-        btn.style.opacity = '';
-        btn.style.pointerEvents = '';
+    // Re-enable all elements we disabled (tab buttons, tooltips toggle, etc.)
+    const disabledElements = document.querySelectorAll('[data-tutorial-disabled="true"]');
+    disabledElements.forEach(el => {
+        el.removeAttribute('data-tutorial-disabled');
+        el.style.opacity = '';
+        el.style.pointerEvents = '';
     });
 
-    console.log('[GuidedMode] Re-enabled New tab buttons');
+    console.log('[GuidedMode] Re-enabled New tab buttons and tooltips toggle');
 }
 
 // ===========================================
@@ -225,6 +237,9 @@ export function startGuidedMode(config) {
         actionHistory: [],
         validationCallback: null
     };
+
+    // Set global flag for tutorial-aware components (e.g., suppress duration warning modals)
+    window.isTutorialInProgress = true;
 
     // Switch to target tab first (so we can save its state)
     switchTab(targetTab);
@@ -315,6 +330,7 @@ export function endGuidedMode(completed = false) {
     removeFloatingBanner();
     removeSpotlight();
     removeStepIndicator();
+    removeIntroDimmingOverlay();
 
     // Restore page styles (remove padding, unlock scrolling)
     restorePageStyles();
@@ -328,8 +344,17 @@ export function endGuidedMode(completed = false) {
     // Clear tutorial expected note (used for assisted placement)
     window.tutorialExpectedNote = null;
 
+    // Clear global tutorial flag
+    window.isTutorialInProgress = false;
+
     // Re-enable chord card tooltips (they may have been disabled during site tutorial)
     document.body.classList.remove('progression-tooltips-disabled');
+
+    // Re-enable tooltips/details in fullscreen Chord Lab (they may have been disabled during tutorial)
+    const chordLabEditor = window.getFullScreenChordLabEditor?.();
+    if (chordLabEditor?.bottomPanel?.setTooltipsEnabled) {
+        chordLabEditor.bottomPanel.setTooltipsEnabled(true);
+    }
 
     // Clean up any expanded chord cards and open tooltips
     // First, collapse all chord cards using the proper function
@@ -613,6 +638,7 @@ function returnToLesson() {
     removeFloatingBanner();
     removeSpotlight();
     removeStepIndicator();
+    removeIntroDimmingOverlay();
 
     // Restore page styles (remove padding, unlock scrolling)
     restorePageStyles();
@@ -625,6 +651,9 @@ function returnToLesson() {
 
     // Clear tutorial expected note (used for assisted placement)
     window.tutorialExpectedNote = null;
+
+    // Clear global tutorial flag
+    window.isTutorialInProgress = false;
 
     // Re-enable chord card tooltips (they may have been disabled during site tutorial)
     document.body.classList.remove('progression-tooltips-disabled');
@@ -651,8 +680,8 @@ function returnToLesson() {
     }
 
     if (isSiteTutorial) {
-        // For site tutorials, stay in Composition Studio
-        switchTab('melody');
+        // For site tutorials, stay on the current tab (don't switch)
+        // The user can navigate away manually if they want
     } else {
         // For Theory Academy lessons, go back to Learn tab and show the lesson
         switchTab('learn');
@@ -777,7 +806,8 @@ function showCurrentStep() {
         // Pass whether this is an info-only step (no validation required)
         const isInfoOnly = !currentStep.validation;
         const extraHeight = currentStep.spotlightExtraHeight || 0;
-        showStepIndicator(currentStep.targetElement, stepIndex + 1, isInfoOnly, extraHeight);
+        const indicatorOffset = currentStep.indicatorOffset || 0;
+        showStepIndicator(currentStep.targetElement, stepIndex + 1, isInfoOnly, extraHeight, indicatorOffset);
     } else {
         removeStepIndicator();
     }
@@ -818,10 +848,14 @@ function showCurrentStep() {
 
 /**
  * Show a "Continue" button for info-only steps
+ * Uses "Start Tutorial" for step 0, "Continue" for other steps
  */
 function showNextButton() {
     const instructionContainer = document.getElementById('guided-step-instruction');
     if (!instructionContainer) return;
+
+    const isFirstStep = guidedModeState.stepIndex === 0;
+    const buttonText = isFirstStep ? 'Start Tutorial' : 'Continue';
 
     // Check if button already exists
     let nextBtn = instructionContainer.querySelector('#guided-continue-btn');
@@ -829,18 +863,28 @@ function showNextButton() {
         nextBtn = document.createElement('button');
         nextBtn.id = 'guided-continue-btn';
         nextBtn.className = 'ml-4 px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white font-medium rounded-lg transition inline-flex items-center gap-1';
-        nextBtn.innerHTML = `
-            Continue
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-        `;
         nextBtn.addEventListener('click', () => {
+            // Remove intro dimming overlay when advancing from step 0
+            removeIntroDimmingOverlay();
             advanceToNextStep();
         });
         instructionContainer.appendChild(nextBtn);
     }
+
+    // Update button text based on step
+    nextBtn.innerHTML = `
+        ${buttonText}
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+    `;
+
     nextBtn.classList.remove('hidden');
+
+    // Show dimming overlay for intro step (step 0 with no target)
+    if (isFirstStep && !guidedModeState.currentStep?.targetElement) {
+        showIntroDimmingOverlay();
+    }
 }
 
 /**
@@ -1264,10 +1308,20 @@ function restoreTabState() {
 
 let currentSpotlightTarget = null;
 
-function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
-    removeSpotlight();
+/**
+ * Show spotlight on a target element
+ * Exported for use by tutorials that need to dynamically spotlight elements
+ */
+export function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
+    console.log('[GuidedMode] showSpotlight called with:', targetSelector);
+
+    // Remove highlighting from previous target (but keep overlay to prevent flash)
+    document.querySelectorAll('.guided-spotlight-target').forEach(el => {
+        el.classList.remove('guided-spotlight-target');
+    });
 
     let targetEl = document.querySelector(targetSelector);
+    console.log('[GuidedMode] showSpotlight found element:', targetEl ? 'yes' : 'no', targetEl ? targetEl.getBoundingClientRect() : 'N/A');
 
     // Special handling for Circle of Fifths - it may need time to appear
     if (targetSelector === '#circle-of-fifths-panel' && (!targetEl || targetEl.classList.contains('hidden'))) {
@@ -1277,6 +1331,32 @@ function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
             showSpotlight(targetSelector, position, extraHeight);
         }, 300);
         return;
+    }
+
+    // Special handling for fullscreen Chord Lab selectors - elements may not be rendered yet
+    // These selectors look for dynamically rendered elements
+    const isChordLabDynamicSelector = (
+        (targetSelector.includes('#fs-chord-grid-container') && targetSelector.includes('.key-button-wrapper')) ||
+        (targetSelector.includes('#fs-fab-quick-buttons') && targetSelector.includes('button')) ||
+        (targetSelector.includes('#fs-chordlab-fab') && targetSelector.includes('button'))
+    );
+    if (isChordLabDynamicSelector && !targetEl) {
+        // Track retry count to avoid infinite loops
+        const retryCount = (showSpotlight._retryCount || 0) + 1;
+        if (retryCount < 15) {
+            showSpotlight._retryCount = retryCount;
+            console.log(`[GuidedMode] Chord Lab dynamic element not found yet, retry ${retryCount}/15:`, targetSelector);
+            setTimeout(() => {
+                showSpotlight(targetSelector, position, extraHeight);
+            }, 200);
+            return;
+        } else {
+            console.warn('[GuidedMode] Chord Lab dynamic element not found after max retries:', targetSelector);
+            showSpotlight._retryCount = 0;
+        }
+    } else if (targetEl) {
+        // Reset retry count on success
+        showSpotlight._retryCount = 0;
     }
 
     if (!targetEl) {
@@ -1319,13 +1399,19 @@ function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
         }
     }
 
-    // Create overlay using SVG for more reliable cutout
-    spotlightOverlay = document.createElement('div');
-    spotlightOverlay.id = 'guided-spotlight-overlay';
-    spotlightOverlay.className = 'fixed inset-0 z-[9998] pointer-events-none';
-    // Start hidden - will be shown after scroll completes
-    spotlightOverlay.style.opacity = '0';
-    spotlightOverlay.style.transition = 'opacity 0.2s ease-in-out';
+    // Reuse existing overlay if it exists (prevents flash between steps)
+    const overlayExists = !!spotlightOverlay;
+    if (!spotlightOverlay) {
+        // Create overlay using SVG for more reliable cutout
+        spotlightOverlay = document.createElement('div');
+        spotlightOverlay.id = 'guided-spotlight-overlay';
+        spotlightOverlay.className = 'fixed inset-0 z-[9998] pointer-events-none';
+        // Start hidden - will be shown after scroll completes
+        spotlightOverlay.style.opacity = '0';
+        spotlightOverlay.style.transition = 'opacity 0.2s ease-in-out';
+        document.body.appendChild(spotlightOverlay);
+    }
+
     // Store extra height for updateSpotlightPosition
     spotlightOverlay.dataset.extraHeight = extraHeight;
 
@@ -1335,10 +1421,15 @@ function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
     // Add pulsing border to target
     targetEl.classList.add('guided-spotlight-target');
 
-    document.body.appendChild(spotlightOverlay);
-
     // Ensure target is visible (scroll the content area, not the window since it's locked)
-    // The spotlight will be made visible after scroll completes
+    // For existing overlay, show immediately for fixed elements to prevent flash
+    if (overlayExists) {
+        const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons, #fab-melody-quick-buttons, #fs-fab-quick-buttons, #fs-chordlab-fab');
+        if (isFixed) {
+            // Already visible, just update position
+            spotlightOverlay.style.opacity = '1';
+        }
+    }
     ensureTargetVisible(targetEl);
 }
 
@@ -1348,14 +1439,36 @@ function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
  * @param {number} extraHeight - Extra height to add to the spotlight cutout (for expandable elements)
  */
 function updateSpotlightPosition(targetEl, extraHeight = 0) {
-    if (!spotlightOverlay || !targetEl) return;
+    if (!spotlightOverlay) return;
 
     // Get extra height from dataset if not provided (for resize/scroll updates)
     if (extraHeight === 0 && spotlightOverlay.dataset.extraHeight) {
         extraHeight = parseInt(spotlightOverlay.dataset.extraHeight, 10) || 0;
     }
 
+    // If the element is disconnected from DOM (stale reference due to re-render),
+    // re-query using the stored selector
+    if (!targetEl || !targetEl.isConnected) {
+        if (currentSpotlightTarget) {
+            targetEl = document.querySelector(currentSpotlightTarget);
+            if (targetEl) {
+                // Also update the class on the new element
+                targetEl.classList.add('guided-spotlight-target');
+            }
+        }
+        if (!targetEl) {
+            console.warn('[GuidedMode] updateSpotlightPosition: element disconnected and re-query failed');
+            return;
+        }
+    }
+
     const rect = targetEl.getBoundingClientRect();
+
+    // Skip position update if element has invalid dimensions (might be mid-render)
+    if (rect.width === 0 || rect.height === 0) {
+        return;
+    }
+
     const padding = 12;
 
     // Account for the banner height offset
@@ -1373,8 +1486,9 @@ function updateSpotlightPosition(targetEl, extraHeight = 0) {
     const cutoutHeight = Math.max(10, cutoutBottom - cutoutTop);
 
     // Use SVG mask for more reliable spotlight effect
+    // IMPORTANT: pointer-events: none on SVG ensures clicks pass through to elements below
     spotlightOverlay.innerHTML = `
-        <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;">
+        <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0; pointer-events: none;">
             <defs>
                 <mask id="spotlight-mask">
                     <rect width="100%" height="100%" fill="white"/>
@@ -1384,7 +1498,7 @@ function updateSpotlightPosition(targetEl, extraHeight = 0) {
                           fill="black" rx="8"/>
                 </mask>
             </defs>
-            <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#spotlight-mask)"/>
+            <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#spotlight-mask)" style="pointer-events: none;"/>
         </svg>
     `;
 }
@@ -1397,7 +1511,7 @@ function ensureTargetVisible(targetEl) {
     if (!targetEl) return;
 
     // Check if element is in a fixed position container (like FAB, floating controls)
-    const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons');
+    const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons, #fab-melody-quick-buttons, #fs-fab-quick-buttons, #fs-chordlab-fab');
 
     if (isFixed) {
         // For fixed elements, just show spotlight immediately without scrolling
@@ -1504,16 +1618,121 @@ function removeSpotlight() {
         delete mainHeader.dataset.shiftedForSpotlight;
         console.log('[GuidedMode] Restored header position');
     }
+
+    // Clean up any tutorial-applied styles on all elements
+    cleanupTutorialStyles();
+}
+
+/**
+ * Show a dimming overlay for intro steps (step 0 with no target)
+ * This makes it clear the user should click "Start Tutorial"
+ */
+let introDimmingOverlay = null;
+
+function showIntroDimmingOverlay() {
+    if (introDimmingOverlay) return; // Already showing
+
+    introDimmingOverlay = document.createElement('div');
+    introDimmingOverlay.id = 'intro-dimming-overlay';
+    introDimmingOverlay.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 9997;
+        pointer-events: none;
+        transition: opacity 0.3s ease-in-out;
+    `;
+    document.body.appendChild(introDimmingOverlay);
+    console.log('[GuidedMode] Showing intro dimming overlay');
+}
+
+function removeIntroDimmingOverlay() {
+    if (introDimmingOverlay) {
+        introDimmingOverlay.remove();
+        introDimmingOverlay = null;
+        console.log('[GuidedMode] Removed intro dimming overlay');
+    }
+}
+
+/**
+ * Clean up all tutorial-applied visual styles from elements
+ * This ensures buttons and UI elements return to their standard state when tutorial ends
+ */
+function cleanupTutorialStyles() {
+    // Remove animate-pulse class from all elements
+    document.querySelectorAll('.animate-pulse').forEach(el => {
+        el.classList.remove('animate-pulse');
+    });
+
+    // Reset inline styles that tutorials commonly apply
+    // Target common tutorial-highlighted elements
+    const selectors = [
+        '#fs-fab-quick-buttons button',
+        '#fs-root-buttons button',
+        '#fs-chord-grid-container .key-button-wrapper',
+        '#fs-chord-grid-container button',
+        '#header-tab-btn-builder',
+        '#header-tab-btn-melody',
+        '#header-tab-btn-chordlab-new',
+        '#header-tab-btn-studio-new',
+        '[id^="header-tab-btn-"]',
+        '.chord-card-wrapper',
+        '.section-container',
+        '#add-section-btn',
+        '#builder-note-selector button',
+        '#builder-chord-type-selector button',
+        '#fab-builder-quick-buttons button',
+        '#fab-melody-quick-buttons button',
+        '#mobile-fab button'
+    ];
+
+    selectors.forEach(selector => {
+        document.querySelectorAll(selector).forEach(el => {
+            // Clear common tutorial-applied inline styles
+            el.style.boxShadow = '';
+            el.style.transform = '';
+            el.style.backgroundColor = '';
+            el.style.border = '';
+            el.style.outline = '';
+            // Remove any lingering classes
+            el.classList.remove('animate-pulse', 'ring-2', 'ring-offset-2');
+        });
+    });
+
+    console.log('[GuidedMode] Cleaned up tutorial styles');
 }
 
 // ===========================================
 // STEP INDICATOR
 // ===========================================
 
-function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false, extraHeight = 0) {
+function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false, extraHeight = 0, indicatorOffset = 0) {
     removeStepIndicator();
 
     const targetEl = document.querySelector(targetSelector);
+
+    // Retry logic for dynamically rendered elements (like FAB buttons in Chord Lab)
+    const isDynamicSelector = (
+        (targetSelector.includes('#fs-chord-grid-container') && targetSelector.includes('.key-button-wrapper')) ||
+        (targetSelector.includes('#fs-chordlab-fab') && targetSelector.includes('button'))
+    );
+    if (!targetEl && isDynamicSelector) {
+        const retryCount = (showStepIndicator._retryCount || 0) + 1;
+        if (retryCount < 15) {
+            showStepIndicator._retryCount = retryCount;
+            console.log(`[GuidedMode] Step indicator target not found yet, retry ${retryCount}/15:`, targetSelector);
+            setTimeout(() => {
+                showStepIndicator(targetSelector, stepNumber, isInfoOnly, extraHeight, indicatorOffset);
+            }, 200);
+            return;
+        } else {
+            console.warn('[GuidedMode] Step indicator target not found after max retries:', targetSelector);
+            showStepIndicator._retryCount = 0;
+        }
+    } else if (targetEl) {
+        showStepIndicator._retryCount = 0;
+    }
+
     if (!targetEl) return;
 
     stepIndicator = document.createElement('div');
@@ -1522,10 +1741,11 @@ function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false, extra
     // Start hidden - will be shown after scroll completes
     stepIndicator.style.opacity = '0';
     stepIndicator.style.transition = 'opacity 0.2s ease-in-out';
-    // Store the selector, step number, and extra height for repositioning
+    // Store the selector, step number, extra height, and indicator offset for repositioning
     stepIndicator.dataset.targetSelector = targetSelector;
     stepIndicator.dataset.stepNumber = stepNumber;
     stepIndicator.dataset.extraHeight = extraHeight;
+    stepIndicator.dataset.indicatorOffset = indicatorOffset;
 
     // Different label for info-only steps vs action steps
     const labelText = isInfoOnly ? 'See here' : 'Do this step';
@@ -1552,6 +1772,14 @@ function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false, extra
     updateStepIndicatorPosition(targetEl, extraHeight);
 
     document.body.appendChild(stepIndicator);
+
+    // For fixed elements (like FAB) or chord grid elements, show immediately
+    // These don't need scrolling and the spotlight is already visible
+    const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons, #fab-melody-quick-buttons, #fs-fab-quick-buttons, #fs-chordlab-fab');
+    const isChordGrid = targetEl.closest('#fs-chord-grid-container');
+    if (isFixed || isChordGrid) {
+        stepIndicator.style.opacity = '1';
+    }
 }
 
 /**
@@ -1562,18 +1790,31 @@ function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false, extra
 function updateStepIndicatorPosition(targetEl, extraHeight = 0) {
     if (!stepIndicator) return;
 
-    // If no targetEl provided, try to get it from stored selector
-    if (!targetEl && stepIndicator.dataset.targetSelector) {
+    // If no targetEl provided or element is disconnected, try to re-query using stored selector
+    if ((!targetEl || !targetEl.isConnected) && stepIndicator.dataset.targetSelector) {
         targetEl = document.querySelector(stepIndicator.dataset.targetSelector);
     }
-    if (!targetEl) return;
+    // If still can't find element, keep indicator visible at current position rather than hiding
+    if (!targetEl || !targetEl.isConnected) {
+        // Don't hide the indicator - just skip the position update
+        // The element might re-appear after a re-render
+        return;
+    }
 
     // Get extra height from dataset if not provided
     if (extraHeight === 0 && stepIndicator.dataset.extraHeight) {
         extraHeight = parseInt(stepIndicator.dataset.extraHeight, 10) || 0;
     }
 
+    // Get indicator offset from dataset (for fine-tuning vertical position)
+    const indicatorOffset = parseInt(stepIndicator.dataset.indicatorOffset, 10) || 0;
+
     const rect = targetEl.getBoundingClientRect();
+
+    // Skip position update if element has invalid dimensions (might be mid-render)
+    if (rect.width === 0 || rect.height === 0) {
+        return;
+    }
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
 
@@ -1607,8 +1848,11 @@ function updateStepIndicatorPosition(targetEl, extraHeight = 0) {
     const isFabElement = targetEl.closest('#mobile-fab') ||
                          targetEl.id?.includes('fab') ||
                          targetEl.closest('#fab-builder-quick-buttons') ||
-                         targetEl.closest('#fab-melody-quick-buttons');
-    const fabOffset = isFabElement ? 70 : 50; // Extra space for FAB buttons
+                         targetEl.closest('#fab-melody-quick-buttons') ||
+                         targetEl.closest('#fs-fab-quick-buttons') ||
+                         targetEl.closest('#fs-chordlab-fab');
+    // fabOffset determines base vertical spacing, indicatorOffset allows per-step fine-tuning
+    const fabOffset = (isFabElement ? 70 : 50) + indicatorOffset;
 
     // For right-edge elements, always position above (never to the left with wrong arrow)
     if (isNearRightEdge && isNarrowElement) {
@@ -1686,6 +1930,7 @@ function setupActionListeners() {
     window.addEventListener('fabClosed', handleBuilderAction);
     window.addEventListener('bpmChanged', handleBuilderAction);
     window.addEventListener('settingsSectionClicked', handleBuilderAction);
+    window.addEventListener('playbackSectionClicked', handleBuilderAction);
 
     // Listen for Circle of Fifths and Quick Add events
     window.addEventListener('circleOfFifthsOpened', handleBuilderAction);
@@ -1708,6 +1953,12 @@ function setupActionListeners() {
     window.addEventListener('notationNotesDeselected', handleBuilderAction);
     window.addEventListener('notationTieCreated', handleBuilderAction);
     window.addEventListener('notationRestModeToggled', handleBuilderAction);
+
+    // Listen for fullscreen Composition Studio events
+    window.addEventListener('fsDockPanelOpened', handleBuilderAction);
+    window.addEventListener('metronomePanelOpened', handleBuilderAction);
+    window.addEventListener('chordBracketEditorOpened', handleBuilderAction);
+    window.addEventListener('chordBracketInversionChanged', handleBuilderAction);
 }
 
 function cleanupActionListeners() {
@@ -1730,6 +1981,7 @@ function cleanupActionListeners() {
     window.removeEventListener('fabClosed', handleBuilderAction);
     window.removeEventListener('bpmChanged', handleBuilderAction);
     window.removeEventListener('settingsSectionClicked', handleBuilderAction);
+    window.removeEventListener('playbackSectionClicked', handleBuilderAction);
     window.removeEventListener('circleOfFifthsOpened', handleBuilderAction);
     window.removeEventListener('quickAddFormOpened', handleBuilderAction);
 
@@ -1750,6 +2002,12 @@ function cleanupActionListeners() {
     window.removeEventListener('notationNotesDeselected', handleBuilderAction);
     window.removeEventListener('notationTieCreated', handleBuilderAction);
     window.removeEventListener('notationRestModeToggled', handleBuilderAction);
+
+    // Remove fullscreen Composition Studio event listeners
+    window.removeEventListener('fsDockPanelOpened', handleBuilderAction);
+    window.removeEventListener('metronomePanelOpened', handleBuilderAction);
+    window.removeEventListener('chordBracketEditorOpened', handleBuilderAction);
+    window.removeEventListener('chordBracketInversionChanged', handleBuilderAction);
 }
 
 function handleBuilderAction(event) {
@@ -1884,6 +2142,10 @@ function validateAction(action, validation) {
         // Settings section clicked in FAB
         case 'settings_section_clicked':
             return action.type === 'settingsSectionClicked';
+
+        // Playback section clicked in FAB
+        case 'playback_section_clicked':
+            return action.type === 'playbackSectionClicked';
 
         // Quick Add form opened
         case 'quick_add_form_opened':
@@ -2032,6 +2294,37 @@ function validateAction(action, validation) {
             return action.type === 'notationRestModeToggled' &&
                    action.detail?.isRestMode === false;
 
+        // ========== Fullscreen Composition Studio Validation Types ==========
+
+        // Fullscreen dock panel opened
+        case 'fs_panel_opened':
+            if (action.type !== 'fsDockPanelOpened') return false;
+            return !value || action.detail?.panelId === value;
+
+        // Metronome panel opened in fullscreen studio
+        case 'metronome_panel_opened':
+            return action.type === 'metronomePanelOpened';
+
+        // Chord bracket editor opened (edit button clicked in fullscreen studio)
+        case 'chord_bracket_editor_opened':
+            if (action.type !== 'chordBracketEditorOpened') return false;
+            // If value is specified, check if it matches the chord index
+            if (value !== undefined && value !== null) {
+                return action.detail?.chordIndex === value;
+            }
+            return true;
+
+        // Inversion changed via chord bracket editor
+        case 'chord_bracket_inversion_changed':
+            if (action.type !== 'chordBracketInversionChanged') return false;
+            // If value is specified as {chordIndex, inversion}, check both
+            if (typeof value === 'object' && value !== null) {
+                const indexMatch = value.chordIndex === undefined || action.detail?.chordIndex === value.chordIndex;
+                const inversionMatch = value.inversion === undefined || action.detail?.inversion === value.inversion;
+                return indexMatch && inversionMatch;
+            }
+            return true;
+
         default:
             console.warn('[GuidedMode] Unknown validation type:', type);
             return false;
@@ -2119,8 +2412,12 @@ const guidedModeStyles = `
 
 .guided-spotlight-target {
     animation: guidedPulse 1.5s infinite;
-    position: relative;
     z-index: 9997 !important;
+}
+
+/* For non-fixed elements that need stacking context, add position relative via JS */
+.guided-spotlight-target:not([class*="fixed"]) {
+    position: relative;
 }
 
 #lesson-guided-banner {

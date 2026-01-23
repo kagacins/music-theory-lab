@@ -111,6 +111,10 @@ class FullScreenChordLabEditor {
         // State
         this.sidebarCollapsed = this._loadFromStorage(STORAGE_KEYS.SIDEBAR_COLLAPSED, false);
 
+        // Track the "base" root for diatonic mode - this persists through temporary root changes
+        // when clicking diatonic chords (which temporarily change the builder root to play the chord)
+        this._diatonicBaseRoot = null;
+
         // Event handler bindings
         this._boundKeyHandler = this._handleKeyDown.bind(this);
         this._boundBuilderUpdateHandler = this._onBuilderUpdate.bind(this);
@@ -802,6 +806,10 @@ class FullScreenChordLabEditor {
     }
 
     _selectRoot(index) {
+        // Update the diatonic base root - this is the "real" root the user selected
+        // (as opposed to temporary root changes when clicking diatonic chords)
+        this._diatonicBaseRoot = index;
+
         // Select root note (without playing - we'll use startBuilderChord for sustained playback)
         if (window.selectBuilderRootNote) {
             window.selectBuilderRootNote(index, false);
@@ -825,6 +833,31 @@ class FullScreenChordLabEditor {
     }
 
     _onBuilderUpdate() {
+        const chordLibraryMode = getChordLibraryMode();
+
+        // In non-diatonic mode, sync the base root with the actual builder root
+        if (chordLibraryMode !== 'diatonic') {
+            this._diatonicBaseRoot = getBuilderRootIndex();
+        } else {
+            // In diatonic mode, we need to detect if this is a "real" root change (keyboard click)
+            // vs a temporary change (diatonic chord click that will be restored).
+            // Diatonic chord clicks: setRoot(temp) → play → setRoot(original) - root is restored after builderUpdated
+            // Keyboard clicks: setRoot(new) - root stays at new value
+            // We use a microtask to check the root AFTER the current call stack completes.
+            // If the root is different from our base AND stable, then it's a real change.
+            const rootAtEventTime = getBuilderRootIndex();
+            queueMicrotask(() => {
+                const rootAfterStack = getBuilderRootIndex();
+                // If root is still the same after the call stack settles, it's a real change
+                if (rootAfterStack === rootAtEventTime && rootAfterStack !== this._diatonicBaseRoot) {
+                    // This is a real root change (keyboard click), update base root
+                    this._diatonicBaseRoot = rootAfterStack;
+                    // Re-sync UI to show correct root highlighting
+                    this._syncFromBuilderState();
+                }
+            });
+        }
+
         // Sync UI when builder state changes
         this._syncFromBuilderState();
         // Update chord button highlighting (preserves tooltips)
@@ -847,11 +880,20 @@ class FullScreenChordLabEditor {
 
         const enhPref = getEnharmonicPreference();
         const notes = enhPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
-        const rootIndex = getBuilderRootIndex();
+        const builderRootIndex = getBuilderRootIndex();
         const chordType = getBuilderChordType();
         const inversion = getBuilderInversion();
         const octaveShift = getBuilderOctaveShift();
         const lhType = getBuilderLHType?.() || 'off';
+        const chordLibraryMode = getChordLibraryMode();
+
+        // In diatonic mode, use the base root (the root the user actually selected)
+        // rather than the temporary builder root (which changes when clicking diatonic chords).
+        // Initialize base root if not set.
+        if (this._diatonicBaseRoot === null) {
+            this._diatonicBaseRoot = builderRootIndex;
+        }
+        const rootIndexForUI = (chordLibraryMode === 'diatonic') ? this._diatonicBaseRoot : builderRootIndex;
 
         // Update root buttons (light theme)
         const rootButtons = this.tabContent.querySelectorAll('#fs-root-buttons button');
@@ -859,7 +901,7 @@ class FullScreenChordLabEditor {
             btn.textContent = notes[i];
             // Reset classes first
             btn.className = 'px-1.5 py-1.5 text-xs font-semibold rounded';
-            if (i === rootIndex) {
+            if (i === rootIndexForUI) {
                 btn.classList.add('bg-amber-500', 'text-white');
             } else {
                 btn.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-100', 'border', 'border-gray-200');

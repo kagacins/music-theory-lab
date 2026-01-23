@@ -121,10 +121,66 @@ export class ChordLabBottomPanel {
         }
     }
 
+    /**
+     * Programmatically set tooltips/details enabled state
+     * Used by tutorial system to disable tooltips during tutorials
+     * @param {boolean} enabled - Whether tooltips should be enabled
+     */
+    setTooltipsEnabled(enabled) {
+        this.tooltipsEnabled = enabled;
+
+        // Update the checkbox if it exists
+        const tooltipsToggle = document.getElementById('fs-library-tooltips');
+        if (tooltipsToggle) {
+            tooltipsToggle.checked = enabled;
+        }
+
+        // Update label styling
+        const offLabel = document.getElementById('fs-details-off-label');
+        const onLabel = document.getElementById('fs-details-on-label');
+        if (offLabel) {
+            offLabel.className = `text-[10px] font-semibold ${!enabled ? 'text-white' : 'text-white/60'}`;
+        }
+        if (onLabel) {
+            onLabel.className = `text-[10px] font-semibold ${enabled ? 'text-white' : 'text-white/60'}`;
+        }
+
+        // Hide any open tooltip when disabled
+        if (!enabled) {
+            this._hideAllTooltips();
+        }
+
+        // Disable/enable the toggle container during tutorials
+        const toggleContainer = tooltipsToggle?.closest('.flex.items-center');
+        if (toggleContainer) {
+            if (!enabled && window.isTutorialInProgress) {
+                toggleContainer.dataset.tutorialDisabled = 'true';
+                toggleContainer.style.opacity = '0.4';
+                toggleContainer.style.pointerEvents = 'none';
+            } else {
+                delete toggleContainer.dataset.tutorialDisabled;
+                toggleContainer.style.opacity = '';
+                toggleContainer.style.pointerEvents = '';
+            }
+        }
+    }
+
     init() {
         this._renderDock();
         // Show library panel content by default
         this._renderMainContent('library');
+
+        // Listen for progression updates (e.g., when cleared from Composition Studio)
+        // to keep the Progression panel in sync
+        window.addEventListener('progressionUpdated', () => {
+            // Only refresh if the progression panel is currently visible
+            if (this.currentPanel === 'progression') {
+                const mainContent = this.container.querySelector('#fs-chordlab-main-content');
+                if (mainContent) {
+                    this._renderProgressionContent(mainContent);
+                }
+            }
+        });
     }
 
     openPanel(panelId) {
@@ -434,6 +490,26 @@ export class ChordLabBottomPanel {
                     this._hideAllTooltips();
                 }
             });
+
+            // Disable tooltips toggle and turn OFF tooltips during tutorials
+            if (window.isTutorialInProgress) {
+                // Force tooltips OFF during tutorial
+                this.tooltipsEnabled = false;
+                tooltipsToggle.checked = false;
+                // Update label styling
+                const offLabel = document.getElementById('fs-details-off-label');
+                const onLabel = document.getElementById('fs-details-on-label');
+                if (offLabel) offLabel.className = 'text-[10px] font-semibold text-white';
+                if (onLabel) onLabel.className = 'text-[10px] font-semibold text-white/60';
+
+                // Disable the toggle container
+                const toggleContainer = tooltipsToggle.closest('.flex.items-center');
+                if (toggleContainer) {
+                    toggleContainer.dataset.tutorialDisabled = 'true';
+                    toggleContainer.style.opacity = '0.4';
+                    toggleContainer.style.pointerEvents = 'none';
+                }
+            }
         }
     }
 
@@ -1038,6 +1114,49 @@ export class ChordLabBottomPanel {
         }
 
         container.appendChild(grid);
+
+        // Check if no chords were found (grid is empty or has no children)
+        if (grid.children.length === 0) {
+            const enhPref = getEnharmonicPreference();
+            const notes = enhPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+            const rootNote = notes[getBuilderRootIndex()];
+            const scaleFilter = getScaleFilter();
+            const paletteFilter = getPaletteFilter();
+
+            // Build descriptive filter names
+            const filterParts = [];
+            if (mode === 'diatonic') {
+                filterParts.push(`Diatonic to ${scaleFilter || 'Major'}`);
+            } else if (scaleFilter) {
+                filterParts.push(`${scaleFilter} scale`);
+            }
+            if (paletteFilter && CHORD_PALETTES[paletteFilter]) {
+                filterParts.push(`${CHORD_PALETTES[paletteFilter].label} palette`);
+            }
+
+            const filterDescription = filterParts.length > 0
+                ? filterParts.join(' + ')
+                : 'the selected filters';
+
+            // Create empty state message
+            const emptyState = document.createElement('div');
+            emptyState.className = 'flex flex-col items-center justify-center h-full text-center p-8';
+            emptyState.innerHTML = `
+                <svg class="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-500 mb-2">No Chords Found</h3>
+                <p class="text-sm text-gray-400 max-w-md">
+                    No chords match <strong>${filterDescription}</strong> with root <strong>${rootNote}</strong>.
+                </p>
+                <p class="text-xs text-gray-400 mt-3">
+                    Try changing the scale, palette, or switching to Chromatic mode.
+                </p>
+            `;
+
+            container.innerHTML = '';
+            container.appendChild(emptyState);
+        }
     }
 
     /**

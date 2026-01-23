@@ -5673,9 +5673,22 @@ export class CompositionState {
     /**
      * Get unique chords (not measures) - NEW single source of truth method
      * Use this instead of progressionData for reading chord progression
+     * CRITICAL FIX: Uses storedProgressionData as the source of truth to handle
+     * cases where multiple short-duration chords share a single measure.
+     * Falls back to measure-based reconstruction only if storedProgressionData is empty.
      * @returns {Array} Array of unique chord objects
      */
     getChords() {
+        // Use stored progression data if available (source of truth)
+        // This is critical for sub-measure chords (e.g., 2-beat chords in 4/4 time)
+        // where multiple chords share a single measure
+        if (this.storedProgressionData && this.storedProgressionData.length > 0) {
+            // Return a copy to prevent external mutations
+            return this.storedProgressionData.map(chord => ({ ...chord }));
+        }
+
+        // Fallback: reconstruct from measures (for backward compatibility)
+        // This path is only taken if syncWithProgressionData was never called
         const chords = [];
         const seenChordIndices = new Set();
 

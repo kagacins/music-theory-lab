@@ -1089,6 +1089,11 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
         detail: { message: 'Cards reordered', type: 'success' }
     }));
 
+    // Dispatch chordReordered event for tutorial system
+    window.dispatchEvent(new CustomEvent('chordReordered', {
+        detail: { fromIndex: sortedPositions[0], toIndex: newVisualOrder[0] }
+    }));
+
     // CRITICAL: Remove the dragged item from DOM before re-rendering
     // to prevent duplicate chord cards
     if (draggedItem.parentNode) {

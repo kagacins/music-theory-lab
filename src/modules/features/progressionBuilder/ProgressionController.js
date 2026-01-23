@@ -1294,6 +1294,13 @@ export function updateChordDuration(index, sourceElement, directBeatsValue = nul
 
     // Check if we need user confirmation for truncation
     if (result && result.needsConfirmation) {
+        // During tutorials, auto-accept the truncation without showing dialog
+        if (window.isTutorialInProgress) {
+            compositionState.forceApplyChordDuration(index, totalBeats);
+            finalizeDurationChange(index, totalBeats);
+            return;
+        }
+
         showTruncationWarningDialog(result.truncationInfo, () => {
             // User confirmed - force apply the change
             compositionState.forceApplyChordDuration(index, totalBeats);
@@ -2660,13 +2667,18 @@ export async function clearProgression(skipConfirmation = false) {
         window.renderMelodyNotationIfNeeded();
     }
 
-    // Phase 2.2: Dispatch event for chord recommendations sidebar
+    // Phase 2.2: Dispatch event for chord recommendations sidebar and fullscreen chord lab
     window.dispatchEvent(new CustomEvent('progressionUpdated', {
         detail: {
             progression: [],
             key: trainerState.currentKey
         }
     }));
+
+    // Update classic chord lab's progression panel
+    if (window.renderBuilderProgressionCards) {
+        window.renderBuilderProgressionCards();
+    }
 
     // Clear coach badges immediately (don't wait for async coach analysis)
     if (window.updateMeasureCoachItems) {

@@ -1132,9 +1132,22 @@ export function showDuplicateSectionDialog(sectionId, sectionLabel, compositionS
     overlay.style.zIndex = '9995';
     overlay.style.pointerEvents = 'auto';
 
+    // Check if tutorial banner is present and adjust dialog positioning
+    const tutorialBanner = document.getElementById('guided-lesson-banner');
+    if (tutorialBanner) {
+        const bannerHeight = tutorialBanner.getBoundingClientRect().height;
+        overlay.style.paddingTop = `${bannerHeight + 20}px`; // Add padding to push dialog below banner
+        overlay.style.alignItems = 'flex-start'; // Align to top with padding instead of center
+    }
+
     // Create dialog
     const dialog = document.createElement('div');
     dialog.className = 'bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4';
+
+    // Add margin-top when tutorial is active to ensure dialog is fully visible
+    if (tutorialBanner) {
+        dialog.style.marginTop = '40px';
+    }
     dialog.innerHTML = `
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Duplicate "${sectionLabel}"</h3>
         <p class="text-sm text-gray-600 mb-4">Choose what to include in the duplicate:</p>

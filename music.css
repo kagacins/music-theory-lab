@@ -109,18 +109,28 @@ body[data-active-tab="studio-new"] #tab-studio-new {
 body[data-active-tab="studio-new"] .rm-overlay,
 body[data-active-tab="studio-new"] .unified-modal-overlay,
 body[data-active-tab="studio-new"] [id$="-modal"],
-body[data-active-tab="studio-new"] [id$="-overlay"],
+body[data-active-tab="studio-new"] [id$="-overlay"]:not(#guided-spotlight-overlay),
 body[data-active-tab="studio-new"] [id$="-dialog"] {
     pointer-events: auto;
+}
+
+/* Tutorial spotlight must allow clicks through to underlying elements */
+#guided-spotlight-overlay {
+    pointer-events: none !important;
 }
 
 /* Ensure all children of dialogs/modals also have pointer events */
 body[data-active-tab="studio-new"] .rm-overlay *,
 body[data-active-tab="studio-new"] .unified-modal-overlay *,
 body[data-active-tab="studio-new"] [id$="-modal"] *,
-body[data-active-tab="studio-new"] [id$="-overlay"] *,
+body[data-active-tab="studio-new"] [id$="-overlay"]:not(#guided-spotlight-overlay) *,
 body[data-active-tab="studio-new"] [id$="-dialog"] * {
     pointer-events: auto;
+}
+
+/* Tutorial spotlight children must also allow clicks through */
+#guided-spotlight-overlay * {
+    pointer-events: none !important;
 }
 
 /* Tab-specific action bar element visibility */
