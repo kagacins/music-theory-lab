@@ -370,21 +370,28 @@ export class FullScreenBottomPanel {
             this._updateApplyToSelectedButton();
         });
 
-        // Listen for section changes to re-render chord panels
+        // Listen for section and chord structure changes to re-render chord panels
         const compState = getCompositionState();
         if (compState?.events) {
-            const sectionEvents = [
+            const structureEvents = [
                 'sectionCreated', 'sectionUpdated', 'sectionDeleted',
                 'sectionDuplicated', 'sectionsReordered', 'sectionsReorderedByIds',
                 'chordAddedToSection', 'chordRemovedFromSection',
                 'sectionChordsReordered', 'sectionsUpdatedAfterDelete',
-                'sectionsUpdatedAfterInsert', 'sectionsUpdatedAfterReorder'
+                'sectionsUpdatedAfterInsert', 'sectionsUpdatedAfterReorder',
+                'chordInserted', 'chordRemoved'  // Chord structure changes
             ];
-            sectionEvents.forEach(eventName => {
+            structureEvents.forEach(eventName => {
                 compState.events.on(eventName, () => {
-                    // Re-render panels that show chord cards when sections change
+                    // Re-render panels that show chord cards when structure changes
                     if (this.activePanel === 'chords' || this.activePanel === 'quick-add' || this.activePanel === 'auto-bass') {
                         this._renderPanelContent();
+                        // Update selection visuals after re-render (for paste highlighting)
+                        setTimeout(() => {
+                            if (window.updateMultiSelectVisuals) {
+                                window.updateMultiSelectVisuals();
+                            }
+                        }, 0);
                     }
                 });
             });
@@ -545,6 +552,10 @@ export class FullScreenBottomPanel {
     }
 
     _renderChordsPanel(container) {
+        // Save scroll position before re-rendering (container may be recreated)
+        const existingCardsContainer = container.querySelector('#fs-chord-cards-container');
+        const savedScrollLeft = existingCardsContainer?.scrollLeft || 0;
+
         const compState = getCompositionState();
         // Use buildSectionView() to get all sections including auto-materialized ungrouped sections
         const sections = compState?.buildSectionView?.() || compState?.getSections?.() || [];
@@ -782,6 +793,36 @@ export class FullScreenBottomPanel {
         } else {
             // Scroll View: horizontal scrolling with section-aware layout
             this._renderFSScrollViewCards(cardsContainer, chords, key, sections);
+        }
+
+        // Scroll handling - center on selected chords (after paste) or restore position
+        if (cardsContainer) {
+            cardsContainer.style.scrollBehavior = 'auto';
+
+            // Check if there are selected chords (e.g., after paste)
+            const selectedIndices = window.getSelectedChordIndicesArray?.() || [];
+            if (selectedIndices.length > 0) {
+                // Scroll to center the first selected chord in the visible area
+                const firstSelectedIndex = Math.min(...selectedIndices);
+                const targetCard = cardsContainer.querySelector(`[data-chord-index="${firstSelectedIndex}"]`);
+                if (targetCard) {
+                    const containerWidth = cardsContainer.clientWidth;
+                    const cardWidth = targetCard.offsetWidth;
+                    // offsetLeft is the card's left edge relative to the scrollable content
+                    // To center: scroll so card's center aligns with container's center
+                    const cardCenter = targetCard.offsetLeft + (cardWidth / 2);
+                    const scrollTo = cardCenter - (containerWidth / 2);
+                    cardsContainer.scrollLeft = Math.max(0, scrollTo);
+                }
+            } else if (savedScrollLeft > 0) {
+                // No selection, restore saved scroll position
+                cardsContainer.scrollLeft = savedScrollLeft;
+            }
+
+            // Re-enable smooth scrolling after a microtask
+            queueMicrotask(() => {
+                cardsContainer.style.scrollBehavior = 'smooth';
+            });
         }
 
         // Render ambient tension strip (respects Experience Mode internally)
@@ -3369,15 +3410,8 @@ export class FullScreenBottomPanel {
         }
 
         // Apply to All button
+        // Note: applyBassPatternToAll() has its own confirmation dialog, so we don't add one here
         container.querySelector('#fs-bass-apply')?.addEventListener('click', async () => {
-            const confirmed = await showConfirmModal({
-                title: 'Apply Bass Pattern to All',
-                message: 'This will replace the bass line for all chords with the selected pattern. Continue?',
-                confirmText: 'Apply to All',
-                danger: false
-            });
-            if (!confirmed) return;
-
             if (window.applyBassPatternToAll) {
                 await window.applyBassPatternToAll();
             } else if (window.regenerateAllBass) {

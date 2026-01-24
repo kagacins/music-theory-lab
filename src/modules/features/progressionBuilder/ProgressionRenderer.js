@@ -6010,6 +6010,8 @@ function createPseudoSectionContainer(section, progressionData, key) {
             delayOnTouchOnly: true,
             touchStartThreshold: 5,
             onAdd: function(evt) {
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
                 // Card added from another section/pseudo-section
                 handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
             },
@@ -6018,6 +6020,8 @@ function createPseudoSectionContainer(section, progressionData, key) {
                 if (evt.from !== evt.to) {
                     return;
                 }
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
                 handleCardDragWithinSection(evt, section.id);
             }
         });
@@ -6139,7 +6143,9 @@ function createUnifiedSectionContainer(section, progressionData, key) {
             touchStartThreshold: 5,
             // Handle cards added FROM outside (ungrouped or another section) INTO this section
             onAdd: function(evt) {
-                // Use delegated function for drag handling (not yet migrated)
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
+                // Use delegated function for drag handling
                 handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
             },
             onEnd: function(evt) {
@@ -6148,6 +6154,8 @@ function createUnifiedSectionContainer(section, progressionData, key) {
                 if (evt.from !== evt.to) {
                     return;
                 }
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
                 // Handle card movement within this section (use delegated function)
                 handleCardDragWithinSection(evt, section.id);
             }

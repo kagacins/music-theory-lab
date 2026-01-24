@@ -386,8 +386,17 @@ export class StaffLayoutManager {
         realY >= bounds.y &&
         realY <= bounds.y + bounds.height + verticalTolerance
       ) {
-        // Add index to bounds for consistency with actual positions path
-        return { ...bounds, index };
+        // Add index and calculated staff positions for consistency with actual positions path
+        // This ensures getStaffPositionAtPoint always has treble/bass Y values
+        const systemMarginTop = 30; // Match GRAND_STAFF_DEFAULTS
+        const staffHeight = 80;
+        const staffSpacing = 80;
+        return {
+          ...bounds,
+          index,
+          actualTrebleY: bounds.y + systemMarginTop,
+          actualBassY: bounds.y + systemMarginTop + staffHeight + staffSpacing,
+        };
       }
     }
 

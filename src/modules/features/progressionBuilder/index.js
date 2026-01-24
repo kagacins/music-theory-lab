@@ -96,7 +96,7 @@ import {
 } from './ProgressionDragDrop.js';
 
 // State imports
-import { clearSelection } from '../../state/trainerState.js';
+import { clearSelection, getSelectedIndicesArray } from '../../state/trainerState.js';
 
 // Controller Functions (LARGE EXPORT LIST)
 import {
@@ -450,10 +450,11 @@ if (typeof window !== 'undefined') {
     window.updateMultiSelectVisuals = updateMultiSelectVisuals;
     window.updateBassSelectionUI = updateBassSelectionUI;
     window.updateCustomBassPatternInfo = updateCustomBassPatternInfo;
-    window.copySelectedChords = copySelectedChords;
+    // Note: These are wrapped to automatically get selected indices
+    window.copySelectedChords = () => copySelectedChords(getSelectedIndicesArray());
     window.pasteChords = pasteChords;
-    window.duplicateSelectedChords = duplicateSelectedChords;
-    window.deleteSelectedChords = deleteSelectedChords;
+    window.duplicateSelectedChords = () => duplicateSelectedChords(getSelectedIndicesArray());
+    window.deleteSelectedChords = () => deleteSelectedChords(getSelectedIndicesArray());
     window.highlightChordCard = highlightChordCard;
     window.unhighlightAllChordCards = unhighlightAllChordCards;
     window.expandChordCard = expandChordCard;

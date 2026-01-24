@@ -799,6 +799,15 @@ function showCurrentStep() {
         showSpotlight(currentStep.spotlight, currentStep.spotlightPosition || 'bottom', currentStep.spotlightExtraHeight || 0);
     } else {
         removeSpotlight();
+
+        // If no spotlight but scrollTarget is specified, scroll to that element
+        // This is useful for info steps that need to show a specific UI element
+        if (currentStep.scrollTarget) {
+            const scrollEl = document.querySelector(currentStep.scrollTarget);
+            if (scrollEl) {
+                ensureTargetVisible(scrollEl);
+            }
+        }
     }
 
     // Show step indicator near target element (but not on free explore steps)
@@ -1424,7 +1433,7 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
     // Ensure target is visible (scroll the content area, not the window since it's locked)
     // For existing overlay, show immediately for fixed elements to prevent flash
     if (overlayExists) {
-        const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons, #fab-melody-quick-buttons, #fs-fab-quick-buttons, #fs-chordlab-fab');
+        const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons, #fab-melody-quick-buttons, #fs-fab-quick-buttons, #fs-chordlab-fab, #fs-chordlab-keyboard-area');
         if (isFixed) {
             // Already visible, just update position
             spotlightOverlay.style.opacity = '1';
@@ -1511,7 +1520,8 @@ function ensureTargetVisible(targetEl) {
     if (!targetEl) return;
 
     // Check if element is in a fixed position container (like FAB, floating controls)
-    const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons, #fab-melody-quick-buttons, #fs-fab-quick-buttons, #fs-chordlab-fab');
+    // Also include the fullscreen Chord Lab keyboard area since it's at the top of the layout and can't be scrolled
+    const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons, #fab-melody-quick-buttons, #fs-fab-quick-buttons, #fs-chordlab-fab, #fs-chordlab-keyboard-area');
 
     if (isFixed) {
         // For fixed elements, just show spotlight immediately without scrolling
@@ -1597,6 +1607,19 @@ function ensureTargetVisible(targetEl) {
     }, 400);
 }
 
+/**
+ * Force update the spotlight position based on current element location
+ * Call this after layout changes (e.g., adding margin to parent container)
+ */
+export function forceSpotlightUpdate() {
+    if (!spotlightOverlay || !currentSpotlightTarget) return;
+
+    const targetEl = document.querySelector(currentSpotlightTarget);
+    if (targetEl) {
+        updateSpotlightPosition(targetEl);
+        updateStepIndicatorPosition(targetEl);
+    }
+}
 
 function removeSpotlight() {
     if (spotlightOverlay) {

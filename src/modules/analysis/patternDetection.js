@@ -1442,7 +1442,7 @@ function getNoteValue(note) {
 }
 
 /**
- * Calculate interval in semitones between two notes
+ * Calculate interval in semitones between two notes (pitch class only, 0-11)
  * @param {string} note1 - First note
  * @param {string} note2 - Second note
  * @returns {number|null} Interval in semitones (0-11) or null if invalid
@@ -1452,6 +1452,48 @@ function getInterval(note1, note2) {
     const v2 = getNoteValue(note2);
     if (v1 === -1 || v2 === -1) return null;
     return ((v2 - v1) + 12) % 12;
+}
+
+/**
+ * Calculate signed interval in semitones between two notes (octave-aware)
+ * Positive = ascending, negative = descending
+ * Handles Cb/B# octave boundary correctly (Cb4 = B3, B#3 = C4)
+ * @param {string} note1 - First note with octave (e.g., 'C4', 'Bb3')
+ * @param {string} note2 - Second note with octave
+ * @returns {number|null} Signed interval in semitones or null if invalid
+ */
+function getSignedInterval(note1, note2) {
+    if (!note1 || !note2) return null;
+
+    // Extract pitch class and octave
+    const match1 = note1.match(/^([A-Ga-g][#b]*)(\d+)$/);
+    const match2 = note2.match(/^([A-Ga-g][#b]*)(\d+)$/);
+
+    if (!match1 || !match2) return null;
+
+    const pitch1 = match1[1];
+    let octave1 = parseInt(match1[2], 10);
+    const pitch2 = match2[1];
+    let octave2 = parseInt(match2[2], 10);
+
+    const semitone1 = NOTE_TO_SEMITONE[pitch1];
+    const semitone2 = NOTE_TO_SEMITONE[pitch2];
+
+    if (semitone1 === undefined || semitone2 === undefined) return null;
+
+    // Handle Cb/B# octave boundary:
+    // Cb4 is enharmonically B3 (one octave lower than written)
+    // B#3 is enharmonically C4 (one octave higher than written)
+    if (pitch1 === 'Cb') octave1 -= 1;
+    if (pitch1 === 'B#') octave1 += 1;
+    if (pitch2 === 'Cb') octave2 -= 1;
+    if (pitch2 === 'B#') octave2 += 1;
+
+    // Calculate absolute MIDI-like value
+    const midiValue1 = (octave1 * 12) + semitone1;
+    const midiValue2 = (octave2 * 12) + semitone2;
+
+    return midiValue2 - midiValue1;
 }
 
 /**
@@ -2028,8 +2070,9 @@ export function detectChromaticVoiceMotion(progression) {
                 continue;
             }
 
-            const interval = getInterval(voiceNotes[i-1], voiceNotes[i]);
-            const isChromatic = interval === 1 || interval === 11;
+            // Use octave-aware interval for accurate chromatic detection
+            const signedInterval = getSignedInterval(voiceNotes[i-1], voiceNotes[i]);
+            const isChromatic = signedInterval !== null && Math.abs(signedInterval) === 1;
 
             if (isChromatic) {
                 if (runStart === -1) {
@@ -2260,8 +2303,9 @@ export function detectCommonTonePreservation(progression) {
             // Check if this is parsimonious voice leading (most voices stay still or move by step)
             const prevBass = getChordBassNote(prevChord);
             const currBass = getChordBassNote(currChord);
-            const bassInterval = prevBass && currBass ? getInterval(prevBass, currBass) : null;
-            const isSmoothBass = bassInterval !== null && (bassInterval <= 2 || bassInterval >= 10);
+            // Use octave-aware interval for accurate smooth bass detection
+            const bassInterval = prevBass && currBass ? getSignedInterval(prevBass, currBass) : null;
+            const isSmoothBass = bassInterval !== null && Math.abs(bassInterval) <= 2;
 
             // Pre-compute display strings for message templates
             const commonToneCount = commonTones.length;
@@ -2293,7 +2337,8 @@ export function detectCommonTonePreservation(progression) {
                 smoothBassNote: smoothBassNote,
                 startIndex: i - 1,
                 endIndex: i,
-                chordIndices: [i - 1, i],
+                chordIndex: i,  // Badge on the chord where tone is held TO
+                highlightIndices: [i - 1, i],
                 fromChord: prevChord,
                 toChord: currChord
             });
@@ -2369,7 +2414,8 @@ export function detectFunctionalCycle(progression) {
                 romans: romans,
                 startIndex: i,
                 endIndex: i + 3,
-                chordIndices: [i, i + 1, i + 2, i + 3],
+                chordIndex: i,  // Badge on first chord of cycle
+                highlightIndices: [i, i + 1, i + 2, i + 3],
                 cycleChords: chords.map(c => ({
                     symbol: getChordSymbol(c),
                     roman: c.roman || c.romanNumeral,
@@ -2440,8 +2486,8 @@ export function detectPhraseElision(progression, key) {
                 cadenceType: isAuthentic ? 'authentic' : 'plagal',
                 fromChord: getChordSymbol(prevChord),
                 toChord: getChordSymbol(nextChord),
-                chordIndex: i,
-                chordIndices: [i - 1, i, i + 1],
+                chordIndex: i,  // Badge shows on the elision chord itself
+                highlightIndices: [i - 1, i, i + 1],  // Context highlighting (prev, elision, next)
                 measure: Math.floor(i / 2) + 1 // Approximate measure
             });
             return items; // One elision per analysis
@@ -2518,7 +2564,8 @@ export function detectSequenceContinuationOpportunity(progression) {
                     patternLength: patternLen,
                     startIndex: 0,
                     endIndex: patternLen * 2 - 1,
-                    chordIndices: Array.from({ length: patternLen * 2 }, (_, i) => i),
+                    chordIndex: 0,  // Badge on first chord of pattern
+                    highlightIndices: Array.from({ length: patternLen * 2 }, (_, i) => i),
                     suggestion: 'Consider adding one more repetition (Rule of Three)'
                 });
                 return items;
@@ -2570,9 +2617,25 @@ export function detectStepwiseBassLine(progression) {
             continue;
         }
 
-        const interval = getInterval(bassNotes[i - 1], bassNotes[i]);
-        const isStep = interval === 1 || interval === 2 || interval === 10 || interval === 11;
-        const direction = (interval <= 2) ? 1 : -1; // 1 or 2 = ascending, 10 or 11 = descending
+        // Use octave-aware interval to correctly detect direction
+        const signedInterval = getSignedInterval(bassNotes[i - 1], bassNotes[i]);
+
+        let isStep = false;
+        let direction = 0;
+
+        if (signedInterval !== null) {
+            // Octave-aware: check if it's a stepwise motion (1 or 2 semitones in either direction)
+            const absInterval = Math.abs(signedInterval);
+            isStep = absInterval === 1 || absInterval === 2;
+            direction = signedInterval > 0 ? 1 : -1; // Positive = ascending, negative = descending
+        } else {
+            // Fall back to pitch-class interval if octave info missing
+            const interval = getInterval(bassNotes[i - 1], bassNotes[i]);
+            if (interval !== null) {
+                isStep = interval === 1 || interval === 2 || interval === 10 || interval === 11;
+                direction = (interval <= 2) ? 1 : -1;
+            }
+        }
 
         if (isStep && (runDirection === 0 || runDirection === direction)) {
             runDirection = direction;
@@ -2613,7 +2676,8 @@ export function detectStepwiseBassLine(progression) {
             length: longestRun.length,
             startIndex: longestRun.start,
             endIndex: longestRun.start + longestRun.length - 1,
-            chordIndices: Array.from({ length: longestRun.length }, (_, i) => longestRun.start + i),
+            chordIndex: longestRun.start,  // Badge on first chord of bass line
+            highlightIndices: Array.from({ length: longestRun.length }, (_, i) => longestRun.start + i),
             chords: progression.slice(longestRun.start, longestRun.start + longestRun.length).map(c => ({
                 symbol: getChordSymbol(c),
                 inversion: c.inversion || 0,
@@ -2687,7 +2751,7 @@ export function detectHarmonicAnticipation(progression) {
                         currentInvLabel: currInvLabel,
                         nextInvLabel: nextInvLabel,
                         chordIndex: i,
-                        chordIndices: [i, i + 1]
+                        highlightIndices: [i, i + 1]
                     });
                     return items; // One per analysis
                 }
@@ -2766,7 +2830,8 @@ export function detectPlagalExtension(progression) {
                     })),
                     startIndex: i - 2,
                     endIndex: i + 1,
-                    chordIndices: [i - 2, i - 1, i, i + 1]
+                    chordIndex: i - 2,  // Badge on first chord of pattern
+                    highlightIndices: [i - 2, i - 1, i, i + 1]
                 });
                 return items;
             }
@@ -2790,7 +2855,8 @@ export function detectPlagalExtension(progression) {
                 })),
                 startIndex: i - 2,
                 endIndex: i,
-                chordIndices: [i - 2, i - 1, i]
+                chordIndex: i - 2,  // Badge on first chord of pattern
+                highlightIndices: [i - 2, i - 1, i]
             });
             return items;
         }
@@ -2868,7 +2934,12 @@ export function detectModeMixture(progression, key) {
                 notes: c.notes || []
             })),
             mixRatio: Math.round(mixRatio * 100),
-            chordIndices: progression.map((_, i) => i).filter(i => {
+            // Badge on first borrowed chord, highlight all borrowed chords
+            chordIndex: progression.findIndex((c, i) => {
+                const roman = normalizeRoman(c.roman || c.romanNumeral);
+                return borrowedMinorRomans.some(r => roman.includes(r));
+            }),
+            highlightIndices: progression.map((_, i) => i).filter(i => {
                 const roman = normalizeRoman(progression[i].roman || progression[i].romanNumeral);
                 return borrowedMinorRomans.some(r => roman.includes(r));
             })
@@ -2919,7 +2990,7 @@ export function detectHarmonicDensityChange(progression) {
                 atChordInversion: atChordInv,
                 atChordInvLabel: atChordInvLabel,
                 chordIndex: i,
-                chordIndices: [i - 1, i]
+                highlightIndices: [i - 1, i]
             });
             return items;
         } else if (ratio <= 0.55) {
@@ -2939,7 +3010,7 @@ export function detectHarmonicDensityChange(progression) {
                 atChordInversion: atChordInv,
                 atChordInvLabel: atChordInvLabel,
                 chordIndex: i,
-                chordIndices: [i - 1, i]
+                highlightIndices: [i - 1, i]
             });
             return items;
         }
@@ -3014,7 +3085,9 @@ export function detectExtendedFifthChain(progression) {
             romans: romans,
             startIndex: longestChain.start,
             endIndex: longestChain.start + longestChain.length - 1,
-            chordIndices: Array.from({ length: longestChain.length }, (_, i) => longestChain.start + i),
+            // Badge on first chord of chain, highlight entire chain
+            chordIndex: longestChain.start,
+            highlightIndices: Array.from({ length: longestChain.length }, (_, i) => longestChain.start + i),
             chainChords: chainChords.map(c => ({
                 symbol: getChordSymbol(c),
                 roman: c.roman || c.romanNumeral,

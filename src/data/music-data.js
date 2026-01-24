@@ -2,7 +2,10 @@
 
 const ALL_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const SHARP_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-const FLAT_NOTES =  ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "Cb"];
+// IMPORTANT: Index 11 is B, not Cb. Cb is an enharmonic edge case that should only
+// be used in specific theoretical contexts (like Gb major scale), not as the default
+// flat spelling for pitch class 11. Using "Cb" here caused bugs where B became Cb.
+const FLAT_NOTES =  ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
 // --- CHORD ID GENERATION ---
 // Each chord card gets a unique ID for tracking bass edits across reorders/inserts/removes
@@ -938,7 +941,10 @@ const SCALE_CATEGORIES = {
 const ENHARMONIC_MAP = {
     'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb',
     'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#',
-    'B': 'Cb', 'Cb': 'B' 
+    'B': 'Cb', 'Cb': 'B',
+    'E': 'Fb', 'Fb': 'E',   // Fb used in Gb7, Cb major, etc.
+    'F': 'E#', 'E#': 'F',   // E# used in F# major, C# major, etc.
+    'C': 'B#', 'B#': 'C'    // B# used in C# major, etc.
 };
 
 const KEY_SIGNATURE_TEXT = {

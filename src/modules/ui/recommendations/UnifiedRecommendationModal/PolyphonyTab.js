@@ -33,84 +33,127 @@ import { renderGrandStaffMeasure } from '../../../notation/grandStaff.js';
 
 // Texture types for adding complementary voices
 export const TEXTURE_TYPES = {
+    // === UNIVERSAL TEXTURES (work for both clefs) ===
     PARALLEL_THIRDS: {
         id: 'parallel_thirds',
-        name: 'Parallel Thirds',
-        description: 'Follows melody a third below - classic warm harmony',
-        icon: '🎵'
+        name: 'Parallel 3rds',
+        description: 'Follows melody a third below/above - classic warm harmony',
+        icon: '🎵',
+        clefs: ['treble', 'bass']
     },
     PARALLEL_SIXTHS: {
         id: 'parallel_sixths',
-        name: 'Parallel Sixths',
-        description: 'Follows melody a sixth below - rich, full sound',
-        icon: '🎶'
+        name: 'Parallel 6ths',
+        description: 'Follows melody a sixth below/above - rich, full sound',
+        icon: '🎶',
+        clefs: ['treble', 'bass']
     },
     CONTRARY_MOTION: {
         id: 'contrary',
-        name: 'Contrary Motion',
+        name: 'Contrary',
         description: 'Moves opposite to melody - creates interesting counterpoint',
-        icon: '↕️'
+        icon: '↕️',
+        clefs: ['treble', 'bass']
     },
     PEDAL_ROOT: {
         id: 'pedal_root',
-        name: 'Pedal Tone (Root)',
+        name: 'Pedal (Root)',
         description: 'Sustained chord root - grounding effect',
-        icon: '🔊'
+        icon: '🔊',
+        clefs: ['treble', 'bass']
     },
     PEDAL_FIFTH: {
         id: 'pedal_fifth',
-        name: 'Pedal Tone (Fifth)',
+        name: 'Pedal (5th)',
         description: 'Sustained fifth - adds depth without dissonance',
-        icon: '🎹'
+        icon: '🎹',
+        clefs: ['treble', 'bass']
     },
     RHYTHMIC_COMPLEMENT: {
         id: 'rhythmic',
         name: 'Rhythmic Fill',
         description: 'Fills gaps where main voice has rests',
-        icon: '🥁'
+        icon: '🥁',
+        clefs: ['treble', 'bass']
     },
     HARMONIC_ACCOMPANIMENT: {
         id: 'harmonic_accompaniment',
-        name: 'Harmonic Accompaniment',
+        name: 'Harmonic',
         description: 'Chord tones following the melody rhythm',
-        icon: '🎹'
+        icon: '🎹',
+        clefs: ['treble', 'bass']
     },
     COUNTER_MELODY: {
         id: 'counter',
-        name: 'Counter-Melody',
+        name: 'Counter',
         description: 'Independent complementary line with rhythmic interest',
-        icon: '🎼'
+        icon: '🎼',
+        clefs: ['treble', 'bass']
     },
-    // === NEW TEXTURE TYPES ===
     OBLIQUE_MOTION: {
         id: 'oblique',
-        name: 'Oblique Motion',
+        name: 'Oblique',
         description: 'One voice holds a chord tone while melody moves',
-        icon: '➡️'
+        icon: '➡️',
+        clefs: ['treble', 'bass']
     },
     OCTAVE_DOUBLING: {
         id: 'octave_doubling',
-        name: 'Octave Doubling',
-        description: 'Doubles the melody an octave below',
-        icon: '8️⃣'
+        name: 'Octave',
+        description: 'Doubles the melody an octave below/above',
+        icon: '8️⃣',
+        clefs: ['treble', 'bass']
     },
     CALL_RESPONSE: {
         id: 'call_response',
-        name: 'Call & Response',
+        name: 'Call/Response',
         description: 'Second voice echoes the melody with delay',
-        icon: '🗣️'
+        icon: '🗣️',
+        clefs: ['treble', 'bass']
     },
     DRONE: {
         id: 'drone',
-        name: 'Drone/Sustained',
+        name: 'Drone',
         description: 'Sustained harmony note throughout the measure',
-        icon: '🔉'
+        icon: '🔉',
+        clefs: ['treble', 'bass']
     },
     ARPEGGIATED: {
         id: 'arpeggiated',
-        name: 'Arpeggiated Harmony',
+        name: 'Arpeggio',
         description: 'Broken chord accompaniment following melody rhythm',
-        icon: '🎹'
+        icon: '🎹',
+        clefs: ['treble', 'bass']
+    },
+    // === BASS-SPECIFIC TEXTURES ===
+    ALBERTI_BASS: {
+        id: 'alberti',
+        name: 'Alberti',
+        description: 'Classic broken chord: root-5th-3rd-5th pattern',
+        icon: '🎹',
+        clefs: ['bass']
+    },
+    WALKING_BASS: {
+        id: 'walking',
+        name: 'Walking',
+        description: 'Stepwise motion connecting chord roots - jazz/blues',
+        icon: '🚶',
+        clefs: ['bass']
+    },
+    SHELL_VOICINGS: {
+        id: 'shell',
+        name: 'Shell',
+        description: 'Root + 3rd or Root + 7th - jazz comping style',
+        icon: '🐚',
+        clefs: ['bass']
+    },
+    // === TREBLE-SPECIFIC TEXTURES ===
+    COMPOUND_TENTHS: {
+        id: 'tenths',
+        name: '10ths',
+        description: 'Compound thirds - wide, open voicing below melody',
+        icon: '🔟',
+        clefs: ['treble']
     }
 };
 
@@ -637,41 +680,51 @@ function createTextureTypeSelector() {
     const section = document.createElement('div');
     section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px;';
 
-    const staffLabel = polyphonyState.selectedStaff === 'bass' ? 'Bass' : 'Treble Voice 2';
+    const currentStaff = polyphonyState.selectedStaff;
 
-    // UNIFIED: Show all texture types for both clefs
-    // Staff toggle determines WHERE the texture is applied
-    // More compact layout: smaller padding, tighter spacing
-    const textureOptions = Object.values(TEXTURE_TYPES).map(type => `
-        <div class="texture-type-option" data-type="${type.id}" title="${type.description}" style="
-            padding: 3px 5px;
-            border: 1px solid ${polyphonyState.selectedTextureType === type.id ? '#667eea' : '#e5e7eb'};
-            border-radius: 4px;
-            background: ${polyphonyState.selectedTextureType === type.id ? '#f0f4ff' : 'white'};
-            cursor: pointer;
-            transition: all 0.15s;
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            font-size: 10px;
-        ">
-            <span style="font-size: 11px;">${type.icon}</span>
-            <span style="font-weight: 500; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${type.name}</span>
-        </div>
-    `).join('');
+    // Generate texture options with clef eligibility check
+    const textureOptions = Object.values(TEXTURE_TYPES).map(type => {
+        const isEligible = !type.clefs || type.clefs.includes(currentStaff);
+        const isSelected = polyphonyState.selectedTextureType === type.id && isEligible;
+
+        // Styling based on eligibility and selection
+        const borderColor = !isEligible ? '#e5e7eb' : (isSelected ? '#667eea' : '#e5e7eb');
+        const bgColor = !isEligible ? '#f3f4f6' : (isSelected ? '#f0f4ff' : 'white');
+        const textColor = !isEligible ? '#9ca3af' : '#374151';
+        const cursor = isEligible ? 'pointer' : 'not-allowed';
+        const opacity = isEligible ? '1' : '0.5';
+
+        return `
+            <div class="texture-type-option" data-type="${type.id}" data-eligible="${isEligible}" title="${type.description}${!isEligible ? ' (not available for ' + currentStaff + ' clef)' : ''}" style="
+                padding: 4px 6px;
+                border: 1px solid ${borderColor};
+                border-radius: 4px;
+                background: ${bgColor};
+                cursor: ${cursor};
+                transition: all 0.15s;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 11px;
+                opacity: ${opacity};
+            ">
+                <span style="font-size: 12px;">${type.icon}</span>
+                <span style="font-weight: 500; color: ${textColor}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${type.name}</span>
+            </div>
+        `;
+    }).join('');
+
+    const staffLabel = currentStaff === 'bass' ? 'Bass' : 'Treble Voice 2';
 
     section.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
             <span style="font-weight: 600; font-size: 12px; color: #374151;">Texture Type</span>
-            <div style="display: flex; align-items: center; gap: 4px;">
-                <label style="font-size: 10px; color: #6b7280;">Apply to:</label>
-                <select id="polyphony-staff-select" style="padding: 2px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 10px; background: white;">
-                    <option value="treble" ${polyphonyState.selectedStaff === 'treble' ? 'selected' : ''}>Treble (Voice 2)</option>
-                    <option value="bass" ${polyphonyState.selectedStaff === 'bass' ? 'selected' : ''}>Bass</option>
-                </select>
-            </div>
+            <select id="polyphony-staff-select" style="padding: 2px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 10px; background: white;">
+                <option value="treble" ${currentStaff === 'treble' ? 'selected' : ''}>Treble (Voice 2)</option>
+                <option value="bass" ${currentStaff === 'bass' ? 'selected' : ''}>Bass</option>
+            </select>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; margin-bottom: 8px;">
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-bottom: 8px;">
             ${textureOptions}
         </div>
         <div style="display: flex; gap: 6px; align-items: center;">
@@ -720,11 +773,22 @@ function createTextureTypeSelector() {
         // Texture type selection
         document.querySelectorAll('.texture-type-option').forEach(option => {
             option.addEventListener('click', () => {
+                // Check if this texture is eligible for the current clef
+                const isEligible = option.dataset.eligible === 'true';
+                if (!isEligible) {
+                    // Show a toast or just ignore the click
+                    if (window.showToast) {
+                        window.showToast(`This texture is not available for ${polyphonyState.selectedStaff} clef`, { type: 'info' });
+                    }
+                    return;
+                }
+
                 polyphonyState.selectedTextureType = option.dataset.type;
                 document.querySelectorAll('.texture-type-option').forEach(opt => {
-                    const isSelected = opt.dataset.type === polyphonyState.selectedTextureType;
+                    const optEligible = opt.dataset.eligible === 'true';
+                    const isSelected = opt.dataset.type === polyphonyState.selectedTextureType && optEligible;
                     opt.style.borderColor = isSelected ? '#667eea' : '#e5e7eb';
-                    opt.style.background = isSelected ? '#f0f4ff' : 'white';
+                    opt.style.background = !optEligible ? '#f3f4f6' : (isSelected ? '#f0f4ff' : 'white');
                 });
                 // Auto-regenerate suggestions when texture type changes
                 generatePolyphonySuggestions();
@@ -1347,19 +1411,20 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
     const moodAdj = MOOD_TEXTURE_ADJUSTMENTS[polyphonyState.selectedMood] || MOOD_TEXTURE_ADJUSTMENTS.bright;
 
     // Determine base octaves based on target staff
-    // Bass clef should use octaves 1-3, treble clef should use octaves 3-5
+    // Bass clef should use octaves 2-4 (comfortable reading range), treble clef should use octaves 3-5
     const isBassClef = staff === 'bass';
     const getBaseOctave = (moodBias) => {
         if (isBassClef) {
-            // Bass clef: lower = 1, normal = 2, higher = 3
-            return moodBias === 'lower' ? 1 : (moodBias === 'higher' ? 3 : 2);
+            // Bass clef: lower = 2, normal = 3, higher = 4
+            // (Octave 1 is too low - E1 is below standard piano range and creates excessive ledger lines)
+            return moodBias === 'lower' ? 2 : (moodBias === 'higher' ? 4 : 3);
         } else {
             // Treble clef: lower = 3, normal = 4, higher = 5
             return moodBias === 'lower' ? 3 : (moodBias === 'higher' ? 5 : 4);
         }
     };
 
-    // Helper: Ensure a harmony pitch is below the melody pitch
+    // Helper: Ensure a harmony pitch is below the melody pitch (for treble clef V2)
     const ensureBelowMelody = (harmonyPitch, melodyPitch) => {
         const melodyMidi = pitchToMidi(melodyPitch);
         let harmonyMidi = pitchToMidi(harmonyPitch);
@@ -1367,6 +1432,50 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
             harmonyMidi -= 12;
         }
         return midiToPitch(harmonyMidi, shouldPreferFlats(key));
+    };
+
+    // Helper: Ensure a harmony pitch is above the melody pitch (for bass clef V2)
+    // In bass clef, V2 (texture) should be ABOVE V1 (bass line) so stems don't cross awkwardly
+    const ensureAboveMelody = (harmonyPitch, melodyPitch) => {
+        const melodyMidi = pitchToMidi(melodyPitch);
+        let harmonyMidi = pitchToMidi(harmonyPitch);
+        while (harmonyMidi <= melodyMidi) {
+            harmonyMidi += 12;
+        }
+        return midiToPitch(harmonyMidi, shouldPreferFlats(key));
+    };
+
+    // Helper: Find the nearest chord tone below a given pitch (for treble clef harmonic accompaniment)
+    // This creates better voice leading by having the accompaniment follow the melody contour
+    const findNearestChordToneBelow = (melodyPitch, chordTones) => {
+        const melodyMidi = pitchToMidi(melodyPitch);
+        let bestPitch = null;
+        let bestDistance = Infinity;
+
+        // Try each chord tone at various octaves to find the nearest one below melody
+        for (const tone of chordTones) {
+            // Try octaves 1-6
+            for (let oct = 1; oct <= 6; oct++) {
+                const candidatePitch = `${tone}${oct}`;
+                const candidateMidi = pitchToMidi(candidatePitch);
+                // Must be below melody
+                if (candidateMidi < melodyMidi) {
+                    const distance = melodyMidi - candidateMidi;
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestPitch = candidatePitch;
+                    }
+                }
+            }
+        }
+
+        // Fallback: if no chord tone found below, return first chord tone an octave below melody
+        if (!bestPitch) {
+            const melodyOctave = parseInt(melodyPitch.match(/\d+/)?.[0] || '4', 10);
+            bestPitch = `${chordTones[0]}${melodyOctave - 1}`;
+        }
+
+        return midiToPitch(pitchToMidi(bestPitch), shouldPreferFlats(key));
     };
 
     // Calculate interval adjustments based on style and mood
@@ -1591,10 +1700,42 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                 // Duration based on style rhythm density
                 const pedalDuration = stylePrefs.rhythmDensity === 'sparse' ? 'w' :
                                      stylePrefs.rhythmDensity === 'driving' ? 'h' : 'w';
+                let pedalPitch = `${chordRoot}${pedalOctave}`;
+
+                // For bass clef, ensure pedal is ABOVE the lowest V1 note
+                // For treble clef, ensure pedal is BELOW the highest V1 note
+                if (isBassClef && melodyNotes.length > 0) {
+                    // Find the lowest V1 pitch
+                    const lowestV1 = melodyNotes
+                        .filter(n => !n.isRest && n.type !== 'rest')
+                        .map(n => n.pitch || n.pitches?.[0])
+                        .filter(Boolean)
+                        .reduce((lowest, pitch) => {
+                            if (!lowest) return pitch;
+                            return pitchToMidi(pitch) < pitchToMidi(lowest) ? pitch : lowest;
+                        }, null);
+                    if (lowestV1) {
+                        pedalPitch = ensureAboveMelody(pedalPitch, lowestV1);
+                    }
+                } else if (!isBassClef && melodyNotes.length > 0) {
+                    // For treble clef, ensure pedal is below the highest V1 note
+                    const highestV1 = melodyNotes
+                        .filter(n => !n.isRest && n.type !== 'rest')
+                        .map(n => n.pitch || n.pitches?.[0])
+                        .filter(Boolean)
+                        .reduce((highest, pitch) => {
+                            if (!highest) return pitch;
+                            return pitchToMidi(pitch) > pitchToMidi(highest) ? pitch : highest;
+                        }, null);
+                    if (highestV1) {
+                        pedalPitch = ensureBelowMelody(pedalPitch, highestV1);
+                    }
+                }
+
                 suggestions.push({
                     type: 'note',
-                    pitch: `${chordRoot}${pedalOctave}`,
-                    pitches: [`${chordRoot}${pedalOctave}`],
+                    pitch: pedalPitch,
+                    pitches: [pedalPitch],
                     duration: pedalDuration,
                     beat: 0,
                     voiceIndex: 1,
@@ -1610,10 +1751,40 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                 const fifth = getFifthFromRoot(chordRoot);
                 const fifthDuration = stylePrefs.rhythmDensity === 'sparse' ? 'w' :
                                      stylePrefs.rhythmDensity === 'driving' ? 'h' : 'w';
+                let fifthPitch = `${fifth}${fifthOctave}`;
+
+                // For bass clef, ensure fifth pedal is ABOVE the lowest V1 note
+                // For treble clef, ensure fifth pedal is BELOW the highest V1 note
+                if (isBassClef && melodyNotes.length > 0) {
+                    const lowestV1 = melodyNotes
+                        .filter(n => !n.isRest && n.type !== 'rest')
+                        .map(n => n.pitch || n.pitches?.[0])
+                        .filter(Boolean)
+                        .reduce((lowest, pitch) => {
+                            if (!lowest) return pitch;
+                            return pitchToMidi(pitch) < pitchToMidi(lowest) ? pitch : lowest;
+                        }, null);
+                    if (lowestV1) {
+                        fifthPitch = ensureAboveMelody(fifthPitch, lowestV1);
+                    }
+                } else if (!isBassClef && melodyNotes.length > 0) {
+                    const highestV1 = melodyNotes
+                        .filter(n => !n.isRest && n.type !== 'rest')
+                        .map(n => n.pitch || n.pitches?.[0])
+                        .filter(Boolean)
+                        .reduce((highest, pitch) => {
+                            if (!highest) return pitch;
+                            return pitchToMidi(pitch) > pitchToMidi(highest) ? pitch : highest;
+                        }, null);
+                    if (highestV1) {
+                        fifthPitch = ensureBelowMelody(fifthPitch, highestV1);
+                    }
+                }
+
                 suggestions.push({
                     type: 'note',
-                    pitch: `${fifth}${fifthOctave}`,
-                    pitches: [`${fifth}${fifthOctave}`],
+                    pitch: fifthPitch,
+                    pitches: [fifthPitch],
                     duration: fifthDuration,
                     beat: 0,
                     voiceIndex: 1,
@@ -1629,14 +1800,50 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                 const chordTones = getChordTonesForStyle(chordRoot, chord.type, stylePrefs);
                 let chordToneIndex = 0;
                 const baseOctave = getBaseOctave(moodAdj.registerBias);
+
+                // Find reference pitch for position awareness (lowest for bass, highest for treble)
+                let referencePitch = null;
+                if (melodyNotes.length > 0) {
+                    const nonRestNotes = melodyNotes
+                        .filter(n => !n.isRest && n.type !== 'rest')
+                        .map(n => n.pitch || n.pitches?.[0])
+                        .filter(Boolean);
+                    if (nonRestNotes.length > 0) {
+                        if (isBassClef) {
+                            // For bass clef, find lowest V1 pitch to ensure fills are above
+                            referencePitch = nonRestNotes.reduce((lowest, pitch) => {
+                                if (!lowest) return pitch;
+                                return pitchToMidi(pitch) < pitchToMidi(lowest) ? pitch : lowest;
+                            }, null);
+                        } else {
+                            // For treble clef, find highest V1 pitch to ensure fills are below
+                            referencePitch = nonRestNotes.reduce((highest, pitch) => {
+                                if (!highest) return pitch;
+                                return pitchToMidi(pitch) > pitchToMidi(highest) ? pitch : highest;
+                            }, null);
+                        }
+                    }
+                }
+
                 melodyNotes.forEach(note => {
                     if (note.isRest || note.type === 'rest') {
                         // Cycle through chord tones for variety
                         const tone = chordTones[chordToneIndex % chordTones.length];
+                        let fillPitch = `${tone}${baseOctave}`;
+
+                        // Position fill notes appropriately relative to V1 notes
+                        if (referencePitch) {
+                            if (isBassClef) {
+                                fillPitch = ensureAboveMelody(fillPitch, referencePitch);
+                            } else {
+                                fillPitch = ensureBelowMelody(fillPitch, referencePitch);
+                            }
+                        }
+
                         suggestions.push({
                             type: 'note',
-                            pitch: `${tone}${baseOctave}`,
-                            pitches: [`${tone}${baseOctave}`],
+                            pitch: fillPitch,
+                            pitches: [fillPitch],
                             duration: note.duration,
                             beat: note.beat,
                             voiceIndex: 1,
@@ -1661,14 +1868,23 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                         suggestions.push({ ...note, voiceIndex: 1, sourceMeasure: measureIndex });
                     } else {
                         const melodyPitch = note.pitch || note.pitches?.[0];
-                        // Cycle through chord tones, picking ones that harmonize well
-                        const tone = accompChordTones[accompToneIndex % accompChordTones.length];
-                        let accompPitch = `${tone}${baseOctave}`;
+                        let accompPitch;
 
-                        // For treble clef, ensure accompaniment is below melody
-                        // For bass clef, the baseOctave already places it appropriately
-                        if (melodyPitch && !isBassClef) {
-                            accompPitch = ensureBelowMelody(accompPitch, melodyPitch);
+                        if (melodyPitch) {
+                            if (isBassClef) {
+                                // Bass clef: cycle through chord tones, positioned above bass line
+                                const tone = accompChordTones[accompToneIndex % accompChordTones.length];
+                                accompPitch = `${tone}${baseOctave}`;
+                                accompPitch = ensureAboveMelody(accompPitch, melodyPitch);
+                            } else {
+                                // Treble clef: find nearest chord tone BELOW melody for better voice leading
+                                // This makes the accompaniment "follow" the melody contour
+                                accompPitch = findNearestChordToneBelow(melodyPitch, accompChordTones);
+                            }
+                        } else {
+                            // Fallback: use cycling chord tones
+                            const tone = accompChordTones[accompToneIndex % accompChordTones.length];
+                            accompPitch = `${tone}${baseOctave}`;
                         }
 
                         suggestions.push({
@@ -1736,7 +1952,10 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                             // Validate against scale (jazz/blues allow chromatic passing tones)
                             transposed = validateNoteForStyle(transposed, key, currentStyle);
                             // For treble: ensure counter-melody stays below the melody
-                            if (!isBassClef) {
+                            // For bass: ensure counter-melody stays above the bass line
+                            if (isBassClef) {
+                                transposed = ensureAboveMelody(transposed, pitch);
+                            } else {
                                 transposed = ensureBelowMelody(transposed, pitch);
                             }
                             suggestions.push({
@@ -1771,10 +1990,14 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                         suggestions.push({ ...note, voiceIndex: 1, sourceMeasure: measureIndex });
                     } else {
                         const melodyPitch = note.pitch || note.pitches?.[0];
-                        // Ensure held note is below melody (for treble clef)
+                        // Ensure held note is below melody (treble) or above bass line (bass)
                         let validHeld = heldNote;
-                        if (melodyPitch && !isBassClef) {
-                            validHeld = ensureBelowMelody(heldNote, melodyPitch);
+                        if (melodyPitch) {
+                            if (isBassClef) {
+                                validHeld = ensureAboveMelody(heldNote, melodyPitch);
+                            } else {
+                                validHeld = ensureBelowMelody(heldNote, melodyPitch);
+                            }
                         }
                         suggestions.push({
                             ...note,
@@ -1834,7 +2057,10 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                         // Scale validation without clamping
                         echoPitch = validateNoteForStyle(echoPitch, key, currentStyle);
                         // For treble clef, ensure echo stays below the melody note
-                        if (!isBassClef) {
+                        // For bass clef, ensure echo stays above the bass line
+                        if (isBassClef) {
+                            echoPitch = ensureAboveMelody(echoPitch, pitch);
+                        } else {
                             echoPitch = ensureBelowMelody(echoPitch, pitch);
                         }
 
@@ -1864,6 +2090,34 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
 
                 // Scale validation without clamping
                 dronePitch = validateNoteForStyle(dronePitch, key, currentStyle);
+
+                // For bass clef, ensure drone is ABOVE the lowest V1 note
+                // For treble clef, ensure drone is BELOW the highest V1 note
+                if (isBassClef && melodyNotes.length > 0) {
+                    const lowestV1 = melodyNotes
+                        .filter(n => !n.isRest && n.type !== 'rest')
+                        .map(n => n.pitch || n.pitches?.[0])
+                        .filter(Boolean)
+                        .reduce((lowest, pitch) => {
+                            if (!lowest) return pitch;
+                            return pitchToMidi(pitch) < pitchToMidi(lowest) ? pitch : lowest;
+                        }, null);
+                    if (lowestV1) {
+                        dronePitch = ensureAboveMelody(dronePitch, lowestV1);
+                    }
+                } else if (!isBassClef && melodyNotes.length > 0) {
+                    const highestV1 = melodyNotes
+                        .filter(n => !n.isRest && n.type !== 'rest')
+                        .map(n => n.pitch || n.pitches?.[0])
+                        .filter(Boolean)
+                        .reduce((highest, pitch) => {
+                            if (!highest) return pitch;
+                            return pitchToMidi(pitch) > pitchToMidi(highest) ? pitch : highest;
+                        }, null);
+                    if (highestV1) {
+                        dronePitch = ensureBelowMelody(dronePitch, highestV1);
+                    }
+                }
 
                 // Single whole note for the entire measure
                 suggestions.push({
@@ -1899,8 +2153,13 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                         // Scale validation without clamping
                         arpNote = validateNoteForStyle(arpNote, key, currentStyle);
                         // For treble clef, ensure arpeggio note is below the melody
-                        if (melodyPitch && !isBassClef) {
-                            arpNote = ensureBelowMelody(arpNote, melodyPitch);
+                        // For bass clef, ensure arpeggio note is above the bass line
+                        if (melodyPitch) {
+                            if (isBassClef) {
+                                arpNote = ensureAboveMelody(arpNote, melodyPitch);
+                            } else {
+                                arpNote = ensureBelowMelody(arpNote, melodyPitch);
+                            }
                         }
                         suggestions.push({
                             ...note,
@@ -2020,7 +2279,9 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                     }
 
                     harmonyNote = validateNoteForStyle(harmonyNote, key, currentStyle);
-                    if (!isBassClef) {
+                    if (isBassClef) {
+                        harmonyNote = ensureAboveMelody(harmonyNote, currPitch);
+                    } else {
                         harmonyNote = ensureBelowMelody(harmonyNote, currPitch);
                     }
 
@@ -2071,7 +2332,9 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                     // pattern 0 and 2 stay on chord tone
 
                     harmonyNote = validateNoteForStyle(harmonyNote, key, currentStyle);
-                    if (!isBassClef) {
+                    if (isBassClef) {
+                        harmonyNote = ensureAboveMelody(harmonyNote, currPitch);
+                    } else {
                         harmonyNote = ensureBelowMelody(harmonyNote, currPitch);
                     }
 
@@ -2117,8 +2380,13 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                     innerNote = validateNoteForStyle(innerNote, key, currentStyle);
 
                     // For treble staff, ensure inner voice is below melody
-                    if (!isBassClef && currPitch) {
-                        innerNote = ensureBelowMelody(innerNote, currPitch);
+                    // For bass staff, ensure inner voice is above bass line
+                    if (currPitch) {
+                        if (isBassClef) {
+                            innerNote = ensureAboveMelody(innerNote, currPitch);
+                        } else {
+                            innerNote = ensureBelowMelody(innerNote, currPitch);
+                        }
                     }
 
                     // Output the inner voice (pedal is implied by the texture name but
@@ -2156,7 +2424,10 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                         imitationPitch = validateNoteForStyle(imitationPitch, key, currentStyle);
 
                         // For treble, ensure imitation stays below original
-                        if (!isBassClef) {
+                        // For bass, ensure imitation stays above bass line
+                        if (isBassClef) {
+                            imitationPitch = ensureAboveMelody(imitationPitch, pitch);
+                        } else {
                             imitationPitch = ensureBelowMelody(imitationPitch, pitch);
                         }
 
@@ -2169,6 +2440,160 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
                             voiceIndex: 1,
                             sourceMeasure: measureIndex
                         });
+                    }
+                });
+            }
+            break;
+
+        // === NEW CLEF-SPECIFIC TEXTURES ===
+
+        case 'alberti':
+            // Alberti Bass: Classic broken chord pattern root-5th-3rd-5th
+            // Bass clef only - creates flowing accompaniment
+            {
+                const albertiOctave = getBaseOctave(moodAdj.registerBias);
+                const root = `${chordRoot}${albertiOctave}`;
+                const third = `${chordThird}${albertiOctave}`;
+                const fifth = `${chordFifth}${albertiOctave}`;
+
+                // Alberti pattern: root-5th-3rd-5th repeated
+                const pattern = [root, fifth, third, fifth];
+
+                // Generate 4 eighth notes per measure (or match melody rhythm)
+                const beatsPerMeasure = 4;
+                for (let beat = 0; beat < beatsPerMeasure; beat++) {
+                    const patternNote = pattern[beat % pattern.length];
+                    suggestions.push({
+                        type: 'note',
+                        pitch: patternNote,
+                        pitches: [patternNote],
+                        duration: '8n',
+                        beat: beat,
+                        voiceIndex: 1,
+                        sourceMeasure: measureIndex
+                    });
+                }
+            }
+            break;
+
+        case 'walking':
+            // Walking Bass: Stepwise motion connecting chord roots
+            // Bass clef only - jazz/blues style
+            {
+                const walkOctave = getBaseOctave(moodAdj.registerBias);
+                const rootPitch = `${chordRoot}${walkOctave}`;
+
+                // Get scale tones for walking motion
+                const isMinorKey = key.endsWith('m') || key.includes('minor');
+
+                // Walking bass typically: root, passing tone, passing tone, approach note
+                // We'll create quarter notes walking toward the next chord root
+                const beatsPerMeasure = 4;
+
+                for (let beat = 0; beat < beatsPerMeasure; beat++) {
+                    let walkPitch;
+                    if (beat === 0) {
+                        // Beat 1: chord root
+                        walkPitch = rootPitch;
+                    } else if (beat === 3) {
+                        // Beat 4: approach note (half step or whole step to next root)
+                        // For now, use the 7th scale degree as approach
+                        walkPitch = transposeDiatonic(rootPitch, key, -1);
+                    } else {
+                        // Beats 2-3: scale-wise motion (3rd, 5th, or passing tones)
+                        const scaleStep = beat === 1 ? 2 : 4; // 3rd on beat 2, 5th on beat 3
+                        walkPitch = transposeDiatonic(rootPitch, key, scaleStep);
+                    }
+
+                    walkPitch = validateNoteForStyle(walkPitch, key, currentStyle);
+
+                    suggestions.push({
+                        type: 'note',
+                        pitch: walkPitch,
+                        pitches: [walkPitch],
+                        duration: '4n',
+                        beat: beat,
+                        voiceIndex: 1,
+                        sourceMeasure: measureIndex
+                    });
+                }
+            }
+            break;
+
+        case 'shell':
+            // Shell Voicings: Root + 3rd or Root + 7th
+            // Bass clef only - jazz comping style
+            {
+                const shellOctave = getBaseOctave(moodAdj.registerBias);
+                const root = `${chordRoot}${shellOctave}`;
+
+                // Determine if chord has a 7th
+                const has7th = chord.type && (
+                    chord.type.includes('7') ||
+                    chord.type.includes('Major 7') ||
+                    chord.type.includes('Minor 7') ||
+                    chord.type.includes('Dominant')
+                );
+
+                // Shell voicing: root + 3rd, or root + 7th for 7th chords
+                let shellNote;
+                if (has7th) {
+                    // Use 7th (10 semitones for dominant/minor 7th, 11 for major 7th)
+                    const isMaj7 = chord.type.includes('Major 7');
+                    const seventhInterval = isMaj7 ? 11 : 10;
+                    shellNote = transposePitch(root, seventhInterval);
+                } else {
+                    // Use 3rd
+                    shellNote = `${chordThird}${shellOctave}`;
+                }
+
+                // Play as half notes or whole note chord
+                suggestions.push({
+                    type: 'note',
+                    pitch: root,
+                    pitches: [root, shellNote], // Chord with both notes
+                    duration: '2n',
+                    beat: 0,
+                    voiceIndex: 1,
+                    sourceMeasure: measureIndex
+                });
+
+                // Repeat on beat 3 for rhythmic interest
+                suggestions.push({
+                    type: 'note',
+                    pitch: root,
+                    pitches: [root, shellNote],
+                    duration: '2n',
+                    beat: 2,
+                    voiceIndex: 1,
+                    sourceMeasure: measureIndex
+                });
+            }
+            break;
+
+        case 'tenths':
+            // Compound Tenths: 10th below melody (octave + 3rd)
+            // Treble clef only - wide, open voicing
+            {
+                melodyNotes.forEach(note => {
+                    if (note.isRest || note.type === 'rest') {
+                        suggestions.push({ ...note, voiceIndex: 1, sourceMeasure: measureIndex });
+                    } else {
+                        const pitch = note.pitch || note.pitches?.[0];
+                        if (pitch) {
+                            // 10th below = -16 semitones (octave + major 3rd)
+                            // Use diatonic transposition for correct scale degree
+                            let tenthPitch = transposeDiatonic(pitch, key, -9); // 9 scale degrees down = 10th
+                            tenthPitch = validateNoteForStyle(tenthPitch, key, currentStyle);
+
+                            suggestions.push({
+                                ...note,
+                                pitch: tenthPitch,
+                                pitches: [tenthPitch],
+                                voiceIndex: 1,
+                                sourceMeasure: measureIndex
+                            });
+                        }
                     }
                 });
             }
@@ -2302,14 +2727,51 @@ function getSeventhFromRoot(root, isMajorSeventh = false) {
 }
 
 // Helper: Get chord tones based on style preferences
+// Smart 7th selection based on chord function:
+// - If chord already has a 7th, use that specific 7th
+// - For Major triads adding color: use major 7th (diatonic, sounds like Imaj7)
+// - For Minor triads adding color: use minor 7th (diatonic, sounds like m7)
+// - Dominant 7th only for explicit dominant chords
 function getChordTonesForStyle(root, chordType, stylePrefs) {
     const third = getThirdFromRoot(root, chordType);
     const fifth = getFifthFromRoot(root);
-    const seventh = getSeventhFromRoot(root, chordType?.includes('maj7'));
+
+    // Determine the appropriate 7th based on chord type
+    let seventh = null;
+    const type = chordType || '';
+
+    // Check if chord already specifies a 7th
+    if (type.includes('Major 7') || type.includes('maj7')) {
+        // Major 7th chord - use major 7th
+        seventh = getSeventhFromRoot(root, true);
+    } else if (type.includes('Dominant 7') || type === '7' || type.includes('7th') && !type.includes('Major') && !type.includes('Minor') && !type.includes('Diminished')) {
+        // Dominant 7th chord - use dominant (minor) 7th
+        seventh = getSeventhFromRoot(root, false);
+    } else if (type.includes('Minor 7') || type.includes('m7') || type.includes('min7')) {
+        // Minor 7th chord - use minor 7th
+        seventh = getSeventhFromRoot(root, false);
+    } else if (type.includes('Diminished 7') || type.includes('dim7')) {
+        // Diminished 7th - use diminished 7th (double-flatted)
+        seventh = getSeventhFromRoot(root, false); // Approximation
+    } else if (type.includes('Half-Diminished') || type.includes('m7b5')) {
+        // Half-diminished - use minor 7th
+        seventh = getSeventhFromRoot(root, false);
+    } else {
+        // Triad without explicit 7th - choose based on chord quality for "color" styles
+        const isMinor = type.includes('Minor') || type.includes('m') || type.includes('min');
+        if (isMinor) {
+            // Minor triad: if adding color, use minor 7th (diatonic)
+            seventh = getSeventhFromRoot(root, false);
+        } else {
+            // Major triad: if adding color, use MAJOR 7th (diatonic, not dominant!)
+            // This makes C Major -> Cmaj7 sound, not C7 which implies V function
+            seventh = getSeventhFromRoot(root, true);
+        }
+    }
 
     switch (stylePrefs.intervalBias) {
         case 'colorful':
-            // Jazz: include 7ths, maybe 9ths
+            // Jazz/Indie: include 7ths for color (now using appropriate 7th type)
             return [root, third, fifth, seventh];
         case 'power':
             // Rock: root and fifth primarily
@@ -2318,12 +2780,13 @@ function getChordTonesForStyle(root, chordType, stylePrefs) {
             // Gospel: full triads with some extensions
             return [root, third, fifth, seventh];
         case 'bluesy':
-            // Blues: root, flatted third, fifth, flatted seventh
-            return [root, third, fifth, seventh];
+            // Blues: use dominant 7th for that bluesy sound regardless of chord type
+            const bluesy7th = getSeventhFromRoot(root, false); // Always dominant/minor 7th for blues
+            return [root, third, fifth, bluesy7th];
         case 'simple':
         case 'consonant':
         default:
-            // Pop/Folk: basic triad
+            // Pop/Folk: basic triad only
             return [root, third, fifth];
     }
 }

@@ -552,15 +552,12 @@ export function toggleStyleMoodInsightsPanel() {
  * @param {string} containerId - Container ID
  */
 export function showAddSectionMenu(event, containerId) {
-    console.log('[Section] showAddSectionMenu called', { containerId });
     event.stopPropagation();
 
     // Check if any chords are selected
     const selectedIndices = getSelectedIndicesArray ? getSelectedIndicesArray() : [];
-    console.log('[Section] Selected indices:', selectedIndices);
 
     if (selectedIndices.length === 0) {
-        console.log('[Section] No chords selected - showing warning');
         // Show a message to the user
         if (window.showToast) {
             window.showToast('Please select one or more chords to create a Section', { type: 'warning' });
@@ -569,11 +566,9 @@ export function showAddSectionMenu(event, containerId) {
     }
 
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    console.log('[Section] CompositionState:', compositionState ? 'found' : 'NOT FOUND');
     if (!compositionState) return;
 
     const sectionTypes = compositionState.constructor.SECTION_TYPES;
-    console.log('[Section] Section types:', Object.keys(sectionTypes));
 
     // Remove existing menu if any
     const existingMenu = document.querySelector('.section-type-menu');
@@ -641,60 +636,44 @@ export function showAddSectionMenu(event, containerId) {
  * @param {string} containerId - Container ID
  */
 function createNewSection(type, containerId) {
-    console.log('[Section] createNewSection called', { type, containerId });
-
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    console.log('[Section] CompositionState in createNewSection:', compositionState ? 'found' : 'NOT FOUND');
     if (!compositionState) return;
 
     // Get selected chord indices (already sorted)
     const selectedIndices = getSelectedIndicesArray();
-    console.log('[Section] Selected indices for new section:', selectedIndices);
 
     // If we have selected indices, validate they are adjacent
     if (selectedIndices.length > 1) {
-        console.log('[Section] Checking adjacency for multiple selections');
         // Check for adjacency - each index should be exactly 1 more than the previous
         for (let i = 1; i < selectedIndices.length; i++) {
             if (selectedIndices[i] !== selectedIndices[i - 1] + 1) {
-                console.log('[Section] Non-adjacent selection detected - blocking section creation');
-
                 // Show toast notification explaining the requirement
                 if (window.showToast) {
                     window.showToast('Sections can only be created from consecutive chords. Please select adjacent chord cards.', { type: 'warning', duration: 4000 });
                 } else if (window.showNotification) {
                     window.showNotification('Sections can only be created from consecutive chords. Please select adjacent chord cards.', 'warning');
                 }
-
-                // Do NOT create a section - just return
-                console.log('[Section] Section creation blocked due to non-consecutive selection');
                 return;
             }
         }
     }
 
     // All indices are adjacent (or single/empty) - create section
-    console.log('[Section] All indices adjacent or single - creating section');
-    console.log('[Section] Calling compositionState.createSection');
     compositionState.createSection(type, selectedIndices);
 
     // Switch to Section view when creating a section
-    console.log('[Section] Switching to Section view');
     if (window.setProgressionViewMode) {
         window.setProgressionViewMode('section');
     }
 
     // Clear selection
-    console.log('[Section] Clearing selection');
     clearSelection();
 
     // Re-render to show the new section
-    console.log('[Section] Re-rendering progression display');
     renderProgressionDisplay('melody-progression-visualization', true);
 
     // Dispatch event for tutorial validation
     dispatchBuilderEvent('chordsGrouped', { groupName: type, chordIndices: selectedIndices });
-    console.log('[Section] Section creation complete!');
 }
 
 /**

@@ -33,13 +33,49 @@ function getNoteValue(note) {
 }
 
 /**
- * Calculate interval between two notes
+ * Get MIDI note value (including octave) for octave-aware interval calculations
+ * @param {string} note - Note with octave (e.g., 'C4', 'Db3')
+ * @returns {number} MIDI-like value or -1 if invalid
+ */
+function getMidiNoteValue(note) {
+    if (!note) return -1;
+    const match = note.match(/^([A-Ga-g][#b]*)(\d+)$/);
+    if (!match) return -1;
+
+    const noteName = match[1];
+    let octave = parseInt(match[2], 10);
+
+    const semitone = NOTE_TO_SEMITONE[noteName];
+    if (semitone === undefined) return -1;
+
+    // Handle Cb/B# octave boundary (Cb4 = B3, B#3 = C4)
+    if (noteName === 'Cb') octave -= 1;
+    if (noteName === 'B#') octave += 1;
+
+    return (octave * 12) + semitone;
+}
+
+/**
+ * Calculate interval between two notes (pitch class only, 0-11)
  */
 function getInterval(note1, note2) {
     const v1 = getNoteValue(note1);
     const v2 = getNoteValue(note2);
     if (v1 === -1 || v2 === -1) return null;
     return ((v2 - v1) + 12) % 12;
+}
+
+/**
+ * Calculate actual interval in semitones including octave (for voice leading)
+ * @param {string} note1 - First note with octave
+ * @param {string} note2 - Second note with octave
+ * @returns {number|null} Interval in semitones (can be > 12) or null if invalid
+ */
+function getActualInterval(note1, note2) {
+    const v1 = getMidiNoteValue(note1);
+    const v2 = getMidiNoteValue(note2);
+    if (v1 === -1 || v2 === -1) return null;
+    return v2 - v1;
 }
 
 /**
@@ -333,54 +369,92 @@ export function detectParallelMotion(context) {
             continue;
         }
 
-        // Check each pair of voices
-        for (let v1 = 0; v1 < prev.notes.length - 1; v1++) {
-            for (let v2 = v1 + 1; v2 < prev.notes.length; v2++) {
-                if (v2 >= curr.notes.length) continue;
+        // Match voices between chords by nearest pitch (voice leading principle)
+        // This ensures we're tracking actual voice movement, not just array indices
+        const prevMidiNotes = prev.notes.map(n => ({ note: n, midi: getMidiNoteValue(n) })).filter(n => n.midi !== -1);
+        const currMidiNotes = curr.notes.map(n => ({ note: n, midi: getMidiNoteValue(n) })).filter(n => n.midi !== -1);
 
-                const prevInterval = getInterval(prev.notes[v1], prev.notes[v2]);
-                const currInterval = getInterval(curr.notes[v1], curr.notes[v2]);
+        if (prevMidiNotes.length < 2 || currMidiNotes.length < 2) continue;
 
-                if (prevInterval === null || currInterval === null) continue;
+        // For each note in prev chord, find its nearest match in curr chord (voice leading)
+        const voiceMatches = [];
+        const usedCurrIndices = new Set();
 
-                // Parallel fifths (interval 7)
+        for (const prevNote of prevMidiNotes) {
+            let bestMatch = null;
+            let bestDistance = Infinity;
+
+            for (let ci = 0; ci < currMidiNotes.length; ci++) {
+                if (usedCurrIndices.has(ci)) continue;
+                const distance = Math.abs(currMidiNotes[ci].midi - prevNote.midi);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestMatch = { currIndex: ci, currNote: currMidiNotes[ci] };
+                }
+            }
+
+            if (bestMatch && bestDistance <= 12) { // Max one octave movement for voice continuity
+                usedCurrIndices.add(bestMatch.currIndex);
+                voiceMatches.push({
+                    prevNote: prevNote.note,
+                    prevMidi: prevNote.midi,
+                    currNote: bestMatch.currNote.note,
+                    currMidi: bestMatch.currNote.midi,
+                    motion: bestMatch.currNote.midi - prevNote.midi
+                });
+            }
+        }
+
+        // Check each pair of matched voices for parallel fifths/octaves
+        for (let v1 = 0; v1 < voiceMatches.length - 1; v1++) {
+            for (let v2 = v1 + 1; v2 < voiceMatches.length; v2++) {
+                const match1 = voiceMatches[v1];
+                const match2 = voiceMatches[v2];
+
+                // Calculate intervals between this voice pair in each chord
+                const prevInterval = match2.prevMidi - match1.prevMidi;
+                const currInterval = match2.currMidi - match1.currMidi;
+
+                // Parallel fifths: both intervals are exactly 7 semitones (P5)
+                // AND both voices move in the same direction (true parallel motion)
                 if (prevInterval === 7 && currInterval === 7) {
-                    const voice1Moved = getNoteValue(prev.notes[v1]) !== getNoteValue(curr.notes[v1]);
-                    const voice2Moved = getNoteValue(prev.notes[v2]) !== getNoteValue(curr.notes[v2]);
+                    const bothMoved = match1.motion !== 0 && match2.motion !== 0;
+                    const sameDirection = (match1.motion > 0 && match2.motion > 0) ||
+                                         (match1.motion < 0 && match2.motion < 0);
 
-                    if (voice1Moved && voice2Moved) {
+                    if (bothMoved && sameDirection) {
                         parallelFifthsInstances.push({
                             chordIndices: [i - 1, i],
                             fromChordIndex: i - 1,
                             toChordIndex: i,
                             fromChord: prev,
                             toChord: curr,
-                            voice1Index: v1,
-                            voice2Index: v2,
-                            fromNotes: [prev.notes[v1], prev.notes[v2]],
-                            toNotes: [curr.notes[v1], curr.notes[v2]],
-                            label: `Chords ${i} → ${i + 1}: ${prev.notes[v1]}→${curr.notes[v1]}, ${prev.notes[v2]}→${curr.notes[v2]}`
+                            fromNotes: [match1.prevNote, match2.prevNote],
+                            toNotes: [match1.currNote, match2.currNote],
+                            label: `Chords ${i} → ${i + 1}: ${match1.prevNote}→${match1.currNote}, ${match2.prevNote}→${match2.currNote}`
                         });
                     }
                 }
 
-                // Parallel octaves (interval 0 or 12)
-                if (prevInterval === 0 && currInterval === 0) {
-                    const voice1Moved = getNoteValue(prev.notes[v1]) !== getNoteValue(curr.notes[v1]);
-                    const voice2Moved = getNoteValue(prev.notes[v2]) !== getNoteValue(curr.notes[v2]);
+                // Parallel octaves: intervals are 0 or 12 semitones (unison/P8)
+                const isPrevOctave = prevInterval === 0 || Math.abs(prevInterval) === 12;
+                const isCurrOctave = currInterval === 0 || Math.abs(currInterval) === 12;
 
-                    if (voice1Moved && voice2Moved) {
+                if (isPrevOctave && isCurrOctave) {
+                    const bothMoved = match1.motion !== 0 && match2.motion !== 0;
+                    const sameDirection = (match1.motion > 0 && match2.motion > 0) ||
+                                         (match1.motion < 0 && match2.motion < 0);
+
+                    if (bothMoved && sameDirection) {
                         parallelOctavesInstances.push({
                             chordIndices: [i - 1, i],
                             fromChordIndex: i - 1,
                             toChordIndex: i,
                             fromChord: prev,
                             toChord: curr,
-                            voice1Index: v1,
-                            voice2Index: v2,
-                            fromNotes: [prev.notes[v1], prev.notes[v2]],
-                            toNotes: [curr.notes[v1], curr.notes[v2]],
-                            label: `Chords ${i} → ${i + 1}: ${prev.notes[v1]}→${curr.notes[v1]}, ${prev.notes[v2]}→${curr.notes[v2]}`
+                            fromNotes: [match1.prevNote, match2.prevNote],
+                            toNotes: [match1.currNote, match2.currNote],
+                            label: `Chords ${i} → ${i + 1}: ${match1.prevNote}→${match1.currNote}, ${match2.prevNote}→${match2.currNote}`
                         });
                     }
                 }

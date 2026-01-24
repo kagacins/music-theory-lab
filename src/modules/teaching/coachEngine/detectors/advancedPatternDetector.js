@@ -43,6 +43,32 @@ function getInterval(note1, note2) {
 }
 
 /**
+ * Get the actual bass note from a chord, considering inversions
+ * For inverted chords, the bass note is the first note in the notes array
+ * @param {Object} chord - Chord object with root, type, inversion, notes
+ * @returns {string} Bass note name without octave (e.g., 'C', 'F#')
+ */
+function getChordBassNote(chord) {
+    if (!chord) return null;
+
+    // If chord has a notes array, the first note is the bass (lowest pitch)
+    // This handles inversions correctly
+    if (chord.notes && chord.notes.length > 0) {
+        // Extract note name without octave
+        const bassNote = chord.notes[0];
+        return bassNote.replace(/\d+$/, '');
+    }
+
+    // Fallback: use explicit bass property if set
+    if (chord.bass) {
+        return chord.bass;
+    }
+
+    // Final fallback: root position, bass = root
+    return chord.root;
+}
+
+/**
  * Normalize roman numeral for comparison
  */
 function normalizeRoman(roman) {
@@ -164,8 +190,8 @@ export function detectPedalPoint(context) {
 
     for (let i = 0; i < progression.length; i++) {
         const chord = progression[i];
-        // Get bass note (could be from inversion or explicit bass)
-        const bassNote = chord.bass || chord.root;
+        // Get bass note (properly handles inversions via notes array)
+        const bassNote = getChordBassNote(chord);
 
         if (pedalNote === null) {
             pedalNote = bassNote;
@@ -259,8 +285,9 @@ export function detectChromaticBassLine(context) {
     let direction = null; // 'ascending' or 'descending'
 
     for (let i = 1; i < progression.length; i++) {
-        const prevBass = progression[i - 1].bass || progression[i - 1].root;
-        const currBass = progression[i].bass || progression[i].root;
+        // Use getChordBassNote to properly handle inversions
+        const prevBass = getChordBassNote(progression[i - 1]);
+        const currBass = getChordBassNote(progression[i]);
 
         const interval = getInterval(prevBass, currBass);
 
@@ -282,7 +309,7 @@ export function detectChromaticBassLine(context) {
             } else {
                 // Direction changed - check if we had a significant run
                 if (chromaticLength >= 3) {
-                    const bassNotes = progression.slice(chromaticStart, chromaticStart + chromaticLength).map(c => c.bass || c.root);
+                    const bassNotes = progression.slice(chromaticStart, chromaticStart + chromaticLength).map(c => getChordBassNote(c));
                     items.push({
                         type: 'observation',
                         category: 'voice-leading',
@@ -315,7 +342,7 @@ export function detectChromaticBassLine(context) {
         } else {
             // Not chromatic - check if we had a significant run
             if (chromaticLength >= 3) {
-                const bassNotes = progression.slice(chromaticStart, chromaticStart + chromaticLength).map(c => c.bass || c.root);
+                const bassNotes = progression.slice(chromaticStart, chromaticStart + chromaticLength).map(c => getChordBassNote(c));
                 items.push({
                     type: 'observation',
                     category: 'voice-leading',
@@ -349,7 +376,7 @@ export function detectChromaticBassLine(context) {
 
     // Check for chromatic line at end
     if (chromaticLength >= 3) {
-        const bassNotes = progression.slice(chromaticStart, chromaticStart + chromaticLength).map(c => c.bass || c.root);
+        const bassNotes = progression.slice(chromaticStart, chromaticStart + chromaticLength).map(c => getChordBassNote(c));
         items.push({
             type: 'observation',
             category: 'voice-leading',

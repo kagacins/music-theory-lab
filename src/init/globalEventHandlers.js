@@ -27,11 +27,20 @@ function isModalOpen() {
     // Look for visible modal overlays (fixed position, full screen, not hidden)
     const modalOverlays = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
     for (const overlay of modalOverlays) {
-        // Check if it looks like a modal (has semi-transparent background)
+        // Skip tab content elements - they use fixed positioning but are not modals
+        if (overlay.classList.contains('tab-content')) {
+            continue;
+        }
+        // Check if it looks like a modal (has semi-transparent background with actual opacity)
         const style = window.getComputedStyle(overlay);
         const bg = style.backgroundColor;
-        // Modal overlays typically have rgba background with opacity
-        if (bg.includes('rgba') || overlay.classList.contains('bg-black') || overlay.classList.contains('bg-opacity-50')) {
+        // Modal overlays typically have rgba background with opacity > 0
+        // rgba(0, 0, 0, 0) is transparent and should not count as a modal
+        const rgbaMatch = bg.match(/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\s*\)/);
+        if (rgbaMatch && parseFloat(rgbaMatch[1]) > 0) {
+            return true;
+        }
+        if (overlay.classList.contains('bg-black') && overlay.classList.contains('bg-opacity-50')) {
             return true;
         }
     }
@@ -79,10 +88,9 @@ function setupKeyboardShortcuts() {
         // Don't process when a modal is open (prevents accidental undo while using modals)
         if (isModalOpen()) return;
 
-        // Check which tab we're in - undo/redo works on builder, trainer, and melody tabs
-        const currentTab = document.querySelector('[id^="tab-"]:not(.hidden)');
-        const tabId = currentTab ? currentTab.id : '';
-        const isUndoRedoTab = tabId === 'tab-builder' || tabId === 'tab-trainer' || tabId === 'tab-melody' || tabId === 'tab-studio-new';
+        // Check which tab we're in - use window.currentTab which is the reliable source of truth
+        const currentTab = window.currentTab || '';
+        const isUndoRedoTab = currentTab === 'builder' || currentTab === 'trainer' || currentTab === 'melody' || currentTab === 'studio-new';
 
         // Only handle undo/redo in tabs that support it
         if (!isUndoRedoTab) return;
@@ -114,6 +122,36 @@ function setupKeyboardShortcuts() {
             event.preventDefault();
             if (window.handleRedo) {
                 window.handleRedo();
+            }
+        }
+
+        // Ctrl+C: Copy selected chords
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'c' || event.key === 'C') && !event.shiftKey) {
+            // Only if on progression tabs and chords are selected
+            if (isUndoRedoTab) {
+                const selectedCount = window.getSelectedChordIndicesArray?.()?.length || 0;
+                if (selectedCount > 0) {
+                    event.preventDefault();
+                    if (window.copySelectedChords) {
+                        window.copySelectedChords();
+                        // Show toast feedback
+                        if (window.toast) {
+                            window.toast.success(`Copied ${selectedCount} chord${selectedCount > 1 ? 's' : ''}`);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ctrl+V: Paste chords from clipboard
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'v' || event.key === 'V') && !event.shiftKey) {
+            // Only if on progression tabs and clipboard has chords
+            if (isUndoRedoTab && window.hasClipboard?.()) {
+                event.preventDefault();
+                if (window.pasteChords) {
+                    window.pasteChords();
+                    // Toast is shown inside pasteChords after counting pasted chords
+                }
             }
         }
     });

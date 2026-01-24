@@ -38,7 +38,7 @@ import { showWhatIfSandbox } from '../modules/ui/whatIfSandbox.js';
 import { initChordFunctionLegend, showLegend as showChordFunctionLegend, hideLegend as hideChordFunctionLegend, toggleLegend as toggleChordFunctionLegend } from '../modules/ui/chordFunctionLegend.js';
 // Phase 3: Guided Learning Journeys
 // Learn tab is lazy loaded when user clicks the tab (see tabs.js)
-import { dispatchBuilderEvent, showSpotlight } from '../modules/ui/lessonGuidedMode.js';
+import { dispatchBuilderEvent, showSpotlight, forceSpotlightUpdate } from '../modules/ui/lessonGuidedMode.js';
 import { startLetItBeTutorial } from '../modules/teaching/letItBeTutorial.js';
 // Tier 1: Teaching-Composition Integration
 import { initTheoryMoments, toggleTheoryMoments, recallTheoryMoment } from '../modules/teaching/theoryMoments.js';
@@ -250,7 +250,7 @@ import {
     setExperienceMode,
     isFeatureEnabled
 } from '../modules/state/globalState.js';
-import { getTrainerState, setProgressionData, setIsReady, getCurrentKey, setCurrentKey, invalidateProgressionDataCache } from '../modules/state/trainerState.js';
+import { getTrainerState, setProgressionData, setIsReady, getCurrentKey, setCurrentKey, invalidateProgressionDataCache, hasClipboard } from '../modules/state/trainerState.js';
 import {
     getBuilderRootIndex,
     getBuilderChordType,
@@ -1583,6 +1583,7 @@ export function setupWindowExports() {
     window.getNotationPreference = getNotationPreference;
     window.getNumOctaves = getNumOctaves;
     window.getTrainerState = getTrainerState;
+    window.hasClipboard = hasClipboard;
     window.setIsReady = setIsReady;
     window.clearHighlights = clearHighlights;
     window.getScaleRootIndex = getScaleRootIndex;
@@ -2431,6 +2432,7 @@ export function setupWindowExports() {
     window.startLetItBeTutorial = startLetItBeTutorial;
     window.dispatchBuilderEvent = dispatchBuilderEvent;
     window.showSpotlight = showSpotlight;
+    window.forceSpotlightUpdate = forceSpotlightUpdate;
 
     // Builder state getters (for other modules)
     window.getBuilderRootIndex = getBuilderRootIndex;

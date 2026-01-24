@@ -14,6 +14,8 @@ import { getLearningProgress, markLessonComplete, markExerciseComplete, updateQu
 import { switchTab, setCurrentLessonForHistory } from './tabs.js';
 import { startTutorial, whatIsANoteTutorial, sharpsFlatsTutorial, octavesTutorial, scalesTutorial, intervalsTutorial, whatIsAChordTutorial, majorVsMinorTutorial, chordInversionsTutorial, whyChordMoveTutorial, firstProgressionTutorial, voiceLeadingTutorial, popularProgressionTutorial, addingEmotionTutorial, seventhChordsTutorial, secondaryDominantsTutorial, borrowedChordsTutorial, tensionReleaseTutorial, melodyChordTutorial, scaleTypesTutorial, modesIntroTutorial, modalHarmonyTutorial, advancedVoiceLeadingTutorial, extendedChordsTutorial, createMiniKeyboard } from './interactiveTutorial.js';
 import { startGuidedMode, startGuidedModeWithConfirmation } from './lessonGuidedMode.js';
+import { hasFullscreenGuidedSteps, getFullscreenGuidedSteps, FULLSCREEN_GUIDED_STEPS } from '../teaching/fullscreenGuidedExercises.js';
+import { setupFullscreenTutorial, cleanupFullscreenTutorial } from '../teaching/fullscreenTutorialHelpers.js';
 
 // ===========================================
 // STATE
@@ -1586,22 +1588,34 @@ function renderTryItSection(lesson) {
     const tutorial = lessonTutorials[lesson.id];
     // Has keyboard tutorial if there are any non-guided_builder steps (info, play_note, play_sequence, etc.)
     const hasKeyboardTutorial = tutorial && hasKeyboardSteps(tutorial);
-    // Has guided exercise if there are any guided_builder steps
-    const hasGuidedExercise = tutorial && hasGuidedBuilderSteps(tutorial);
+    // Has guided exercise if there are any guided_builder steps OR fullscreen guided steps
+    const hasFullscreenExercise = hasFullscreenGuidedSteps(lesson.id);
+    const hasGuidedExercise = hasFullscreenExercise || (tutorial && hasGuidedBuilderSteps(tutorial));
 
     // If no tryIt content AND no tutorial, return empty
     if (!tryIt && !hasKeyboardTutorial && !hasGuidedExercise) return '';
 
-    // Determine exercise type based on target tab
-    const guidedTargetTab = tutorial ? getGuidedTargetTab(tutorial) : 'builder';
-    const isProgressionWorkshop = guidedTargetTab === 'trainer';
-    const guidedExerciseTitle = isProgressionWorkshop
-        ? 'Guided Progression Workshop Exercise'
-        : 'Guided Chord Lab Exercise';
-    const guidedExerciseDesc = isProgressionWorkshop
-        ? 'Build progressions hands-on in the Progression Workshop! We\'ll guide you through each step with highlights and real-time feedback.'
-        : 'Build chords hands-on in the Chord Lab! We\'ll guide you through each step with highlights and real-time feedback.';
-    const guidedExerciseIcon = isProgressionWorkshop ? '🎼' : '🎛️';
+    // Determine exercise type and description
+    // Fullscreen exercises use the new Chord Lab; classic uses the old builder/trainer tabs
+    let guidedExerciseTitle, guidedExerciseDesc, guidedExerciseIcon;
+
+    if (hasFullscreenExercise) {
+        // New fullscreen Chord Lab approach
+        guidedExerciseTitle = 'Guided Chord Lab Exercise';
+        guidedExerciseDesc = 'Build chords hands-on in the fullscreen Chord Lab! We\'ll guide you through each step with spotlights, highlights, and real-time feedback.';
+        guidedExerciseIcon = '🎹';
+    } else {
+        // Classic mode - determine based on target tab
+        const guidedTargetTab = tutorial ? getGuidedTargetTab(tutorial) : 'builder';
+        const isProgressionWorkshop = guidedTargetTab === 'trainer';
+        guidedExerciseTitle = isProgressionWorkshop
+            ? 'Guided Progression Workshop Exercise'
+            : 'Guided Chord Lab Exercise';
+        guidedExerciseDesc = isProgressionWorkshop
+            ? 'Build progressions hands-on in the Progression Workshop! We\'ll guide you through each step with highlights and real-time feedback.'
+            : 'Build chords hands-on in the Chord Lab! We\'ll guide you through each step with highlights and real-time feedback.';
+        guidedExerciseIcon = isProgressionWorkshop ? '🎼' : '🎛️';
+    }
 
     // Render exercises if they exist
     const exercisesHTML = tryIt?.exercises?.map((ex, idx) => {
@@ -2440,6 +2454,37 @@ function attachLessonEventListeners(container, lesson) {
 
     // Guided exercise button (Chord Lab/Progression Workshop guided exercises for lessons 6+)
     container.querySelector('#start-guided-exercise-btn')?.addEventListener('click', () => {
+        // Check if this lesson has fullscreen guided steps (new approach)
+        if (hasFullscreenGuidedSteps(lesson.id)) {
+            const fullscreenSteps = getFullscreenGuidedSteps(lesson.id);
+            if (fullscreenSteps && fullscreenSteps.length > 0) {
+                // Setup for fullscreen tutorial (clear progression, reset BPM, etc.)
+                setupFullscreenTutorial();
+
+                // Determine target tab - fullscreen Chord Lab for now
+                // Future: could be 'studio-new' for progression exercises
+                const targetTab = 'chordlab-new';
+
+                // Start the guided mode with fullscreen steps
+                startGuidedModeWithConfirmation({
+                    lessonId: lesson.id,
+                    lessonTitle: lesson.title,
+                    targetTab: targetTab,
+                    steps: fullscreenSteps,
+                    onComplete: (actionHistory) => {
+                        console.log('[LessonViewer] Fullscreen guided exercise completed');
+                        cleanupFullscreenTutorial();
+                    },
+                    onCancel: () => {
+                        console.log('[LessonViewer] Fullscreen guided exercise cancelled');
+                        cleanupFullscreenTutorial();
+                    }
+                });
+                return;
+            }
+        }
+
+        // Fallback to classic mode tutorial if no fullscreen steps available
         const tutorial = lessonTutorials[lesson.id];
         if (tutorial) {
             // Extract the guided steps and target tab from the tutorial

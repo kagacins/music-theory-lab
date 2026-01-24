@@ -3251,12 +3251,13 @@ export function copySelectedChords(indices) {
         .map(idx => ({ ...progressionData[idx] }));
 
     if (chordsToCopy.length > 0) {
-        setClipboard({ type: 'chords', data: chordsToCopy });
+        setClipboard('chords', chordsToCopy);
     }
 }
 
 /**
  * Paste chords from clipboard at insertion point
+ * Pastes after the last selected chord, in the same section as that chord
  */
 export function pasteChords() {
     const clipboard = getClipboard();
@@ -3278,26 +3279,46 @@ export function pasteChords() {
     // Find insertion point (after last selected, or at end)
     const selectedIndices = getSelectedIndicesArray();
     let insertAt = progressionData.length;
+    let targetSectionId = null;
+
     if (selectedIndices.length > 0) {
-        insertAt = Math.max(...selectedIndices) + 1;
+        const lastSelectedIndex = Math.max(...selectedIndices);
+        insertAt = lastSelectedIndex + 1;
+
+        // Get the section of the last selected chord (if any)
+        const section = compositionState.getSectionForChord(lastSelectedIndex);
+        if (section) {
+            targetSectionId = section.id;
+        }
     }
 
-    // Insert each chord
+    // Insert each chord, preserving original voicing (notes array) and duration
+    const pastedCount = clipboard.data.length;
     clipboard.data.forEach((chord, i) => {
-        const newChord = { ...chord };
+        // Deep copy to preserve all properties including notes array
+        const newChord = JSON.parse(JSON.stringify(chord));
         compositionState.insertChord(insertAt + i, newChord);
+
+        // Add to the same section as the selected chord (if applicable)
+        if (targetSectionId) {
+            compositionState.addChordToSection(insertAt + i, targetSectionId);
+        }
     });
 
     // Clear selection and select pasted chords
     clearSelection();
-    for (let i = 0; i < clipboard.data.length; i++) {
+    for (let i = 0; i < pastedCount; i++) {
         addToSelection(insertAt + i);
     }
 
-    // Re-render
+    // Sync and re-render everything
+    syncProgressionToMelodyComposer();
+    refreshNotationFromProgression();
     renderProgressionDisplay('melody-progression-visualization', true);
-
     updateMultiSelectVisuals();
+
+    // Show toast feedback
+    showToast(`Pasted ${pastedCount} chord${pastedCount > 1 ? 's' : ''}`, 'success');
 }
 
 /**
@@ -4309,6 +4330,10 @@ export function captureProgressionState() {
         if (compositionState.voltaBrackets) {
             state.voltaBrackets = JSON.parse(JSON.stringify(compositionState.voltaBrackets));
         }
+        // Capture sections (for undo/redo of cross-section chord moves)
+        if (compositionState.sections) {
+            state.sections = JSON.parse(JSON.stringify(compositionState.sections));
+        }
     }
 
     return state;
@@ -4398,6 +4423,10 @@ function restoreProgressionState(state) {
         // Restore volta brackets
         if (state.voltaBrackets) {
             compositionState.voltaBrackets = JSON.parse(JSON.stringify(state.voltaBrackets));
+        }
+        // Restore sections (for undo/redo of cross-section chord moves)
+        if (state.sections) {
+            compositionState.sections = JSON.parse(JSON.stringify(state.sections));
         }
         compositionState.events.emit('loaded', { measures: compositionState.measures });
     }

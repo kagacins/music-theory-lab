@@ -84,6 +84,11 @@ export function getEnharmonicPreferenceForKey(key) {
 /**
  * Spell a note correctly for a given key
  * Uses the key's enharmonic preference to choose between sharp and flat spellings
+ *
+ * IMPORTANT: Natural notes (C, D, E, F, G, A, B) are NEVER converted to their
+ * enharmonic equivalents (Cb, Db, etc.). Only chromatic notes (sharps/flats)
+ * use the enharmonic preference. This prevents bugs like B becoming Cb.
+ *
  * @param {string} note - Note name (with or without octave, e.g., "C#" or "C#4")
  * @param {string} key - Key signature for context
  * @returns {string} Correctly spelled note for the key
@@ -91,12 +96,19 @@ export function getEnharmonicPreferenceForKey(key) {
 export function spellNoteInKey(note, key) {
     if (!note) return note;
 
-    const preference = getEnharmonicPreferenceForKey(key);
-
     // Check if note has octave
     const hasOctave = /\d$/.test(note);
     const notePart = hasOctave ? note.slice(0, -1) : note;
     const octavePart = hasOctave ? note.slice(-1) : '';
+
+    // CRITICAL: Natural notes should NEVER be converted to enharmonic equivalents
+    // B should stay B (not become Cb), C should stay C, etc.
+    const naturalNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    if (naturalNotes.includes(notePart)) {
+        return note; // Return as-is, no conversion needed
+    }
+
+    const preference = getEnharmonicPreferenceForKey(key);
 
     // Find the note index
     let noteIndex = ALL_NOTES.indexOf(notePart);
@@ -111,6 +123,7 @@ export function spellNoteInKey(note, key) {
     if (noteIndex === -1) return note; // Can't resolve, return original
 
     // Get the correctly spelled note based on preference
+    // Note: FLAT_NOTES[11] is now "B" (not "Cb") to avoid incorrect conversions
     const spelledNote = preference === 'flat' ? FLAT_NOTES[noteIndex] : SHARP_NOTES[noteIndex];
 
     return spelledNote + octavePart;
@@ -410,16 +423,19 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
             }
         }
 
-        // Handle octave adjustments for enharmonics that cross octave boundaries
-        // B#/C boundary: B#3 = C4, so when spelling C as B#, subtract 1 from octave
-        // Cb/B boundary: Cb4 = B3, so when spelling B as Cb, add 1 to octave
-        // Note: E#/F and Fb/E do NOT cross octave boundaries (E#3 = F3, Fb3 = E3)
-        if (noteName === "Cb" && rawNoteName !== "Cb") {
-            noteOctave = noteOctave + 1;
-        } else if (noteName === "B#" && rawNoteName !== "B#") {
-            noteOctave = noteOctave - 1;
-        }
-        // E# and Fb don't need octave adjustment - they're in the same octave as F and E
+        // IMPORTANT: Do NOT adjust octaves when generating notes from MIDI values!
+        // The MIDI calculation already produces the correct octave.
+        //
+        // For example, F Diminished = F-Ab-Cb:
+        //   - F3 (MIDI 65) + 6 semitones = MIDI 71 = B3 = Cb3 (NOT Cb4!)
+        //   - B3 and Cb3 are the SAME pitch, same octave
+        //
+        // The Cb/B# octave boundary adjustment is only needed when:
+        //   1. The INPUT root note contains Cb or B# (handled by noteToMidi)
+        //   2. We need to DISPLAY a note that crosses the boundary (handled by getNoteKeyId)
+        //
+        // Here we're generating notes from intervals, so the MIDI-derived octave is correct.
+        // E# and Fb also don't need adjustment (E#3 = F3, Fb3 = E3, same octave)
 
         // Final return — this single string is what's used for both playback and highlighting
         return `${noteName}${noteOctave}`;

@@ -5697,7 +5697,7 @@ export function toggleFullScreenNotation() {
  */
 export function refreshFullscreenChordPanel() {
     const editor = _instance;
-    if (editor && editor.isOpen && editor.bottomPanel) {
+    if (editor && (editor.isOpen || editor.isTabMode) && editor.bottomPanel) {
         editor.bottomPanel.refresh();
     }
 }

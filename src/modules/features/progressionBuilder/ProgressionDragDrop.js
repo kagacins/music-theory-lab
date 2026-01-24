@@ -74,8 +74,6 @@ export function initializeSectionContainerSortable(container) {
         // Allow sorting within this container
         sort: true,
         onEnd: function(evt) {
-            console.log('[SectionContainer] Drag ended - using NEW section model');
-
             // Save state for undo BEFORE making changes
             saveStateBeforeChange();
 
@@ -90,8 +88,6 @@ export function initializeSectionContainerSortable(container) {
             const newSectionOrder = allContainers
                 .map(cont => cont.getAttribute('data-section-id'))
                 .filter(Boolean);
-
-            console.log('[SectionContainer] New section order:', newSectionOrder);
 
             // Use the new reorderSectionsByIds method which handles everything cleanly
             const success = compositionState.reorderSectionsByIds(
@@ -131,12 +127,9 @@ export function initializeSectionContainerSortable(container) {
                     window.renderProgressionDisplay('melody-progression-visualization', true);
                 }
 
-                console.log('[SectionContainer] Section reorder complete');
                 window.dispatchEvent(new CustomEvent('showNotification', {
                     detail: { message: 'Section order updated', type: 'success' }
                 }));
-            } else {
-                console.error('[SectionContainer] Section reorder failed');
             }
         }
     });
@@ -244,8 +237,6 @@ export function initializeSectionChipsSortable(chipsContainer) {
         delayOnTouchOnly: true,
         touchStartThreshold: 3,
         onEnd: function(evt) {
-            console.log('[SectionChips] Drag ended - using NEW section model');
-
             // Save state for undo BEFORE making changes
             saveStateBeforeChange();
 
@@ -260,8 +251,6 @@ export function initializeSectionChipsSortable(chipsContainer) {
             const newSectionOrder = allChips
                 .map(chip => chip.getAttribute('data-section-id'))
                 .filter(Boolean);
-
-            console.log('[SectionChips] New section order:', newSectionOrder);
 
             // Use the new reorderSectionsByIds method
             const success = compositionState.reorderSectionsByIds(
@@ -300,12 +289,9 @@ export function initializeSectionChipsSortable(chipsContainer) {
                     window.renderProgressionDisplay('melody-progression-visualization', true);
                 }
 
-                console.log('[SectionChips] Section reorder complete');
                 window.dispatchEvent(new CustomEvent('showNotification', {
                     detail: { message: 'Section order updated', type: 'success' }
                 }));
-            } else {
-                console.error('[SectionChips] Section reorder failed');
             }
         }
     });
@@ -701,11 +687,6 @@ export function handleChordMoveToSection(evt) {
  * @param {string} originalSectionId - The section the card was originally in
  */
 export function handleCardDragWithinSection(evt, originalSectionId) {
-    console.log('[handleCardDragWithinSection] Using NEW section model');
-    console.log('[handleCardDragWithinSection] evt.from:', evt.from?.className, 'data-section-id:', evt.from?.getAttribute('data-section-id'));
-    console.log('[handleCardDragWithinSection] evt.to:', evt.to?.className, 'data-section-id:', evt.to?.getAttribute('data-section-id'));
-    console.log('[handleCardDragWithinSection] originalSectionId param:', originalSectionId);
-
     const draggedItem = evt.item;
     const oldChordIndex = parseInt(draggedItem.getAttribute('data-chord-index'), 10);
     const fromContainer = evt.from;
@@ -740,16 +721,11 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
     let toSectionId = toContainer.getAttribute('data-section-id');
     let fromSectionId = fromContainer.getAttribute('data-section-id');
 
-    console.log('[handleCardDragWithinSection] toSectionId from toContainer:', toSectionId);
-    console.log('[handleCardDragWithinSection] fromSectionId from fromContainer:', fromSectionId);
-
     if (!fromSectionId) {
         fromSectionId = draggedItem.getAttribute('data-in-section');
-        console.log('[handleCardDragWithinSection] fromSectionId from draggedItem:', fromSectionId);
     }
     if (!toSectionId && isFilteredView) {
         toSectionId = draggedItem.getAttribute('data-in-section');
-        console.log('[handleCardDragWithinSection] toSectionId from draggedItem (filtered view):', toSectionId);
     }
 
     // Check if dropped on main container (outside any section)
@@ -758,15 +734,11 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
          toContainer.id?.includes('progression-visualization') ||
          toContainer.classList.contains('flex'));
 
-    console.log(`[handleCardDragWithinSection] Card ${oldChordIndex} from section ${fromSectionId} to ${toSectionId}, mainContainer=${isDroppedOnMainContainer}`);
-
     // Handle drop on main container - card becomes ungrouped at a specific position
     if (isDroppedOnMainContainer) {
-        console.log('[handleCardDragWithinSection] Dropped on main container - determining position');
 
         // Remove from old section if it was in one (all sections are now "real", including ungrouped)
         if (fromSectionId) {
-            console.log(`[handleCardDragWithinSection] Removing chord ${oldChordIndex} from section ${fromSectionId}`);
             compositionState.removeChordFromSection(oldChordIndex);
         }
 
@@ -823,8 +795,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
             }
         }
 
-        console.log(`[handleCardDragWithinSection] Main container drop: prev=${prevSectionLastChord}, next=${nextSectionFirstChord}`);
-
         // Calculate new position
         if (prevSectionLastChord >= 0) {
             newChordIndex = prevSectionLastChord + 1;
@@ -840,8 +810,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
             newChordIndex = 0;
         }
 
-        console.log(`[handleCardDragWithinSection] Main container: moving chord ${oldChordIndex} to ${newChordIndex}`);
-
         if (oldChordIndex !== newChordIndex) {
             // Update section boundaries with preserveMembership since we're creating ungrouped chord
             if (typeof compositionState.updateSectionsAfterChordReorder === 'function') {
@@ -851,7 +819,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
             // CRITICAL: Use compositionState.reorderChord() instead of manual splice
             // This properly reorders bass blocks BEFORE sync, preserving user edits
             if (typeof compositionState.reorderChord === 'function') {
-                console.log(`[handleCardDragWithinSection] Using compositionState.reorderChord(${oldChordIndex}, ${newChordIndex})`);
                 compositionState.reorderChord(oldChordIndex, newChordIndex);
             }
 
@@ -859,7 +826,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
             // compositionState.reorderChord() updates storedProgressionData internally
             // We must sync trainerState to match, NOT do a separate manual splice
             const reorderedData = compositionState.exportToProgressionData();
-            console.log(`[handleCardDragWithinSection] After reorder, compositionState has ${reorderedData.length} chords`);
             trainerState.progressionData = reorderedData;
 
             // Also reorder the romans array to match
@@ -893,14 +859,14 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
 
     // Handle section membership change (card moved between sections)
     // SIMPLIFIED APPROACH: Read the DOM to determine new order and section assignments
-    console.log(`[handleCardDragWithinSection] Comparing sections: fromSectionId="${fromSectionId}" toSectionId="${toSectionId}" equal=${fromSectionId === toSectionId}`);
     if (fromSectionId !== toSectionId) {
-        console.log(`[handleCardDragWithinSection] Cross-section move: from ${fromSectionId} to ${toSectionId}`);
 
         // Find the main grid container
         const mainGrid = toContainer.closest('[id$="-cards-grid"]') ||
                         toContainer.closest('#progression-visualization') ||
-                        toContainer.closest('#melody-progression-visualization');
+                        toContainer.closest('#melody-progression-visualization') ||
+                        toContainer.closest('#fs-chord-cards-container') ||
+                        toContainer.closest('.section-filtered-cards');
 
         if (!mainGrid) {
             console.error('[handleCardDragWithinSection] Could not find main grid container');
@@ -924,9 +890,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
                 newOrder.push({ oldIndex: oldIdx, sectionId });
             });
         });
-
-        console.log('[handleCardDragWithinSection] DOM order after drop:',
-            newOrder.map(x => `${x.oldIndex}→${x.sectionId}`).join(', '));
 
         // Validate we have all chords
         const totalChords = trainerState.progressionData.length;
@@ -955,7 +918,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
 
         // Update compositionState - sync with the new progression data
         if (typeof compositionState.syncWithProgressionData === 'function') {
-            console.log('[handleCardDragWithinSection] Syncing compositionState with new order');
             compositionState.syncWithProgressionData(newProgressionData, {
                 key: compositionState.metadata?.key || 'C',
                 timeSignature: compositionState.metadata?.timeSignature || { num: 4, denom: 4 }
@@ -964,12 +926,10 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
 
         // Now rebuild section boundaries from the DOM structure
         // Group consecutive chords by sectionId
-        console.log('[handleCardDragWithinSection] Rebuilding section boundaries from DOM');
 
         // CRITICAL: Access sections array directly, NOT via getSection() which returns COPIES!
         const sections = compositionState.sections;
         if (!sections) {
-            console.error('[handleCardDragWithinSection] No sections array found on compositionState');
             return;
         }
 
@@ -983,17 +943,13 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
         let currentSectionId = null;
         let sectionStartIdx = 0;
 
-        console.log('[handleCardDragWithinSection] Processing newOrder items:');
         newOrder.forEach((item, newIdx) => {
-            console.log(`  newIdx=${newIdx}: oldIndex=${item.oldIndex}, sectionId=${item.sectionId}`);
             if (item.sectionId !== currentSectionId) {
                 // Finish previous section - use direct array access, not getSection()
                 if (currentSectionId !== null) {
                     const prevSection = sections.find(s => s.id === currentSectionId);
                     if (prevSection) {
-                        const count = newIdx - sectionStartIdx;
-                        console.log(`    Finishing ${currentSectionId}: chordCount = ${newIdx} - ${sectionStartIdx} = ${count}`);
-                        prevSection.chordCount = count;
+                        prevSection.chordCount = newIdx - sectionStartIdx;
                     }
                 }
                 // Start new section - use direct array access
@@ -1001,7 +957,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
                 sectionStartIdx = newIdx;
                 const section = sections.find(s => s.id === currentSectionId);
                 if (section) {
-                    console.log(`    Starting ${currentSectionId} at startIndex=${newIdx}`);
                     section.startIndex = newIdx;
                 }
             }
@@ -1011,19 +966,9 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
         if (currentSectionId !== null) {
             const lastSection = sections.find(s => s.id === currentSectionId);
             if (lastSection) {
-                const count = newOrder.length - sectionStartIdx;
-                console.log(`  Finishing last section ${currentSectionId}: chordCount = ${newOrder.length} - ${sectionStartIdx} = ${count}`);
-                lastSection.chordCount = count;
+                lastSection.chordCount = newOrder.length - sectionStartIdx;
             }
         }
-
-        // Log the rebuilt sections (using direct array to confirm changes persisted)
-        console.log('[handleCardDragWithinSection] Section boundaries after rebuild:');
-        sections.forEach(s => {
-            if (s.chordCount > 0) {
-                console.log(`  ${s.id}: startIndex=${s.startIndex}, chordCount=${s.chordCount}, type=${s.type}`);
-            }
-        });
 
         // CRITICAL: Remove the dragged item from DOM before re-rendering
         if (draggedItem.parentNode) {
@@ -1063,8 +1008,6 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
         // No change in order
         return;
     }
-
-    console.log('[handleCardDragWithinSection] Reordering:', sortedPositions, '->', newVisualOrder);
 
     // Build the new progression: for each sorted position, put the data from the corresponding new visual position
     const newProgressionData = [...trainerState.progressionData];
@@ -1121,11 +1064,8 @@ export function handleCardDragWithinSection(evt, originalSectionId) {
  * @param {Object} evt - Sortable event
  */
 export function handleSectionDragEnd(container, sectionEl, evt) {
-    console.log('[Scroll Mode] Section drag ended - using NEW section model');
-
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('[Scroll Mode] CompositionState not available');
         return;
     }
 
@@ -1147,8 +1087,6 @@ export function handleSectionDragEnd(container, sectionEl, evt) {
             // Skip individual cards as they're part of a section container
         }
     });
-
-    console.log('[Scroll Mode] New section order:', newSectionOrder);
 
     // Use the new reorderSectionsByIds method
     const success = compositionState.reorderSectionsByIds(
@@ -1187,12 +1125,9 @@ export function handleSectionDragEnd(container, sectionEl, evt) {
             window.renderProgressionDisplay('melody-progression-visualization', true);
         }
 
-        console.log('[Scroll Mode] Section reorder complete');
         window.dispatchEvent(new CustomEvent('showNotification', {
             detail: { message: 'Section order updated', type: 'success' }
         }));
-    } else {
-        console.error('[Scroll Mode] Section reorder failed');
     }
 }
 
@@ -1221,8 +1156,6 @@ export function reorderSectionsWithChords(sections, fromIndex, toIndex) {
     const newSectionOrder = sectionView.map(s => s.id);
     const [movedId] = newSectionOrder.splice(fromIndex, 1);
     newSectionOrder.splice(toIndex, 0, movedId);
-
-    console.log('[reorderSectionsWithChords] New section order:', newSectionOrder);
 
     // Use the new reorderSectionsByIds method
     const success = compositionState.reorderSectionsByIds(

@@ -78,7 +78,8 @@
       "Bash(timeout:*)",
       "Bash(git pull:*)",
       "Bash(npx @anthropic-ai/mcp-server-playwright@latest:*)",
-      "Bash(do md5sum src/modules/ui/recommendations/UnifiedRecommendationModal/ChordTab.js)"
+      "Bash(do md5sum src/modules/ui/recommendations/UnifiedRecommendationModal/ChordTab.js)",
+      "Bash(git grep:*)"
     ],
     "deny": [],
     "ask": []

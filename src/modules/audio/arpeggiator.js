@@ -143,6 +143,18 @@ export function playArpeggio(selectionType, type, direction) {
 
     if (notesToPlay.length === 0) return; // No notes to play
 
+    // Dispatch builderChordPlayed event for guided mode tutorials
+    // This allows arpeggio playback to satisfy "chord_played" validation
+    if (window.dispatchBuilderEvent && window.isGuidedModeActive && window.isGuidedModeActive()) {
+        window.dispatchBuilderEvent('builderChordPlayed', {
+            root: rootNote,
+            type: type,
+            inversion: window.builderInversion || 0,
+            isArpeggio: true,
+            direction: direction
+        });
+    }
+
     if (direction === 'down') {
         notesToPlay.reverse();
     }

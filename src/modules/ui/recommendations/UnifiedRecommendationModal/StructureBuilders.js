@@ -111,6 +111,7 @@ export function createModalStructure() {
 
 /**
  * Create modal header with title, key badge, and selection badge
+ * Header is draggable to reposition the modal
  * @returns {HTMLElement} Header element
  */
 export function createHeader() {
@@ -118,6 +119,99 @@ export function createHeader() {
 
     const header = document.createElement('div');
     header.className = 'rm-header';
+    header.style.cursor = 'grab';
+    header.title = 'Drag to reposition';
+
+    // Drag state
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let modalStartX = 0;
+    let modalStartY = 0;
+
+    // Drag handlers
+    const handleMouseDown = (e) => {
+        // Don't drag if clicking on close button or other interactive elements
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+            return;
+        }
+
+        const modal = header.closest('.unified-modal-container');
+        if (!modal) return;
+
+        isDragging = true;
+        header.style.cursor = 'grabbing';
+
+        // Get current modal position
+        const rect = modal.getBoundingClientRect();
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+
+        // If modal doesn't have explicit positioning yet, set it based on current position
+        if (!modal.style.left || modal.style.left === 'auto') {
+            modal.style.position = 'fixed';
+            modal.style.left = rect.left + 'px';
+            modal.style.top = rect.top + 'px';
+            modal.style.transform = 'none';
+            modal.style.margin = '0';
+        }
+
+        modalStartX = parseInt(modal.style.left, 10) || rect.left;
+        modalStartY = parseInt(modal.style.top, 10) || rect.top;
+
+        e.preventDefault();
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging) return;
+
+        const modal = header.closest('.unified-modal-container');
+        if (!modal) return;
+
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+
+        let newX = modalStartX + deltaX;
+        let newY = modalStartY + deltaY;
+
+        // Constrain to viewport (leave at least 50px visible on each edge)
+        const modalRect = modal.getBoundingClientRect();
+        const minX = -modalRect.width + 100;
+        const maxX = window.innerWidth - 100;
+        const minY = 0;
+        const maxY = window.innerHeight - 50;
+
+        newX = Math.max(minX, Math.min(maxX, newX));
+        newY = Math.max(minY, Math.min(maxY, newY));
+
+        modal.style.left = newX + 'px';
+        modal.style.top = newY + 'px';
+    };
+
+    const handleMouseUp = () => {
+        if (isDragging) {
+            isDragging = false;
+            header.style.cursor = 'grab';
+        }
+    };
+
+    header.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Clean up listeners when modal is removed
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.removedNodes.forEach((node) => {
+                if (node === header || (node.contains && node.contains(header))) {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                    observer.disconnect();
+                }
+            });
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
     // Left side: Title with key and selection info
     const titleArea = document.createElement('div');

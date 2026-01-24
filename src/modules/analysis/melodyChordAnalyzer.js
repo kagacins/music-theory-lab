@@ -134,8 +134,13 @@ export function analyzeMelodyNotesForChord(chordIndex) {
     const chord = progressionData[chordIndex];
     if (!chord) return null;
 
-    // Get melody notes during this chord
-    const melodyNotes = compositionState?.gatherTrebleNotesForChord?.(chordIndex) || [];
+    // Get melody notes during this chord (filter out rests and notes without pitches)
+    const allNotes = compositionState?.gatherTrebleNotesForChord?.(chordIndex) || [];
+    const melodyNotes = allNotes.filter(note => {
+        if (note.isRest) return false;
+        const pitch = note.pitches?.[0] || note.pitch;
+        return pitch && typeof pitch === 'string';
+    });
 
     if (melodyNotes.length === 0) {
         return {
@@ -222,6 +227,24 @@ export function analyzeMelodyNotesForChord(chordIndex) {
 }
 
 /**
+ * Create default return object for early exits in analyzeMelodicImplications
+ */
+function createDefaultImplicationsReturn(currentChord, prevChord, nextChord, key, leadingTones = [], hasMelody = false) {
+    return {
+        currentChord,
+        prevChord,
+        nextChord,
+        key,
+        leadingTones,
+        suggestedAlternatives: [],
+        suggestedNextChords: [],
+        tensionLevel: 'Low',
+        tensionDescription: 'No melody to analyze',
+        hasMelody
+    };
+}
+
+/**
  * Analyze melodic tendencies and suggest what chords the melody implies
  * @param {number} chordIndex - Current chord index
  * @returns {Object} Melodic implications and suggestions
@@ -237,8 +260,13 @@ export function analyzeMelodicImplications(chordIndex) {
 
     if (!currentChord) return null;
 
-    // Get melody notes for current chord
-    const melodyNotes = compositionState?.gatherTrebleNotesForChord?.(chordIndex) || [];
+    // Get melody notes for current chord (filter out rests and notes without pitches)
+    const allNotes = compositionState?.gatherTrebleNotesForChord?.(chordIndex) || [];
+    const melodyNotes = allNotes.filter(note => {
+        if (note.isRest) return false;
+        const pitch = note.pitches?.[0] || note.pitch;
+        return pitch && typeof pitch === 'string';
+    });
 
     // Extract pitches for chord suggestion
     const melodyPitches = melodyNotes
@@ -251,6 +279,7 @@ export function analyzeMelodicImplications(chordIndex) {
 
     melodyNotes.forEach(note => {
         const pitch = note.pitches?.[0] || note.pitch;
+        if (!pitch) return; // Skip notes without valid pitch
         const scaleDegree = getScaleDegree(pitch, key);
 
         if (scaleDegree && LEADING_TONE_TENDENCIES[scaleDegree]) {
@@ -281,6 +310,7 @@ export function analyzeMelodicImplications(chordIndex) {
     if (melodyNotes.length > 0) {
         const lastNote = melodyNotes[melodyNotes.length - 1];
         const lastPitch = lastNote.pitches?.[0] || lastNote.pitch;
+        if (!lastPitch) return createDefaultImplicationsReturn(currentChord, prevChord, nextChord, key, leadingTones, true);
         const lastNoteName = lastPitch.replace(/\d+$/, '');
         const lastNoteIndex = noteToChromatic(lastNoteName);
 

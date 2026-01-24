@@ -48,22 +48,24 @@ export const MELODY_VIEWS = {
 // MODAL STATE
 // ============================================================================
 
+// Clear session-specific tab/intent state on page load
+// This ensures fresh page loads start at Chords -> Suggest
+// while changes within the session are still remembered (saved on tab switch)
+localStorage.removeItem('unified-modal-active-tab');
+localStorage.removeItem('unified-modal-chord-intent');
+
 /**
  * Central state object for the Unified Recommendation Modal
  * Persists key preferences to localStorage for user convenience
  */
 const modalState = {
-    // Tab navigation
-    activeTab: localStorage.getItem('unified-modal-active-tab') || TABS.CHORD,
+    // Tab navigation - defaults to CHORD on fresh page load
+    activeTab: TABS.CHORD,
 
     // Chord tab state
     chordView: localStorage.getItem('unified-modal-chord-view') || CHORD_VIEWS.QUICK,
-    // Handle legacy localStorage values (compare/transform now map to alternatives)
-    chordIntent: (() => {
-        const stored = localStorage.getItem('unified-modal-chord-intent');
-        if (stored === 'compare' || stored === 'transform') return CHORD_INTENTS.ALTERNATIVES;
-        return stored || CHORD_INTENTS.SUGGEST;
-    })(),
+    // Defaults to SUGGEST on fresh page load
+    chordIntent: CHORD_INTENTS.SUGGEST,
     style: localStorage.getItem('chord-suggestion-style') || 'balanced',
     mood: localStorage.getItem('chord-suggestion-mood') || 'bright',
     activeInversion: 0,

@@ -2518,15 +2518,16 @@ function createSuggestedChordObject(alt, currentChord, key) {
     const enharmonicPref = getEnharmonicPreferenceForKey(key);
 
     // Extract base octave from current chord to maintain consistent register
-    let baseOctave = 4;
+    let baseOctave = 3; // Default to octave 3 (matches getInvertedChordNotes default)
     if (currentChord.notes?.length > 0) {
         const m = currentChord.notes[0].match(/(\d+)$/);
         if (m) baseOctave = parseInt(m[1], 10);
     }
 
-    // Calculate octave shift to match current chord's register
-    // getInvertedChordNotes uses octave 4 as default, so shift relative to that
-    const octaveShift = baseOctave - 4;
+    // Calculate octave shift IN SEMITONES to match current chord's register
+    // getInvertedChordNotes uses octave 3 as base: baseOctave = 3 + Math.floor(octaveShift / 12)
+    // So to get target octave X, we need: octaveShift = (X - 3) * 12
+    const octaveShift = (baseOctave - 3) * 12;
 
     const result = getInvertedChordNotes(alt.root, alt.type, alt.inversion || 0, key, octaveShift, enharmonicPref);
     return {
