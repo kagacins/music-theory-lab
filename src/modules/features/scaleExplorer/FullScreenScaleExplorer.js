@@ -227,7 +227,7 @@ class FullScreenScaleExplorer {
             <!-- Mobile-only: Edge tab to open sidebar (visible when sidebar collapsed) -->
             <div id="fs-scaleexplorer-edge-tab"
                  onclick="window.fsScaleExplorerToggleSidebar && window.fsScaleExplorerToggleSidebar()"
-                 class="absolute left-0 top-1/3 z-[100] w-5 h-16 bg-lime-500 hover:bg-lime-600 active:bg-lime-700 text-white rounded-r-lg shadow-lg flex items-center justify-center cursor-pointer transition-all"
+                 class="absolute left-0 top-1/3 z-[100] w-5 h-16 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-r-lg shadow-lg flex items-center justify-center cursor-pointer transition-all"
                  title="Open Filters"
                  style="display: none;">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,7 +243,7 @@ class FullScreenScaleExplorer {
                 <!-- Main content area -->
                 <div class="flex-1 flex flex-col overflow-hidden">
                     <!-- Scale Info Panel (compact, at top) -->
-                    <div id="fs-scale-info-panel" class="bg-lime-50 border-b border-lime-200 px-3 py-2 shadow-sm"></div>
+                    <div id="fs-scale-info-panel" class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 shadow-sm"></div>
 
                     <!-- Main content area - Shows Scale Types Grid -->
                     <div id="fs-scaleexplorer-main-content" class="flex-1 overflow-y-auto p-2 pb-16 bg-gray-50">
@@ -272,11 +272,11 @@ class FullScreenScaleExplorer {
         return `
         <div id="fs-scaleexplorer-sidebar" class="w-52 bg-white border-r border-gray-200 flex flex-col overflow-y-auto text-sm transition-all duration-300" style="min-width: 200px;">
             <!-- Mobile-only: Sidebar header with collapse button -->
-            <div id="fs-scaleexplorer-sidebar-mobile-header" class="hidden bg-lime-500 text-white px-3 py-2 flex-shrink-0">
+            <div id="fs-scaleexplorer-sidebar-mobile-header" class="hidden bg-emerald-700 text-white px-3 py-2 flex-shrink-0">
                 <div class="flex items-center justify-between">
                     <span class="font-semibold text-sm">Root & Filters</span>
                     <button onclick="window.fsScaleExplorerToggleSidebar && window.fsScaleExplorerToggleSidebar()"
-                            class="w-8 h-8 flex items-center justify-center rounded hover:bg-lime-600 active:bg-lime-700 transition-colors"
+                            class="w-8 h-8 flex items-center justify-center rounded hover:bg-emerald-800 active:bg-emerald-900 transition-colors"
                             title="Close">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -290,23 +290,23 @@ class FullScreenScaleExplorer {
                     <div class="flex items-center justify-between mb-1">
                         <span class="text-gray-700 font-semibold text-sm">Root</span>
                         <label class="flex items-center gap-0.5 cursor-pointer" title="Sharp/Flat">
-                            <span class="${enhPref === 'sharp' ? 'text-lime-600 font-bold' : 'text-gray-400'}">&#9839;</span>
+                            <span class="${enhPref === 'sharp' ? 'text-emerald-700 font-bold' : 'text-gray-400'}">&#9839;</span>
                             <div class="relative">
                                 <input type="checkbox" id="fs-scaleexplorer-enharmonic"
                                        ${enhPref === 'flat' ? 'checked' : ''}
                                        onchange="window.fsScaleExplorerToggleEnharmonic && window.fsScaleExplorerToggleEnharmonic(this.checked)"
                                        class="sr-only peer">
-                                <div class="w-7 h-3.5 bg-gray-300 peer-checked:bg-lime-500 rounded-full"></div>
+                                <div class="w-7 h-3.5 bg-gray-300 peer-checked:bg-emerald-700 rounded-full"></div>
                                 <div class="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform peer-checked:translate-x-3.5"></div>
                             </div>
-                            <span class="${enhPref === 'flat' ? 'text-lime-600 font-bold' : 'text-gray-400'}">&#9837;</span>
+                            <span class="${enhPref === 'flat' ? 'text-emerald-700 font-bold' : 'text-gray-400'}">&#9837;</span>
                         </label>
                     </div>
                     <div id="fs-scale-root-buttons" class="grid grid-cols-4 gap-1">
                         ${notes.map((note, i) => `
                             <button data-root="${i}"
                                     onclick="window.fsScaleExplorerSelectRoot && window.fsScaleExplorerSelectRoot(${i})"
-                                    class="px-1.5 py-1.5 text-xs font-semibold rounded ${i === rootIndex ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
+                                    class="px-1.5 py-1.5 text-xs font-semibold rounded ${i === rootIndex ? 'bg-emerald-700 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'}">
                                 ${note}
                             </button>
                         `).join('')}
@@ -319,13 +319,13 @@ class FullScreenScaleExplorer {
                     <div id="fs-scale-category-buttons" class="flex flex-wrap gap-1">
                         <button data-category="all"
                                 onclick="window.fsScaleExplorerFilterCategory && window.fsScaleExplorerFilterCategory('all')"
-                                class="scale-category-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.categoryFilters.length === 0 ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}">
+                                class="scale-category-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.categoryFilters.length === 0 ? 'bg-emerald-700 text-white' : 'bg-white text-gray-700 hover:bg-emerald-100 border border-gray-200'}">
                             All
                         </button>
                         ${Object.entries(SCALE_CATEGORIES).map(([id, cat]) => `
                             <button data-category="${id}"
                                     onclick="window.fsScaleExplorerFilterCategory && window.fsScaleExplorerFilterCategory('${id}')"
-                                    class="scale-category-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.categoryFilters.includes(id) ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}"
+                                    class="scale-category-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.categoryFilters.includes(id) ? 'bg-emerald-700 text-white' : 'bg-white text-gray-700 hover:bg-emerald-100 border border-gray-200'}"
                                     title="${cat.description} (click to toggle)">
                                 ${cat.icon} ${cat.name}
                             </button>
@@ -339,12 +339,12 @@ class FullScreenScaleExplorer {
                     <div id="fs-scale-difficulty-buttons" class="flex flex-wrap gap-1">
                         <button data-difficulty="all"
                                 onclick="window.fsScaleExplorerFilterDifficulty && window.fsScaleExplorerFilterDifficulty('all')"
-                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.length === 0 ? 'bg-lime-500 text-white' : 'bg-white text-gray-700 hover:bg-lime-100 border border-gray-200'}">
+                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.length === 0 ? 'bg-emerald-700 text-white' : 'bg-white text-gray-700 hover:bg-emerald-100 border border-gray-200'}">
                             All
                         </button>
                         <button data-difficulty="beginner"
                                 onclick="window.fsScaleExplorerFilterDifficulty && window.fsScaleExplorerFilterDifficulty('beginner')"
-                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.includes('beginner') ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-green-100 border border-gray-200'}"
+                                class="scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all ${this.difficultyFilters.includes('beginner') ? 'bg-emerald-600 text-white' : 'bg-white text-gray-700 hover:bg-emerald-100 border border-gray-200'}"
                                 title="Beginner scales (click to toggle)">
                             🟢 Beginner
                         </button>
@@ -364,9 +364,9 @@ class FullScreenScaleExplorer {
                 </div>
 
                 <!-- Notes Display -->
-                <div class="bg-lime-50 border border-lime-200 rounded p-2">
-                    <span class="text-lime-700 font-semibold text-sm block mb-1">Scale Notes</span>
-                    <div id="fs-sidebar-scale-notes" class="text-lime-800 text-xs font-mono">
+                <div class="bg-emerald-50 border border-emerald-200 rounded p-2">
+                    <span class="text-emerald-700 font-semibold text-sm block mb-1">Scale Notes</span>
+                    <div id="fs-sidebar-scale-notes" class="text-emerald-800 text-xs font-mono">
                         C - D - E - F - G - A - B - C
                     </div>
                 </div>
@@ -382,7 +382,7 @@ class FullScreenScaleExplorer {
             <div id="fs-scale-fab-quick-buttons" class="flex flex-col gap-2 mb-2">
                 <!-- Play Ascending (top) -->
                 <button onclick="window.fsScaleExplorerPlay && window.fsScaleExplorerPlay('asc')"
-                        class="w-12 h-12 bg-lime-600 hover:bg-lime-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
+                        class="w-12 h-12 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
                         title="Play Ascending">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M5.293 7.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L6.707 7.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
@@ -390,7 +390,7 @@ class FullScreenScaleExplorer {
                 </button>
                 <!-- Play Descending (bottom) -->
                 <button onclick="window.fsScaleExplorerPlay && window.fsScaleExplorerPlay('desc')"
-                        class="w-12 h-12 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
+                        class="w-12 h-12 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
                         title="Play Descending">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M14.707 12.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -411,17 +411,17 @@ class FullScreenScaleExplorer {
             <div id="fs-scale-fab-menu" class="hidden absolute bottom-16 right-0 flex flex-col-reverse gap-2 mb-2">
                 <!-- Playback category -->
                 <div class="fs-scale-fab-category relative" data-category="playback">
-                    <button class="fs-scale-fab-category-btn w-12 h-12 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Playback">
+                    <button class="fs-scale-fab-category-btn w-12 h-12 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Playback">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
                     </button>
                     <span class="fs-scale-fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Playback</span>
                     <!-- Playback submenu -->
                     <div class="fs-scale-fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
-                        <button onclick="window.fsScaleExplorerPlay && window.fsScaleExplorerPlay('asc')" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
-                            <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <button onclick="window.fsScaleExplorerPlay && window.fsScaleExplorerPlay('asc')" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-emerald-50 flex items-center gap-2 active:bg-emerald-100">
+                            <svg class="w-4 h-4 text-emerald-700" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M5.293 7.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L6.707 7.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
                             </svg>
-                            <span class="text-green-700 font-medium">Play Ascending</span>
+                            <span class="text-emerald-700 font-medium">Play Ascending</span>
                         </button>
                         <button onclick="window.fsScaleExplorerPlay && window.fsScaleExplorerPlay('desc')" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
                             <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
@@ -475,9 +475,9 @@ class FullScreenScaleExplorer {
                     <span class="fs-scale-fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Help</span>
                     <!-- Help submenu -->
                     <div class="fs-scale-fab-submenu hidden absolute bottom-0 right-14 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
-                        <button onclick="window.switchTab && window.switchTab('scales')" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
-                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                            <span class="text-green-700 font-medium">Classic View</span>
+                        <button onclick="window.switchTab && window.switchTab('scales')" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-emerald-50 flex items-center gap-2 active:bg-emerald-100">
+                            <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            <span class="text-emerald-700 font-medium">Classic View</span>
                         </button>
                         <button onclick="window.showKeyboardShortcuts && window.showKeyboardShortcuts()" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
                             <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -690,14 +690,14 @@ class FullScreenScaleExplorer {
             const difficulty = btn.dataset.difficulty;
             if (difficulty === 'all') {
                 if (this.difficultyFilters.length === 0) {
-                    btn.className = 'scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all bg-lime-500 text-white';
+                    btn.className = 'scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all bg-emerald-700 text-white';
                 } else {
-                    btn.className = 'scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all bg-white text-gray-700 hover:bg-lime-100 border border-gray-200';
+                    btn.className = 'scale-difficulty-btn px-2 py-1 text-[11px] font-medium rounded-lg transition-all bg-white text-gray-700 hover:bg-emerald-100 border border-gray-200';
                 }
             } else {
                 const isActive = this.difficultyFilters.includes(difficulty);
                 const colorMap = {
-                    'beginner': isActive ? 'bg-green-500 text-white' : 'bg-white text-gray-700 hover:bg-green-100 border border-gray-200',
+                    'beginner': isActive ? 'bg-emerald-600 text-white' : 'bg-white text-gray-700 hover:bg-emerald-100 border border-gray-200',
                     'intermediate': isActive ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100 border border-gray-200',
                     'advanced': isActive ? 'bg-red-500 text-white' : 'bg-white text-gray-700 hover:bg-red-100 border border-gray-200'
                 };
@@ -819,7 +819,7 @@ class FullScreenScaleExplorer {
             btn.textContent = notes[i];
             btn.className = 'px-1.5 py-1.5 text-xs font-semibold rounded';
             if (i === rootIndex) {
-                btn.classList.add('bg-lime-500', 'text-white');
+                btn.classList.add('bg-emerald-700', 'text-white');
             } else {
                 btn.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-100', 'border', 'border-gray-200');
             }
@@ -876,9 +876,9 @@ class FullScreenScaleExplorer {
                 ? this.categoryFilters.length === 0
                 : this.categoryFilters.includes(category);
             if (isSelected) {
-                btn.classList.add('bg-lime-500', 'text-white');
+                btn.classList.add('bg-emerald-700', 'text-white');
             } else {
-                btn.classList.add('bg-white', 'text-gray-700', 'hover:bg-lime-100', 'border', 'border-gray-200');
+                btn.classList.add('bg-white', 'text-gray-700', 'hover:bg-emerald-100', 'border', 'border-gray-200');
             }
         });
     }
@@ -923,8 +923,8 @@ class FullScreenScaleExplorer {
             scales.forEach(({ type, scale }) => {
                 const isSelected = type === currentScaleType;
                 const selectedClass = isSelected
-                    ? 'bg-lime-500 text-white border-lime-600'
-                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-lime-100 hover:border-lime-300';
+                    ? 'bg-emerald-700 text-white border-emerald-800'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-emerald-100 hover:border-emerald-300';
 
                 html += `
                     <button onclick="window.fsScaleExplorerSelectScale && window.fsScaleExplorerSelectScale('${type}')"
@@ -950,7 +950,7 @@ class FullScreenScaleExplorer {
 
     _getDifficultyBadge(difficulty) {
         const badges = {
-            'beginner': '<span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded font-medium">Beginner</span>',
+            'beginner': '<span class="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium">Beginner</span>',
             'intermediate': '<span class="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded font-medium">Intermediate</span>',
             'advanced': '<span class="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded font-medium">Advanced</span>'
         };
@@ -973,7 +973,7 @@ class FullScreenScaleExplorer {
         // Compact horizontal info bar with larger fonts
         infoPanel.innerHTML = `
             <div class="flex items-center gap-3 flex-wrap">
-                <span class="font-bold text-lime-800 text-lg">${rootNote} ${currentType}</span>
+                <span class="font-bold text-emerald-800 text-lg">${rootNote} ${currentType}</span>
                 ${this._getDifficultyBadge(scale.difficulty)}
                 <span class="text-gray-500 text-sm">|</span>
                 <span class="text-gray-600 text-sm font-mono">${scaleNotes.map(n => n.slice(0, -1)).join(' - ')}</span>

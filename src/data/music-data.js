@@ -95,8 +95,7 @@ const CHORD_DEFINITIONS = {
     'Dominant 7th b9': { intervals: [0, 4, 7, 10, 13], symbol: '7b9', description: 'Alias for 7b9' },
     'Dominant 7th #5': { intervals: [0, 4, 8, 10], symbol: '7#5', description: 'Alias for 7#5' },
     'Dominant 7th b5': { intervals: [0, 4, 6, 10], symbol: '7b5', description: 'Alias for 7b5' },
-    'Sus2': { intervals: [0, 2, 7], symbol: 'sus2', description: 'Alias for Suspended 2nd' },
-    'Sus4': { intervals: [0, 5, 7], symbol: 'sus4', description: 'Alias for Suspended 4th' },
+    // Note: Sus2 and Sus4 are NOT aliases - they are the primary chord type names defined above (lines 62-63)
 };
 
 const INVERSION_NAMES = ['Root', '1st', '2nd', '3rd', '4th', '5th'];

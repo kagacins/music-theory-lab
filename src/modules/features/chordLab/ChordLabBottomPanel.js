@@ -64,8 +64,8 @@ const PANEL_CONFIG = {
     substitutions: {
         icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>`,
         label: 'Substitutions',
-        activeColor: 'bg-amber-600',
-        hoverColor: 'hover:bg-amber-700'
+        activeColor: 'bg-amber-700',
+        hoverColor: 'hover:bg-amber-800'
     },
     progression: {
         icon: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>`,
@@ -280,7 +280,7 @@ export class ChordLabBottomPanel {
                 const gradientMap = {
                     'bg-indigo-600': 'from-indigo-500 to-blue-600',
                     'bg-emerald-600': 'from-emerald-500 to-teal-500',
-                    'bg-amber-600': 'from-amber-500 to-orange-500',
+                    'bg-amber-700': 'from-amber-700 to-amber-600',
                     'bg-violet-600': 'from-violet-500 to-purple-500',
                     'bg-cyan-600': 'from-cyan-500 to-sky-500'
                 };
@@ -1534,7 +1534,7 @@ export class ChordLabBottomPanel {
         container.innerHTML = `
             <div class="h-full flex flex-col">
                 <!-- Header bar -->
-                <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-600 to-orange-600 flex-shrink-0">
+                <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-700 to-amber-600 flex-shrink-0">
                     <div class="flex items-center gap-3">
                         <span class="text-white font-semibold text-sm" style="-webkit-text-fill-color: white;">Substitutions for</span>
                         <span class="px-3 py-1 bg-white/20 rounded-full text-white font-bold text-lg" style="-webkit-text-fill-color: white;">${rootNote}${chordSymbol}</span>
@@ -1641,8 +1641,8 @@ export class ChordLabBottomPanel {
                     </div>
 
                     <!-- How to use -->
-                    <div class="px-4 py-2 bg-amber-50 border-b border-amber-100">
-                        <p class="text-xs text-amber-800"><strong>How to use:</strong> ${typeInfo.howToUse}</p>
+                    <div class="px-4 py-2 bg-amber-50/70 border-b border-amber-200">
+                        <p class="text-xs text-amber-700"><strong>How to use:</strong> ${typeInfo.howToUse}</p>
                     </div>
 
                     <!-- Substitution chord buttons -->
@@ -1664,7 +1664,7 @@ export class ChordLabBottomPanel {
      */
     _renderSubstitutionButton(sub, typeInfo) {
         const isPrefix = sub.isPrefix ? '→' : '';
-        const prefixLabel = sub.isPrefix ? '<span class="text-[9px] text-amber-600 block">Use before target</span>' : '';
+        const prefixLabel = sub.isPrefix ? '<span class="text-[9px] text-amber-700 block">Use before target</span>' : '';
 
         return `
             <div class="substitution-chord-btn flex flex-col items-center p-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-md min-w-[70px]"

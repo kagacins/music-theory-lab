@@ -85,7 +85,7 @@ function renderLessonBrowser(container) {
                     <p style="color: #000;" class=" dark:text-white mt-1 font-medium">Interactive lessons to master music theory through doing</p>
                 </div>
 
-                <!-- Progress Stats -->
+                <!-- Progress Stats - Hidden for now, not functional yet
                 <div class="flex gap-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/40 dark:to-indigo-900/40 rounded-xl p-4">
                     <div class="text-center">
                         <div class="text-2xl font-bold text-blue-700 dark:text-blue-300">${stats.completedLessons}</div>
@@ -100,6 +100,7 @@ function renderLessonBrowser(container) {
                         <div style="color: #000;" class="text-xs font-medium dark:text-white">Day Streak</div>
                     </div>
                 </div>
+                -->
             </div>
 
             <!-- Quick Actions -->

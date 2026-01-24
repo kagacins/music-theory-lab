@@ -265,29 +265,29 @@ export function switchTab(tabId, options = {}) {
             activeColor = 'bg-orange-500'; // Orange for Chord Builder (amber on keyboard)
             inactiveHover = 'hover:bg-gray-700';
         } else if (id === 'melody') {
-            activeColor = 'bg-violet-600'; // Violet for Melody Composer
+            activeColor = 'bg-purple-600'; // Purple for Composition Studio (matches landing page)
             inactiveHover = 'hover:bg-gray-700';
         } else if (id === 'scales') {
-            activeColor = 'bg-lime-400'; // Lime for Scale Explorer (lime-400 matches keyboard)
+            activeColor = 'bg-emerald-600'; // Emerald for Scale Explorer (matches landing page)
             inactiveHover = 'hover:bg-gray-700';
         } else if (id === 'learn') {
             activeColor = 'bg-blue-500'; // Blue for Learn tab
             inactiveHover = 'hover:bg-gray-700';
         } else if (id === 'studio-new') {
-            activeColor = 'bg-indigo-600'; // Indigo for Composition Studio (New)
+            activeColor = 'bg-purple-600'; // Purple for Composition Studio (New), matches landing page
             inactiveHover = 'hover:bg-gray-700';
         } else if (id === 'chordlab-new') {
             activeColor = 'bg-amber-500'; // Amber for Chord Lab (New), matching classic Chord Lab
             inactiveHover = 'hover:bg-gray-700';
         } else if (id === 'scaleexplorer-new') {
-            activeColor = 'bg-lime-500'; // Lime for Scale Explorer (New), matching classic Scale Explorer
+            activeColor = 'bg-emerald-600'; // Emerald for Scale Explorer (New), matching new theme
             inactiveHover = 'hover:bg-gray-700';
         }
 
         // Update sidebar button (if it exists)
         const sidebarBtn = document.getElementById(`sidebar-btn-${id}`);
         if (sidebarBtn) {
-            sidebarBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-lime-500', 'bg-violet-600', 'bg-indigo-500', 'hover:bg-gray-700');
+            sidebarBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-lime-500', 'bg-emerald-500', 'bg-emerald-600', 'bg-violet-600', 'bg-purple-600', 'bg-indigo-500', 'hover:bg-gray-700');
             if (id === tabId) {
                 sidebarBtn.classList.add(activeColor);
             } else {
@@ -299,7 +299,7 @@ export function switchTab(tabId, options = {}) {
         const headerBtn = document.getElementById(`header-tab-btn-${id}`);
         if (headerBtn) {
             // Remove old styling classes
-            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-lime-500', 'bg-violet-600', 'bg-indigo-500', 'bg-amber-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
+            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-lime-500', 'bg-emerald-500', 'bg-emerald-600', 'bg-violet-600', 'bg-purple-600', 'bg-indigo-500', 'bg-indigo-600', 'bg-amber-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
             // Special case: melody button should be active for both 'melody' and 'studio-new' tabs
             // Special case: builder button should be active for both 'builder' and 'chordlab-new' tabs
             // Special case: scales button should be active for both 'scales' and 'scaleexplorer-new' tabs
@@ -568,12 +568,12 @@ export function switchTab(tabId, options = {}) {
         };
         const tabColors = {
             'builder': 'text-amber-600',
-            'melody': 'text-violet-600',
-            'scales': 'text-lime-600',
+            'melody': 'text-purple-600',
+            'scales': 'text-emerald-600',
             'learn': 'text-blue-600',
-            'studio-new': 'text-indigo-600',
+            'studio-new': 'text-purple-600',
             'chordlab-new': 'text-amber-600',
-            'scaleexplorer-new': 'text-lime-600'
+            'scaleexplorer-new': 'text-emerald-600'
         };
         // Remove all color classes and add the new one
         tabSubtitle.className = 'text-[10px] font-semibold leading-tight ' + (tabColors[tabId] || 'text-gray-600');

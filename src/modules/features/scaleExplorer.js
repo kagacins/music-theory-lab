@@ -161,7 +161,7 @@ export function selectScaleRootNote(index) {
     }
     document.querySelectorAll('#scale-note-selector button').forEach((btn, i) => {
         const isSelected = parseInt(btn.dataset.index) === index;
-        btn.classList.toggle('bg-lime-600', isSelected);
+        btn.classList.toggle('bg-emerald-700', isSelected);
         btn.classList.toggle('text-white', isSelected);
         btn.classList.toggle('bg-gray-200', !isSelected);
         btn.classList.toggle('text-gray-800', !isSelected);
@@ -185,12 +185,12 @@ export function selectScaleType(type) {
     setScaleType(type);
     document.querySelectorAll('#scale-type-selector button').forEach(btn => {
         const isSelected = btn.dataset.scaleType === type;
-        btn.classList.toggle('bg-lime-500', isSelected);
+        btn.classList.toggle('bg-emerald-700', isSelected);
         btn.classList.toggle('text-white', isSelected);
         btn.classList.toggle('shadow-md', isSelected);
         btn.classList.toggle('bg-gray-200', !isSelected);
         btn.classList.toggle('text-gray-800', !isSelected);
-        btn.classList.toggle('hover:bg-lime-100', !isSelected);
+        btn.classList.toggle('hover:bg-emerald-100', !isSelected);
     });
     updateScaleDisplay();
     updateScaleInfoPanel();
@@ -337,7 +337,7 @@ export function filterScalesByCategory(category) {
     // Update category filter buttons
     document.querySelectorAll('.scale-category-btn').forEach(btn => {
         const isSelected = btn.dataset.category === category;
-        btn.classList.toggle('bg-lime-500', isSelected);
+        btn.classList.toggle('bg-emerald-700', isSelected);
         btn.classList.toggle('text-white', isSelected);
         btn.classList.toggle('bg-gray-100', !isSelected);
         btn.classList.toggle('text-gray-700', !isSelected);
@@ -362,7 +362,7 @@ function renderScaleTypeButtons() {
         const button = document.createElement('button');
         button.dataset.scaleType = type;
         button.onclick = () => selectScaleType(type);
-        button.className = 'key-button px-2 py-1.5 font-medium rounded-lg text-xs transition duration-150 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-lime-100 text-left flex flex-col';
+        button.className = 'key-button px-2 py-1.5 font-medium rounded-lg text-xs transition duration-150 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-emerald-100 text-left flex flex-col';
 
         // Scale name
         const nameSpan = document.createElement('span');
@@ -407,7 +407,7 @@ function renderCategoryFilters() {
 
     // "All" button
     const allBtn = document.createElement('button');
-    allBtn.className = 'scale-category-btn px-2 py-1 text-xs font-medium rounded-lg transition-all bg-lime-500 text-white';
+    allBtn.className = 'scale-category-btn px-2 py-1 text-xs font-medium rounded-lg transition-all bg-emerald-700 text-white';
     allBtn.textContent = 'All';
     allBtn.dataset.category = 'all';
     allBtn.onclick = () => filterScalesByCategory('all');
@@ -416,7 +416,7 @@ function renderCategoryFilters() {
     // Category buttons
     Object.entries(SCALE_CATEGORIES).forEach(([id, cat]) => {
         const btn = document.createElement('button');
-        btn.className = 'scale-category-btn px-2 py-1 text-xs font-medium rounded-lg transition-all bg-gray-100 text-gray-700 hover:bg-lime-100';
+        btn.className = 'scale-category-btn px-2 py-1 text-xs font-medium rounded-lg transition-all bg-gray-100 text-gray-700 hover:bg-emerald-100';
         btn.innerHTML = `${cat.icon} ${cat.name}`;
         btn.dataset.category = id;
         btn.title = cat.description;
@@ -437,9 +437,9 @@ export function updateScaleInfoPanel() {
     if (!scale) return;
 
     infoPanel.innerHTML = `
-        <div class="bg-lime-50 border border-lime-200 rounded-lg p-3 mt-2">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-2">
             <div class="flex items-start justify-between mb-1">
-                <span class="font-bold text-lime-800">${currentType}</span>
+                <span class="font-bold text-emerald-800">${currentType}</span>
                 ${getDifficultyBadge(scale.difficulty)}
             </div>
             <p class="text-sm text-gray-700 mb-2">${scale.description || ''}</p>
@@ -478,7 +478,7 @@ export function renderScaleSelectors() {
         button.textContent = note;
         button.dataset.index = index;
         button.onclick = () => selectScaleRootNote(index);
-        button.className = `key-button px-1 py-2 font-semibold rounded-lg transition duration-150 transform hover:scale-105 text-xs bg-gray-200 text-gray-800 hover:bg-lime-100`;
+        button.className = `key-button px-1 py-2 font-semibold rounded-lg transition duration-150 transform hover:scale-105 text-xs bg-gray-200 text-gray-800 hover:bg-emerald-100`;
         rootSelector.appendChild(button);
     });
 

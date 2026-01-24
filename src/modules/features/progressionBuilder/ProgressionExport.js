@@ -111,6 +111,139 @@ function getKeyBasedEnharmonic() {
 }
 
 // ============================================================================
+// SMART OCTAVE PLACEMENT
+// ============================================================================
+
+/**
+ * Apply smart octave placement to a chord progression.
+ * Uses lookahead to minimize TOTAL voice movement across transitions,
+ * not just the immediate transition.
+ *
+ * This is a simpler approach than full voice leading optimization - it only
+ * considers root-to-root movement rather than all voice parts.
+ *
+ * Example: In I-bVI-IV-V (E-C-A-B):
+ * - Greedy: E3→C3 (4), C3→A3 (9), A3→B3 (2) = 15 total
+ * - With lookahead: E3→C4 (8), C4→A3 (3), A3→B3 (2) = 13 total (better!)
+ *
+ * The lookahead approach considers both the incoming and outgoing transitions
+ * to choose the octave that minimizes overall movement.
+ *
+ * @param {Array<Object>} progression - Array of chord objects with notes and root
+ * @returns {Array<Object>} Progression with optimized octave placement
+ */
+function applySmartOctavePlacement(progression) {
+    if (!progression || progression.length < 2) return progression;
+
+    // Get MIDI value for a note
+    function getMidi(note) {
+        return noteToMidi(note);
+    }
+
+    // Calculate semitone distance (absolute) between two MIDIs
+    function getDistance(midi1, midi2) {
+        if (midi1 === null || midi2 === null) return Infinity;
+        return Math.abs(midi2 - midi1);
+    }
+
+    // Shift all notes in a chord by the specified number of semitones
+    function shiftChord(chord, semitones) {
+        if (semitones === 0) return chord;
+        return {
+            ...chord,
+            notes: chord.notes.map(note => {
+                const midi = getMidi(note);
+                if (midi === null) return note;
+                if (window.Tone && window.Tone.Midi) {
+                    return window.Tone.Midi(midi + semitones).toNote();
+                }
+                // Fallback: manually adjust octave
+                const match = note.match(/^([A-G][#b]?)(\d+)$/);
+                if (match) {
+                    const octaveShift = Math.round(semitones / 12);
+                    return match[1] + (parseInt(match[2]) + octaveShift);
+                }
+                return note;
+            }),
+            octaveShift: (chord.octaveShift || 0) + Math.round(semitones / 12)
+        };
+    }
+
+    // Get root MIDI from a chord
+    function getChordRootMidi(chord) {
+        if (!chord.notes || chord.notes.length === 0) return null;
+        return getMidi(chord.notes[0]);
+    }
+
+    const result = [...progression];
+
+    // Extract root MIDIs for lookahead calculations
+    const rootMidis = progression.map(c => getChordRootMidi(c));
+
+    // Process each chord (except the first, which stays at base octave)
+    for (let i = 1; i < result.length; i++) {
+        const chord = result[i];
+        if (!chord.notes || chord.notes.length === 0) continue;
+
+        const currentMidi = rootMidis[i];
+        if (currentMidi === null) continue;
+
+        // Get the previous chord's ACTUAL midi (which may have been shifted)
+        const prevMidi = getChordRootMidi(result[i - 1]);
+        if (prevMidi === null) continue;
+
+        // Get the next chord's midi for lookahead (if exists)
+        const nextMidi = (i + 1 < rootMidis.length) ? rootMidis[i + 1] : null;
+
+        // Calculate total cost for each octave option: current, up, down
+        // Cost = distance from prev + distance to next (if exists)
+        const options = [
+            { shift: 0, midi: currentMidi },
+            { shift: 12, midi: currentMidi + 12 },
+            { shift: -12, midi: currentMidi - 12 }
+        ];
+
+        // Filter out options that would put the chord too low or too high
+        const validOptions = options.filter(opt => {
+            // Don't go below C2 (36) or above C6 (84)
+            return opt.midi >= 36 && opt.midi <= 84;
+        });
+
+        if (validOptions.length === 0) continue;
+
+        // Calculate costs for each option
+        let bestOption = validOptions[0];
+        let bestCost = Infinity;
+
+        for (const option of validOptions) {
+            // Cost from previous chord
+            const costFromPrev = getDistance(prevMidi, option.midi);
+
+            // Cost to next chord (lookahead)
+            // Weight lookahead less heavily (0.7x) since it's a prediction
+            const costToNext = nextMidi !== null ?
+                getDistance(option.midi, nextMidi) * 0.7 : 0;
+
+            const totalCost = costFromPrev + costToNext;
+
+            if (totalCost < bestCost) {
+                bestCost = totalCost;
+                bestOption = option;
+            }
+        }
+
+        // Apply the best option
+        if (bestOption.shift !== 0) {
+            result[i] = shiftChord(chord, bestOption.shift);
+            // Update rootMidis for subsequent lookahead calculations
+            rootMidis[i] = bestOption.midi;
+        }
+    }
+
+    return result;
+}
+
+// ============================================================================
 // GROUP F: CHORD LIST IMPORT/EXPORT
 // ============================================================================
 
@@ -780,6 +913,18 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
                     return note; // Fallback: keep original
                 });
             }
+        }
+
+        // Apply smart octave placement to minimize root-to-root jumps
+        // This is a simpler alternative to full voice leading that keeps chords
+        // at consistent inversions but adjusts octaves for smoother transitions.
+        // Example: I-bVI-IV-V in E (E-C-A-B) - without this, C is at octave 3
+        // which creates a 9-semitone jump to A. With this, C moves to octave 4
+        // for smoother voice flow.
+        const newChords = progressionData.slice(newChordsStartIndex);
+        const optimizedChords = applySmartOctavePlacement(newChords);
+        for (let i = 0; i < optimizedChords.length; i++) {
+            progressionData[newChordsStartIndex + i] = optimizedChords[i];
         }
     }
 

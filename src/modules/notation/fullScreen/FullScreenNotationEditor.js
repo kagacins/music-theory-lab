@@ -386,18 +386,8 @@ export class FullScreenNotationEditor {
             <div id="studio-new-content" class="w-full h-screen bg-black/60 flex flex-col">
                 <!-- Header Bar -->
                 <div class="fullscreen-header h-12 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-between px-4 shadow-lg flex-shrink-0">
-                    <!-- Left: Back Button + Title -->
+                    <!-- Left: Title -->
                     <div class="flex items-center gap-3">
-                        <!-- Back Button (returns to Composition Studio Classic) -->
-                        <button id="studio-new-back-btn"
-                                class="p-1.5 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1"
-                                title="Return to Composition Studio (Classic)">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                            </svg>
-                            <span class="text-xs text-white/80">Classic</span>
-                        </button>
-
                         <!-- Title/Composer (clickable to edit) -->
                         <div id="fs-title-composer" class="cursor-pointer hover:bg-white/10 rounded px-2 py-0.5 transition-colors flex items-center gap-3"
                              title="Click to edit title and composer">
@@ -1343,13 +1333,6 @@ export class FullScreenNotationEditor {
     _attachTabModeEventHandlers() {
         if (!this.tabContent) return;
 
-        // Back button
-        const backBtn = this.tabContent.querySelector('#studio-new-back-btn');
-        if (backBtn) {
-            backBtn.addEventListener('click', () => this.closeTabMode());
-        }
-
-        // Navigation menu toggle (opens main app sidebar)
         // Sidebar expand/collapse
         const toggleStrip = this.tabContent.querySelector('.sidebar-toggle-strip');
         if (toggleStrip) {

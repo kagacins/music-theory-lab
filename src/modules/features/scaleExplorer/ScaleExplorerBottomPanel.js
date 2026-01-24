@@ -52,7 +52,7 @@ export class ScaleExplorerBottomPanel {
             <div class="pointer-events-auto flex items-center gap-1 px-3 py-2 bg-gray-900/90 backdrop-blur-sm rounded-full shadow-xl">
                 <!-- Play Ascending Button -->
                 <button onclick="window.fsScaleExplorerPlay && window.fsScaleExplorerPlay('asc')"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-lime-500 to-green-500 text-white text-xs font-semibold transition-all hover:from-lime-600 hover:to-green-600 active:scale-95"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-700 to-emerald-600 text-white text-xs font-semibold transition-all hover:from-emerald-800 hover:to-emerald-700 active:scale-95"
                         title="Play Ascending">
                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M5.293 7.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L6.707 7.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
@@ -62,7 +62,7 @@ export class ScaleExplorerBottomPanel {
 
                 <!-- Play Descending Button -->
                 <button onclick="window.fsScaleExplorerPlay && window.fsScaleExplorerPlay('desc')"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-green-500 to-teal-500 text-white text-xs font-semibold transition-all hover:from-green-600 hover:to-teal-600 active:scale-95"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold transition-all hover:from-emerald-700 hover:to-teal-700 active:scale-95"
                         title="Play Descending">
                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M14.707 12.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -120,8 +120,8 @@ export class ScaleExplorerBottomPanel {
                 <div class="w-px h-6 bg-gray-600 mx-1"></div>
 
                 <!-- Scale Info Display -->
-                <div class="flex items-center gap-2 px-2 py-1 bg-lime-500/20 rounded-full">
-                    <span id="fs-bottom-scale-name" class="text-[11px] font-bold text-lime-400">${this._getCurrentScaleName()}</span>
+                <div class="flex items-center gap-2 px-2 py-1 bg-emerald-600/20 rounded-full">
+                    <span id="fs-bottom-scale-name" class="text-[11px] font-bold text-emerald-400">${this._getCurrentScaleName()}</span>
                 </div>
             </div>
         `;

@@ -297,13 +297,13 @@ export function renderKeyboard() {
                 
                 // Add consistent playback highlighting based on current tab
                 keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback', 'active-lesson-playback');
-                if (currentTabNow === 'builder') {
+                if (currentTabNow === 'builder' || currentTabNow === 'chordlab-new') {
                     keyEl.classList.add('active-builder-playback');
-                } else if (currentTabNow === 'scales') {
+                } else if (currentTabNow === 'scales' || currentTabNow === 'scaleexplorer-new') {
                     keyEl.classList.add('active-scale-playback');
                 } else if (currentTabNow === 'trainer') {
                     keyEl.classList.add('active-progression');
-                } else if (currentTabNow === 'melody') {
+                } else if (currentTabNow === 'melody' || currentTabNow === 'studio-new') {
                     keyEl.classList.add('active-melody-playback');
                 } else if (currentTabNow === 'learn') {
                     keyEl.classList.add('active-lesson-playback');
@@ -369,13 +369,13 @@ export function renderKeyboard() {
             
             // Add consistent playback highlighting based on current tab
             keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback', 'active-lesson-playback');
-            if (currentTab === 'builder') {
+            if (currentTab === 'builder' || currentTab === 'chordlab-new') {
                 keyEl.classList.add('active-builder-playback');
-            } else if (currentTab === 'scales') {
+            } else if (currentTab === 'scales' || currentTab === 'scaleexplorer-new') {
                 keyEl.classList.add('active-scale-playback');
             } else if (currentTab === 'trainer') {
                 keyEl.classList.add('active-progression');
-            } else if (currentTab === 'melody') {
+            } else if (currentTab === 'melody' || currentTab === 'studio-new') {
                 keyEl.classList.add('active-melody-playback');
             } else if (currentTab === 'learn') {
                 keyEl.classList.add('active-lesson-playback');
