@@ -17,7 +17,7 @@ import {
     getProgressionLookback,
     setProgressionLookback
 } from '../state/trainerState.js';
-import { showChordExplorerModal } from './chordExplorerModal.js';
+// chordExplorerModal is lazy-loaded when needed (2000+ lines)
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
 
 /**
@@ -461,17 +461,20 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             tensionDirection = 'build';
         }
 
-        showChordExplorerModal(
-            currentRoot,
-            currentChordType,
-            activeInversion, // Use active inversion
-            key,
-            selectedStyle,
-            selectedMood,
-            onAddChord, // Use the provided callback
-            onPlayChord, // Use the provided callback
-            onStopChord  // Use the provided callback
-        );
+        // Lazy load the chord explorer modal (2000+ lines)
+        import('./chordExplorerModal.js').then(module => {
+            module.showChordExplorerModal(
+                currentRoot,
+                currentChordType,
+                activeInversion, // Use active inversion
+                key,
+                selectedStyle,
+                selectedMood,
+                onAddChord, // Use the provided callback
+                onPlayChord, // Use the provided callback
+                onStopChord  // Use the provided callback
+            );
+        });
     });
     controlsRow.appendChild(showAllBtn);
 

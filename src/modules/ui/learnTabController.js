@@ -15,6 +15,8 @@
 import { learningPaths, getAllLessons, getLessonById, LESSON_STATUS } from '../../data/theoryExplanations/lessons/index.js';
 // Progress tracking - needed for browser view
 import { getLessonStatus, getUserStats, getRecommendedLesson, loadProgress } from './learningProgress.js';
+// Admin check - for showing dev-only features
+import { checkAdminStatus } from '../admin/adminService.js';
 
 // ===========================================
 // LAZY LOADED MODULES
@@ -153,10 +155,11 @@ function renderLessonBrowser(container) {
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                 </button>
 
-                <button id="start-gator-teeth-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
+                <!-- Gator Teeth - Admin only (in development) -->
+                <button id="start-gator-teeth-btn" class="hidden flex items-center gap-4 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
                     <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🐊</div>
                     <div class="text-left flex-1">
-                        <div class="text-xs text-emerald-100">Arcade Game</div>
+                        <div class="text-xs text-emerald-100">Arcade Game <span class="px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-semibold">DEV</span></div>
                         <div class="text-sm font-bold">Gator Teeth</div>
                     </div>
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
@@ -301,15 +304,27 @@ function attachBrowserListeners(container) {
         }
     });
 
-    // Start Gator Teeth game button (lazy loaded)
-    container.querySelector('#start-gator-teeth-btn')?.addEventListener('click', async () => {
-        try {
-            const module = await loadGatorTeeth();
-            module.launchGatorTeeth();
-        } catch (err) {
-            console.error('[LearnTab] Failed to load Gator Teeth:', err);
-        }
-    });
+    // Start Gator Teeth game button (lazy loaded) - Admin only
+    const gatorTeethBtn = container.querySelector('#start-gator-teeth-btn');
+    if (gatorTeethBtn) {
+        // Check admin status and show button if admin
+        checkAdminStatus().then(status => {
+            if (status?.isAdmin) {
+                gatorTeethBtn.classList.remove('hidden');
+            }
+        }).catch(() => {
+            // Silently fail - button stays hidden for non-admins
+        });
+
+        gatorTeethBtn.addEventListener('click', async () => {
+            try {
+                const module = await loadGatorTeeth();
+                module.launchGatorTeeth();
+            } catch (err) {
+                console.error('[LearnTab] Failed to load Gator Teeth:', err);
+            }
+        });
+    }
 
     // Lesson cards
     container.querySelectorAll('.lesson-card').forEach(card => {

@@ -63,9 +63,6 @@ import { generateComprehensiveRecommendations } from './comprehensiveChordRecomm
 // Import roman numeral utilities for proper borrowed chord handling
 import { noteToRomanNumeral } from '../utils/romanNumerals.js';
 
-// Import chord explorer for detailed 3D visualization
-import { showChordExplorerModal } from '../ui/chordExplorerModal.js';
-
 // Import unified recommendation modal
 import { showUnifiedRecommendationModal } from '../ui/recommendations/UnifiedRecommendationModal/index.js';
 

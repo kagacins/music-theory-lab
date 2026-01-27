@@ -14,7 +14,7 @@
  */
 
 import { switchTab } from './tabs.js';
-import { renderLessonViewer } from './lessonViewer.js';
+// lessonViewer is lazy-loaded to avoid circular dependency and reduce initial bundle
 import { getProgressionData, setProgressionData, getCurrentKey, setCurrentKey } from '../state/trainerState.js';
 import { renderProgressionDisplay, loadProgression } from '../features/progressionBuilder/index.js';
 import { getIsKeyNamesOn, setIsKeyNamesOn } from '../state/globalState.js';
@@ -387,10 +387,12 @@ export function endGuidedMode(completed = false) {
 
         // Then render the specific lesson into the correct container
         if (lessonId) {
-            setTimeout(() => {
+            setTimeout(async () => {
                 // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
                 const learnContainer = document.getElementById('learn-tab-content');
-                if (learnContainer && typeof renderLessonViewer === 'function') {
+                if (learnContainer) {
+                    // Lazy load lessonViewer
+                    const { renderLessonViewer } = await import('./lessonViewer.js');
                     renderLessonViewer(lessonId, learnContainer, false);
                 }
             }, 100);
@@ -687,10 +689,12 @@ function returnToLesson() {
 
         // Then render the specific lesson into the correct container
         if (lessonId) {
-            setTimeout(() => {
+            setTimeout(async () => {
                 // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
                 const learnContainer = document.getElementById('learn-tab-content');
-                if (learnContainer && typeof renderLessonViewer === 'function') {
+                if (learnContainer) {
+                    // Lazy load lessonViewer
+                    const { renderLessonViewer } = await import('./lessonViewer.js');
                     renderLessonViewer(lessonId, learnContainer, false);
                 }
             }, 100);

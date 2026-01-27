@@ -2416,7 +2416,7 @@ export function addToProgressionData(chordData, options = {}) {
     const containerScrollLeft = canvasContainer ? canvasContainer.scrollLeft : 0;
 
     // Render both progression displays to keep them in sync
-    // TODO: Import renderProgressionDisplay from ProgressionRenderer once all modules extracted
+    // Note: renderProgressionDisplay is imported from ProgressionRenderer at top of file
     renderProgressionDisplay('melody-progression-visualization', true);
 
     // Also update the Chord Lab/Builder panel if it exists
@@ -2822,13 +2822,6 @@ export function toggleProgressionLHNote(chordIndex, note) {
 
     // Sync progressionData changes to notation display
     updateChordAndRenderPreservingTrebleNotes(chordIndex);
-}
-
-/**
- * Toggle staff notation visibility
- */
-export function toggleProgressionNotation(chordIndex, sourceContainerId) {
-    // TODO: Extract implementation from progressionBuilder.js
 }
 
 // ============================================================================
@@ -4436,8 +4429,6 @@ function restoreProgressionState(state) {
         }
         compositionState.events.emit('loaded', { measures: compositionState.measures });
     }
-
-    // TODO: Extract remaining implementation
 }
 
 /**

@@ -14,6 +14,8 @@ import { getCurrentKey, setCurrentKey, setProgressionData, setProgressionRomans 
 import { getChordNotes } from '../utils/noteUtils.js';
 import { getPiano } from '../audio/audioEngine.js';
 import { renderProgressionDisplay, setProgressionViewMode } from '../features/progressionBuilder/index.js';
+import { switchTab } from './tabs.js';
+import { toast } from './toastNotifications.js';
 
 // Section type colors
 const SECTION_COLORS = {
@@ -1536,13 +1538,11 @@ export class SongwritingWizardModal {
         // Close wizard
         this.close();
 
-        // Show success notification
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: {
-                message: `Created ${sections.length} sections with ${allChords.length} chords!`,
-                type: 'success'
-            }
-        }));
+        // Navigate to Composition Studio with toast notification
+        setTimeout(() => {
+            switchTab('studio-new');
+            toast.success(`Song structure loaded! ${sections.length} sections with ${allChords.length} chords ready.`);
+        }, 100);
     }
 }
 

@@ -19,6 +19,7 @@ import { getAllTemplates, getTemplate } from '../../data/songStructureTemplates.
 import { getSectionProfile } from '../features/sectionProfiles.js';
 import { renderProgressionDisplay, setProgressionViewMode, clearSectionSelection } from '../features/progressionBuilder/index.js';
 import { openNewSongwritingWizard } from './songwritingWizardModal.js';
+import { toast } from './toastNotifications.js';
 
 // ===========================================
 // WIZARD DATA - EXPANDED MOODS
@@ -3235,17 +3236,9 @@ function doApplyTemplateWithOrder(template, reorderedSections, modal) {
     // Re-render the progression display to reflect cleared selection
     renderProgressionDisplay('melody-progression-visualization', true);
 
-    // Close modal and refresh main view
+    // Close modal and refresh main view, navigating to Composition Studio
     modal.remove();
-    refreshMainViewOnClose();
-
-    // Show success notification
-    window.dispatchEvent(new CustomEvent('showNotification', {
-        detail: {
-            message: `Created ${reorderedSections.length} sections from "${template.name}" template!`,
-            type: 'success'
-        }
-    }));
+    refreshMainViewOnClose(true);
 }
 
 /**
@@ -3336,8 +3329,9 @@ function doApplyTemplate(templateId, modal) {
 
 /**
  * Refresh the main progression display when modal closes (called from close handlers)
+ * @param {boolean} navigateToStudio - If true, switch to Composition Studio tab (default: false for close/cancel)
  */
-function refreshMainViewOnClose() {
+function refreshMainViewOnClose(navigateToStudio = false) {
     // Switch to Section View mode to show the placeholders
     setProgressionViewMode('section');
 
@@ -3348,6 +3342,15 @@ function refreshMainViewOnClose() {
     const builderViz = document.getElementById('builder-progression-visualization');
     if (builderViz) {
         renderProgressionDisplay('builder-progression-visualization', false);
+    }
+
+    // Navigate to Composition Studio if requested (after applying template)
+    if (navigateToStudio) {
+        // Small delay to ensure state is fully updated
+        setTimeout(() => {
+            switchTab('studio-new');
+            toast.success('Song structure loaded! Start adding chords to your sections.');
+        }, 100);
     }
 }
 
@@ -4127,16 +4130,9 @@ function applyTemplateWithCustomOrder(template, reorderedSections, content, moda
         // Re-render progression display
         renderProgressionDisplay('melody-progression-visualization', true);
 
-        // Close modal and refresh main view
+        // Close modal and refresh main view, navigating to Composition Studio
         modal.remove();
-        refreshMainViewOnClose();
-
-        window.dispatchEvent(new CustomEvent('showNotification', {
-            detail: {
-                message: `Created ${reorderedSections.length} sections from "${template.name}"!`,
-                type: 'success'
-            }
-        }));
+        refreshMainViewOnClose(true);
     } catch (error) {
         console.error('[SongwritingWizard] Error applying template:', error);
     }

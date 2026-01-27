@@ -84,7 +84,8 @@
       "Bash(paste:*)",
       "Bash(sort:*)",
       "Bash(while read f)",
-      "Bash(do node scripts/remove-debug-logs.cjs \"$f\")"
+      "Bash(do node scripts/remove-debug-logs.cjs \"$f\")",
+      "Bash(du:*)"
     ],
     "deny": [],
     "ask": []
