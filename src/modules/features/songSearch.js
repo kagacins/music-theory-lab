@@ -15,7 +15,7 @@
 
 import { SHARP_NOTES, FLAT_NOTES, ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
 import { toast } from '../ui/toastNotifications.js';
-import { showAlertModal } from '../ui/modals.js';
+import { showAlertModal, showConfirmModal } from '../ui/modals.js';
 
 // Song database - loaded from JSON file
 let DEMO_SONG_DATABASE = [];
@@ -620,8 +620,13 @@ export async function importInternetSongProgression(song) {
     }
     
     // Confirm with user
-    const confirmed = confirm(`Import "${song.title}" by ${song.artist || 'Unknown'}?\n\nThis will replace your current chord progression.\n\nChords: ${song.chords.join(' → ')}`);
-    
+    const confirmed = await showConfirmModal({
+        title: 'Import Song',
+        message: `Import "${song.title}" by ${song.artist || 'Unknown'}"?\n\nThis will replace your current chord progression.\n\nChords: ${song.chords.join(' → ')}`,
+        confirmText: 'Import',
+        cancelText: 'Cancel'
+    });
+
     if (!confirmed) return;
     
     // Detect which enharmonic preference the progression uses
@@ -1015,10 +1020,15 @@ export async function importSongProgression(songIndex) {
     }
     
     const song = DEMO_SONG_DATABASE[songIndex];
-    
+
     // Confirm with user
-    const confirmed = confirm(`Import "${song.title}" by ${song.artist}?\n\nThis will replace your current chord progression.\n\nKey: ${song.key}\nChords: ${song.chords.join(' → ')}`);
-    
+    const confirmed = await showConfirmModal({
+        title: 'Import Song',
+        message: `Import "${song.title}" by ${song.artist}"?\n\nThis will replace your current chord progression.\n\nKey: ${song.key}\nChords: ${song.chords.join(' → ')}`,
+        confirmText: 'Import',
+        cancelText: 'Cancel'
+    });
+
     if (!confirmed) return;
     
     // Detect which enharmonic preference the progression uses

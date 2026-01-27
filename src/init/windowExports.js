@@ -24,7 +24,7 @@ import { initWhyThisWorksPanel } from '../modules/ui/whyThisWorksPanel.js';
 import { openManualChordEntryModal, closeManualChordEntryModal } from '../modules/ui/manualChordEntryModal.js';
 import { showAutoHarmonizeModal } from '../modules/ui/autoHarmonizeModal.js';
 import { showTensionOptimizerModal } from '../modules/ui/tensionOptimizerModal.js';
-import { toast, showToast } from '../modules/ui/toastNotifications.js';
+import { toast, showToast, dismissToast } from '../modules/ui/toastNotifications.js';
 import { showCompositionStudioHelp, closeCompositionStudioHelp } from '../modules/ui/compositionStudioHelp.js';
 import {
     quickAddChordFromForm,
@@ -1641,22 +1641,24 @@ export function setupWindowExports() {
 
     // Complete save project function - wraps saveProjectToFile with toast and UI cleanup
     window.saveProject = async function saveProject() {
+        let loadingToast = null;
         try {
             const compositionState = window.getCompositionState();
             if (!compositionState) {
-                if (window.showToast) {
-                    window.showToast('No composition to save', { type: 'error' });
-                }
+                toast.error('No composition to save');
                 return { success: false, error: 'No composition to save' };
             }
 
+            // Show loading indicator (persistent until dismissed)
+            loadingToast = showToast('Saving project...', { type: 'info', duration: 0 });
+
             const result = await saveProjectToFile(compositionState);
 
+            // Dismiss loading indicator
+            if (loadingToast) dismissToast(loadingToast);
+
             if (result.success) {
-                // Show success toast
-                if (window.showToast) {
-                    window.showToast(`Saved: ${result.filename}`, { type: 'success' });
-                }
+                toast.success(`Saved: ${result.filename}`);
 
                 // Close the FAB submenus (File dropdown) without closing the entire FAB
                 if (window.closeFabSubmenus) {
@@ -1664,25 +1666,24 @@ export function setupWindowExports() {
                 }
             } else if (result.error !== 'Save cancelled') {
                 // Show error toast (but not for user cancellation)
-                if (window.showToast) {
-                    window.showToast(result.error || 'Failed to save project', { type: 'error' });
-                }
+                toast.error(result.error || 'Failed to save project');
             }
 
             return result;
         } catch (error) {
+            // Dismiss loading indicator on error
+            if (loadingToast) dismissToast(loadingToast);
             console.error('[IMTL Export] Error in saveProject:', error);
-            if (window.showToast) {
-                window.showToast(error.message || 'Failed to save project', { type: 'error' });
-            }
+            toast.error(error.message || 'Failed to save project');
             return { success: false, error: error.message };
         }
     };
 
     // Complete load project function - combines loadProjectFromFile + applyProjectToState
     window.loadProject = async function loadProject() {
+        let loadingToast = null;
         try {
-            // Get the project file
+            // Get the project file (no loading indicator during file picker)
             const result = await loadProjectFromFile();
             if (!result.success) {
                 if (result.error !== 'Load cancelled') {
@@ -1691,11 +1692,15 @@ export function setupWindowExports() {
                 return { success: false, error: result.error };
             }
 
+            // Show loading indicator after file is selected (persistent until dismissed)
+            loadingToast = showToast('Loading project...', { type: 'info', duration: 0 });
+
             // Get current state instances
             const compositionState = getCompositionState();
             const trainerState = getTrainerState();
 
             if (!compositionState || !trainerState) {
+                if (loadingToast) dismissToast(loadingToast);
                 const error = 'Application state not ready. Please wait for the app to fully load.';
                 console.error('[IMTL Import] State not ready:', error);
                 toast.error(error);
@@ -1722,6 +1727,9 @@ export function setupWindowExports() {
                     }
                 }
             });
+
+            // Dismiss loading indicator
+            if (loadingToast) dismissToast(loadingToast);
 
             if (!applyResult.success) {
                 console.error('[IMTL Import] Apply failed:', applyResult.error);
@@ -1750,6 +1758,8 @@ export function setupWindowExports() {
 
             return { success: true, project: result.project, filename: result.filename };
         } catch (error) {
+            // Dismiss loading indicator on error
+            if (loadingToast) dismissToast(loadingToast);
             console.error('[IMTL Import] Caught error in loadProject:', error);
             const errorMessage = error.message || 'Failed to load project';
             toast.error(errorMessage);

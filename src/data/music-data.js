@@ -992,6 +992,36 @@ const DIATONIC_CHORD_GROUPS = [
         ]
     },
     {
+        title: 'Suspended',
+        chords: [
+            // Sus2 chords that are diatonic in major scale
+            // (root + 2nd + 5th must all be in scale)
+            { degree: 1, type: 'Sus2', roman: 'Isus2' },    // C-D-G ✓
+            { degree: 2, type: 'Sus2', roman: 'IIsus2' },   // D-E-A ✓
+            { degree: 4, type: 'Sus2', roman: 'IVsus2' },   // F-G-C ✓
+            { degree: 5, type: 'Sus2', roman: 'Vsus2' },    // G-A-D ✓
+            { degree: 6, type: 'Sus2', roman: 'VIsus2' },   // A-B-E ✓
+            // Sus4 chords that are diatonic in major scale
+            // (root + 4th + 5th must all be in scale)
+            { degree: 1, type: 'Sus4', roman: 'Isus4' },    // C-F-G ✓
+            { degree: 2, type: 'Sus4', roman: 'IIsus4' },   // D-G-A ✓
+            { degree: 3, type: 'Sus4', roman: 'IIIsus4' },  // E-A-B ✓
+            { degree: 5, type: 'Sus4', roman: 'Vsus4' },    // G-C-D ✓
+            { degree: 6, type: 'Sus4', roman: 'VIsus4' }    // A-D-E ✓
+        ]
+    },
+    {
+        title: 'Sixths',
+        chords: [
+            // 6th chords that are diatonic in major scale
+            // (root + 3rd + 5th + 6th must all be in scale)
+            { degree: 1, type: 'Major 6th', roman: 'I6' },     // C-E-G-A ✓
+            { degree: 2, type: 'Minor 6th', roman: 'ii6' },    // D-F-A-B ✓
+            { degree: 4, type: 'Major 6th', roman: 'IV6' },    // F-A-C-D ✓
+            { degree: 5, type: 'Major 6th', roman: 'V6' }      // G-B-D-E ✓
+        ]
+    },
+    {
         title: 'Sevenths',
         chords: [
             { degree: 1, type: 'Major 7th', roman: 'Imaj7' },
@@ -1012,6 +1042,18 @@ const DIATONIC_CHORD_GROUPS = [
             { degree: 4, type: 'Major 9th', roman: 'IVmaj9' },
             { degree: 5, type: 'Dominant 9th', roman: 'V9' },
             { degree: 6, type: 'Minor 9th', roman: 'vi9' }
+        ]
+    },
+    {
+        title: 'Elevenths',
+        chords: [
+            // 11th chords that are diatonic in major scale
+            // Minor 11th: root + m3 + P5 + m7 + M9 + P11 = [0,3,7,10,14,17]
+            { degree: 2, type: 'Minor 11th', roman: 'ii11' },    // Dm11: D-F-A-C-E-G ✓
+            { degree: 6, type: 'Minor 11th', roman: 'vi11' },    // Am11: A-C-E-G-B-D ✓
+            // Dominant 11th: root + M3 + P5 + m7 + M9 + P11 = [0,4,7,10,14,17]
+            { degree: 5, type: 'Dominant 11th', roman: 'V11' }   // G11: G-B-D-F-A-C ✓
+            // Note: iii11 (Em11) = E-G-B-D-F#-A has F# which is NOT in C major
         ]
     },
     {
@@ -1130,6 +1172,7 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
     // For scales with fewer than 7 notes (pentatonic, blues, etc.),
     // we still generate chords but with limited degrees
     const triads = [];
+    const suspendedChords = [];
     const sixths = [];
     const sevenths = [];
     const ninths = [];
@@ -1166,6 +1209,26 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
                 root: chordRoot,
                 type: quality.triad,
                 roman: romanBase + romanSuffix,
+                degree: degree + 1
+            });
+        }
+
+        // === Suspended Chords ===
+        // Sus2 and Sus4 replace the 3rd with 2nd or 4th
+        // Only add if all chord notes are in the scale
+        if (isChordInScale(chordRoot, 'Sus2')) {
+            suspendedChords.push({
+                root: chordRoot,
+                type: 'Sus2',
+                roman: ROMAN_NUMERALS[degree] + 'sus2',
+                degree: degree + 1
+            });
+        }
+        if (isChordInScale(chordRoot, 'Sus4')) {
+            suspendedChords.push({
+                root: chordRoot,
+                type: 'Sus4',
+                roman: ROMAN_NUMERALS[degree] + 'sus4',
                 degree: degree + 1
             });
         }
@@ -1326,6 +1389,9 @@ function generateScaleDiatonicChords(rootNote, scaleName, noteArray) {
     // Build result with all chord groups
     const result = [{ title: 'Triads', chords: triads }];
 
+    if (suspendedChords.length > 0) {
+        result.push({ title: 'Suspended', chords: suspendedChords });
+    }
     if (sixths.length > 0) {
         result.push({ title: 'Sixths', chords: sixths });
     }

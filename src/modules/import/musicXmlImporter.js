@@ -20,6 +20,7 @@ import { getCompositionState } from '../state/compositionState.js';
 import { setCurrentKey, getProgressionData, setProgressionData, invalidateProgressionDataCache } from '../state/trainerState.js';
 import { syncProgressionToMelodyComposer } from '../integration/melodyComposerBridge.js';
 import { refreshNotationFromProgression } from '../notation/notationInit.js';
+import { toast } from '../ui/toastNotifications.js';
 // Note: We intentionally do NOT use getChordNotes here - we import actual notes from the XML file
 
 // =============================================================================
@@ -105,12 +106,14 @@ function parseXMLString(xmlString) {
         const parseError = doc.querySelector('parsererror');
         if (parseError) {
             console.error('XML Parse Error:', parseError.textContent);
+            toast.error('Invalid MusicXML file format');
             return null;
         }
 
         return doc;
     } catch (error) {
         console.error('Error parsing XML:', error);
+        toast.error('Failed to parse MusicXML file');
         return null;
     }
 }

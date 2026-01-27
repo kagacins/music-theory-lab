@@ -2167,8 +2167,8 @@ button:disabled {
 #melody-progression-visualization .chord-card-wrapper:not(.shift-right):hover,
 #builder-progression-visualization .chord-card-wrapper:not(.shift-right):hover,
 [id$="-cards-grid"] .chord-card-wrapper:not(.shift-right):hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.15), 0 6px 12px -4px rgba(0, 0, 0, 0.08);
 }
 
 /* For shifted cards, combine both transforms */
@@ -2176,8 +2176,8 @@ button:disabled {
 #melody-progression-visualization .chord-card-wrapper.shift-right:hover,
 #builder-progression-visualization .chord-card-wrapper.shift-right:hover,
 [id$="-cards-grid"] .chord-card-wrapper.shift-right:hover {
-    transform: translateX(var(--card-shift, 0px)) translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    transform: translateX(var(--card-shift, 0px)) translateY(-2px);
+    box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.15), 0 6px 12px -4px rgba(0, 0, 0, 0.08);
 }
 
 .active-progression-card {
@@ -3207,13 +3207,13 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
     border: 1px solid #e5e7eb;
     border-radius: 12px;
     padding: 1rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.18s ease-out;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .preset-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.15), 0 6px 12px -4px rgba(0, 0, 0, 0.08);
     border-color: #667eea;
 }
 
@@ -3624,7 +3624,7 @@ canvas {
 
 /* Card wrapper with smooth grid transitions */
 .chord-card-wrapper {
-    transition: all 0.3s ease-out;
+    transition: all 0.18s ease-out;
     /* Prevent scroll-into-view behavior on hover/focus */
     scroll-margin: 0;
     overflow-anchor: none;

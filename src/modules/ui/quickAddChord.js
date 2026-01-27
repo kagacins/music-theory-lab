@@ -18,11 +18,13 @@ import {
 import { isChordInScale } from '../features/chordBuilder.js';
 
 // All chord types grouped for populating dropdown
+// NOTE: Keep in sync with FullScreenBottomPanel.js ALL_CHORD_TYPES
 const ALL_CHORD_TYPES = {
     'TRIADS': ['Major', 'Minor', 'Augmented', 'Diminished', 'Sus2', 'Sus4', 'Power Chord'],
+    'SIXTHS': ['Major 6th', 'Minor 6th', '6/9'],
     'SEVENTHS': ['Dominant 7th', 'Major 7th', 'Minor 7th', 'Half-Diminished 7th', 'Diminished 7th', 'Minor-Major 7th'],
-    'NINTHS': ['Major 9th', 'Dominant 9th', 'Minor 9th', '6/9', 'Add9'],
-    'EXTENDED': ['Dominant 11th', 'Minor 11th', 'Dominant 13th', 'Major 6th', 'Minor 6th'],
+    'NINTHS': ['Major 9th', 'Dominant 9th', 'Minor 9th', 'Add9'],
+    'EXTENDED': ['Dominant 11th', 'Minor 11th', 'Dominant 13th', 'Major 7th #11'],
     'ALTERED': ['Augmented 7th', '7b5', '7#5', '7b9', '7#9'],
     'INTERVALS': ['Major 2nd', 'Minor 2nd', 'Major 3rd', 'Minor 3rd', 'Perfect 4th', 'Tritone', 'Perfect 5th', 'Major 6th', 'Minor 6th', 'Major 7th', 'Minor 7th', 'Octave']
 };
