@@ -192,6 +192,24 @@ export class PageLayoutManager {
   }
 
   /**
+   * Check if a measure is on a specific page
+   * @param {number} measureIndex - Measure index
+   * @param {number} pageIndex - Page index to check
+   * @returns {boolean} - True if measure is on the specified page
+   */
+  isMeasureOnPage(measureIndex, pageIndex) {
+    if (pageIndex < 0 || pageIndex >= this.pages.length) {
+      return false;
+    }
+    const page = this.pages[pageIndex];
+    if (!page) {
+      return false;
+    }
+    return measureIndex >= page.startMeasure &&
+           measureIndex <= page.endMeasure;
+  }
+
+  /**
    * Get measures for the current page
    * @returns {Array} - Array of measure indices on current page
    */

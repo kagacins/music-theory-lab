@@ -14,7 +14,7 @@ import { getLearningProgress, markLessonComplete, markExerciseComplete, updateQu
 import { switchTab, setCurrentLessonForHistory } from './tabs.js';
 import { startTutorial, whatIsANoteTutorial, sharpsFlatsTutorial, octavesTutorial, scalesTutorial, intervalsTutorial, whatIsAChordTutorial, majorVsMinorTutorial, chordInversionsTutorial, whyChordMoveTutorial, firstProgressionTutorial, voiceLeadingTutorial, popularProgressionTutorial, addingEmotionTutorial, seventhChordsTutorial, secondaryDominantsTutorial, borrowedChordsTutorial, tensionReleaseTutorial, melodyChordTutorial, scaleTypesTutorial, modesIntroTutorial, modalHarmonyTutorial, advancedVoiceLeadingTutorial, extendedChordsTutorial, createMiniKeyboard } from './interactiveTutorial.js';
 import { startGuidedMode, startGuidedModeWithConfirmation } from './lessonGuidedMode.js';
-import { hasFullscreenGuidedSteps, getFullscreenGuidedSteps, FULLSCREEN_GUIDED_STEPS } from '../teaching/fullscreenGuidedExercises.js';
+import { hasFullscreenGuidedSteps, getFullscreenGuidedSteps, FULLSCREEN_GUIDED_STEPS, hasExtendedGuidedSteps, getExtendedGuidedData } from '../teaching/fullscreenGuidedExercises.js';
 import { setupFullscreenTutorial, cleanupFullscreenTutorial } from '../teaching/fullscreenTutorialHelpers.js';
 
 // ===========================================
@@ -1591,9 +1591,12 @@ function renderTryItSection(lesson) {
     // Has guided exercise if there are any guided_builder steps OR fullscreen guided steps
     const hasFullscreenExercise = hasFullscreenGuidedSteps(lesson.id);
     const hasGuidedExercise = hasFullscreenExercise || (tutorial && hasGuidedBuilderSteps(tutorial));
+    // Check for extended guided exercise (deeper exploration from embedded tutorials)
+    const hasExtendedExercise = hasExtendedGuidedSteps(lesson.id);
+    const extendedData = hasExtendedExercise ? getExtendedGuidedData(lesson.id) : null;
 
     // If no tryIt content AND no tutorial, return empty
-    if (!tryIt && !hasKeyboardTutorial && !hasGuidedExercise) return '';
+    if (!tryIt && !hasKeyboardTutorial && !hasGuidedExercise && !hasExtendedExercise) return '';
 
     // Determine exercise type and description
     // Fullscreen exercises use the new Chord Lab; classic uses the old builder/trainer tabs
@@ -1680,6 +1683,27 @@ function renderTryItSection(lesson) {
                             <p class="text-amber-100 mb-4">${guidedExerciseDesc}</p>
                             <button id="start-guided-exercise-btn" class="px-6 py-3 bg-white text-amber-700 hover:bg-amber-50 font-bold rounded-lg shadow-md transition-all hover:shadow-lg flex items-center gap-2">
                                 <span>Start Guided Exercise</span>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
+
+            ${hasExtendedExercise && extendedData ? `
+                <!-- Extended Guided Exercise (Deeper Exploration) -->
+                <div class="bg-gradient-to-r from-violet-500 to-fuchsia-600 rounded-xl p-6 mb-6 text-white shadow-lg">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+                            <span class="text-3xl">${extendedData.icon || '🎵'}</span>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="text-xl font-bold mb-2">${extendedData.title || 'Extended Exercise'}</h4>
+                            <p class="text-violet-100 mb-4">${extendedData.description || 'Go deeper with this extended hands-on exercise!'}</p>
+                            <button id="start-extended-exercise-btn" class="px-6 py-3 bg-white text-violet-700 hover:bg-violet-50 font-bold rounded-lg shadow-md transition-all hover:shadow-lg flex items-center gap-2">
+                                <span>Start Extended Exercise</span>
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
                                 </svg>
@@ -2505,6 +2529,34 @@ function attachLessonEventListeners(container, lesson) {
                     }
                 });
             }
+        }
+    });
+
+    // Extended exercise button (deeper exploration for some lessons)
+    container.querySelector('#start-extended-exercise-btn')?.addEventListener('click', () => {
+        const extendedData = getExtendedGuidedData(lesson.id);
+        if (extendedData && extendedData.steps && extendedData.steps.length > 0) {
+            // Setup for fullscreen tutorial (clear progression, reset BPM, etc.)
+            setupFullscreenTutorial();
+
+            // Use the target tab from extended data, or default to fullscreen Chord Lab
+            const targetTab = extendedData.targetTab || 'chordlab-new';
+
+            // Start the guided mode with extended steps
+            startGuidedModeWithConfirmation({
+                lessonId: lesson.id,
+                lessonTitle: `${lesson.title} - ${extendedData.title || 'Extended'}`,
+                targetTab: targetTab,
+                steps: extendedData.steps,
+                onComplete: (actionHistory) => {
+                    console.log('[LessonViewer] Extended guided exercise completed');
+                    cleanupFullscreenTutorial();
+                },
+                onCancel: () => {
+                    console.log('[LessonViewer] Extended guided exercise cancelled');
+                    cleanupFullscreenTutorial();
+                }
+            });
         }
     });
 

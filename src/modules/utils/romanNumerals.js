@@ -16,19 +16,29 @@ import { noteToMidi, resolveEnharmonic, getInvertedChordNotes } from './noteUtil
 // - enharmonicPreference: 'sharp' or 'flat' preference for note display
 // These will need to be passed as parameters or accessed via a state management system
 
+// Natural minor scale intervals (W-H-W-W-H-W-W)
+const MINOR_SCALE_STEPS = [0, 2, 3, 5, 7, 8, 10];
+
 /**
  * Get the properly spelled note name for a scale degree in a given key.
- * This ensures correct enharmonic spelling (e.g., E# instead of F in F# major).
+ * This ensures correct enharmonic spelling (e.g., E# instead of F in F# major,
+ * Bb instead of A# in G minor).
  *
- * @param {string} key - Key signature (e.g., "F#", "Ab", "C")
+ * @param {string} key - Key signature (e.g., "F#", "Ab", "C", "Gm", "Am")
  * @param {number} scaleDegreeIndex - 0-based scale degree (0=I, 1=II, ..., 6=VII)
  * @returns {string} Properly spelled note name (e.g., "E#", "Bb", "C")
  */
 function getScaleDegreeNote(key, scaleDegreeIndex) {
     const noteLetters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
+    // Check if this is a minor key
+    const isMinor = key.endsWith('m') && !key.endsWith('maj');
+
+    // Extract root note (remove 'm' suffix for minor keys, 'maj' suffix for explicit major)
+    const keyRoot = key.replace(/\s*(major|minor|min|maj|m)$/i, '').trim();
+
     // Get the key's letter (without accidentals)
-    const keyLetter = key.charAt(0).toUpperCase();
+    const keyLetter = keyRoot.charAt(0).toUpperCase();
     const keyLetterIndex = noteLetters.indexOf(keyLetter);
 
     if (keyLetterIndex === -1) {
@@ -41,18 +51,20 @@ function getScaleDegreeNote(key, scaleDegreeIndex) {
     const targetLetter = noteLetters[targetLetterIndex];
 
     // Calculate what pitch class the scale degree should be
-    // First, get the key's pitch class
-    let keyPitchClass = ALL_NOTES.indexOf(key);
+    // First, get the key's pitch class (using root without 'm' suffix)
+    let keyPitchClass = ALL_NOTES.indexOf(keyRoot);
     if (keyPitchClass === -1) {
         // Try enharmonic equivalent
-        keyPitchClass = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+        keyPitchClass = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
     }
     if (keyPitchClass === -1) {
         return null;
     }
 
     // Get the semitone offset for this scale degree
-    const semitoneOffset = MAJOR_SCALE_STEPS[scaleDegreeIndex];
+    // Use minor scale steps for minor keys, major scale steps for major keys
+    const scaleSteps = isMinor ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+    const semitoneOffset = scaleSteps[scaleDegreeIndex];
     const targetPitchClass = (keyPitchClass + semitoneOffset) % 12;
 
     // Now we need to find what accidental makes targetLetter equal targetPitchClass
@@ -169,10 +181,16 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             chordRootNote = properlySpelledRoot;
         } else {
             // Fallback to simple calculation if proper spelling fails
-            let scaleRootIndex = ALL_NOTES.indexOf(key);
-            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+            // Check if this is a minor key
+            const isMinor = key.endsWith('m') && !key.endsWith('maj');
+            const keyRoot = key.replace(/\s*(major|minor|min|maj|m)$/i, '').trim();
 
-            const scaleStep = MAJOR_SCALE_STEPS[mapEntry.index];
+            let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
+            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
+
+            // Use minor scale steps for minor keys
+            const scaleSteps = isMinor ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+            const scaleStep = scaleSteps[mapEntry.index];
             const chordRootIndex = (scaleRootIndex + scaleStep) % 12;
             chordRootNote = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
         }

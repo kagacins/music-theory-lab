@@ -16,6 +16,7 @@ import {
     createTabNavigationStep,
     createInfoStep,
     createPlayChordStep,
+    createChordLabPlayProgressionSteps,
     createKeyboardStep,
 
     // Highlighting helpers
@@ -544,20 +545,183 @@ export const whyChordsMoveGuidedStepsFS = [
     }),
 
     // ========== PLAY THE PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Now play the progression to hear tension → resolution!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'G (tension) → C (release). This is why nearly every song ends on the I chord!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 You experienced the V-I cadence! This tension-resolution pattern drives all of harmony.'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
         'You\'ve discovered why chords move!',
         {
             callout: 'Key concepts:\n• The leading tone (7th scale degree) pulls toward the root\n• V chord (dominant) creates tension\n• I chord (tonic) provides resolution\n• V-I is the strongest cadence in music!',
+            allowFreeExplore: true
+        }
+    )
+];
+
+// ===========================================
+// WHY CHORDS MOVE EXTENDED - Dominant 7th Deep Dive
+// ===========================================
+
+/**
+ * EXTENDED fullscreen guided exercise for "Why Chords Move" lesson
+ * This exercise goes deeper than the basic one:
+ * - Teaches G7 (Dominant 7th) → C Major resolution
+ * - Explains the double pull: B→C AND F→E
+ * - Builds a full C-Am-G7-C progression
+ *
+ * This is extracted from the embedded tutorial's guided_builder steps
+ * and converted to use fullscreen Chord Lab with proper spotlighting.
+ */
+export const whyChordsMoveExtendedFS = [
+    // ========== INTRODUCTION ==========
+    createInfoStep(
+        'Let\'s go deeper! We\'ll explore the DOMINANT 7TH chord and build a full progression.',
+        {
+            callout: 'The V chord becomes even MORE tense when you add a 7th. G7 has TWO notes that want to resolve: B→C (up) and F→E (down). Double the pull, double the satisfaction!'
+        }
+    ),
+
+    // ========== BUILD G DOMINANT 7TH ==========
+    createRootSelectionStep('G', {
+        instruction: 'Let\'s build G7 - the V7 chord. Click "G".',
+        callout: 'G7 (G Dominant 7th) is one of the most powerful chords in music. It practically DEMANDS resolution!',
+        successMessage: 'G selected!'
+    }),
+
+    createChordTypeSelectionStep('Dominant 7th', {
+        instruction: 'Select "Dominant 7th" - this adds the tense 7th note.',
+        callout: 'Dominant 7th = Major triad + minor 7th interval. For G7, that\'s G-B-D-F. The F creates extra tension!',
+        successMessage: 'G7 selected!'
+    }),
+
+    // ========== LOOK AT THE KEYBOARD - SEE THE TENSIONS ==========
+    createKeyboardStep(
+        'Look at the keyboard! Notice B (wants to go UP to C) and F (wants to go DOWN to E).',
+        {
+            callout: 'Two magnetic pulls at once! B is a half-step below C. F is a half-step above E. When G7 resolves to C, both tensions release simultaneously!'
+        }
+    ),
+
+    // ========== PLAY G7 - FEEL THE TENSION ==========
+    createPlayChordStep({
+        instruction: 'Play G7 and FEEL the tension - it\'s screaming for resolution!',
+        callout: 'That unstable, "unfinished" feeling? That\'s the double-pull of the tritone (B-F interval). Your ear NEEDS this to resolve!',
+        successMessage: 'Feel that tension? Now let\'s resolve it!'
+    }),
+
+    // ========== BUILD C MAJOR FOR RESOLUTION ==========
+    createRootSelectionStep('C', {
+        instruction: 'Now let\'s resolve to C Major. Click "C".',
+        callout: 'C Major contains C and E - exactly where B and F want to go!',
+        successMessage: 'C selected!'
+    }),
+
+    createChordTypeSelectionStep('Major', {
+        instruction: 'Select "Major".',
+        successMessage: 'C Major selected!'
+    }),
+
+    // ========== PLAY C MAJOR - FEEL THE RESOLUTION ==========
+    createPlayChordStep({
+        instruction: 'Play C Major - Ahhh... resolution! The tension melts away.',
+        callout: 'B resolved UP to C, F resolved DOWN to E. Both magnetic pulls satisfied! This V7→I resolution is the most powerful force in Western music.',
+        successMessage: 'That\'s the magic of the Dominant 7th resolution!'
+    }),
+
+    // ========== NOW BUILD A FULL PROGRESSION ==========
+    createInfoStep(
+        'Now let\'s build a full progression: C → Am → G7 → C',
+        {
+            callout: 'This progression creates an emotional journey:\n• C (stable, home)\n• Am (emotional, reflective)\n• G7 (TENSION! Maximum instability)\n• C (release, home again)'
+        }
+    ),
+
+    // ========== ADD C MAJOR ==========
+    createRootSelectionStep('C', {
+        instruction: 'Start with C Major. Click "C".',
+        successMessage: 'C selected!'
+    }),
+
+    createChordTypeSelectionStep('Major', {
+        instruction: 'Select "Major".',
+        successMessage: 'C Major selected!'
+    }),
+
+    createAddChordStep('C', 'Major', {
+        instruction: 'Add C Major - our starting point (I chord).',
+        callout: 'C Major is "home base" - stable and grounded.',
+        successMessage: 'C Major added!'
+    }),
+
+    // ========== ADD A MINOR ==========
+    createRootSelectionStep('A', {
+        instruction: 'Now add A Minor - the vi chord. Click "A".',
+        callout: 'Am (the vi chord) adds emotional depth. It\'s stable but more melancholy than C.',
+        successMessage: 'A selected!'
+    }),
+
+    createChordTypeSelectionStep('Minor', {
+        instruction: 'Select "Minor".',
+        successMessage: 'A Minor selected!'
+    }),
+
+    createAddChordStep('A', 'Minor', {
+        instruction: 'Add A Minor to the progression.',
+        callout: 'Am creates a more introspective mood. Notice how it shares notes with C Major (C and E).',
+        successMessage: 'Am added - feeling more emotional now!'
+    }),
+
+    // ========== ADD G DOMINANT 7TH ==========
+    createRootSelectionStep('G', {
+        instruction: 'Now the tension peak - add G7! Click "G".',
+        callout: 'Here comes the tension! G7 is the moment of maximum instability.',
+        successMessage: 'G selected!'
+    }),
+
+    createChordTypeSelectionStep('Dominant 7th', {
+        instruction: 'Select "Dominant 7th".',
+        successMessage: 'G7 selected!'
+    }),
+
+    createAddChordStep('G', 'Dominant 7th', {
+        instruction: 'Add G7 - the tension climax!',
+        callout: 'G7 creates the "rubber band" effect - stretched to maximum tension, begging for release!',
+        successMessage: 'G7 added - feel the tension building!'
+    }),
+
+    // ========== ADD FINAL C MAJOR ==========
+    createRootSelectionStep('C', {
+        instruction: 'Finally, resolve back to C Major. Click "C".',
+        callout: 'This final C releases ALL the tension. Without it, the progression would feel incomplete!',
+        successMessage: 'C selected!'
+    }),
+
+    createChordTypeSelectionStep('Major', {
+        instruction: 'Select "Major".',
+        successMessage: 'C Major selected!'
+    }),
+
+    createAddChordStep('C', 'Major', {
+        instruction: 'Add C Major to complete the journey.',
+        callout: 'Home at last! The G7→C resolution is like a sigh of relief.',
+        successMessage: 'C-Am-G7-C complete!'
+    }),
+
+    // ========== PLAY THE FULL PROGRESSION ==========
+    ...createChordLabPlayProgressionSteps({
+        instruction: 'Play the full progression - feel the emotional journey!',
+        callout: 'Listen for the G7 moment - that\'s where tension peaks. The resolution to C should feel like a sigh of relief!',
+        successMessage: '🎉 Beautiful! You\'ve mastered the V7-I resolution!'
+    }),
+
+    // ========== CONCLUSION ==========
+    createInfoStep(
+        'You now understand why chords "want" to move!',
+        {
+            callout: 'The V7→I resolution drives thousands of years of music - from Bach to Beatles to today\'s pop!\n\nTry this: Build a progression that DOESN\'T resolve the G7. Feel how unsatisfying it is? That\'s the power of unresolved tension!',
             allowFreeExplore: true
         }
     )
@@ -592,14 +756,9 @@ export const firstProgressionGuidedStepsFS = [
         successMessage: 'C Major selected!'
     }),
 
-    createPlayChordStep({
-        instruction: 'Play C Major - this is home!',
-        callout: 'C Major (I) is stable and grounded. This is where most songs in C begin.',
-        successMessage: 'That\'s home base!'
-    }),
-
     createAddChordStep('C', 'Major', {
         instruction: 'Add C Major to start your progression.',
+        callout: 'C Major (I) is stable and grounded. This is where most songs in C begin.',
         successMessage: 'C Major added - the I chord!'
     }),
 
@@ -615,14 +774,9 @@ export const firstProgressionGuidedStepsFS = [
         successMessage: 'F Major selected!'
     }),
 
-    createPlayChordStep({
-        instruction: 'Play F Major. Notice how it lifts away from C.',
-        callout: 'F Major (IV) creates a sense of departure - we\'re moving somewhere!',
-        successMessage: 'That\'s the IV chord!'
-    }),
-
     createAddChordStep('F', 'Major', {
         instruction: 'Add F Major to your progression.',
+        callout: 'F Major (IV) creates a sense of departure - we\'re moving somewhere!',
         successMessage: 'F Major added - the IV chord!'
     }),
 
@@ -638,14 +792,9 @@ export const firstProgressionGuidedStepsFS = [
         successMessage: 'G Major selected!'
     }),
 
-    createPlayChordStep({
-        instruction: 'Play G Major. Feel the tension!',
-        callout: 'G Major (V) creates strong tension. Your ear wants to hear it resolve!',
-        successMessage: 'That\'s the dominant tension!'
-    }),
-
     createAddChordStep('G', 'Major', {
         instruction: 'Add G Major to your progression.',
+        callout: 'G Major (V) creates strong tension. Your ear wants to hear it resolve!',
         successMessage: 'G Major added - the V chord!'
     }),
 
@@ -667,14 +816,11 @@ export const firstProgressionGuidedStepsFS = [
     }),
 
     // ========== PLAY THE COMPLETE PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play your I-IV-V-I progression! C → F → G → C',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'This is the foundation of rock, pop, folk, country, and countless other genres!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 You built the most important progression in music!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -743,14 +889,11 @@ export const voiceLeadingGuidedStepsFS = [
     }),
 
     // ========== HEAR THE JUMPY VERSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play the progression. Notice how the notes jump around.',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'Root position C (C-E-G) to root position G (G-B-D) - the notes jump quite a bit!',
-        validation: { type: 'chord_played' },
         successMessage: 'Hear the jumpiness? Let\'s fix that with inversions!'
-    },
+    }),
 
     // ========== CLEAR AND REBUILD WITH INVERSIONS ==========
     createInfoStep(
@@ -815,14 +958,11 @@ export const voiceLeadingGuidedStepsFS = [
     }),
 
     // ========== HEAR THE SMOOTH VERSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Now play the progression. Notice how much smoother it sounds!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'The notes glide from one chord to the next instead of jumping. That\'s voice leading!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 Much smoother! The notes flow naturally between chords.'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -921,14 +1061,11 @@ export const popularProgressionGuidedStepsFS = [
     }),
 
     // ========== PLAY THE PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play your I-V-vi-IV progression! C → G → Am → F',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'Songs using this: "Let It Be", "No Woman No Cry", "With or Without You", "Someone Like You", and hundreds more!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 You built the most popular progression in modern music!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -1088,14 +1225,11 @@ export const addingEmotionGuidedStepsFS = [
     }),
 
     // ========== PLAY THE EMOTIONAL PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play your emotional progression! C → Am → F → G',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'The Am (vi) chord after C creates that instant emotional shift. This is a classic "emotional ballad" progression!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 Beautiful! The minor chord adds so much emotional depth!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -1271,14 +1405,11 @@ export const seventhChordsGuidedStepsFS = [
     }),
 
     // ========== PLAY THE JAZZY PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play your jazzy progression! Cmaj7 → Am7 → Dm7 → G7',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'This is a II-V-I with an added vi chord - a classic jazz pattern!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 Smooth! You just played a jazz standard progression!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -1356,14 +1487,11 @@ export const secondaryDominantsGuidedStepsFS = [
     }),
 
     // ========== HEAR D7 → G ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play D7 → G. Hear the secondary dominant resolution!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'D7 → G is V/V → V. The same tension-resolution pattern, but for the V chord!',
-        validation: { type: 'chord_played' },
         successMessage: 'That\'s V/V in action!'
-    },
+    }),
 
     // ========== NOW TRY V/vi ==========
     createInfoStep(
@@ -1435,14 +1563,11 @@ export const secondaryDominantsGuidedStepsFS = [
     }),
 
     // ========== PLAY THE PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play C → E7 → Am → G. Hear how E7 intensifies the move to Am!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'The E7 adds drama before Am. Compare to plain C → Em → Am → G - the secondary dominant is much more powerful!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 You\'ve learned secondary dominants!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -1548,14 +1673,11 @@ export const borrowedChordsGuidedStepsFS = [
     }),
 
     // ========== HEAR THE ROCK PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play C → B♭ → F → C. Classic rock with ♭VII!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'This is the sound of rock anthems! The B♭ adds power without resolving like a V chord.',
-        validation: { type: 'chord_played' },
         successMessage: 'That\'s the epic ♭VII sound!'
-    },
+    }),
 
     // ========== THE iv CHORD ==========
     createInfoStep(
@@ -1618,14 +1740,11 @@ export const borrowedChordsGuidedStepsFS = [
     }),
 
     // ========== HEAR THE EMOTIONAL PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play C → Fm → G. The iv chord creates instant emotion!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'Compare F Major to F Minor in this spot. The minor iv is much more poignant!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 You\'ve learned borrowed chords!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -1698,14 +1817,11 @@ export const tensionReleaseGuidedStepsFS = [
         successMessage: 'C Major added - resolution!'
     }),
 
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play G7 → C. Feel the satisfying resolution!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'Ahhh... the tension releases! This V7-I is the most powerful cadence in music.',
-        validation: { type: 'chord_played' },
         successMessage: 'Maximum satisfaction!'
-    },
+    }),
 
     // ========== DECEPTIVE CADENCE ==========
     createInfoStep(
@@ -1746,14 +1862,11 @@ export const tensionReleaseGuidedStepsFS = [
         successMessage: 'A Minor added - surprise!'
     }),
 
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play G7 → Am. The deceptive cadence!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'You expected C but got Am! This extends the phrase and adds emotional depth.',
-        validation: { type: 'chord_played' },
         successMessage: 'Surprise resolution!'
-    },
+    }),
 
     // ========== SUSPENDED CHORD ==========
     createInfoStep(
@@ -1800,14 +1913,11 @@ export const tensionReleaseGuidedStepsFS = [
         successMessage: 'C Major added - suspension resolved!'
     }),
 
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play Csus4 → C. A small but satisfying resolution!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'The F falls to E. This micro-resolution is used everywhere - even within a single chord!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 You\'ve mastered tension and release!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -1957,14 +2067,11 @@ export const melodyChordGuidedStepsFS = [
     }),
 
     // ========== PLAY THE PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play the ii-V-I: Dm7 → G7 → Cmaj7. Think about melody!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'Melody idea: D (chord tone of Dm7) → D (common tone in G7) → C (chord tone of Cmaj7). The D stays, then steps down to C!',
-        validation: { type: 'chord_played' },
         successMessage: '🎉 You understand melody-chord relationships!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2083,14 +2190,11 @@ export const modesIntroGuidedStepsFS = [
     }),
 
     // ========== PLAY THE PROGRESSION ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play your progression! First half is Dorian, second half is Mixolydian.',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'You built: Dm7→G (Dorian i-IV) then G→F (Mixolydian I-♭VII). Two modes, two different colors!',
-        validation: { type: 'chord_played' },
         successMessage: 'You\'re hearing two different modal colors!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2207,14 +2311,11 @@ export const modalHarmonyGuidedStepsFS = [
     }),
 
     // ========== PLAY ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play your modal progressions! First half is Dorian, second half is Lydian.',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'You built: Am→D (Dorian i-IV) then Fmaj7→G (Lydian I-II). Notice how different they feel!',
-        validation: { type: 'chord_played' },
         successMessage: 'Modal harmony in action!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2322,14 +2423,11 @@ export const advancedVoiceLeadingGuidedStepsFS = [
     }),
 
     // ========== PLAY ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play and listen for the smooth voice leading.',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'The guide tones connect like a melody within the chords. This is professional-level voice leading!',
-        validation: { type: 'chord_played' },
         successMessage: 'Smooth as silk!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2451,14 +2549,11 @@ export const extendedChordsGuidedStepsFS = [
     }),
 
     // ========== PLAY ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play your extended ii-V-I: Dm9 → G9 → Cmaj9!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'This is THE classic jazz progression with extended chords. Notice how much richer it sounds than plain triads!',
-        validation: { type: 'chord_played' },
         successMessage: 'You\'re playing jazz harmony!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2591,14 +2686,11 @@ export const counterpointGuidedStepsFS = [
     }),
 
     // ========== PLAY ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play and listen to the walking bass line!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'The bass descends: C→B→A→F while the melody can move up. This contrary motion creates beautiful independence!',
-        validation: { type: 'chord_played' },
         successMessage: 'That\'s counterpoint in action!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2716,14 +2808,11 @@ export const modulationGuidedStepsFS = [
     }),
 
     // ========== PLAY ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play and hear how we shifted from C to G!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'Path: C (I in C) → Am (vi) → Em (pivot: iii in C = vi in G) → D (V in G) → G (I in G). Smooth!',
-        validation: { type: 'chord_played' },
         successMessage: 'You modulated!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2799,14 +2888,11 @@ export const exoticScalesGuidedStepsFS = [
     }),
 
     // ========== HEAR HARMONIC MINOR ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play Am → E to hear the harmonic minor V-i!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'This is the classical minor sound! The E major chord (with G#) creates that dramatic leading tone pull to Am.',
-        validation: { type: 'chord_played' },
         successMessage: 'That\'s harmonic minor!'
-    },
+    }),
 
     // ========== PHRYGIAN DOMINANT ==========
     createInfoStep(
@@ -2850,14 +2936,11 @@ export const exoticScalesGuidedStepsFS = [
     }),
 
     // ========== PLAY PHRYGIAN ==========
-    {
+    ...createChordLabPlayProgressionSteps({
         instruction: 'Play and hear the full exotic progression!',
-        spotlight: '#fs-play-btn',
-        targetElement: '#fs-play-btn',
         callout: 'Your progression: Am→E (harmonic minor) then E7→F (Phrygian Dominant). Two related exotic sounds!',
-        validation: { type: 'chord_played' },
         successMessage: 'Exotic scales in action!'
-    },
+    }),
 
     // ========== FINAL ==========
     createInfoStep(
@@ -2919,4 +3002,50 @@ export function hasFullscreenGuidedSteps(lessonId) {
  */
 export function getFullscreenGuidedSteps(lessonId) {
     return FULLSCREEN_GUIDED_STEPS[lessonId] || null;
+}
+
+// ===========================================
+// EXTENDED GUIDED EXERCISES
+// ===========================================
+
+/**
+ * Extended/additional guided exercises extracted from embedded interactive tutorials.
+ * These provide deeper exploration beyond the basic fullscreen exercises.
+ *
+ * When a lesson has BOTH a basic fullscreen exercise AND an extended exercise,
+ * both should be shown in the TRY IT section as separate options.
+ *
+ * Extended exercises typically:
+ * - Go deeper into a concept (e.g., Dominant 7th vs just V-I)
+ * - Build longer progressions
+ * - Cover advanced applications of the lesson topic
+ */
+export const EXTENDED_GUIDED_STEPS = {
+    // "Why Chords Move" - Extended version teaches G7→C and builds C-Am-G7-C
+    'lesson-why-chords-move': {
+        steps: whyChordsMoveExtendedFS,
+        title: 'Dominant 7th Deep Dive',
+        description: 'Explore the powerful V7→I resolution with G7 and build a full C-Am-G7-C progression.',
+        icon: '🎵',
+        targetTab: 'chordlab-new'
+    }
+    // More extended exercises can be added here as we convert them
+};
+
+/**
+ * Check if a lesson has an extended guided exercise
+ * @param {string} lessonId - The lesson ID
+ * @returns {boolean} True if extended steps exist
+ */
+export function hasExtendedGuidedSteps(lessonId) {
+    return lessonId in EXTENDED_GUIDED_STEPS;
+}
+
+/**
+ * Get extended guided exercise data for a lesson
+ * @param {string} lessonId - The lesson ID
+ * @returns {Object|null} Object with steps, title, description, icon, targetTab
+ */
+export function getExtendedGuidedData(lessonId) {
+    return EXTENDED_GUIDED_STEPS[lessonId] || null;
 }

@@ -56,6 +56,15 @@ async function loadPracticeModeModal() {
     return practiceModeModule;
 }
 
+// Gator Teeth game - only loaded when clicking the game button
+let gatorTeethModule = null;
+async function loadGatorTeeth() {
+    if (!gatorTeethModule) {
+        gatorTeethModule = await import('../games/gatorTeeth/index.js');
+    }
+    return gatorTeethModule;
+}
+
 // ===========================================
 // STATE
 // ===========================================
@@ -104,42 +113,51 @@ function renderLessonBrowser(container) {
             </div>
 
             <!-- Quick Actions -->
-            <div class="grid md:grid-cols-3 gap-4 mb-8">
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 ${recommended ? `
-                    <button id="continue-lesson-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl" data-lesson-id="${recommended.id}">
+                    <button id="continue-lesson-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl shadow-lg transition-all hover:shadow-xl" data-lesson-id="${recommended.id}">
                         <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">
                             ${recommended.icon}
                         </div>
                         <div class="text-left flex-1">
-                            <div class="text-xs text-green-100">Continue Learning</div>
+                            <div class="text-xs text-blue-100">Continue Learning</div>
                             <div class="text-sm font-bold">${recommended.title}</div>
                         </div>
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
                 ` : `
-                    <div class="flex items-center gap-4 p-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl">
+                    <div class="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-500 to-blue-400 text-white rounded-xl">
                         <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🎉</div>
                         <div class="flex-1">
                             <div class="text-sm font-bold">All Lessons Complete!</div>
-                            <div class="text-xs text-green-100">Amazing work!</div>
+                            <div class="text-xs text-blue-100">Amazing work!</div>
                         </div>
                     </div>
                 `}
 
-                <button id="start-practice-mode-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
+                <button id="start-practice-mode-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
                     <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🧠</div>
                     <div class="text-left flex-1">
-                        <div class="text-xs text-emerald-100">Flashcard Review <span class="px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-semibold">WIP</span></div>
+                        <div class="text-xs text-blue-100">Flashcard Review <span class="px-1.5 py-0.5 bg-white/20 rounded text-[10px] font-semibold">WIP</span></div>
                         <div class="text-sm font-bold">Practice Mode</div>
                     </div>
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                 </button>
 
-                <button id="start-ear-training-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
+                <button id="start-ear-training-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
                     <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🎧</div>
                     <div class="text-left flex-1">
-                        <div class="text-xs text-indigo-100">Train Your Ears</div>
+                        <div class="text-xs text-cyan-100">Train Your Ears</div>
                         <div class="text-sm font-bold">Ear Training</div>
+                    </div>
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                </button>
+
+                <button id="start-gator-teeth-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
+                    <div class="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-xl">🐊</div>
+                    <div class="text-left flex-1">
+                        <div class="text-xs text-emerald-100">Arcade Game</div>
+                        <div class="text-sm font-bold">Gator Teeth</div>
                     </div>
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                 </button>
@@ -280,6 +298,16 @@ function attachBrowserListeners(container) {
             module.showEarTrainingModal();
         } catch (err) {
             console.error('[LearnTab] Failed to load ear training:', err);
+        }
+    });
+
+    // Start Gator Teeth game button (lazy loaded)
+    container.querySelector('#start-gator-teeth-btn')?.addEventListener('click', async () => {
+        try {
+            const module = await loadGatorTeeth();
+            module.launchGatorTeeth();
+        } catch (err) {
+            console.error('[LearnTab] Failed to load Gator Teeth:', err);
         }
     });
 
@@ -458,6 +486,24 @@ window.checkUrlForLesson = checkUrlForLesson;
 window.renderLessonViewer = async (lessonId, container, pushHistory) => {
     const module = await loadLessonViewer();
     module.renderLessonViewer(lessonId, container, pushHistory);
+};
+
+// Gator Teeth game launcher (global access)
+window.launchGatorTeeth = async () => {
+    try {
+        const module = await loadGatorTeeth();
+        module.launchGatorTeeth();
+    } catch (err) {
+        console.error('[LearnTab] Failed to load Gator Teeth:', err);
+    }
+};
+window.closeGatorTeeth = async () => {
+    try {
+        const module = await loadGatorTeeth();
+        module.closeGatorTeeth();
+    } catch (err) {
+        console.error('[LearnTab] Failed to close Gator Teeth:', err);
+    }
 };
 
 export default {

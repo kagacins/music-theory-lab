@@ -647,6 +647,11 @@ function previewTemplate(template, previewType, buttonEl) {
 function convertTemplateToChordData(template, key) {
     const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const MAJOR_SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
+    const MINOR_SCALE_STEPS = [0, 2, 3, 5, 7, 8, 10];
+
+    // Check if this is a minor key
+    const isMinorKey = key.endsWith('m') && !key.endsWith('maj');
+    const scaleSteps = isMinorKey ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
 
     const keyIndex = SHARP_NOTES.indexOf(key.replace('m', '').replace('#', '').charAt(0));
     const adjustedKeyIndex = key.includes('#') ? (keyIndex + 1) % 12 : keyIndex;
@@ -808,8 +813,11 @@ function convertTemplateToChordData(template, key) {
         }
 
         // Calculate root note
-        const scaleStep = MAJOR_SCALE_STEPS[entry.degree];
+        // For borrowed chords with offsets (bVII, bVI, #IV, etc.), use MAJOR scale as reference
+        // because the offset represents an alteration from the major scale
         const offset = entry.offset || 0;
+        const useScaleSteps = offset !== 0 ? MAJOR_SCALE_STEPS : scaleSteps;
+        const scaleStep = useScaleSteps[entry.degree];
         const rootIndex = (adjustedKeyIndex + scaleStep + offset + 12) % 12;
         const rootNote = SHARP_NOTES[rootIndex];
 

@@ -26,6 +26,25 @@ import { showAlertModal } from './modals.js';
 let originalProgression = null;
 let isPlaying = false;
 
+/**
+ * Helper to safely get chord notes, handling empty array edge case.
+ * JavaScript's || operator treats empty arrays [] as truthy, so
+ * `getChordNotes(...)?.specificNotes || fallback` would return []
+ * instead of fallback when specificNotes is an empty array.
+ *
+ * @param {string} root - Chord root
+ * @param {string} type - Chord type
+ * @param {Array} fallback - Fallback notes if generation fails
+ * @returns {Array} Generated notes or fallback
+ */
+function safeGetChordNotes(root, type, fallback = []) {
+    const result = getChordNotes(root, type);
+    if (result?.specificNotes && result.specificNotes.length > 0) {
+        return result.specificNotes;
+    }
+    return fallback;
+}
+
 // ===========================================
 // TRANSFORMATION DEFINITIONS
 // ===========================================
@@ -45,7 +64,7 @@ const TRANSFORMATIONS = {
                     return {
                         ...chord,
                         type: 'Minor',
-                        notes: getChordNotes(chord.root, 'Minor')?.specificNotes || chord.notes,
+                        notes: safeGetChordNotes(chord.root, 'Minor', chord.notes),
                         simpleName: `${chord.root}m`
                     };
                 }
@@ -68,13 +87,13 @@ const TRANSFORMATIONS = {
                 // Major → Major 7th
                 if (chord.type === 'Major') {
                     newType = 'Major 7th';
-                    newNotes = getChordNotes(chord.root, 'Major 7th')?.specificNotes || chord.notes;
+                    newNotes = safeGetChordNotes(chord.root, 'Major 7th', chord.notes);
                     newName = `${chord.root}maj7`;
                 }
                 // Minor → Minor 7th
                 else if (chord.type === 'Minor') {
                     newType = 'Minor 7th';
-                    newNotes = getChordNotes(chord.root, 'Minor 7th')?.specificNotes || chord.notes;
+                    newNotes = safeGetChordNotes(chord.root, 'Minor 7th', chord.notes);
                     newName = `${chord.root}m7`;
                 }
                 // Dominant chords stay as Dominant 7th or become it
@@ -120,7 +139,7 @@ const TRANSFORMATIONS = {
                         ...chord,
                         root: newRoot,
                         type: 'Major',
-                        notes: getChordNotes(newRoot, 'Major')?.specificNotes || chord.notes,
+                        notes: safeGetChordNotes(newRoot, 'Major', chord.notes),
                         simpleName: newRoot,
                         roman: chord.roman ? `♭${chord.roman}` : undefined
                     };
@@ -162,7 +181,7 @@ const TRANSFORMATIONS = {
                     result.push({
                         root: iiRoot,
                         type: 'Minor',
-                        notes: getChordNotes(iiRoot, 'Minor')?.specificNotes || [],
+                        notes: safeGetChordNotes(iiRoot, 'Minor', []),
                         simpleName: `${iiRoot}m`,
                         roman: 'ii',
                         beats: 2 // Half the duration
@@ -191,11 +210,11 @@ const TRANSFORMATIONS = {
                 if (chord.type.includes('7th') || chord.type.includes('7')) {
                     if (chord.type.includes('Minor') || chord.type.includes('m')) {
                         newType = 'Minor';
-                        newNotes = getChordNotes(chord.root, 'Minor')?.specificNotes || chord.notes;
+                        newNotes = safeGetChordNotes(chord.root, 'Minor', chord.notes);
                         newName = `${chord.root}m`;
                     } else {
                         newType = 'Major';
-                        newNotes = getChordNotes(chord.root, 'Major')?.specificNotes || chord.notes;
+                        newNotes = safeGetChordNotes(chord.root, 'Major', chord.notes);
                         newName = chord.root;
                     }
                 }
@@ -203,11 +222,11 @@ const TRANSFORMATIONS = {
                 else if (chord.type.includes('9') || chord.type.includes('11') || chord.type.includes('13')) {
                     if (chord.type.includes('Minor')) {
                         newType = 'Minor 7th';
-                        newNotes = getChordNotes(chord.root, 'Minor 7th')?.specificNotes || chord.notes;
+                        newNotes = safeGetChordNotes(chord.root, 'Minor 7th', chord.notes);
                         newName = `${chord.root}m7`;
                     } else {
                         newType = 'Dominant 7th';
-                        newNotes = getChordNotes(chord.root, 'Dominant 7th')?.specificNotes || chord.notes;
+                        newNotes = safeGetChordNotes(chord.root, 'Dominant 7th', chord.notes);
                         newName = `${chord.root}7`;
                     }
                 }
@@ -235,7 +254,7 @@ const TRANSFORMATIONS = {
                     return {
                         ...chord,
                         type: 'Sus4',
-                        notes: getChordNotes(chord.root, 'Sus4')?.specificNotes || chord.notes,
+                        notes: safeGetChordNotes(chord.root, 'Sus4', chord.notes),
                         simpleName: `${chord.root}sus4`
                     };
                 }
@@ -269,7 +288,9 @@ async function playProgression(progression, chordDuration = 0.8) {
 
         const now = Tone.now();
         progression.forEach((chord, index) => {
-            const notes = chord.notes || getChordNotes(chord.root, chord.type)?.specificNotes || [];
+            const notes = (chord.notes && chord.notes.length > 0)
+                ? chord.notes
+                : safeGetChordNotes(chord.root, chord.type, []);
             if (notes.length > 0) {
                 piano.triggerAttackRelease(notes, chordDuration * 0.9, now + (index * chordDuration));
             }

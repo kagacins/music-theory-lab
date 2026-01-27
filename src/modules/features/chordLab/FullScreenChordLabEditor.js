@@ -1344,6 +1344,10 @@ class FullScreenChordLabEditor {
             // Show labels briefly on open
             if (this._fabIsOpen) {
                 this._showFABCategoryLabels();
+                // Dispatch event for guided tutorials
+                window.dispatchEvent(new CustomEvent('fabMenuOpened', {
+                    detail: { type: 'fabMenuOpened' }
+                }));
             }
         });
 
@@ -1368,6 +1372,13 @@ class FullScreenChordLabEditor {
                     const isCurrentlyOpen = !submenu.classList.contains('hidden');
                     submenu.classList.toggle('hidden', isCurrentlyOpen);
                     this._fabActiveSubmenu = isCurrentlyOpen ? null : submenu;
+
+                    // Dispatch event for guided tutorials when playback submenu opens
+                    if (!isCurrentlyOpen && category.dataset.category === 'playback') {
+                        window.dispatchEvent(new CustomEvent('playbackSubmenuOpened', {
+                            detail: { type: 'playbackSubmenuOpened' }
+                        }));
+                    }
                 }
             });
 

@@ -314,9 +314,10 @@ export class StaffLayoutManager {
    * Find measure at a point (for click handling)
    * @param {number} x - X coordinate (canvas-local)
    * @param {number} y - Y coordinate (canvas-local)
+   * @param {number|null} pageIndex - Optional page index (for continuous mode with multiple visible pages)
    * @returns {Object|null} - Measure bounds or null
    */
-  getMeasureAtPoint(x, y) {
+  getMeasureAtPoint(x, y, pageIndex = null) {
     // CRITICAL: Use actual VexFlow positions if available (nuclear solution)
     const useActualPositions = this.actualMeasurePositions.size > 0;
     const isPaginated = this.isPaginationEnabled();
@@ -340,10 +341,18 @@ export class StaffLayoutManager {
       const verticalTolerance = 80; // Allow clicks well below bass staff
 
       for (const [index, actualPos] of this.actualMeasurePositions) {
-        // NEW: In pagination mode, only check measures on current page
+        // In pagination mode, only check measures on the relevant page
         if (isPaginated && this.pageLayoutManager) {
-          if (!this.pageLayoutManager.isMeasureOnCurrentPage(index)) {
-            continue;
+          // If pageIndex is provided (from mouse event in continuous mode), use it
+          // Otherwise fall back to currentPageIndex (for navigation-based page switching)
+          if (pageIndex !== null) {
+            if (!this.pageLayoutManager.isMeasureOnPage(index, pageIndex)) {
+              continue;
+            }
+          } else {
+            if (!this.pageLayoutManager.isMeasureOnCurrentPage(index)) {
+              continue;
+            }
           }
         }
 
@@ -407,10 +416,11 @@ export class StaffLayoutManager {
    * Find the staff (treble or bass) at a point
    * @param {number} x - X coordinate (canvas-local)
    * @param {number} y - Y coordinate (canvas-local)
+   * @param {number|null} pageIndex - Optional page index (for continuous mode with multiple visible pages)
    * @returns {Object|null} - { measure, staff: 'treble'|'bass', line, pitch }
    */
-  getStaffPositionAtPoint(x, y) {
-    const measureBounds = this.getMeasureAtPoint(x, y);
+  getStaffPositionAtPoint(x, y, pageIndex = null) {
+    const measureBounds = this.getMeasureAtPoint(x, y, pageIndex);
     if (!measureBounds) {
       return null;
     }

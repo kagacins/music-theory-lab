@@ -2383,7 +2383,9 @@ export class NotationComposer {
     const position = this.getPositionFromEvent(e);
     if (!position) return;
 
-    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+    // In continuous pagination mode, pass the page index for correct measure filtering
+    const pageIndex = position.page?.index ?? null;
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y, pageIndex);
 
     if (staffPosition && staffPosition.measure) {
       this.mouseDownTime = Date.now();
@@ -2518,8 +2520,9 @@ export class NotationComposer {
       }
     }
 
-    // Find what was clicked
-    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+    // Find what was clicked - pass page index for continuous mode
+    const pageIndex = position.page?.index ?? null;
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y, pageIndex);
 
     if (staffPosition && staffPosition.measure) {
       // SECTION VIEW FIX: Apply filter offset to convert local index to global
@@ -2569,8 +2572,9 @@ export class NotationComposer {
     const position = this.getPositionFromEvent(e);
     if (!position) return;
 
-    // Find what was clicked
-    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+    // Find what was clicked - pass page index for continuous mode
+    const pageIndex = position.page?.index ?? null;
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y, pageIndex);
 
     if (staffPosition && staffPosition.measure) {
       // SECTION VIEW FIX: Apply filter offset to convert local index to global
@@ -3324,7 +3328,8 @@ export class NotationComposer {
     hideNoteTooltip();
 
     // Check if mouse is over a measure for edit icon
-    const staffPosition = this.layoutManager.getStaffPositionAtPoint(x, y);
+    // Pass currentPageIndex for continuous mode measure filtering
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(x, y, currentPageIndex);
     if (staffPosition && staffPosition.measure) {
       // Apply section filter offset for correct global index
       const filterOffset = this.getMeasureFilterOffset();
@@ -4799,9 +4804,14 @@ export class NotationComposer {
     dialog.querySelector('.cancel-btn').addEventListener('click', () => {
       dialog.remove();
       // Reset the toolbar dropdown to the old value
+      const oldTS = this.compositionState.getTimeSignature();
       if (this.toolbar) {
-        const oldTS = this.compositionState.getTimeSignature();
         this.toolbar.setTimeSignature(oldTS.num, oldTS.denom);
+      }
+      // Also reset the fullscreen dropdown
+      const fsDropdown = document.querySelector('#fullscreen-timesig-dropdown');
+      if (fsDropdown) {
+        fsDropdown.value = `${oldTS.num}/${oldTS.denom}`;
       }
     });
 
@@ -4830,9 +4840,14 @@ export class NotationComposer {
       if (e.target === dialog) {
         dialog.remove();
         // Reset the toolbar dropdown
+        const oldTS = this.compositionState.getTimeSignature();
         if (this.toolbar) {
-          const oldTS = this.compositionState.getTimeSignature();
           this.toolbar.setTimeSignature(oldTS.num, oldTS.denom);
+        }
+        // Also reset the fullscreen dropdown
+        const fsDropdown = document.querySelector('#fullscreen-timesig-dropdown');
+        if (fsDropdown) {
+          fsDropdown.value = `${oldTS.num}/${oldTS.denom}`;
         }
       }
     });

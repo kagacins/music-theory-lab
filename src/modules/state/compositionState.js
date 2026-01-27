@@ -1606,9 +1606,10 @@ export class CompositionState {
 
         // Create a building block for each chord
         progressionData.forEach((chordData, index) => {
-            // Get the pitches for this chord - use lhNotes (left hand/bass clef) if available
-            // Both lhNotes (octave 2 base) and notes (octave 3 base) are already at appropriate octaves
-            let pitches = chordData.lhNotes || chordData.notes || [];
+            // Get the pitches for this chord directly from notes array
+            // BUGFIX: Previously checked lhNotes first, but empty array [] is truthy,
+            // so `[] || notes` returns [] instead of notes, causing inversion to be lost
+            let pitches = (chordData.notes && chordData.notes.length > 0) ? chordData.notes : [];
 
             // If no notes, generate from chord root/type (already at octave 3)
             if (pitches.length === 0 && chordData.root && chordData.type) {
@@ -5053,24 +5054,28 @@ export class CompositionState {
 
             // CRITICAL: Store the complete progression data independently of measures
             // This is the source of truth when multiple chords share a single measure
+            // MUST use deep copy to prevent external mutations from corrupting stored data
             this.storedProgressionData = progressionData.map(chord => {
                 // CRITICAL: Ensure each chord has a unique ID for bass preservation system
                 // This ID tracks bass edits across reorders/inserts/removes
                 if (!chord.id) {
                     chord.id = `chord_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
                 }
+                // Deep copy the chord to isolate it from external mutations
+                // This prevents copy/paste and other operations from corrupting stored data
+                const deepCopy = JSON.parse(JSON.stringify(chord));
                 return {
-                    ...chord,
+                    ...deepCopy,
                     // Ensure all required fields have defaults
-                    id: chord.id, // Preserve the ID
-                    beats: chord.beats !== undefined ? chord.beats : 4,
-                    inversion: chord.inversion || 0,
-                    omittedNotes: chord.omittedNotes || [],
-                    lhOmittedNotes: chord.lhOmittedNotes || [],
-                    octaveShift: chord.octaveShift || 0,
-                    lhOctaveShift: chord.lhOctaveShift || 0,
-                    lhNotes: chord.lhNotes || [],
-                    bassPattern: chord.bassPattern || null, // Per-chord bass pattern (null = use global)
+                    id: chord.id, // Preserve the ID (may have been just assigned)
+                    beats: deepCopy.beats !== undefined ? deepCopy.beats : 4,
+                    inversion: deepCopy.inversion || 0,
+                    omittedNotes: deepCopy.omittedNotes || [],
+                    lhOmittedNotes: deepCopy.lhOmittedNotes || [],
+                    octaveShift: deepCopy.octaveShift || 0,
+                    lhOctaveShift: deepCopy.lhOctaveShift || 0,
+                    lhNotes: deepCopy.lhNotes || [],
+                    bassPattern: deepCopy.bassPattern || null, // Per-chord bass pattern (null = use global)
                 };
             });
 
@@ -5438,11 +5443,14 @@ export class CompositionState {
     exportToProgressionData() {
         // Use stored progression data if available (source of truth)
         if (this.storedProgressionData && this.storedProgressionData.length > 0) {
-            // Return a deep copy to prevent external mutations
-            return this.storedProgressionData.map(chord => ({
-                ...chord,
-                selectionMode: 'chord',
-            }));
+            // Return a DEEP copy to prevent external mutations from corrupting stored data
+            // CRITICAL: Must use JSON.parse/stringify to deep copy nested arrays (notes, omittedNotes, lhNotes)
+            // A shallow spread { ...chord } would share array references, causing mutations to affect stored data
+            return this.storedProgressionData.map(chord => {
+                const deepCopy = JSON.parse(JSON.stringify(chord));
+                deepCopy.selectionMode = 'chord';
+                return deepCopy;
+            });
         }
 
         // Fallback: reconstruct from measures (for backward compatibility)
@@ -5683,8 +5691,9 @@ export class CompositionState {
         // This is critical for sub-measure chords (e.g., 2-beat chords in 4/4 time)
         // where multiple chords share a single measure
         if (this.storedProgressionData && this.storedProgressionData.length > 0) {
-            // Return a copy to prevent external mutations
-            return this.storedProgressionData.map(chord => ({ ...chord }));
+            // Return DEEP copy to prevent external mutations from affecting stored data
+            // CRITICAL: Shallow copy { ...chord } shares array references (notes, omittedNotes)
+            return this.storedProgressionData.map(chord => JSON.parse(JSON.stringify(chord)));
         }
 
         // Fallback: reconstruct from measures (for backward compatibility)
@@ -6339,8 +6348,8 @@ export class CompositionState {
             });
         }
 
-        // Insert the new chord
-        progressionData.splice(atIndex, 0, { ...chordData });
+        // Insert the new chord (deep copy to prevent shared references)
+        progressionData.splice(atIndex, 0, JSON.parse(JSON.stringify(chordData)));
 
         // Update section indices - all chords at or after atIndex shift up by 1
         this.updateSectionsAfterChordInsert(atIndex);

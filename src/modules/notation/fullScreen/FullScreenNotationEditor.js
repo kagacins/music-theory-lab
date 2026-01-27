@@ -2775,23 +2775,29 @@ export class FullScreenNotationEditor {
             });
         });
 
-        // Ornament buttons - apply ornament to selected notes
+        // Ornament buttons - arm ornament for new notes or apply to selected notes
         sidebar.querySelectorAll('.fs-ornament-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const ornament = e.currentTarget.dataset.ornament;
                 const toolbar = getToolbar();
                 if (ornament && toolbar) {
-                    toolbar.onOrnamentApply?.(ornament);
-                    // Don't manually update - let sync handle it after selection updates
+                    // Use setOrnament which handles arming AND applies to selected if any
+                    toolbar.setOrnament(ornament);
+                    this._updateActiveOrnamentButton(toolbar.currentOrnament);
                 }
             });
         });
 
-        // Ornament remove button
+        // Ornament remove button - also clears armed ornament
         const ornamentRemoveBtn = sidebar.querySelector('.fs-ornament-remove-btn');
         ornamentRemoveBtn?.addEventListener('click', () => {
             const toolbar = getToolbar();
-            toolbar?.onOrnamentRemove?.();
+            if (toolbar) {
+                toolbar.currentOrnament = null;
+                toolbar.updateOrnamentButtons?.();
+                toolbar.onOrnamentRemove?.();
+                this._updateActiveOrnamentButton(null);
+            }
         });
 
         // Tuplet buttons
@@ -3279,13 +3285,13 @@ export class FullScreenNotationEditor {
             this._updateActiveDynamicButton(toolbar.currentDynamic);
         }
 
-        // Update ornament buttons
+        // Update ornament buttons (show armed ornament when no selection)
         if (hasSelection) {
             if (toolbar.selectionOrnament !== 'mixed') {
                 this._updateActiveOrnamentButton(toolbar.selectionOrnament);
             }
         } else {
-            this._updateActiveOrnamentButton(null);
+            this._updateActiveOrnamentButton(toolbar.currentOrnament);
         }
 
         // Update arpeggio buttons
@@ -3934,7 +3940,7 @@ export class FullScreenNotationEditor {
         this._updateActiveAccidentalButton(toolbar.currentAccidental);
         this._updateActiveArticulationButton(toolbar.currentArticulation);
         this._updateActiveDynamicButton(toolbar.currentDynamic);
-        this._updateActiveOrnamentButton(null);
+        this._updateActiveOrnamentButton(toolbar.currentOrnament);
         this._updateActiveArpeggioButton(null);
         this._updatePedalButtons(toolbar.selectionPedal);
         this._updateVoltaButtons(toolbar.selectionMeasureIndices);
@@ -3973,10 +3979,12 @@ export class FullScreenNotationEditor {
         const has1 = count >= 1;
         const has2 = count >= 2;
 
-        // --- Buttons requiring 1+ notes selected ---
-        setButtonState('.fs-articulation-btn', has1);
-        setButtonState('.fs-dynamic-btn', has1);
-        setButtonState('.fs-ornament-btn', has1);
+        // --- "Armable" buttons - always enabled ---
+        // These can be clicked to "arm" the property for the next note added,
+        // or to apply to selected notes if any are selected
+        setButtonState('.fs-articulation-btn', true);
+        setButtonState('.fs-dynamic-btn', true);
+        setButtonState('.fs-ornament-btn', true);
 
         // --- Buttons requiring 2+ notes selected ---
         // Slurs, ties - special handling: don't disable if button is active (showing current state)

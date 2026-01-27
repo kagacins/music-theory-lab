@@ -210,6 +210,13 @@ import { syncProgressionToMelodyComposer } from '../../integration/melodyCompose
 import { refreshNotationFromProgression, getNotationComposer } from '../../notation/notationInit.js';
 
 // ============================================================================
+// LOCAL CONSTANTS
+// ============================================================================
+
+// Natural minor scale intervals (W-H-W-W-H-W-W)
+const MINOR_SCALE_STEPS = [0, 2, 3, 5, 7, 8, 10];
+
+// ============================================================================
 // MODULE-LEVEL STATE
 // ============================================================================
 
@@ -3238,6 +3245,8 @@ export function updateCustomBassPatternInfo() {
 
 /**
  * Copy selected chords to clipboard
+ * IMPORTANT: Uses deep copy to preserve chord voicing (notes array) independently
+ * of any future modifications to the original chords
  */
 export function copySelectedChords(indices) {
     if (indices.length === 0) return;
@@ -3245,10 +3254,13 @@ export function copySelectedChords(indices) {
     const trainerState = getTrainerState();
     const progressionData = trainerState.progressionData || [];
 
+    // Deep copy each chord to preserve notes array, omittedNotes, lhNotes, etc.
+    // Without deep copy, the clipboard shares array references with progressionData,
+    // so any modification to original chords would corrupt the clipboard data
     const chordsToCopy = indices
         .filter(idx => idx < progressionData.length)
         .sort((a, b) => a - b)
-        .map(idx => ({ ...progressionData[idx] }));
+        .map(idx => JSON.parse(JSON.stringify(progressionData[idx])));
 
     if (chordsToCopy.length > 0) {
         setClipboard('chords', chordsToCopy);
@@ -3338,20 +3350,20 @@ export function duplicateSelectedChords(indices) {
         window.saveStateBeforeChange();
     }
 
-    // Get chord data for selected indices
+    // Deep copy each chord to preserve voicing (notes array, omittedNotes, lhNotes, etc.)
     const chordsToDuplicate = indices
         .filter(idx => idx < progressionData.length)
         .sort((a, b) => a - b)
-        .map(idx => ({ ...progressionData[idx] }));
+        .map(idx => JSON.parse(JSON.stringify(progressionData[idx])));
 
     if (chordsToDuplicate.length === 0) return;
 
     // Insert after the last selected chord
     const insertAt = Math.max(...indices) + 1;
 
-    // Insert each chord
+    // Insert each chord (already deep copied, so just pass directly)
     chordsToDuplicate.forEach((chord, i) => {
-        compositionState.insertChord(insertAt + i, { ...chord });
+        compositionState.insertChord(insertAt + i, chord);
     });
 
     // Clear selection and select duplicated chords
@@ -3517,9 +3529,10 @@ export function loadProgression() {
         // Use explicit chord quality if found, otherwise use default from ROMAN_MAP_BASE
         const chordType = chordQuality || defaultQuality;
 
-        // Get key without 'm' suffix for calculation
-        const keyForCalculation = isMinorKey ? currentKey.replace(/m$/, '') : currentKey;
-        const chordData = getProgressionChordNotes(keyForCalculation, roman, chordType, 0, freshTrainerState.octaveShift);
+        // Pass the FULL key (including 'm' suffix) to preserve enharmonic preference
+        // The function internally extracts the root for scale calculations but needs
+        // the full key to determine correct enharmonic spelling (Gm uses flats, G uses sharps)
+        const chordData = getProgressionChordNotes(currentKey, roman, chordType, 0, freshTrainerState.octaveShift);
         if (chordData) {
             // Validate and filter notes to ensure they're all valid strings
             if (chordData.notes && Array.isArray(chordData.notes)) {
@@ -3735,6 +3748,10 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
     // Extract just the root note from the key (e.g., "Cm" -> "C", "F# minor" -> "F#")
     const keyRoot = key.replace(/\s*(major|minor|min|m)$/i, '').trim();
 
+    // Check if this is a minor key - use minor scale steps for diatonic chord calculation
+    const isMinorKey = key.endsWith('m') && !key.endsWith('maj');
+    const scaleSteps = isMinorKey ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+
     let mapEntry = ROMAN_MAP_BASE[romanNumeral];
     let chordRootNote = '';
 
@@ -3753,7 +3770,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
             if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
 
-            const targetStep = MAJOR_SCALE_STEPS[targetEntry.index];
+            const targetStep = scaleSteps[targetEntry.index];
             const targetRootIndex = (scaleRootIndex + targetStep) % 12;
 
             // The secondary dominant is a perfect 5th above the target
@@ -3834,7 +3851,10 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
                 let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
                 if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
 
-                // Get the diatonic scale step
+                // IMPORTANT: For borrowed chords with accidentals (bVII, bVI, #IV, etc.),
+                // the accidental represents an alteration from the MAJOR scale, not the current key's scale.
+                // Example: bVII in F minor = Eb (VII in F major is E, lowered = Eb)
+                // If we used minor scale, VII in F minor = Eb, lowered = D (wrong!)
                 const scaleStep = MAJOR_SCALE_STEPS[scaleDegreeIndex];
                 let chordRootIndex = (scaleRootIndex + scaleStep) % 12;
 
@@ -3856,7 +3876,8 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
         let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
         if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
 
-        const scaleStep = MAJOR_SCALE_STEPS[mapEntry.index];
+        // Use minor scale steps for minor keys
+        const scaleStep = scaleSteps[mapEntry.index];
         let chordRootIndex = (scaleRootIndex + scaleStep) % 12;
 
         // Apply accidental if present
@@ -4392,6 +4413,13 @@ function restoreProgressionState(state) {
         }
         if (state.timeSignature) {
             compositionState.metadata.timeSignature = { ...state.timeSignature };
+            // Emit event so UI components (like fullscreen time signature dropdown) update
+            compositionState.events.emit('timeSignatureChanged', state.timeSignature);
+            // Also sync to interactiveMelody for metronome playback
+            const tsString = `${state.timeSignature.num}/${state.timeSignature.denom}`;
+            if (window.setTimeSignature) {
+                window.setTimeSignature(tsString);
+            }
         }
         if (state.trebleBlockSequence) {
             try {
@@ -4488,6 +4516,11 @@ export function handleUndo() {
         if (window.refreshFullscreenChordPanel) {
             window.refreshFullscreenChordPanel();
         }
+
+        // Dispatch progressionUpdated event so fullscreen UI updates (time signature dropdown, etc.)
+        window.dispatchEvent(new CustomEvent('progressionUpdated', {
+            detail: { source: 'undo' }
+        }));
     }
 }
 
@@ -4545,6 +4578,11 @@ export function handleRedo() {
         if (window.refreshFullscreenChordPanel) {
             window.refreshFullscreenChordPanel();
         }
+
+        // Dispatch progressionUpdated event so fullscreen UI updates (time signature dropdown, etc.)
+        window.dispatchEvent(new CustomEvent('progressionUpdated', {
+            detail: { source: 'redo' }
+        }));
     }
 }
 

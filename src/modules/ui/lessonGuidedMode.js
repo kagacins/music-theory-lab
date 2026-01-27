@@ -17,6 +17,8 @@ import { switchTab } from './tabs.js';
 import { renderLessonViewer } from './lessonViewer.js';
 import { getProgressionData, setProgressionData, getCurrentKey, setCurrentKey } from '../state/trainerState.js';
 import { renderProgressionDisplay, loadProgression } from '../features/progressionBuilder/index.js';
+import { getIsKeyNamesOn, setIsKeyNamesOn } from '../state/globalState.js';
+import { updateKeyboardLabels } from './keyboard.js';
 
 // Enharmonic equivalents for chord validation
 const ENHARMONIC_MAP = {
@@ -1056,7 +1058,8 @@ function saveTabState(targetTab) {
         panels: {},
         scrollPositions: {},
         progressionData: null,
-        progressionKey: null
+        progressionKey: null,
+        keyboardLabelsOn: getIsKeyNamesOn() // Save keyboard label state to restore later
     };
 
     if (targetTab === 'builder') {
@@ -1229,6 +1232,28 @@ function forceTutorialState(targetTab) {
         });
     }
 
+    // Turn on keyboard note labels for guided exercises (helps users identify notes)
+    // The original state is saved in savedTabState.keyboardLabelsOn and restored when exercise ends
+    setIsKeyNamesOn(true);
+    window.isKeyNamesOn = true;
+    updateKeyboardLabels();
+
+    // Also update the toggle checkbox UI if it exists
+    const keyNamesToggle = document.getElementById('key-names-toggle');
+    if (keyNamesToggle) {
+        keyNamesToggle.checked = true;
+    }
+    const offIndicator = document.getElementById('key-names-off-indicator');
+    const onIndicator = document.getElementById('key-names-on-indicator');
+    if (onIndicator) {
+        onIndicator.classList.remove('text-gray-500');
+        onIndicator.classList.add('text-indigo-300');
+    }
+    if (offIndicator) {
+        offIndicator.classList.remove('text-indigo-300');
+        offIndicator.classList.add('text-gray-500');
+    }
+
 }
 
 /**
@@ -1308,6 +1333,41 @@ function restoreTabState() {
         });
     }
 
+    // Restore keyboard note labels to their original state (before guided exercise)
+    if (savedTabState.keyboardLabelsOn !== undefined) {
+        const wasKeyNamesOn = savedTabState.keyboardLabelsOn;
+        setIsKeyNamesOn(wasKeyNamesOn);
+        window.isKeyNamesOn = wasKeyNamesOn;
+        updateKeyboardLabels();
+
+        // Also restore the toggle checkbox UI if it exists
+        const keyNamesToggle = document.getElementById('key-names-toggle');
+        if (keyNamesToggle) {
+            keyNamesToggle.checked = wasKeyNamesOn;
+        }
+        const offIndicator = document.getElementById('key-names-off-indicator');
+        const onIndicator = document.getElementById('key-names-on-indicator');
+        if (wasKeyNamesOn) {
+            if (onIndicator) {
+                onIndicator.classList.remove('text-gray-500');
+                onIndicator.classList.add('text-indigo-300');
+            }
+            if (offIndicator) {
+                offIndicator.classList.remove('text-indigo-300');
+                offIndicator.classList.add('text-gray-500');
+            }
+        } else {
+            if (offIndicator) {
+                offIndicator.classList.remove('text-gray-500');
+                offIndicator.classList.add('text-indigo-300');
+            }
+            if (onIndicator) {
+                onIndicator.classList.remove('text-indigo-300');
+                onIndicator.classList.add('text-gray-500');
+            }
+        }
+    }
+
     savedTabState = null;
 }
 
@@ -1347,8 +1407,27 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
     const isChordLabDynamicSelector = (
         (targetSelector.includes('#fs-chord-grid-container') && targetSelector.includes('.key-button-wrapper')) ||
         (targetSelector.includes('#fs-fab-quick-buttons') && targetSelector.includes('button')) ||
-        (targetSelector.includes('#fs-chordlab-fab') && targetSelector.includes('button'))
+        (targetSelector.includes('#fs-chordlab-fab') && targetSelector.includes('button')) ||
+        // FAB submenu buttons that are hidden until menus are opened
+        targetSelector.includes('data-action="play-builder-progression"')
     );
+
+    // For the play-builder-progression button, add an initial delay on first call per step
+    // to allow the submenu animation to complete
+    const isPlayProgressionButton = targetSelector.includes('data-action="play-builder-progression"');
+    if (isPlayProgressionButton) {
+        // Use step index to track which step has already had the delay
+        const currentStepIndex = guidedModeState?.stepIndex ?? -1;
+        if (showSpotlight._playProgressionDelayedStep !== currentStepIndex) {
+            showSpotlight._playProgressionDelayedStep = currentStepIndex;
+            console.log('[GuidedMode] Play Progression button - adding initial delay for submenu animation (step', currentStepIndex, ')');
+            setTimeout(() => {
+                showSpotlight(targetSelector, position, extraHeight);
+            }, 300);
+            return;
+        }
+    }
+
     if (isChordLabDynamicSelector && !targetEl) {
         // Track retry count to avoid infinite loops
         const retryCount = (showSpotlight._retryCount || 0) + 1;
@@ -1373,10 +1452,28 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
         return;
     }
 
-    // Check if element is hidden
+    // Check if element is hidden (either directly or via parent)
     if (targetEl.classList.contains('hidden')) {
         console.warn('[GuidedMode] Spotlight target is hidden:', targetSelector);
         return;
+    }
+
+    // Check if element or any parent is hidden (for elements in submenus)
+    const isVisuallyHidden = targetEl.closest('.hidden');
+    if (isVisuallyHidden && isChordLabDynamicSelector) {
+        // The element exists but its container is hidden, retry
+        const retryCount = (showSpotlight._retryCount || 0) + 1;
+        if (retryCount < 15) {
+            showSpotlight._retryCount = retryCount;
+            console.log(`[GuidedMode] Element's parent is hidden, retry ${retryCount}/15:`, targetSelector);
+            setTimeout(() => {
+                showSpotlight(targetSelector, position, extraHeight);
+            }, 200);
+            return;
+        }
+    } else {
+        // Reset retry counter on success (element visible)
+        showSpotlight._retryCount = 0;
     }
 
     currentSpotlightTarget = targetSelector;
@@ -1959,6 +2056,10 @@ function setupActionListeners() {
     window.addEventListener('circleOfFifthsOpened', handleBuilderAction);
     window.addEventListener('quickAddFormOpened', handleBuilderAction);
 
+    // Listen for Chord Lab FAB menu events (guided exercise support)
+    window.addEventListener('fabMenuOpened', handleBuilderAction);
+    window.addEventListener('playbackSubmenuOpened', handleBuilderAction);
+
     // Listen for multi-select and grouping events (site tutorial support)
     window.addEventListener('chordsSelectionChanged', handleBuilderAction);
     window.addEventListener('addSectionMenuOpened', handleBuilderAction);
@@ -2007,6 +2108,10 @@ function cleanupActionListeners() {
     window.removeEventListener('playbackSectionClicked', handleBuilderAction);
     window.removeEventListener('circleOfFifthsOpened', handleBuilderAction);
     window.removeEventListener('quickAddFormOpened', handleBuilderAction);
+
+    // Remove Chord Lab FAB menu event listeners
+    window.removeEventListener('fabMenuOpened', handleBuilderAction);
+    window.removeEventListener('playbackSubmenuOpened', handleBuilderAction);
 
     // Remove multi-select and grouping event listeners
     window.removeEventListener('chordsSelectionChanged', handleBuilderAction);
@@ -2073,7 +2178,7 @@ function handleBuilderAction(event) {
                 } else {
                     setTimeout(() => {
                         advanceToNextStep();
-                    }, 1000);
+                    }, 500);
                 }
             }
         }
@@ -2152,6 +2257,14 @@ function validateAction(action, validation) {
         // FAB menu closed
         case 'fab_closed':
             return action.type === 'fabClosed';
+
+        // FAB menu opened (Chord Lab main FAB button clicked)
+        case 'fab_menu_opened':
+            return action.type === 'fabMenuOpened';
+
+        // Playback submenu opened (Chord Lab playback category button clicked)
+        case 'playback_submenu_opened':
+            return action.type === 'playbackSubmenuOpened';
 
         // BPM/tempo changed
         case 'bpm_changed':

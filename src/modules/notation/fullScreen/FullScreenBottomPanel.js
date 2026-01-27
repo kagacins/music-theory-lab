@@ -59,10 +59,10 @@ const PANEL_HEIGHTS = {
 };
 
 const DOCK_BUTTONS = [
-    { id: 'workbench', label: 'Workbench', icon: '🧪', color: 'from-violet-500 to-indigo-500' },
+    { id: 'workbench', label: 'Workbench', icon: '🧪', color: 'from-indigo-500 to-purple-500' },
     { id: 'chords', label: 'Chord Progression', icon: '🎵', color: 'from-purple-500 to-indigo-500' },
     { id: 'quick-add', label: 'Quick Add', icon: '➕', color: 'from-lime-700 to-lime-800' },
-    { id: 'auto-bass', label: 'Auto-Bass', icon: '🎸', color: 'from-amber-700 to-amber-600' },
+    { id: 'auto-bass', label: 'Auto-Bass', icon: '🎸', color: 'from-amber-600 to-amber-500' },
     { id: 'voice-leading', label: 'Voice Leading', icon: '📊', color: 'from-blue-500 to-cyan-500' },
     { id: 'borrowed', label: 'Borrowed Chords', icon: '🔄', color: 'from-slate-600 to-indigo-700' },
     { id: 'theory', label: 'Theory', icon: '💡', color: 'from-yellow-500 to-amber-500' }
@@ -428,7 +428,7 @@ export class FullScreenBottomPanel {
         const key = getCurrentKey() || 'C';
 
         container.innerHTML = `
-            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 border-b border-violet-700">
+            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 border-b border-indigo-700">
                 <span class="text-white text-sm font-semibold flex items-center gap-2" style="-webkit-text-fill-color: white;">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                     Song Workbench
@@ -441,7 +441,7 @@ export class FullScreenBottomPanel {
             </div>
 
             <!-- 3-Column Layout -->
-            <div class="grid grid-cols-3 gap-3 p-3 bg-gradient-to-br from-violet-50 to-indigo-50" style="height: calc(100% - 40px);">
+            <div class="grid grid-cols-3 gap-3 p-3 bg-gradient-to-br from-indigo-50 to-purple-50" style="height: calc(100% - 40px);">
 
                 <!-- Column 1: Key -->
                 <div class="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
@@ -1648,7 +1648,7 @@ export class FullScreenBottomPanel {
 
             return `
                 <div class="flex-shrink-0 rounded overflow-hidden border" style="border-color: ${hexToRgba(sectionColor, 0.3)}; background: ${hexToRgba(sectionColor, 0.05)};">
-                    <div class="text-[9px] font-semibold text-white px-2 py-1 text-center whitespace-nowrap" style="background: ${sectionColor};">${section.label}</div>
+                    <div class="text-[9px] font-semibold text-white px-2 py-1 text-center whitespace-nowrap" style="background: ${sectionColor}; -webkit-text-fill-color: white;">${section.label}</div>
                     <div class="flex items-center gap-0.5 p-1.5">${chipsHTML}</div>
                 </div>
             `;
@@ -1670,12 +1670,12 @@ export class FullScreenBottomPanel {
                          style="border-color: ${accentColor}; background: ${hexToRgba(accentColor, 0.08)};"
                          data-suggestion='${JSON.stringify(suggestion).replace(/'/g, "&#39;")}'
                          title="Click to add ${displayName} to complete the ${suggestion.pattern || 'pattern'}">
-                        <div class="text-[8px] font-semibold text-white px-2 py-0.5 text-center whitespace-nowrap" style="background: ${accentColor};">
+                        <div class="text-[8px] font-semibold text-white px-2 py-0.5 text-center whitespace-nowrap" style="background: ${accentColor}; -webkit-text-fill-color: white;">
                             ${suggestion.pattern || 'Continue'}
                         </div>
                         <div class="flex items-center justify-center gap-1 p-1.5">
-                            <span class="text-[11px] font-bold" style="color: ${accentColor};">${displayName}${invText}</span>
-                            <span class="text-[9px]" style="color: ${accentColor};">+</span>
+                            <span class="text-[11px] font-bold" style="color: ${accentColor}; -webkit-text-fill-color: ${accentColor};">${displayName}${invText}</span>
+                            <span class="text-[9px]" style="color: ${accentColor}; -webkit-text-fill-color: ${accentColor};">+</span>
                         </div>
                     </div>
                 `;
@@ -2105,6 +2105,29 @@ export class FullScreenBottomPanel {
         return note;
     }
 
+    /**
+     * Helper: Convert a chromatic index (0-11) to a properly spelled note name for the current key.
+     * Uses flat spellings for flat keys (F, Bb, Eb, Ab, Db, Gb, Dm, Gm, Cm, Fm, Bbm, Ebm)
+     * Uses sharp spellings for sharp keys (G, D, A, E, B, F#, Em, Bm, F#m, C#m, G#m)
+     *
+     * This fixes the bug where chords like Ab in G minor were being spelled as G#.
+     *
+     * @param {number} index - Chromatic index (0=C, 1=C#/Db, 2=D, etc.)
+     * @param {string} key - Current key (e.g., 'C', 'Gm', 'F#')
+     * @returns {string} Properly spelled note name
+     */
+    _getRootNameForKey(index, key) {
+        const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+        // Get the enharmonic preference for this key
+        const preference = window.getEnharmonicPreferenceForKey?.(key) ||
+            (window.getKeyBasedEnharmonic?.() === 'flat' ? 'flat' : 'sharp');
+
+        const notes = preference === 'flat' ? FLAT_NOTES : SHARP_NOTES;
+        return notes[index % 12];
+    }
+
     _renderQuickAddPanel(container) {
         const compState = getCompositionState();
         // Get key from trainerState (the single source of truth for current key)
@@ -2468,7 +2491,9 @@ export class FullScreenBottomPanel {
         const root = parseInt(container.querySelector('#fs-quick-root').value);
         const type = container.querySelector('#fs-quick-type').value;
         const inversion = parseInt(container.querySelector('#fs-quick-inversion').value);
-        const rootName = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][root];
+        // Use key-aware spelling (Ab instead of G# in flat keys like Gm)
+        const key = getCurrentKey() || 'C';
+        const rootName = this._getRootNameForKey(root, key);
 
         // Use main app's selected chord index
         const insertAfterIdx = window.getSelectedChordIndex?.() ?? -1;
@@ -2504,8 +2529,7 @@ export class FullScreenBottomPanel {
         }) : 'null (no section)');
 
         // Build chord data using the app's helper
-        // Get key from trainerState (the single source of truth for current key)
-        const key = getCurrentKey() || 'C';
+        // key was already retrieved above (line 2495)
         let chordData = null;
         if (window.getInvertedChordNotes) {
             const result = window.getInvertedChordNotes(
@@ -2996,7 +3020,9 @@ export class FullScreenBottomPanel {
         if (!rootSelect || !typeSelect) return;
 
         const rootIndex = parseInt(rootSelect.value, 10);
-        const rootNoteName = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][rootIndex];
+        // Use key-aware spelling (Ab instead of G# in flat keys like Gm)
+        const key = getCurrentKey() || 'C';
+        const rootNoteName = this._getRootNameForKey(rootIndex, key);
         const selectedScale = scaleSelect?.value || '';
 
         // Store current selection
@@ -3106,7 +3132,7 @@ export class FullScreenBottomPanel {
         const sel = (val) => bassPattern === val ? 'selected' : '';
 
         container.innerHTML = `
-            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-amber-700 to-amber-600 border-b border-amber-800">
+            <div class="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-amber-600 to-amber-500 border-b border-amber-700">
                 <span class="text-white text-sm font-semibold" style="-webkit-text-fill-color: white;">Auto-Bass Patterns</span>
                 <div class="flex items-center gap-2">
                     <!-- Progression Summary/Details Slider Toggle (first/leftmost) -->
@@ -3234,10 +3260,10 @@ export class FullScreenBottomPanel {
                         <input type="checkbox" id="fs-bass-follows-inv" class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
                         <span class="text-xs font-medium text-gray-700">Follow Inv</span>
                     </label>
-                    <button id="fs-bass-apply" class="px-3 py-1.5 bg-gradient-to-r from-amber-700 to-amber-600 text-white text-xs font-medium rounded-lg hover:from-amber-800 hover:to-amber-700 transition-all shadow">
+                    <button id="fs-bass-apply" class="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 text-white text-xs font-medium rounded-lg hover:from-amber-700 hover:to-amber-600 transition-all shadow">
                         Apply to All
                     </button>
-                    <button id="fs-bass-apply-selected" class="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 text-white text-xs font-medium rounded-lg hover:from-amber-700 hover:to-amber-600 transition-all shadow" style="opacity: 0.5;" disabled title="Shift+click chord cards to multi-select, then apply pattern to selected chords only">
+                    <button id="fs-bass-apply-selected" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 text-white text-xs font-medium rounded-lg hover:from-amber-600 hover:to-amber-500 transition-all shadow" style="opacity: 0.5;" disabled title="Shift+click chord cards to multi-select, then apply pattern to selected chords only">
                         Apply to Selected
                     </button>
                     <button id="fs-bass-revert-selected" class="px-2 py-1.5 bg-gradient-to-r from-amber-300 to-amber-200 text-amber-800 text-xs font-medium rounded-lg hover:from-amber-400 hover:to-amber-300 transition-all shadow" style="opacity: 0.5;" disabled title="Revert selected chord(s) to their chord card voicings">
@@ -4727,7 +4753,7 @@ export class FullScreenBottomPanel {
             // This ensures "Ungrouped 1" header is visible like in the unified modal
             return `
                 <div class="flex-shrink-0 rounded overflow-hidden border" style="border-color: ${hexToRgba(sectionColor, 0.3)}; background: ${hexToRgba(sectionColor, 0.05)};">
-                    <div class="text-[9px] font-semibold text-white px-2 py-1 text-center whitespace-nowrap" style="background: ${sectionColor};">${section.label}</div>
+                    <div class="text-[9px] font-semibold text-white px-2 py-1 text-center whitespace-nowrap" style="background: ${sectionColor}; -webkit-text-fill-color: white;">${section.label}</div>
                     <div class="flex items-center gap-0.5 p-1.5">${chipsHTML}</div>
                 </div>
             `;
@@ -4893,21 +4919,25 @@ export class FullScreenBottomPanel {
     _buildBorrowedChordNotes(root, type, inversion = 0) {
         // Intervals: Major = [0, 4, 7], Minor = [0, 3, 7]
         const intervals = type === 'Minor' ? [0, 3, 7] : [0, 4, 7];
-        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        // Use both arrays for index lookup (sharps) and output (key-aware)
+        const sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const key = getCurrentKey() || 'C';
 
-        // Normalize root (handle flats)
-        let rootIdx = noteNames.indexOf(root);
+        // Normalize root to index (handle both sharps and flats in input)
+        let rootIdx = sharpNotes.indexOf(root);
         if (rootIdx === -1) {
-            // Handle flats
+            // Handle flats by converting to sharp index
             const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
-            rootIdx = noteNames.indexOf(flatMap[root] || root);
+            rootIdx = sharpNotes.indexOf(flatMap[root] || root);
         }
         if (rootIdx === -1) rootIdx = 0;
 
         // Build notes in octave 3 (bass-ish register)
+        // Use key-aware spelling for the output
         let notes = intervals.map(interval => {
             const noteIdx = (rootIdx + interval) % 12;
-            return noteNames[noteIdx] + '3';
+            const noteName = this._getRootNameForKey(noteIdx, key);
+            return noteName + '3';
         });
 
         // Apply inversion

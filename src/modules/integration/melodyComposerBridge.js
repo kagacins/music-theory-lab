@@ -225,9 +225,11 @@ function getCurrentBeat(measureIndex, staff) {
  * @param {string} accidental - Accidental ('#', 'b', 'n', or null)
  * @param {string} articulation - Articulation type
  * @param {Object} tuplet - Tuplet attribute object (optional)
+ * @param {string} dynamic - Dynamic marking (pp, p, mp, mf, f, ff, sfz, fp)
+ * @param {string} ornament - Ornament type (trill, mordent, turn, etc.)
  * @returns {Object} - {success: boolean, measuresFilled: number}
  */
-export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null, articulation = null, tuplet = null) {
+export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null, articulation = null, tuplet = null, dynamic = null, ornament = null) {
     if (!useCompositionState) return { success: false, measuresFilled: 0 };
 
     // Get selected measure from notation composer
@@ -278,6 +280,8 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             dotted: dotted,
             accidental: accidental,
             articulation: articulation, // Include articulation from toolbar
+            dynamic: dynamic, // Include dynamic from toolbar
+            ornament: ornament, // Include ornament from toolbar
             beat: beatPosition,
         };
 
@@ -318,6 +322,8 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
                 dotted: fitDuration.dotted,
                 accidental: accidental,
                 articulation: articulation,
+                dynamic: dynamic,
+                ornament: ornament,
                 beat: beatPosition,
             };
 
@@ -353,6 +359,8 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             dotted: firstPartDuration.dotted,
             accidental: accidental,
             articulation: articulation,
+            dynamic: dynamic,
+            ornament: ornament,
             tie: isRest ? undefined : 'start',  // Only notes get ties, not rests
             beat: beatPosition,
         };

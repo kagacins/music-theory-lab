@@ -224,8 +224,8 @@ export function detectOstinatoPatternWrapper(context) {
  * @returns {Array} Coach items
  */
 export function detectChromaticVoiceMotionWrapper(context) {
-    const { progression } = context;
-    const results = detectChromaticVoiceMotion(progression);
+    const { progression, key } = context;
+    const results = detectChromaticVoiceMotion(progression, key);
     return results.map(r => formatForCoachEngine(r, 'chromatic-voice-motion'));
 }
 
@@ -250,8 +250,8 @@ export function detectVoiceRangeExtremeWrapper(context) {
  * @returns {Array} Coach items
  */
 export function detectCommonTonePreservationWrapper(context) {
-    const { progression } = context;
-    const results = detectCommonTonePreservation(progression);
+    const { progression, key } = context;
+    const results = detectCommonTonePreservation(progression, key);
     return results.map(r => formatForCoachEngine(r, 'common-tone-preservation'));
 }
 
@@ -294,8 +294,8 @@ export function detectSequenceContinuationOpportunityWrapper(context) {
  * @returns {Array} Coach items
  */
 export function detectStepwiseBassLineWrapper(context) {
-    const { progression } = context;
-    const results = detectStepwiseBassLine(progression);
+    const { progression, key } = context;
+    const results = detectStepwiseBassLine(progression, key);
     return results.map(r => formatForCoachEngine(r, 'stepwise-bass-line'));
 }
 

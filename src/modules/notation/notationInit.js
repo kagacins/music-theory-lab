@@ -317,7 +317,9 @@ export function initEnhancedNotation(options = {}) {
           data.note.isRest || false,  // isRest flag
           data.note.accidental,
           data.note.articulation,  // Pass articulation from toolbar
-          data.note.tuplet  // Pass tuplet attribute for tuplet insert mode
+          data.note.tuplet,  // Pass tuplet attribute for tuplet insert mode
+          data.note.dynamic,  // Pass dynamic from toolbar
+          data.note.ornament  // Pass ornament from toolbar
         );
       } else {
         // Fallback: Add directly to compositionState with beat validation
@@ -368,6 +370,9 @@ export function initEnhancedNotation(options = {}) {
                 isRest: data.note.isRest,
                 dotted: data.note.dotted,
                 accidental: data.note.accidental,
+                articulation: data.note.articulation, // Preserve articulation
+                dynamic: data.note.dynamic, // Preserve dynamic
+                ornament: data.note.ornament, // Preserve ornament
                 beat: data.note.beat,
                 tuplet: data.note.tuplet, // Preserve tuplet attributes
               });
@@ -1639,13 +1644,20 @@ export function initEnhancedNotation(options = {}) {
 
     // Handle ornament application
     notationComposer.toolbar.onOrnamentApply = (ornamentType) => {
+      // Always set ornament for new notes (arming)
+      noteEditor.setOrnament(ornamentType);
+
       if (noteEditor.selectedNotes.size >= 1) {
+        // Also apply ornament to selected notes
         noteEditor.applyOrnamentToSelected(ornamentType);
       }
     };
 
     // Handle ornament removal
     notationComposer.toolbar.onOrnamentRemove = () => {
+      // Clear the armed ornament
+      noteEditor.setOrnament(null);
+
       if (noteEditor.selectedNotes.size >= 1) {
         noteEditor.removeOrnamentFromSelected();
       }

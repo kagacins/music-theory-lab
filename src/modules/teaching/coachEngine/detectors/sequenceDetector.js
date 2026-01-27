@@ -246,11 +246,15 @@ export function detectSecondaryDominants(context) {
         const nextRootSemitone = getNoteValue(nextChord.root);
         if (nextRootSemitone === -1) continue;
 
-        // Check if this chord is V of the next chord (7 semitones above next)
+        // Check if this chord is V of the next chord
+        // For a chord to be V of the next chord, the current chord must be a perfect 5th ABOVE the next chord
+        // Or equivalently, the next chord is a perfect 5th BELOW the current chord
+        // Perfect 5th = 7 semitones, so next should be 5 semitones above (or 7 below) current
         const intervalToNext = ((nextRootSemitone - chordRootSemitone) + 12) % 12;
 
-        // V relationship = 7 semitones up (or 5 down)
-        if (intervalToNext === 7 || intervalToNext === 5) {
+        // V relationship: next chord is a P5 below current (intervalToNext === 5)
+        // This means current chord resolves DOWN a fifth to next chord (e.g., D7 → G)
+        if (intervalToNext === 5) {
             // This chord is V of next chord
             // Check if next chord is diatonic (to confirm it's a secondary dominant)
             const nextIntervalFromKey = ((nextRootSemitone - keyRootSemitone) + 12) % 12;

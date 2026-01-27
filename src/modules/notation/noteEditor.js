@@ -179,6 +179,7 @@ export class NoteEditor {
     this.currentAccidental = null;
     this.currentArticulation = null; // Current articulation from toolbar
     this.currentDynamic = null; // Current dynamic marking from toolbar (pp, p, mp, mf, f, ff, sfz, fp)
+    this.currentOrnament = null; // Current ornament from toolbar (trill, mordent, turn, etc.)
     this.currentVoice = 1; // Active voice (1 or 2) for multi-voice support
 
     // Chord context for coloring
@@ -398,7 +399,9 @@ export class NoteEditor {
 
     // REMOVED: Hover toolbar click handling - now using contextual top toolbar
 
-    let staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+    // In continuous pagination mode, pass the page index from the mouse event
+    const pageIndex = position.page?.index ?? null;
+    let staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y, pageIndex);
 
     // When Alt is held, prefer the last hovered position (ghost note)
     if (e.altKey && this.hoveredPosition && this.hoveredPosition.pitch) {
@@ -632,7 +635,10 @@ export class NoteEditor {
     if (!this.isEnabled) return;
 
     const position = this.getCanvasPosition(e);
-    let staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+    // In continuous pagination mode, pass the page index from the mouse event
+    // so we filter measures by the page the mouse is actually over (not the navigation page)
+    const pageIndex = position.page?.index ?? null;
+    let staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y, pageIndex);
 
     // Phase 3: Apply staff selection mode override from toolbar for ghost note
     if (staffPosition && staffPosition.staff) {
@@ -1745,6 +1751,7 @@ export class NoteEditor {
           accidental: this.currentAccidental,
           articulation: this.currentArticulation,
           dynamic: this.currentDynamic,
+          ornament: this.currentOrnament,
         };
 
         // Show overflow dialog
@@ -1848,6 +1855,7 @@ export class NoteEditor {
         accidental: this.currentAccidental,
         articulation: this.currentArticulation,
         dynamic: this.currentDynamic,
+        ornament: this.currentOrnament,
       };
 
       // Insert note at the specified position
@@ -1902,6 +1910,7 @@ export class NoteEditor {
         accidental: this.currentAccidental,
         articulation: this.currentArticulation,
         dynamic: this.currentDynamic,
+        ornament: this.currentOrnament,
         beat: this.getCurrentBeat(targetMeasureIndex, staff),
       };
 
@@ -1963,6 +1972,7 @@ export class NoteEditor {
         accidental: this.currentAccidental,
         articulation: this.currentArticulation,
         dynamic: this.currentDynamic,
+        ornament: this.currentOrnament,
         beat: beatPosition,
       };
 
@@ -2005,6 +2015,7 @@ export class NoteEditor {
           accidental: this.currentAccidental,
           articulation: this.currentArticulation,
           dynamic: this.currentDynamic,
+          ornament: this.currentOrnament,
           beat: beatPosition,
         };
 
@@ -2041,6 +2052,7 @@ export class NoteEditor {
         accidental: this.currentAccidental,
         articulation: this.currentArticulation,
         dynamic: this.currentDynamic,
+        ornament: this.currentOrnament,
         tie: 'start', // Mark as start of tie
         beat: beatPosition,
       };
@@ -7485,6 +7497,14 @@ export class NoteEditor {
    */
   setDynamic(dynamic) {
     this.currentDynamic = dynamic;
+  }
+
+  /**
+   * Set current ornament for new notes
+   * @param {string|null} ornament - 'trill', 'mordent', 'turn', 'inverted-mordent', 'inverted-turn', or null
+   */
+  setOrnament(ornament) {
+    this.currentOrnament = ornament;
   }
 
   /**

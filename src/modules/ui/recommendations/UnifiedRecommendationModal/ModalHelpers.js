@@ -79,10 +79,10 @@ export function showSectionInfo(sectionId, title, description) {
     `;
     popup.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <h3 style="margin: 0; font-size: 18px; color: #374151;">${title}</h3>
-            <button id="close-section-info" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #9ca3af; padding: 4px; pointer-events: auto;">&times;</button>
+            <h3 style="margin: 0; font-size: 18px; color: #374151; -webkit-text-fill-color: #374151;">${title}</h3>
+            <button id="close-section-info" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #9ca3af; -webkit-text-fill-color: #9ca3af; padding: 4px; pointer-events: auto;">&times;</button>
         </div>
-        <p style="margin: 0; color: #6b7280; line-height: 1.6; font-size: 14px;">${description}</p>
+        <p style="margin: 0; color: #6b7280; -webkit-text-fill-color: #6b7280; line-height: 1.6; font-size: 14px;">${description}</p>
     `;
 
     // Backdrop - must also have pointer-events: auto to capture clicks

@@ -2610,11 +2610,11 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff, measu
 // HELPER FUNCTIONS - PITCH MANIPULATION
 // ============================================================================
 
-// Helper: Transpose a pitch by semitones
-function transposePitch(pitch, semitones) {
+// Helper: Transpose a pitch by semitones (automatically uses current key for enharmonic spelling)
+function transposePitch(pitch, semitones, key = null) {
     if (!pitch) return pitch;
 
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     // Map flats to their sharp equivalents
     const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Fb': 'E', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B' };
 
@@ -2630,7 +2630,7 @@ function transposePitch(pitch, semitones) {
         noteName = flatToSharp[noteName] || noteName;
     }
 
-    let noteIndex = noteNames.indexOf(noteName);
+    let noteIndex = SHARP_NOTES.indexOf(noteName);
 
     if (noteIndex === -1) return pitch;
 
@@ -2644,7 +2644,11 @@ function transposePitch(pitch, semitones) {
         octave++;
     }
 
-    return `${noteNames[noteIndex]}${octave}`;
+    const rawNote = SHARP_NOTES[noteIndex];
+    // Automatically get current key if not provided, for correct enharmonic spelling
+    const effectiveKey = key || getCurrentKey() || 'C';
+    const spelledNote = spellNoteInKey(rawNote, effectiveKey);
+    return `${spelledNote}${octave}`;
 }
 
 // Helper: Compare two pitches (returns 1 if second is higher, -1 if lower, 0 if same)
@@ -2862,14 +2866,26 @@ function pitchToMidi(pitch) {
     return (octave + 1) * 12 + noteValue;
 }
 
-// Convert MIDI note number back to pitch string
-function midiToPitch(midi, preferFlats = false) {
-    const sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-    const noteArray = preferFlats ? flatNotes : sharpNotes;
+// Convert MIDI note number back to pitch string (uses key for correct spelling)
+function midiToPitch(midi, keyOrPreferFlats = null) {
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const octave = Math.floor(midi / 12) - 1;
     const noteIndex = midi % 12;
-    return noteArray[noteIndex] + octave;
+    const rawNote = SHARP_NOTES[noteIndex];
+
+    // If a key string is provided, use spellNoteInKey for correct enharmonic
+    // If boolean true is provided (legacy), use flat array
+    // If null/undefined, use current key
+    if (typeof keyOrPreferFlats === 'string') {
+        return spellNoteInKey(rawNote, keyOrPreferFlats) + octave;
+    } else if (keyOrPreferFlats === true) {
+        const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        return FLAT_NOTES[noteIndex] + octave;
+    } else {
+        // Default: use current key for spelling
+        const currentKey = getCurrentKey() || 'C';
+        return spellNoteInKey(rawNote, currentKey) + octave;
+    }
 }
 
 // Determine if a key prefers flat spellings

@@ -6,24 +6,32 @@
  */
 
 import { CHORD_DEFINITIONS } from '../../../../data/music-data.js';
+import { spellNoteInKey, getEnharmonicPreferenceForKey } from '../../../utils/noteUtils.js';
 
 /**
  * Get chord notes for display in explanation modals (no octave numbers)
  * @param {string} root - Root note (e.g., 'C', 'F#')
  * @param {string} type - Chord type from CHORD_DEFINITIONS
+ * @param {string} [key] - Optional key for enharmonic spelling (defaults to root as key)
  * @returns {Array<string>} Array of note names (first 3 notes of chord)
  */
-export function getChordNotesForDisplay(root, type) {
+export function getChordNotesForDisplay(root, type, key = null) {
     const chordDef = CHORD_DEFINITIONS[type];
     if (!chordDef) return [root];
 
-    const notes = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-    const rootIndex = notes.findIndex(n => normalizeNoteForComparison(n) === normalizeNoteForComparison(root));
+    // Use sharps for indexing, then spell correctly for key
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const rootIndex = SHARP_NOTES.findIndex(n => normalizeNoteForComparison(n) === normalizeNoteForComparison(root));
     if (rootIndex === -1) return [root];
+
+    // Use provided key, or fall back to root as key context
+    const effectiveKey = key || root;
 
     return chordDef.intervals.slice(0, 3).map(interval => {
         const noteIndex = (rootIndex + interval) % 12;
-        return notes[noteIndex];
+        const rawNote = SHARP_NOTES[noteIndex];
+        // Spell note correctly for the key (e.g., Gb in Gm, F# in G)
+        return spellNoteInKey(rawNote, effectiveKey);
     });
 }
 
@@ -42,12 +50,20 @@ export function normalizeNoteForComparison(note) {
  * Get chord name for a scale degree in a given key
  * Converts roman numeral notation to actual chord names
  * @param {string} degree - Roman numeral degree (e.g., 'I', 'ii', 'V')
- * @param {string} key - Key root note
+ * @param {string} key - Key root note (e.g., 'C', 'Gm', 'Bb')
  * @returns {string} Chord name (e.g., 'C', 'Dm', 'G')
  */
 export function getChordInKeyForDegree(degree, key) {
-    const notes = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-    const keyIndex = notes.indexOf(key);
+    // Use sharps for indexing
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+    // Extract key root (strip 'm' for minor keys)
+    const keyRoot = key.replace(/m$/, '');
+
+    // Find key index in either array
+    let keyIndex = SHARP_NOTES.indexOf(keyRoot);
+    if (keyIndex === -1) keyIndex = FLAT_NOTES.indexOf(keyRoot);
     if (keyIndex === -1) return degree;
 
     const degreeToSemitone = {
@@ -59,7 +75,9 @@ export function getChordInKeyForDegree(degree, key) {
     if (semitone === undefined) return degree;
 
     const noteIndex = (keyIndex + semitone) % 12;
-    const chordRoot = notes[noteIndex];
+    const rawNote = SHARP_NOTES[noteIndex];
+    // Spell correctly for the key (e.g., Bb in F major, A# would be wrong)
+    const chordRoot = spellNoteInKey(rawNote, key);
 
     // Determine quality based on degree
     const minorDegrees = ['ii', 'iii', 'vi'];
@@ -70,18 +88,23 @@ export function getChordInKeyForDegree(degree, key) {
 
 /**
  * Get a note relative to a given key by transposing by semitones
- * @param {string} key - Starting note (e.g., 'C', 'F#', 'Bb')
+ * @param {string} key - Starting note (e.g., 'C', 'F#', 'Bb', 'Gm')
  * @param {number} semitones - Number of semitones to transpose
- * @returns {string} Transposed note name (uses sharps)
+ * @returns {string} Transposed note name (spelled correctly for key)
  */
 export function getRelativeNote(key, semitones) {
-    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-    let keyIndex = notes.indexOf(key);
-    if (keyIndex === -1) keyIndex = flatNotes.indexOf(key);
+    // Extract key root (strip 'm' for minor keys)
+    const keyRoot = key.replace(/m$/, '');
+
+    let keyIndex = SHARP_NOTES.indexOf(keyRoot);
+    if (keyIndex === -1) keyIndex = FLAT_NOTES.indexOf(keyRoot);
     if (keyIndex === -1) keyIndex = 0;
 
-    const newIndex = (keyIndex + semitones) % 12;
-    return notes[newIndex];
+    const newIndex = ((keyIndex + semitones) % 12 + 12) % 12; // Handle negative semitones
+    const rawNote = SHARP_NOTES[newIndex];
+    // Spell correctly for the key
+    return spellNoteInKey(rawNote, key);
 }

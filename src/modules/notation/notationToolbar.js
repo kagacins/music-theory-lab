@@ -324,6 +324,7 @@ export class NotationToolbar {
     this.currentAccidental = null;
     this.currentArticulation = null;
     this.currentDynamic = null;
+    this.currentOrnament = null;
     this.zoom = 100;
     this.measuresPerLine = 4;
     this.voiceNumber = 1;
@@ -1934,24 +1935,25 @@ export class NotationToolbar {
       }
     });
 
-    // Ornament buttons - apply ornament to selected notes
+    // Ornament buttons - apply ornament to selected notes or arm for new notes
     this.container.querySelectorAll('.ornament-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const ornamentType = e.currentTarget.dataset.ornament;
-        if (ornamentType && this.selectedNotesCount >= 1) {
-          this.onOrnamentApply(ornamentType);
-        } else if (this.selectedNotesCount < 1) {
-          console.log('Select at least 1 note to apply an ornament');
+        if (ornamentType) {
+          // Always call onOrnamentApply - it will arm for new notes AND apply to selected if any
+          this.setOrnament(ornamentType);
         }
       });
     });
 
-    // Ornament remove button
+    // Ornament remove button - also clears armed ornament
     this.container.querySelector('.ornament-remove-btn')?.addEventListener('click', () => {
+      // Clear the armed ornament state
+      this.currentOrnament = null;
+      this.updateOrnamentButtons();
+
       if (this.selectedNotesCount >= 1) {
         this.onOrnamentRemove();
-      } else {
-        console.log('Select a note to remove its ornament');
       }
     });
 
@@ -3043,6 +3045,31 @@ export class NotationToolbar {
   }
 
   /**
+   * Set ornament for new notes (arming) and optionally apply to selected notes
+   * @param {string} ornament - Ornament ID (trill, mordent, turn, etc.) or null to clear
+   */
+  setOrnament(ornament) {
+    // Toggle if clicking the same ornament
+    if (this.currentOrnament === ornament) {
+      this.currentOrnament = null;
+    } else {
+      this.currentOrnament = ornament;
+    }
+    this.updateOrnamentButtons();
+    this.onOrnamentApply(this.currentOrnament);
+  }
+
+  /**
+   * Update ornament button states
+   */
+  updateOrnamentButtons() {
+    if (!this.container) return;
+    this.container.querySelectorAll('.ornament-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.ornament === this.currentOrnament);
+    });
+  }
+
+  /**
    * Set the active voice
    * @param {number} voiceNumber - Voice number (1 or 2)
    */
@@ -3681,17 +3708,21 @@ export class NotationToolbar {
       });
     };
 
+    // --- "Armable" buttons - always enabled ---
+    // These can be clicked to "arm" the property for the next note added,
+    // or to apply to selected notes if any are selected
+    setButtonState('.articulation-btn', true);
+    setButtonState('.dynamic-btn', true);
+    setButtonState('.ornament-btn', true);
+
     // --- Buttons requiring 1+ notes selected ---
     const has1 = this.hasNoteSelection;
-    setButtonState('.articulation-btn', has1);
-    setButtonState('.dynamic-btn', has1);
     setButtonState('.pedal-btn', has1);
     setButtonState('.beam-btn[data-beam="start"]', has1);
     setButtonState('.beam-btn[data-beam="end"]', has1);
     setButtonState('.beam-btn[data-beam="unbeam"]', has1);
     setButtonState('.beam-btn[data-beam="clear"]', has1);
     setButtonState('.grace-btn', has1);
-    setButtonState('.ornament-btn', has1);
     setButtonState('[data-action="delete"]', has1);
     setButtonState('[data-action="copy"]', has1);
     setButtonState('.apply-lyric-btn', has1);

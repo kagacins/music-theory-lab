@@ -4,9 +4,14 @@
  * Detects borrowed chords (modal interchange) and creates coach observations.
  * Wraps existing patternDetection.js functionality.
  *
- * CONTEXT-AWARE: bVII can function as either a borrowed chord OR as V/IV (secondary dominant).
- * If bVII resolves to IV, it's functioning as a secondary dominant, not a borrowed chord.
- * We prioritize the secondary dominant interpretation when the resolution confirms it.
+ * Common borrowed chords in major keys:
+ * - bVII: Borrowed from parallel minor (e.g., Bb in C major)
+ * - bVI: Borrowed from parallel minor (e.g., Ab in C major)
+ * - iv: Minor subdominant borrowed from parallel minor
+ * - bIII: Borrowed from parallel minor
+ *
+ * Note: bVII → IV is a common voice leading in rock/pop but bVII is NOT V/IV.
+ * V/IV would be the I chord itself (e.g., in C major, V of F is C).
  */
 
 import { COACH_ITEM_TYPES, COACH_CATEGORIES, OBSERVATION_TYPES } from '../types.js';
@@ -30,16 +35,6 @@ const NOTE_TO_SEMITONE = {
 function getNoteValue(note) {
     if (!note) return -1;
     return NOTE_TO_SEMITONE[note] ?? -1;
-}
-
-/**
- * Calculate interval in semitones between two notes
- */
-function getInterval(note1, note2) {
-    const v1 = getNoteValue(note1);
-    const v2 = getNoteValue(note2);
-    if (v1 === -1 || v2 === -1) return null;
-    return ((v2 - v1) + 12) % 12;
 }
 
 /**
@@ -70,40 +65,6 @@ function normalizeRoman(roman) {
         .replace(/♯/g, '#');
     // Remove extensions but keep base numeral, accidentals, and case
     return normalized.replace(/(maj|min|add|sus|dim|aug|°)/gi, '').replace(/7|9|11|13/g, '');
-}
-
-/**
- * Check if a bVII chord is functioning as V/IV (secondary dominant to IV)
- * @param {Object} chord - Current chord (bVII)
- * @param {Object} nextChord - Next chord in progression
- * @param {string} key - Current key
- * @returns {boolean} True if functioning as V/IV
- */
-function isBVIIFunctioningAsSecondaryDominant(chord, nextChord, key) {
-    if (!nextChord || !chord) return false;
-
-    // Check if this chord resolves a perfect fifth down to the next chord
-    // V/IV means this chord is the V of IV, so it should resolve down a 5th to IV
-    const interval = getInterval(chord.root, nextChord.root);
-
-    // Perfect fifth down = 5 semitones (or 7 up, same thing)
-    const resolvesDownFifth = interval === 5 || interval === 7;
-
-    if (!resolvesDownFifth) return false;
-
-    // Now check if the next chord is IV (subdominant)
-    // Get key root
-    const keyRoot = key?.replace(/\s*(major|minor|min|m)$/i, '').trim() || 'C';
-    const keyRootSemitone = getNoteValue(keyRoot);
-    const nextRootSemitone = getNoteValue(nextChord.root);
-
-    if (keyRootSemitone === -1 || nextRootSemitone === -1) return false;
-
-    // IV is 5 semitones above the tonic
-    const intervalFromTonic = ((nextRootSemitone - keyRootSemitone) + 12) % 12;
-    const isIV = intervalFromTonic === 5;
-
-    return isIV;
 }
 
 /**
@@ -165,19 +126,10 @@ export function detectBorrowedChords(context) {
 
     for (let i = 0; i < progression.length; i++) {
         const chord = progression[i];
-        const nextChord = i < progression.length - 1 ? progression[i + 1] : null;
         const roman = normalizeRoman(chord.roman || chord.romanNumeral);
 
         const borrowedType = identifyBorrowedChord(roman, mode);
         if (!borrowedType) continue;
-
-        // CONTEXT-AWARE: If bVII resolves to IV, it's functioning as V/IV (secondary dominant)
-        // In this case, skip the borrowed chord report - the secondary dominant detector
-        // will catch this and provide the more accurate interpretation
-        if (borrowedType === 'bVII' && isBVIIFunctioningAsSecondaryDominant(chord, nextChord, key)) {
-            // Skip - this will be reported as V/IV by the secondary dominant detector
-            continue;
-        }
 
         // Map to observation type
         const observationTypeMap = {

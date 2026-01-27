@@ -667,11 +667,16 @@ function getRelativeMajorForVexFlow(minorKey) {
     const root = minorKey.slice(0, -1);
 
     // Relative major is 3 semitones up
-    const sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const SHARP_NOTES_LOCAL = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const FLAT_NOTES_LOCAL = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-    const notes = root.includes('b') ? flatNotes : sharpNotes;
-    const index = notes.indexOf(root);
+    // Use the key's enharmonic preference (Gm uses flats even though G doesn't have a flat)
+    const preference = getEnharmonicPreferenceForKey(minorKey);
+    const notes = preference === 'flat' ? FLAT_NOTES_LOCAL : SHARP_NOTES_LOCAL;
+
+    // Find root in either array
+    let index = SHARP_NOTES_LOCAL.indexOf(root);
+    if (index === -1) index = FLAT_NOTES_LOCAL.indexOf(root);
     if (index === -1) return 'C';
 
     const majorIndex = (index + 3) % 12;
@@ -3921,9 +3926,26 @@ export function renderProgressionControls() {
 
     // Randomly select a key and progression on initial load
     // Build valid keys from the actual dropdown options to ensure they match
-    // Filter to only VexFlow-compatible keys (avoid D#, G#, A# major which need double sharps)
-    const invalidMajorRoots = ['D#', 'G#', 'A#']; // These would require double sharps
-    const invalidMinorRoots = ['D#', 'G#', 'A#', 'E#', 'B#']; // These are problematic in minor too
+    // Filter out keys that require DOUBLE sharps (##/x) or DOUBLE flats (bb)
+    // Single sharps/flats are fine (F#, Bb, etc.)
+    //
+    // MAJOR keys requiring double sharps:
+    // - G# major: Fx (F double sharp)
+    // - D# major: Cx, Fx
+    // - A# major: Ex, Bx, Cx, Fx
+    //
+    // MINOR keys requiring double sharps:
+    // - G# minor: Fx
+    // - D# minor: Cx, Fx
+    // - A# minor: Ex, Bx, Cx, Fx
+    //
+    // MINOR keys requiring double flats:
+    // - Gb minor: Bbb, Ebb, Abb, Dbb, Gbb
+    // - Db minor: Bbb, Ebb, Abb
+    // - Ab minor: Bbb, Ebb
+    //
+    const invalidMajorRoots = ['D#', 'G#', 'A#']; // Require double sharps
+    const invalidMinorRoots = ['D#', 'G#', 'A#', 'Gb', 'Db', 'Ab']; // Require double sharps or double flats
 
     const validMajorKeys = notes.filter(note => !invalidMajorRoots.includes(note));
     const validMinorKeys = notes

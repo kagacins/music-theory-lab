@@ -85,9 +85,12 @@ export function getEnharmonicPreferenceForKey(key) {
  * Spell a note correctly for a given key
  * Uses the key's enharmonic preference to choose between sharp and flat spellings
  *
- * IMPORTANT: Natural notes (C, D, E, F, G, A, B) are NEVER converted to their
- * enharmonic equivalents (Cb, Db, etc.). Only chromatic notes (sharps/flats)
- * use the enharmonic preference. This prevents bugs like B becoming Cb.
+ * IMPORTANT: Natural notes (C, D, E, F, G, A, B) are generally NOT converted to their
+ * enharmonic equivalents, EXCEPT in keys where the enharmonic is a diatonic scale degree:
+ * - B → Cb in Gb major and Cb major (Cb is the diatonic IV in Gb, and I in Cb)
+ * - E → Fb in Cb major (Fb is the diatonic IV in Cb major)
+ * - C → B# theoretically in keys like G# major (not commonly used)
+ * - F → E# theoretically in keys like C# major (E# is the diatonic III)
  *
  * @param {string} note - Note name (with or without octave, e.g., "C#" or "C#4")
  * @param {string} key - Key signature for context
@@ -101,11 +104,52 @@ export function spellNoteInKey(note, key) {
     const notePart = hasOctave ? note.slice(0, -1) : note;
     const octavePart = hasOctave ? note.slice(-1) : '';
 
-    // CRITICAL: Natural notes should NEVER be converted to enharmonic equivalents
-    // B should stay B (not become Cb), C should stay C, etc.
+    // Keys where specific natural notes should convert to enharmonic equivalents
+    // These are keys where the enharmonic is a DIATONIC scale degree
+    const KEYS_REQUIRING_CB = ['Gb', 'Gbm', 'Cb', 'Cbm']; // Cb is diatonic in Gb major (IV) and Cb major (I)
+    const KEYS_REQUIRING_FB = ['Cb', 'Cbm'];              // Fb is diatonic in Cb major (IV)
+    const KEYS_REQUIRING_ESHARP = ['C#', 'C#m', 'F#', 'F#m']; // E# is diatonic in C# major (III) and F# major (VII)
+    const KEYS_REQUIRING_BSHARP = ['C#', 'C#m'];          // B# is diatonic in C# major (VII)
+
+    // Normalize key for comparison
+    const normalizedKey = key ? key.replace(/\s*(major|minor|min)$/i, '').trim() : '';
+
+    // Handle B → Cb conversion for keys that require Cb
+    if (notePart === 'B' && KEYS_REQUIRING_CB.includes(normalizedKey)) {
+        // Cb is in the "next" octave from B (octave starts at C)
+        // B4 → Cb5 for correct pitch
+        if (hasOctave) {
+            const octaveNum = parseInt(octavePart, 10);
+            return 'Cb' + (octaveNum + 1);
+        }
+        return 'Cb';
+    }
+
+    // Handle E → Fb conversion for keys that require Fb
+    if (notePart === 'E' && KEYS_REQUIRING_FB.includes(normalizedKey)) {
+        return 'Fb' + octavePart;
+    }
+
+    // Handle E → E# conversion for keys that require E#
+    if (notePart === 'E' && KEYS_REQUIRING_ESHARP.includes(normalizedKey)) {
+        return 'E#' + octavePart;
+    }
+
+    // Handle C → B# conversion for keys that require B# (C → B# means going DOWN enharmonically)
+    if (notePart === 'C' && KEYS_REQUIRING_BSHARP.includes(normalizedKey)) {
+        // B# is in the "previous" octave from C (B#3 = C4)
+        if (hasOctave) {
+            const octaveNum = parseInt(octavePart, 10);
+            return 'B#' + (octaveNum - 1);
+        }
+        return 'B#';
+    }
+
+    // For all other natural notes, return as-is (no conversion needed)
+    // This prevents unwanted conversions like B→Cb in keys where B is correct
     const naturalNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
     if (naturalNotes.includes(notePart)) {
-        return note; // Return as-is, no conversion needed
+        return note; // Return as-is
     }
 
     const preference = getEnharmonicPreferenceForKey(key);
@@ -123,7 +167,7 @@ export function spellNoteInKey(note, key) {
     if (noteIndex === -1) return note; // Can't resolve, return original
 
     // Get the correctly spelled note based on preference
-    // Note: FLAT_NOTES[11] is now "B" (not "Cb") to avoid incorrect conversions
+    // Note: FLAT_NOTES[11] is "B" (not "Cb") - Cb conversion is handled above for specific keys
     const spelledNote = preference === 'flat' ? FLAT_NOTES[noteIndex] : SHARP_NOTES[noteIndex];
 
     return spelledNote + octavePart;
@@ -423,22 +467,47 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
             }
         }
 
-        // IMPORTANT: Do NOT adjust octaves when generating notes from MIDI values!
-        // The MIDI calculation already produces the correct octave.
+        // OCTAVE BOUNDARY ADJUSTMENT for Cb and B#
         //
-        // For example, F Diminished = F-Ab-Cb:
-        //   - F3 (MIDI 65) + 6 semitones = MIDI 71 = B3 = Cb3 (NOT Cb4!)
-        //   - B3 and Cb3 are the SAME pitch, same octave
+        // The octave boundary in music notation is between B and C:
+        //   - C4 is one semitone ABOVE B3
+        //   - Cb is enharmonic to B, but in a HIGHER octave number
+        //   - B# is enharmonic to C, but in a LOWER octave number
         //
-        // The Cb/B# octave boundary adjustment is only needed when:
-        //   1. The INPUT root note contains Cb or B# (handled by noteToMidi)
-        //   2. We need to DISPLAY a note that crosses the boundary (handled by getNoteKeyId)
+        // Examples:
+        //   - MIDI 59 = B3 = Cb4 (Cb is in octave 4, not 3!)
+        //   - MIDI 60 = C4 = B#3 (B# is in octave 3, not 4!)
         //
-        // Here we're generating notes from intervals, so the MIDI-derived octave is correct.
-        // E# and Fb also don't need adjustment (E#3 = F3, Fb3 = E3, same octave)
+        // When Tone.js gives us B3 and we respell it as Cb, we must use Cb4.
+        // When Tone.js gives us C4 and we respell it as B#, we must use B#3.
+        //
+        // This applies to double accidentals too:
+        //   - Cbb (same pitch as Bb) needs octave + 1 when spelled from A#
+        //   - B## (same pitch as C#) needs octave - 1 when spelled from Db
+
+        let finalOctave = noteOctave;
+
+        // Handle Cb/Cbb: when we respell B (or Bb) as Cb (or Cbb), increase octave
+        if (noteName === 'Cb' || noteName === 'Cbb') {
+            // rawNoteName was B or Bb, which is in the lower octave
+            // Cb/Cbb is in the next octave up
+            const rawLetter = rawNoteName.replace(/[#b]/g, '');
+            if (rawLetter === 'B' || rawLetter === 'A') {
+                finalOctave = noteOctave + 1;
+            }
+        }
+        // Handle B#/B##: when we respell C (or C#) as B# (or B##), decrease octave
+        else if (noteName === 'B#' || noteName === 'B##' || noteName === 'Bx') {
+            // rawNoteName was C or C#, which is in the higher octave
+            // B#/B## is in the previous octave
+            const rawLetter = rawNoteName.replace(/[#b]/g, '');
+            if (rawLetter === 'C' || rawLetter === 'D') {
+                finalOctave = noteOctave - 1;
+            }
+        }
 
         // Final return — this single string is what's used for both playback and highlighting
-        return `${noteName}${noteOctave}`;
+        return `${noteName}${finalOctave}`;
 
     }).filter(note => note != null); // Filter out any null values from invalid notes
 

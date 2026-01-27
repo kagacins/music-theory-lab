@@ -1522,15 +1522,17 @@ function getChordSymbol(chord) {
 /**
  * Get leading tone for a key
  * @param {string} key - Current key
- * @returns {string|null} Leading tone note name
+ * @returns {string|null} Leading tone note name (spelled correctly for key)
  */
 function getLeadingTone(key) {
     const keyRoot = key?.replace(/\s*(major|minor|min|m)$/i, '').trim() || 'C';
     const keyValue = getNoteValue(keyRoot);
     if (keyValue === -1) return null;
     const leadingToneValue = (keyValue + 11) % 12;
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    return noteNames[leadingToneValue];
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const rawNote = SHARP_NOTES[leadingToneValue];
+    // Spell the leading tone correctly for the key
+    return spellNoteInKey(rawNote, key);
 }
 
 /**
@@ -2042,9 +2044,10 @@ export function detectOstinatoPattern(progression) {
 /**
  * Detect chromatic motion in inner voices (not bass)
  * @param {Array} progression - Array of chord objects
+ * @param {string} [key] - Optional key for enharmonic spelling of display names
  * @returns {Array} Detected chromatic voice motion
  */
-export function detectChromaticVoiceMotion(progression) {
+export function detectChromaticVoiceMotion(progression, key = null) {
     const items = [];
     if (!progression || progression.length < 3) return items;
 
@@ -2089,11 +2092,19 @@ export function detectChromaticVoiceMotion(progression) {
         }
 
         if (chromaticRun.length >= 3) {
+            // Spell notes correctly for the key (e.g., F# in G major, Gb in Gm)
+            const spelledRun = key
+                ? chromaticRun.map(n => {
+                    const pitch = n.replace(/\d+$/, '');
+                    const octave = n.match(/\d+$/)?.[0] || '';
+                    return spellNoteInKey(pitch, key) + octave;
+                })
+                : chromaticRun;
             items.push({
                 type: 'chromatic-voice-motion',
                 name: 'Chromatic Voice Motion',
-                description: `Chromatic line in voice ${voiceIdx}: ${chromaticRun.join(' → ')}`,
-                notes: chromaticRun.join(' → '),
+                description: `Chromatic line in voice ${voiceIdx}: ${spelledRun.join(' → ')}`,
+                notes: spelledRun.join(' → '),
                 voiceIndex: voiceIdx,
                 startIndex: runStart,
                 length: chromaticRun.length
@@ -2228,6 +2239,44 @@ function getChordPitchClasses(chord) {
 }
 
 /**
+ * Extract notes with octaves from a chord, normalized for comparison
+ * @param {Object} chord - Chord object with notes array
+ * @returns {Map<string, string>} Map of normalized pitch class -> full note with octave
+ */
+function getChordNotesWithOctave(chord) {
+    const notes = new Map();
+    if (!chord || !chord.notes || chord.notes.length === 0) return notes;
+
+    for (const note of chord.notes) {
+        const pitch = note.replace(/\d+$/, '');
+        const octave = note.match(/\d+$/)?.[0] || '4';
+        const normalized = normalizeEnharmonic(pitch);
+        // Store normalized pitch class -> full note
+        notes.set(normalized, normalized + octave);
+    }
+    return notes;
+}
+
+/**
+ * Convert a note to MIDI pitch number for octave-aware comparison
+ * @param {string} note - Note with octave (e.g., 'C4', 'D#5')
+ * @returns {number} MIDI pitch number
+ */
+function noteToMidi(note) {
+    const pitchClass = note.replace(/\d+$/, '');
+    const octave = parseInt(note.match(/\d+$/)?.[0] || '4', 10);
+    const normalized = normalizeEnharmonic(pitchClass);
+
+    const pitchToSemitone = {
+        'C': 0, 'Db': 1, 'D': 2, 'Eb': 3, 'E': 4, 'F': 5,
+        'Gb': 6, 'G': 7, 'Ab': 8, 'A': 9, 'Bb': 10, 'B': 11
+    };
+
+    const semitone = pitchToSemitone[normalized] ?? 0;
+    return (octave + 1) * 12 + semitone;
+}
+
+/**
  * Normalize enharmonic equivalents for comparison
  * @param {string} pitch - Pitch name (e.g., 'C#', 'Db')
  * @returns {string} Normalized pitch
@@ -2265,10 +2314,12 @@ function getChordBassNote(chord) {
 /**
  * Detect common tone preservation between adjacent chords
  * Considers actual voicing, inversions, and omitted notes
+ * NOW OCTAVE-AWARE: Only reports "held" tones when they're in the same octave
  * @param {Array} progression - Array of chord objects
+ * @param {string} [key] - Optional key for enharmonic spelling of display names
  * @returns {Array} Detected common tone preservations
  */
-export function detectCommonTonePreservation(progression) {
+export function detectCommonTonePreservation(progression, key = null) {
     const items = [];
     if (!progression || progression.length < 2) return items;
 
@@ -2279,27 +2330,32 @@ export function detectCommonTonePreservation(progression) {
         // Skip if same chord
         if (prevChord.root === currChord.root && prevChord.type === currChord.type) continue;
 
-        // Get actual pitch classes from the voiced chords
-        const prevPitches = getChordPitchClasses(prevChord);
-        const currPitches = getChordPitchClasses(currChord);
+        // Get notes WITH octaves for true common tone detection
+        const prevNotes = getChordNotesWithOctave(prevChord);
+        const currNotes = getChordNotesWithOctave(currChord);
 
-        if (prevPitches.size === 0 || currPitches.size === 0) continue;
+        if (prevNotes.size === 0 || currNotes.size === 0) continue;
 
-        // Find common tones
-        const commonTones = [];
-        for (const pitch of prevPitches) {
-            if (currPitches.has(pitch)) {
-                commonTones.push(pitch);
+        // Find TRUE common tones (same pitch class AND same octave)
+        const heldTones = []; // Same octave - truly "held"
+
+        for (const [pitchClass, prevNote] of prevNotes) {
+            const currNote = currNotes.get(pitchClass);
+            if (currNote) {
+                // Compare MIDI values to check if same octave
+                const prevMidi = noteToMidi(prevNote);
+                const currMidi = noteToMidi(currNote);
+
+                if (prevMidi === currMidi) {
+                    // Same pitch AND same octave - truly held
+                    heldTones.push(pitchClass);
+                }
+                // If pitch class matches but octave differs, we don't count it as "held"
             }
-            // Also check enharmonic equivalents
-            const sharp = pitch.replace('b', '#');
-            const flat = pitch.replace('#', 'b');
-            if (pitch !== sharp && currPitches.has(sharp)) commonTones.push(pitch);
-            if (pitch !== flat && currPitches.has(flat)) commonTones.push(pitch);
         }
 
-        // Only report if there are common tones AND they're meaningful (not just roots that happen to match)
-        if (commonTones.length >= 1) {
+        // Only report if there are truly held tones (same octave)
+        if (heldTones.length >= 1) {
             // Check if this is parsimonious voice leading (most voices stay still or move by step)
             const prevBass = getChordBassNote(prevChord);
             const currBass = getChordBassNote(currChord);
@@ -2308,8 +2364,12 @@ export function detectCommonTonePreservation(progression) {
             const isSmoothBass = bassInterval !== null && Math.abs(bassInterval) <= 2;
 
             // Pre-compute display strings for message templates
-            const commonToneCount = commonTones.length;
-            const commonTonesDisplay = commonTones.join(commonToneCount === 2 ? ' and ' : ', ');
+            const commonToneCount = heldTones.length;
+            // Spell notes correctly for the key (e.g., F# in G major, Gb in Gm)
+            const spelledTones = key
+                ? heldTones.map(note => spellNoteInKey(note, key))
+                : heldTones;
+            const commonTonesDisplay = spelledTones.join(commonToneCount === 2 ? ' and ' : ', ');
             const noteLabel = commonToneCount === 1 ? 'note' : 'notes';
             const commonToneLabel = commonToneCount === 1 ? 'the common tone' : 'common tones';
             const chord1Inv = prevChord.inversion || 0;
@@ -2322,7 +2382,7 @@ export function detectCommonTonePreservation(progression) {
                 type: 'common-tone-preservation',
                 name: 'Common Tone Held',
                 description: `${commonTonesDisplay} held between ${getChordSymbol(prevChord)} and ${getChordSymbol(currChord)}`,
-                commonTones: commonTones,
+                commonTones: heldTones,
                 commonToneCount: commonToneCount,
                 commonTonesDisplay: commonTonesDisplay,
                 noteLabel: noteLabel,
@@ -2584,9 +2644,10 @@ export function detectSequenceContinuationOpportunity(progression) {
  * Detect stepwise bass motion (melodic bass lines)
  * Considers actual bass notes from inversions and voicing
  * @param {Array} progression - Array of chord objects
+ * @param {string} [key] - Optional key for enharmonic spelling of display names
  * @returns {Array} Detected stepwise bass patterns
  */
-export function detectStepwiseBassLine(progression) {
+export function detectStepwiseBassLine(progression, key = null) {
     const items = [];
     if (!progression || progression.length < 3) return items;
 
@@ -2659,7 +2720,11 @@ export function detectStepwiseBassLine(progression) {
     // Report if we found a significant stepwise line (3+ notes)
     if (longestRun.length >= 3) {
         const directionLabel = longestRun.direction === 1 ? 'ascending' : 'descending';
-        const bassNotePitches = longestRun.notes.map(n => n.replace(/\d+$/, ''));
+        // Spell notes correctly for the key (e.g., F# in G major, Gb in Gm)
+        const bassNotePitches = longestRun.notes.map(n => {
+            const pitch = n.replace(/\d+$/, '');
+            return key ? spellNoteInKey(pitch, key) : pitch;
+        });
         // Pre-compute direction-specific explanation for advanced message
         const directionExplanation = directionLabel === 'descending'
             ? 'Descending bass lines often create tension/release patterns.'
@@ -3050,9 +3115,12 @@ export function detectExtendedFifthChain(progression) {
             continue;
         }
 
-        // Check if this is a descending fifth (or ascending fourth = same thing)
+        // Check if this is a descending fifth (interval of 5 semitones)
+        // Note: interval === 7 is an ASCENDING fifth (wrong direction for circle of fifths)
+        // Only descending fifths (5 semitones) count for circle of fifths motion
+        // e.g., Am → Dm → G → C (each root descends by 5 semitones)
         const interval = getInterval(prevRoot + '4', currRoot + '4');
-        const isFifth = interval === 5 || interval === 7; // Perfect 5th down or Perfect 4th up
+        const isFifth = interval === 5; // Only descending fifths
 
         if (isFifth) {
             chainLength++;

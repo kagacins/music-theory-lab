@@ -6,7 +6,7 @@
 
 import { getProgressionData, getCurrentKey, setProgressionData } from '../state/trainerState.js';
 import { CHORD_DEFINITIONS, ALL_NOTES } from '../../data/music-data.js';
-import { getChordNotes, spellNoteInKey } from '../utils/noteUtils.js';
+import { getChordNotes, spellNoteInKey, getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 import { getChordContextAnalysis } from '../analysis/melodyChordAnalyzer.js';
 import { CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
@@ -83,26 +83,28 @@ function getContextAwareDescription(chord, key) {
 
     // Helper to get resolution target (P4 up from root)
     const getResolutionTarget = (rootNote) => {
-        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-        let idx = notes.indexOf(rootNote);
-        if (idx === -1) idx = flatNotes.indexOf(rootNote);
+        const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        let idx = SHARP_NOTES.indexOf(rootNote);
+        if (idx === -1) idx = FLAT_NOTES.indexOf(rootNote);
         if (idx === -1) return null;
         const targetIdx = (idx + 5) % 12; // P4 up = 5 semitones
-        const useFlat = key.includes('b') || rootNote.includes('b');
-        return useFlat ? flatNotes[targetIdx] : notes[targetIdx];
+        // Use key's enharmonic preference (Gm uses flats even though G has no flat)
+        const preference = getEnharmonicPreferenceForKey(key);
+        return preference === 'flat' ? FLAT_NOTES[targetIdx] : SHARP_NOTES[targetIdx];
     };
 
     // Helper to get half step up
     const getHalfStepUp = (rootNote) => {
-        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-        let idx = notes.indexOf(rootNote);
-        if (idx === -1) idx = flatNotes.indexOf(rootNote);
+        const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        let idx = SHARP_NOTES.indexOf(rootNote);
+        if (idx === -1) idx = FLAT_NOTES.indexOf(rootNote);
         if (idx === -1) return null;
         const targetIdx = (idx + 1) % 12;
-        const useFlat = key.includes('b') || rootNote.includes('b');
-        return useFlat ? flatNotes[targetIdx] : notes[targetIdx];
+        // Use key's enharmonic preference (Gm uses flats even though G has no flat)
+        const preference = getEnharmonicPreferenceForKey(key);
+        return preference === 'flat' ? FLAT_NOTES[targetIdx] : SHARP_NOTES[targetIdx];
     };
 
     // Generate context based on chord type

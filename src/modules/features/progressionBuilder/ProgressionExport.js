@@ -165,7 +165,7 @@ function applySmartOctavePlacement(progression) {
                 }
                 return note;
             }),
-            octaveShift: (chord.octaveShift || 0) + Math.round(semitones / 12)
+            octaveShift: (chord.octaveShift || 0) + semitones
         };
     }
 

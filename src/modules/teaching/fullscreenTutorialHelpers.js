@@ -583,7 +583,7 @@ export function createInfoStep(instruction, options = {}) {
 }
 
 /**
- * Create a chord playback step with spotlight on Play button
+ * Create a chord playback step with spotlight on Play button (Chord Lab)
  * @param {Object} options - Step options
  * @returns {Object} Complete step definition
  */
@@ -615,6 +615,160 @@ export function createPlayChordStep(options = {}) {
             }
         }
     };
+}
+
+/**
+ * Create a progression playback step with spotlight on the green floating Play button (Composition Studio)
+ * Use this for steps that play the full progression in studio-new tab
+ * @param {Object} options - Step options
+ * @returns {Object} Complete step definition
+ */
+export function createPlayProgressionStep(options = {}) {
+    return {
+        instruction: options.instruction || 'Click the green Play button to hear your progression!',
+        spotlight: '#fs-fab-quick-play',
+        targetElement: '#fs-fab-quick-play',
+        callout: options.callout || null,
+        validation: { type: 'chord_played' },
+        successMessage: options.successMessage || 'Great! You played the progression.',
+        onEnter: () => {
+            // Highlight the Play All button with green glow
+            setTimeout(() => {
+                const playBtn = document.querySelector('#fs-fab-quick-play');
+                if (playBtn) {
+                    playBtn.classList.add('animate-pulse');
+                    playBtn.style.boxShadow = '0 0 15px 5px rgba(34, 197, 94, 0.8)';
+                    playBtn.style.transform = 'scale(1.1)';
+                }
+            }, 100);
+        },
+        onExit: () => {
+            const playBtn = document.querySelector('#fs-fab-quick-play');
+            if (playBtn) {
+                playBtn.classList.remove('animate-pulse');
+                playBtn.style.boxShadow = '';
+                playBtn.style.transform = '';
+            }
+        }
+    };
+}
+
+/**
+ * Create steps to play a progression in Chord Lab (chordlab-new tab)
+ * This is a 3-step process:
+ *   1. Click the FAB + button to expand the menu
+ *   2. Click the Playback category button
+ *   3. Click "Play Progression"
+ *
+ * @param {Object} options - Step options
+ * @param {string} options.instruction - Final instruction shown on step 3 (optional)
+ * @param {string} options.callout - Educational callout shown on step 3 (optional)
+ * @param {string} options.successMessage - Success message after playing (optional)
+ * @returns {Array} Array of 3 step definitions
+ */
+export function createChordLabPlayProgressionSteps(options = {}) {
+    return [
+        // Step 1: Open FAB menu
+        {
+            instruction: 'Click the + button to open the actions menu.',
+            spotlight: '#fs-fab-main',
+            targetElement: '#fs-fab-main',
+            callout: null,
+            validation: { type: 'fab_menu_opened' },
+            successMessage: 'Menu opened!',
+            onEnter: () => {
+                setTimeout(() => {
+                    const fabMain = document.querySelector('#fs-fab-main');
+                    if (fabMain) {
+                        fabMain.classList.add('animate-pulse');
+                        fabMain.style.boxShadow = '0 0 15px 5px rgba(99, 102, 241, 0.8)';
+                        fabMain.style.transform = 'scale(1.1)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                const fabMain = document.querySelector('#fs-fab-main');
+                if (fabMain) {
+                    fabMain.classList.remove('animate-pulse');
+                    fabMain.style.boxShadow = '';
+                    fabMain.style.transform = '';
+                }
+            }
+        },
+        // Step 2: Click Playback category
+        {
+            instruction: 'Click the green Playback button.',
+            spotlight: '.fs-fab-category[data-category="playback"] .fs-fab-category-btn',
+            targetElement: '.fs-fab-category[data-category="playback"] .fs-fab-category-btn',
+            callout: null,
+            validation: { type: 'playback_submenu_opened' },
+            successMessage: 'Playback menu opened!',
+            onEnter: () => {
+                setTimeout(() => {
+                    const playbackBtn = document.querySelector('.fs-fab-category[data-category="playback"] .fs-fab-category-btn');
+                    if (playbackBtn) {
+                        playbackBtn.classList.add('animate-pulse');
+                        playbackBtn.style.boxShadow = '0 0 15px 5px rgba(34, 197, 94, 0.8)';
+                        playbackBtn.style.transform = 'scale(1.1)';
+                    }
+                }, 100);
+            },
+            onExit: () => {
+                const playbackBtn = document.querySelector('.fs-fab-category[data-category="playback"] .fs-fab-category-btn');
+                if (playbackBtn) {
+                    playbackBtn.classList.remove('animate-pulse');
+                    playbackBtn.style.boxShadow = '';
+                    playbackBtn.style.transform = '';
+                }
+            }
+        },
+        // Step 3: Click Play Progression
+        // IMPORTANT: Use .fs-fab-submenu prefix to target the VISIBLE button in the submenu,
+        // not the hidden one elsewhere in the DOM
+        {
+            instruction: options.instruction || 'Click "Play Progression" to hear your chord progression!',
+            spotlight: '.fs-fab-submenu button[data-action="play-builder-progression"]',
+            targetElement: '.fs-fab-submenu button[data-action="play-builder-progression"]',
+            callout: options.callout || null,
+            validation: { type: 'progression_played' },
+            successMessage: options.successMessage || 'Great! You played the progression.',
+            onEnter: () => {
+                // The button should already be visible since the submenu was just opened
+                // Try multiple times with increasing delays to handle animation timing
+                const highlightButton = () => {
+                    const playProgBtn = document.querySelector('.fs-fab-submenu button[data-action="play-builder-progression"]');
+                    if (playProgBtn) {
+                        playProgBtn.classList.add('animate-pulse');
+                        playProgBtn.style.boxShadow = '0 0 15px 5px rgba(59, 130, 246, 0.8)';
+                        playProgBtn.style.transform = 'scale(1.05)';
+                        return true;
+                    }
+                    return false;
+                };
+
+                // Try immediately, then at 100ms, 300ms, 500ms
+                if (!highlightButton()) {
+                    setTimeout(() => {
+                        if (!highlightButton()) {
+                            setTimeout(() => {
+                                if (!highlightButton()) {
+                                    setTimeout(highlightButton, 200);
+                                }
+                            }, 200);
+                        }
+                    }, 100);
+                }
+            },
+            onExit: () => {
+                const playProgBtn = document.querySelector('.fs-fab-submenu button[data-action="play-builder-progression"]');
+                if (playProgBtn) {
+                    playProgBtn.classList.remove('animate-pulse');
+                    playProgBtn.style.boxShadow = '';
+                    playProgBtn.style.transform = '';
+                }
+            }
+        }
+    ];
 }
 
 /**
@@ -799,6 +953,8 @@ export default {
     createTabNavigationStep,
     createInfoStep,
     createPlayChordStep,
+    createPlayProgressionStep,
+    createChordLabPlayProgressionSteps,
 
     // Setup/cleanup
     setupFullscreenTutorial,

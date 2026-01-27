@@ -69,10 +69,10 @@
 }
 
 .header-tab-pill[data-tab="scales"].active {
-    background: var(--gradient-lime);
+    background: var(--gradient-emerald);
     color: white;
     border-color: transparent;
-    box-shadow: 0 2px 8px rgba(132, 204, 22, 0.35);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
 }
 
 .header-tab-pill[data-tab="learn"].active {
@@ -103,9 +103,9 @@
 }
 
 .header-tab-pill[data-tab="scales"]:not(.active):hover {
-    background: rgba(132, 204, 22, 0.1);
-    color: #65a30d;
-    border-color: rgba(132, 204, 22, 0.2);
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    border-color: rgba(16, 185, 129, 0.2);
 }
 
 .header-tab-pill[data-tab="learn"]:not(.active):hover {

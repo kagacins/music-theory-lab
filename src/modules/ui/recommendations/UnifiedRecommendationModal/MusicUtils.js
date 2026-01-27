@@ -209,13 +209,14 @@ export function getMaxInversion(chordType) {
  * Transpose a pitch by semitones
  * @param {string} pitch - Pitch string (e.g., "C4", "F#5")
  * @param {number} semitones - Number of semitones to transpose (positive = up, negative = down)
- * @returns {string} - Transposed pitch string
+ * @param {string} [key] - Optional key for enharmonic spelling (e.g., "C", "Gm", "Bb")
+ * @returns {string} - Transposed pitch string (spelled correctly for key if provided)
  */
-export function transposePitch(pitch, semitones) {
+export function transposePitch(pitch, semitones, key = null) {
     if (!pitch) return pitch;
 
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    // Map flats to their sharp equivalents
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    // Map flats to their sharp equivalents for index lookup
     const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Fb': 'E', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B' };
 
     // Match both sharps and flats
@@ -230,7 +231,7 @@ export function transposePitch(pitch, semitones) {
         noteName = flatToSharp[noteName] || noteName;
     }
 
-    let noteIndex = noteNames.indexOf(noteName);
+    let noteIndex = SHARP_NOTES.indexOf(noteName);
 
     if (noteIndex === -1) return pitch;
 
@@ -244,7 +245,10 @@ export function transposePitch(pitch, semitones) {
         octave++;
     }
 
-    return `${noteNames[noteIndex]}${octave}`;
+    const rawNote = SHARP_NOTES[noteIndex];
+    // Spell correctly for the key if provided
+    const spelledNote = key ? spellNoteInKey(rawNote, key) : rawNote;
+    return `${spelledNote}${octave}`;
 }
 
 /**

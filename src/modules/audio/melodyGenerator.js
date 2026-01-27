@@ -4925,14 +4925,18 @@ export async function playAllMelody(options = {}) {
     
     // Schedule chord card highlighting at measure boundaries (handles rests)
     // This ensures chord cards are highlighted even when there are no notes playing
+    // NOTE: We only handle highlightChordCard here, NOT setNotationActiveMeasure.
+    // The yellow measure highlighting is handled by the bass note playback (chordPart)
+    // which fires at the correct times. This part uses measureDuration which doesn't
+    // account for time signature denominator (e.g., 6/8 vs 4/4), so its timing is wrong
+    // for non-quarter-note-based time signatures.
     const measureHighlightPart = new Tone.Part((time, data) => {
         Tone.Draw.schedule(() => {
             if (window.highlightChordCard && data.chordIndex !== undefined) {
                 window.highlightChordCard(data.chordIndex);
             }
-            if (window.setNotationActiveMeasure) {
-                window.setNotationActiveMeasure(data.measureIndex);
-            }
+            // Measure highlighting (yellow background) is handled by chordPart bass note playback
+            // which uses correct timing based on actual note positions
         }, time);
     }, (() => {
         // Generate events for each measure start, respecting repeat signs
