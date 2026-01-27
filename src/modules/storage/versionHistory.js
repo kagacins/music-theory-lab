@@ -129,7 +129,6 @@ export function createVersion(options = {}) {
 
         if (saved) {
             notifyChangeCallbacks('created', version);
-            console.log('[versionHistory] Created version:', version.name);
             return { success: true, version };
         } else {
             // Remove the version if we couldn't save
@@ -252,7 +251,6 @@ export function deleteVersion(id) {
 
     if (saved) {
         notifyChangeCallbacks('deleted', deleted);
-        console.log('[versionHistory] Deleted version:', deleted.name);
         return { success: true };
     }
 
@@ -273,7 +271,6 @@ export function clearAutoVersions() {
     saveVersionsToStorage();
 
     notifyChangeCallbacks('cleared', { deletedCount });
-    console.log('[versionHistory] Cleared', deletedCount, 'auto-versions');
 
     return { success: true, deletedCount };
 }
@@ -288,7 +285,6 @@ export function clearAllVersions() {
     saveVersionsToStorage();
 
     notifyChangeCallbacks('cleared', { deletedCount: count });
-    console.log('[versionHistory] Cleared all', count, 'versions');
 
     return { success: true };
 }
@@ -463,7 +459,6 @@ function enforceVersionLimits() {
             }
         });
 
-        console.log('[versionHistory] Removed', toRemove, 'old auto-versions to enforce limit');
     }
 
     // Check storage usage
@@ -480,7 +475,6 @@ function enforceVersionLimits() {
             }
         }
 
-        console.log('[versionHistory] Removed versions to reduce storage usage');
     }
 }
 
@@ -490,5 +484,4 @@ function enforceVersionLimits() {
 export function cleanupVersionHistory() {
     compositionStateRef = null;
     onChangeCallbacks = [];
-    console.log('[versionHistory] Cleaned up');
 }

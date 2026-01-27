@@ -2725,10 +2725,6 @@ function loadToComposition(targetTab) {
     const key = customizations.key || selectedProg.key || 'C';
     const romanNumerals = selectedProg.roman || [];
 
-    console.log('[SongwritingWizard] loadToComposition called');
-    console.log('  baseChords:', baseChords);
-    console.log('  key:', key);
-    console.log('  selectedProgression:', selectedProg.name);
 
     // Map structure section types to composition section types
     const sectionTypeMap = {
@@ -2802,7 +2798,6 @@ function loadToComposition(targetTab) {
         });
     }
 
-    console.log('[SongwritingWizard] expandedProgression:', expandedProgression);
 
     // Set key and progression
     setCurrentKey(key);
@@ -2825,7 +2820,6 @@ function loadToComposition(targetTab) {
 
     if (typeof window.setBassPattern === 'function') {
         window.setBassPattern(effectiveBassPattern);
-        console.log('[SongwritingWizard] Set bass pattern to:', effectiveBassPattern);
     }
 
     // Enable auto-generate bass so the pattern is applied
@@ -2833,7 +2827,6 @@ function loadToComposition(targetTab) {
         const compositionState = window.getCompositionState();
         if (compositionState && typeof compositionState.updateSettings === 'function') {
             compositionState.updateSettings({ autoGenerateBass: true });
-            console.log('[SongwritingWizard] Enabled auto-generate bass');
         }
     }
 
@@ -2858,14 +2851,12 @@ function loadToComposition(targetTab) {
                             chordIndices.push(i);
                         }
                         compositionState.createSection(secDef.type, chordIndices);
-                        console.log('[SongwritingWizard] Created section:', secDef.type, 'with chords:', chordIndices);
                     }
 
                     // Refresh UI to show sections on chord cards
                     setTimeout(() => {
                         if (typeof window.renderProgressionDisplay === 'function') {
                             window.renderProgressionDisplay('progression-visualization', true);
-                            console.log('[SongwritingWizard] Refreshed progression display to show sections');
                         }
                     }, 50);
                 }
@@ -4105,9 +4096,7 @@ function showTemplatePreviewBeforeApply(template, content, modal) {
 
     // Finalize - NOW apply the template
     const finalizeBtn = content.querySelector('#finalize-template-btn');
-    console.log('[SongwritingWizard] Finalize button found:', !!finalizeBtn);
     finalizeBtn?.addEventListener('click', () => {
-        console.log('[SongwritingWizard] Finalize button clicked!');
         applyTemplateWithCustomOrder(template, reorderedSections, content, modal);
     });
 }
@@ -4116,16 +4105,12 @@ function showTemplatePreviewBeforeApply(template, content, modal) {
  * Apply template with custom section order (called only when Finalize is clicked)
  */
 function applyTemplateWithCustomOrder(template, reorderedSections, content, modal) {
-    console.log('[SongwritingWizard] Finalize clicked - applying template:', template?.name);
-    console.log('[SongwritingWizard] Sections to create:', reorderedSections);
 
     try {
         const compositionState = getCompositionState();
-        console.log('[SongwritingWizard] Got compositionState:', !!compositionState);
 
         // Clear existing sections first
         const existingSections = compositionState.getSections();
-        console.log('[SongwritingWizard] Existing sections to delete:', existingSections.length);
         existingSections.forEach(s => compositionState.deleteSection(s.id));
 
         // Create sections in the reordered order as placeholders with expected chord counts
@@ -4152,7 +4137,6 @@ function applyTemplateWithCustomOrder(template, reorderedSections, content, moda
                 type: 'success'
             }
         }));
-        console.log('[SongwritingWizard] Template applied successfully');
     } catch (error) {
         console.error('[SongwritingWizard] Error applying template:', error);
     }

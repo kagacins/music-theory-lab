@@ -114,11 +114,9 @@ function initRecorder() {
         const reverb = getPianoReverb();
         if (reverb) {
             reverb.connect(recorder);
-            console.log('Audio recorder connected to piano reverb');
         } else {
             // Fallback to destination if reverb not available
             Tone.Destination.connect(recorder);
-            console.log('Audio recorder connected to destination (fallback)');
         }
 
         return recorder;
@@ -209,7 +207,6 @@ export async function exportToAudio(options = {}, onProgress = null) {
     updateProgress(5, 'Preparing to record...');
 
     try {
-        console.log('Export starting, initializing Tone.js...');
 
         // Helper function to add timeout to promises
         const withTimeout = (promise, ms, errorMsg) => {
@@ -222,22 +219,18 @@ export async function exportToAudio(options = {}, onProgress = null) {
         };
 
         // Ensure Tone.js context is started and running
-        console.log('Calling Tone.start()...');
         try {
             await withTimeout(Tone.start(), 5000, 'Tone.start() timed out. Please click anywhere on the page first to enable audio.');
         } catch (e) {
             console.warn('Tone.start() issue:', e.message);
         }
-        console.log('Tone.start() complete, state:', Tone.context.state);
 
         if (Tone.context.state !== 'running') {
-            console.log('Resuming audio context...');
             try {
                 await withTimeout(Tone.context.resume(), 3000, 'Audio context resume timed out');
             } catch (e) {
                 console.warn('Context resume issue:', e.message);
             }
-            console.log('Audio context resumed, state:', Tone.context.state);
         }
 
         // Stop any current playback
@@ -245,11 +238,9 @@ export async function exportToAudio(options = {}, onProgress = null) {
             Tone.Transport.stop();
             Tone.Transport.cancel();
         }
-        console.log('Transport stopped');
 
         // Calculate total duration
         const { totalDuration, tempo } = calculateCompositionDuration(progressionData, settings);
-        console.log(`Duration calculated: ${totalDuration}s at ${tempo} BPM`);
 
         updateProgress(10, 'Starting recording...');
 
@@ -263,18 +254,14 @@ export async function exportToAudio(options = {}, onProgress = null) {
         if (instrument.loaded !== undefined && !instrument.loaded) {
             throw new Error('Piano samples still loading. Please wait a moment and try again.');
         }
-        console.log('Instrument ready:', instrument.name || 'Sampler', 'loaded:', instrument.loaded);
 
         // Mute the output so user doesn't hear playback during export
         const previousVolume = Tone.Destination.volume.value;
         Tone.Destination.mute = true;
-        console.log('Output muted for recording');
 
         // Start recording - wait a moment for it to initialize
-        console.log('Calling recorder.start()...');
         try {
             recorder.start();
-            console.log('recorder.start() called successfully');
         } catch (recErr) {
             console.error('recorder.start() failed:', recErr);
             Tone.Destination.mute = false; // Restore on error
@@ -283,14 +270,11 @@ export async function exportToAudio(options = {}, onProgress = null) {
         isRecording = true;
 
         // Small delay to ensure recorder is ready
-        console.log('Waiting 200ms for recorder to initialize...');
         await new Promise(resolve => setTimeout(resolve, 200));
-        console.log('Recorder initialized, beginning playback...');
 
         // Play the composition
         updateProgress(15, 'Recording composition...');
         await playCompositionForRecording(progressionData, settings, tempo, totalDuration);
-        console.log('Playback complete');
 
         updateProgress(70, 'Stopping recording...');
 
@@ -300,7 +284,6 @@ export async function exportToAudio(options = {}, onProgress = null) {
 
         // Unmute the output
         Tone.Destination.mute = false;
-        console.log('Output unmuted');
 
         updateProgress(75, 'Processing audio...');
 
@@ -346,13 +329,11 @@ function calculateCompositionDuration(progressionData, settings) {
     // If no selector exists, use 2.0 seconds per measure (a comfortable listening tempo)
     const speedSelector = document.getElementById('trainer-speed-select');
     const speedValue = speedSelector ? parseFloat(speedSelector.value) : 2.0;
-    console.log('Export speed value:', speedValue, 'seconds per measure');
 
     // speedValue is seconds per 4 beats (one measure in 4/4)
     // Match the regular playback formula: BPM = (4 / speedValue) * 60
     const bpm = (4 / speedValue) * 60;
     const secondsPerBeat = 60 / bpm; // Convert BPM back to seconds per beat for scheduling
-    console.log('Export BPM:', bpm, 'seconds per beat:', secondsPerBeat);
 
     // Calculate total beats
     let totalBeats = 0;
@@ -363,7 +344,6 @@ function calculateCompositionDuration(progressionData, settings) {
 
     // Add buffer for reverb tail and fade out
     const totalDuration = (totalBeats * secondsPerBeat) + 2.0;
-    console.log('Total beats:', totalBeats, 'Total duration:', totalDuration, 'seconds');
 
     return { totalDuration, tempo: bpm, totalBeats, secondsPerBeat };
 }
@@ -390,7 +370,6 @@ async function playCompositionForRecording(progressionData, settings, tempo, tot
             const speedValue = speedSelector ? parseFloat(speedSelector.value) : 2.0;
             const bpm = (4 / speedValue) * 60;
             const secondsPerBeat = 60 / bpm;
-            console.log('Playback using BPM:', bpm, 'seconds per beat:', secondsPerBeat);
 
             // Ensure audio context is running - MUST await this
             if (Tone.context.state !== 'running') {
@@ -399,12 +378,10 @@ async function playCompositionForRecording(progressionData, settings, tempo, tot
 
             // Ensure Tone.js is started
             await Tone.start();
-            console.log('Tone.js started, context state:', Tone.context.state);
 
             // Schedule all chords
             let currentTime = Tone.now() + 0.1; // Small buffer
             const startTime = currentTime;
-            console.log(`Scheduling ${progressionData.length} chords, starting at time ${startTime}`);
 
             progressionData.forEach((chord, index) => {
                 const chordBeats = chord.beats !== undefined ? chord.beats : 4;
@@ -446,10 +423,8 @@ async function playCompositionForRecording(progressionData, settings, tempo, tot
             // Calculate actual end time and wait
             const endTime = currentTime + 1.5; // Extra buffer for reverb tail
             const waitDuration = (endTime - startTime) * 1000;
-            console.log(`All chords scheduled. Waiting ${waitDuration}ms for playback to complete...`);
 
             setTimeout(() => {
-                console.log('Playback wait complete');
                 resolve();
             }, waitDuration);
 
@@ -834,7 +809,6 @@ async function wavToMp3(wavBlob, bitrate = 192) {
  * @param {string} message - Status message
  */
 function updateProgress(percent, message) {
-    console.log(`Export progress: ${percent}% - ${message}`);
     if (progressCallback) {
         try {
             progressCallback(percent, message);

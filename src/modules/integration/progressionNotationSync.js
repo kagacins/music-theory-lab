@@ -201,7 +201,6 @@ export class ProgressionNotationSync {
         // PERMANENTLY DISABLED: compositionState is now the single source of truth
         // This function is no longer needed - progressionData reads from compositionState
         // via wrapper functions in trainerState.js
-        console.log('[syncNotationToProgression] DISABLED - compositionState is single source of truth');
         return;
 
         if (this.isUpdating) return;

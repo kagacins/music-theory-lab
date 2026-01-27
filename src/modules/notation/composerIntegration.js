@@ -672,10 +672,7 @@ export class NotationComposer {
           // If notes are very high, they'll still display correctly with ledger lines
           // Filter out omitted notes so they don't render or play
           const omittedNotes = measure.chord.omittedNotes || [];
-          console.log(`[composerIntegration] measure.chord.omittedNotes:`, omittedNotes);
-          console.log(`[composerIntegration] measure.chord.notes:`, measure.chord.notes);
           const chordNotes = measure.chord.notes.filter(n => !omittedNotes.includes(n));
-          console.log(`[composerIntegration] chordNotes after filtering:`, chordNotes);
 
           measureData.bassNotes.push({
             pitches: chordNotes,
@@ -998,9 +995,6 @@ export class NotationComposer {
         const bassNotes = m.notation?.bass?.voices?.[0]?.notes || [];
         bassNotes.forEach((note, ni) => {
           if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-            console.log(`[RENDER DEBUG] compositionState measure ${i} bass note ${ni}:`, {
-              pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
-            });
           }
         });
       });
@@ -1098,9 +1092,6 @@ export class NotationComposer {
     measures.forEach((m, i) => {
       (m.bassNotes || []).forEach((note, ni) => {
         if (note.pedal || note.dynamic || note.ornament || note.articulation) {
-          console.log(`[RENDER DEBUG] Mapped measures[${i}].bassNotes[${ni}]:`, {
-            pedal: note.pedal, dynamic: note.dynamic, ornament: note.ornament, articulation: note.articulation
-          });
         }
       });
     });
@@ -1398,7 +1389,6 @@ export class NotationComposer {
     const totalMeasures = this.compositionState.measures.length;
     const validStart = Math.max(0, Math.min(startMeasure, totalMeasures - 1));
     const validEnd = Math.max(validStart, Math.min(endMeasure, totalMeasures - 1));
-    console.log('[NotationComposer] Validated range:', validStart, 'to', validEnd, '(total:', totalMeasures, ')');
 
     // Get the filtered measures
     const allMeasures = this.compositionState.measures.slice(validStart, validEnd + 1);
@@ -2694,7 +2684,6 @@ export class NotationComposer {
     }
 
     // Open the chord bracket editor
-    console.log('[ComposerIntegration] Long-press on chord bracket:', region.chordIndex);
     if (window.showChordBracketEditor) {
       window.showChordBracketEditor(region.chordIndex, region, null);
     }
@@ -3456,7 +3445,6 @@ export class NotationComposer {
       e.stopPropagation();
       e.preventDefault();
       const measureIndex = this.hoveredMeasureIndex;
-      console.log('[MeasureEditOverlay] Click - measureIndex:', measureIndex);
       if (measureIndex >= 0 && window.openMeasureIsolationEditor) {
         this.hideMeasureEditOverlay(true); // preserve index until function called
         window.openMeasureIsolationEditor(measureIndex);
@@ -3748,7 +3736,6 @@ export class NotationComposer {
       e.preventDefault();
       const measureIndex = this.hoveredMeasureIndex;
       const items = this.measureCoachItems.get(measureIndex) || [];
-      console.log('[CoachIndicator] Click - measureIndex:', measureIndex, 'items:', items.length);
 
       if (items.length > 0) {
         // Show coach popup near the indicator
@@ -4398,7 +4385,6 @@ export class NotationComposer {
 
     // Double-click = Open compact chord editor popup
     if (event && event.detail === 2) {
-      console.log('[ComposerIntegration] Double-click on chord bracket:', chordIndex);
       if (window.showChordBracketEditor) {
         window.showChordBracketEditor(chordIndex, region, event);
       }
@@ -4407,13 +4393,6 @@ export class NotationComposer {
 
     // Shift+Click = Replace bass with foundational chord (original behavior)
     if (event && event.shiftKey && chordData) {
-      console.log('[ComposerIntegration] Replacing bass with foundational chord:', {
-        chordIndex,
-        chord: chordData,
-        startBeat,
-        endBeat,
-        durationBeats,
-      });
 
       this.compositionState.replaceBassWithFoundationalChord(
         chordIndex,

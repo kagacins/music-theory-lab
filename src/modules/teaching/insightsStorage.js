@@ -169,7 +169,6 @@ function updateAggregateStats(data, snapshot) {
 export function clearInsightsData() {
     try {
         localStorage.removeItem(STORAGE_KEY);
-        console.log('[InsightsStorage] Data cleared');
     } catch (e) {
         console.warn('[InsightsStorage] Error clearing data:', e);
     }

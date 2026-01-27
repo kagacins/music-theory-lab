@@ -543,12 +543,10 @@ export function setupWindowExports() {
 
     function toggleRomanNumeralEngine() {
         const toggle = document.getElementById('roman-numeral-toggle');
-        console.log('[RomanNumeral] Toggle clicked, checkbox checked:', toggle.checked);
         setIsRomanNumeralEngineOn(toggle.checked);
 
         // Update window.isRomanNumeralEngineOn for modules that access it
         window.isRomanNumeralEngineOn = getIsRomanNumeralEngineOn();
-        console.log('[RomanNumeral] State after set:', window.isRomanNumeralEngineOn);
 
         // Update indicator colors
         const offIndicator = document.getElementById('roman-off-indicator');
@@ -1502,7 +1500,6 @@ export function setupWindowExports() {
             window.refreshNotationFromProgression();
         }
 
-        console.log('Cleared all treble clef notes');
     };
 
     /**
@@ -1684,14 +1681,10 @@ export function setupWindowExports() {
 
     // Complete load project function - combines loadProjectFromFile + applyProjectToState
     window.loadProject = async function loadProject() {
-        console.log('[IMTL Import] window.loadProject() called');
         try {
             // Get the project file
-            console.log('[IMTL Import] Calling loadProjectFromFile()...');
             const result = await loadProjectFromFile();
-            console.log('[IMTL Import] loadProjectFromFile() returned:', { success: result.success, error: result.error, hasProject: !!result.project });
             if (!result.success) {
-                console.log('[IMTL Import] Load failed or cancelled:', result.error);
                 if (result.error !== 'Load cancelled') {
                     toast.error(result.error || 'Failed to load project');
                 }
@@ -1699,10 +1692,8 @@ export function setupWindowExports() {
             }
 
             // Get current state instances
-            console.log('[IMTL Import] Getting compositionState and trainerState...');
             const compositionState = getCompositionState();
             const trainerState = getTrainerState();
-            console.log('[IMTL Import] compositionState:', !!compositionState, 'trainerState:', !!trainerState);
 
             if (!compositionState || !trainerState) {
                 const error = 'Application state not ready. Please wait for the app to fully load.';
@@ -1712,13 +1703,10 @@ export function setupWindowExports() {
             }
 
             // Apply the project to state
-            console.log('[IMTL Import] Calling applyProjectToState()...');
             const applyResult = applyProjectToState(result.project, compositionState, trainerState, {
                 onProgressionLoaded: (progressionData) => {
-                    console.log('[IMTL Import] onProgressionLoaded callback, progressionData length:', progressionData?.length);
                     // Refresh progression display after loading
                     if (window.renderProgressionDisplay) {
-                        console.log('[IMTL Import] Calling renderProgressionDisplay for all three containers...');
                         window.renderProgressionDisplay('melody-progression-visualization', true);
                         window.renderProgressionDisplay('progression-visualization', true);
                         window.renderProgressionDisplay('builder-progression-visualization', true);
@@ -1727,16 +1715,13 @@ export function setupWindowExports() {
                     }
                 },
                 onNotationRefresh: () => {
-                    console.log('[IMTL Import] onNotationRefresh callback');
                     if (window.refreshNotationFromProgression) {
-                        console.log('[IMTL Import] Calling refreshNotationFromProgression...');
                         window.refreshNotationFromProgression();
                     } else {
                         console.warn('[IMTL Import] window.refreshNotationFromProgression not available!');
                     }
                 }
             });
-            console.log('[IMTL Import] applyProjectToState() returned:', applyResult);
 
             if (!applyResult.success) {
                 console.error('[IMTL Import] Apply failed:', applyResult.error);
@@ -1748,7 +1733,6 @@ export function setupWindowExports() {
             const metadataTitle = result.project.metadata?.title;
             const hasCustomTitle = metadataTitle && metadataTitle !== 'Untitled Project';
             const projectTitle = hasCustomTitle ? metadataTitle : (result.filename || 'Untitled Project');
-            console.log('[IMTL Import] SUCCESS! Project loaded:', projectTitle);
             toast.success(`Loaded: ${projectTitle}`);
 
             // Note: refreshNotationFromProgression is already called via onNotationRefresh callback
@@ -1764,7 +1748,6 @@ export function setupWindowExports() {
                 window.closeFabSubmenus();
             }
 
-            console.log('[IMTL Import] Load complete, returning success');
             return { success: true, project: result.project, filename: result.filename };
         } catch (error) {
             console.error('[IMTL Import] Caught error in loadProject:', error);

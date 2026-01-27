@@ -1458,13 +1458,6 @@ async function handleSubmit(status = 'published') {
         // EDIT MODE - Update existing submission
         // ==========================================
         if (editModeState) {
-            console.log('[Share] Updating submission:', {
-                submissionId: editModeState.submissionId,
-                title,
-                submissionType,
-                keySignature: form.dataset.key,
-                compositionDataSize: JSON.stringify(compositionData).length
-            });
 
             submitBtn.innerHTML = `
                 <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1507,19 +1500,6 @@ async function handleSubmit(status = 'published') {
         // ==========================================
         // CREATE NEW SUBMISSION
         // ==========================================
-        console.log('[Share] Submitting with:', {
-            submissionType,
-            status,
-            keySignature: form.dataset.key,
-            timeSignatureNum: timeSigNum,
-            timeSignatureDenom: timeSigDenom,
-            bpm: tempo,
-            baseHash: form.dataset.baseHash?.substring(0, 16) + '...',
-            variantHash: form.dataset.variantHash?.substring(0, 16) + '...',
-            isVariant,
-            parentSubmissionId,
-            compositionDataSize: JSON.stringify(compositionData).length
-        });
 
         // Submit to API
         const response = await fetch('/.netlify/functions/submissions', {

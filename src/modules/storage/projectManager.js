@@ -253,14 +253,12 @@ export async function saveProjectToFile(compositionState, suggestedName) {
  * @returns {Promise<{ success: boolean, project?: IMTLProject, filename?: string, error?: string }>}
  */
 export async function loadProjectFromFile() {
-    console.log('[IMTL Import] loadProjectFromFile() called');
     try {
         let file;
         let filename;
 
         // Try modern File System Access API first
         if ('showOpenFilePicker' in window) {
-            console.log('[IMTL Import] Using showOpenFilePicker API');
             try {
                 const [handle] = await window.showOpenFilePicker({
                     types: [{
@@ -274,10 +272,8 @@ export async function loadProjectFromFile() {
 
                 file = await handle.getFile();
                 filename = handle.name;
-                console.log('[IMTL Import] File selected:', filename);
             } catch (err) {
                 // User cancelled the dialog
-                console.log('[IMTL Import] File picker error:', err.name, err.message);
                 if (err.name === 'AbortError') {
                     return { success: false, error: 'Load cancelled' };
                 }
@@ -285,26 +281,20 @@ export async function loadProjectFromFile() {
             }
         } else {
             // Fallback for browsers without File System Access API
-            console.log('[IMTL Import] Using fallback input method');
             file = await selectFileViaInput();
             if (!file) {
-                console.log('[IMTL Import] No file selected from input');
                 return { success: false, error: 'Load cancelled' };
             }
             filename = file.name;
-            console.log('[IMTL Import] File selected via input:', filename);
         }
 
         // Read file contents
-        console.log('[IMTL Import] Reading file contents...');
         const text = await file.text();
-        console.log('[IMTL Import] File read, length:', text.length, 'chars');
 
         // Parse JSON
         let projectData;
         try {
             projectData = JSON.parse(text);
-            console.log('[IMTL Import] JSON parsed successfully. Keys:', Object.keys(projectData));
         } catch (parseError) {
             console.error('[IMTL Import] JSON parse error:', parseError);
             return {
@@ -314,7 +304,6 @@ export async function loadProjectFromFile() {
         }
 
         // Validate project data
-        console.log('[IMTL Import] Validating project data...');
         const validation = validateProjectData(projectData);
         if (!validation.valid) {
             console.error('[IMTL Import] Validation failed:', validation.error);
@@ -323,13 +312,7 @@ export async function loadProjectFromFile() {
                 error: validation.error
             };
         }
-        console.log('[IMTL Import] Validation passed');
 
-        console.log('[IMTL Import] Returning success with project:', {
-            title: projectData.metadata?.title,
-            measures: projectData.measures?.length,
-            progressionLength: projectData.progressionData?.length
-        });
         return {
             success: true,
             project: projectData,
@@ -354,24 +337,16 @@ export async function loadProjectFromFile() {
  * @returns {{ success: boolean, error?: string }}
  */
 export function applyProjectToState(projectData, compositionState, trainerState, callbacks = {}) {
-    console.log('[IMTL Import] applyProjectToState() called');
-    console.log('[IMTL Import] projectData:', projectData);
-    console.log('[IMTL Import] compositionState available:', !!compositionState);
-    console.log('[IMTL Import] trainerState available:', !!trainerState);
-    console.log('[IMTL Import] callbacks:', Object.keys(callbacks));
 
     try {
-        console.log('[IMTL Import] Applying project to state:', projectData.metadata?.title);
 
         // 0. Set the key FIRST - this ensures all subsequent operations use the correct key
         if (projectData.metadata?.key) {
-            console.log('[IMTL Import] Setting key from project:', projectData.metadata.key);
             setCurrentKey(projectData.metadata.key);
         }
 
         // 1. Update composition metadata
         if (projectData.metadata) {
-            console.log('[IMTL Import] Step 1: Updating composition metadata');
             compositionState.metadata = {
                 ...compositionState.metadata,
                 ...projectData.metadata
@@ -380,7 +355,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
 
         // 2. Update composition settings
         if (projectData.settings) {
-            console.log('[IMTL Import] Step 2: Updating composition settings');
             compositionState.settings = {
                 ...compositionState.settings,
                 ...projectData.settings
@@ -389,7 +363,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
 
         // 3. Load progression data into trainerState (chord cards)
         if (projectData.progressionData && trainerState) {
-            console.log('[IMTL Import] Step 3: Loading progression data, length:', projectData.progressionData.length);
 
             // Ensure all chords have notes computed (some may have been saved with notes: null)
             // AND ensure all chords have unique IDs (for bass preservation system)
@@ -413,7 +386,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                                 'full'
                             );
                             if (result?.specificNotes) {
-                                console.log(`[IMTL Import] Regenerated notes for ${chord.root} ${chord.type}:`, result.specificNotes);
                                 return { ...chord, notes: result.specificNotes };
                             }
                         } catch (err) {
@@ -429,23 +401,19 @@ export function applyProjectToState(projectData, compositionState, trainerState,
 
             // Trigger UI update for chord cards
             if (callbacks.onProgressionLoaded) {
-                console.log('[IMTL Import] Calling onProgressionLoaded callback');
                 callbacks.onProgressionLoaded(projectData.progressionData);
             }
         } else {
-            console.log('[IMTL Import] Step 3: SKIPPED - no progressionData or trainerState');
         }
 
         // 4. Sync composition state with the new progression
         if (projectData.progressionData) {
-            console.log('[IMTL Import] Step 4: Syncing composition state with progression');
             // Normalize time signature to object format for consistency
             let timeSignature = projectData.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
             if (typeof timeSignature === 'string') {
                 const parts = timeSignature.split('/').map(Number);
                 timeSignature = { num: parts[0] || 4, denom: parts[1] || 4 };
             }
-            console.log('[IMTL Import] Time signature:', timeSignature);
 
             compositionState.syncWithProgressionData(projectData.progressionData, {
                 preserveMelody: false, // We'll load melody from the project
@@ -453,7 +421,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                 tempo: projectData.metadata?.tempo,
                 timeSignature: timeSignature
             });
-            console.log('[IMTL Import] syncWithProgressionData completed');
         }
 
         // 4b. Load song sections (verse, chorus, etc. groupings)
@@ -468,7 +435,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             if (BuildingBlockSequence) {
                 compositionState.bassBlockSequence = BuildingBlockSequence.fromJSON(projectData.bassBlockSequence);
                 // DO NOT call renderBassBlocksToMeasures() - we'll restore from saved measures instead
-                console.log('[IMTL Import] Bass BuildingBlockSequence loaded (not rendered - using saved measures)');
             } else {
                 console.warn('[projectManager] BuildingBlockSequence not available, skipping bass block restore');
             }
@@ -481,7 +447,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             if (BuildingBlockSequence) {
                 compositionState.trebleBlockSequence = BuildingBlockSequence.fromJSON(projectData.trebleBlockSequence);
                 // DO NOT call renderTrebleBlocksToMeasures() - we'll restore from saved measures instead
-                console.log('[IMTL Import] Treble BuildingBlockSequence loaded (not rendered - using saved measures)');
             } else {
                 console.warn('[projectManager] BuildingBlockSequence not available, skipping treble block restore');
             }
@@ -495,7 +460,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
         if (projectData.measures && Array.isArray(projectData.measures)) {
             const savedCount = projectData.measures.length;
             const currentCount = compositionState.measures.length;
-            console.log(`[IMTL Import] Restoring notation data. Saved: ${savedCount} measures, Current: ${currentCount} measures`);
 
             // Warn if there's a mismatch (might indicate a time signature or progression issue)
             if (savedCount !== currentCount) {
@@ -516,7 +480,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                         (sum, v) => sum + (v.notes?.length || 0), 0
                     );
                     if (totalNotes > 0 || savedMeasure.notation.treble.voices.length > 1) {
-                        console.log(`[IMTL Import] Measure ${i} treble: ${savedMeasure.notation.treble.voices.length} voices, ${totalNotes} notes`);
                     }
 
                 }
@@ -535,7 +498,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                         (sum, v) => sum + (v.notes?.length || 0), 0
                     );
                     if (totalNotes > 0 || savedMeasure.notation.bass.voices.length > 1) {
-                        console.log(`[IMTL Import] Measure ${i} bass: ${savedMeasure.notation.bass.voices.length} voices, ${totalNotes} notes`);
                     }
 
                 }
@@ -545,7 +507,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                     currentMeasure.notation.dynamics = JSON.parse(JSON.stringify(savedMeasure.notation.dynamics));
                 }
             }
-            console.log('[IMTL Import] All measure notation data restored');
 
             // CRITICAL: Set flag to skip syncWithProgressionData calls for a short period
             // This prevents the bass notes (with ornaments, articulations, etc.) from being regenerated
@@ -555,25 +516,21 @@ export function applyProjectToState(projectData, compositionState, trainerState,
 
         // 8. Restore tempo markings
         if (projectData.tempoMarkings && Array.isArray(projectData.tempoMarkings)) {
-            console.log('[projectManager] Restoring tempo markings:', projectData.tempoMarkings.length);
             compositionState.tempoMarkings = [...projectData.tempoMarkings];
         }
 
         // 9. Restore repeat signs
         if (projectData.repeatSigns && Array.isArray(projectData.repeatSigns)) {
-            console.log('[projectManager] Restoring repeat signs:', projectData.repeatSigns.length);
             compositionState.repeatSigns = [...projectData.repeatSigns];
         }
 
         // 10. Restore hairpins (crescendo/decrescendo)
         if (projectData.hairpins && Array.isArray(projectData.hairpins)) {
-            console.log('[projectManager] Restoring hairpins:', projectData.hairpins.length);
             compositionState.hairpins = [...projectData.hairpins];
         }
 
         // 11. Restore slurs
         if (projectData.slurs && Array.isArray(projectData.slurs)) {
-            console.log('[projectManager] Restoring slurs:', projectData.slurs.length);
             compositionState.slurs = [...projectData.slurs];
             // Update the next ID counter to avoid collisions
             const maxSlurId = projectData.slurs.reduce((max, s) => {
@@ -585,7 +542,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
 
         // 12. Restore volta brackets (1st/2nd endings)
         if (projectData.voltaBrackets && Array.isArray(projectData.voltaBrackets)) {
-            console.log('[projectManager] Restoring volta brackets:', projectData.voltaBrackets.length);
             compositionState.voltaBrackets = [...projectData.voltaBrackets];
             // Update the next ID counter to avoid collisions
             const maxVoltaId = projectData.voltaBrackets.reduce((max, v) => {
@@ -598,7 +554,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
         // 13. BASS PRESERVATION: Restore bass data by chord ID
         // This enables bass edits to survive chord reordering across save/load cycles
         if (projectData.bassDataByChordId && typeof projectData.bassDataByChordId === 'object') {
-            console.log('[IMTL Import] Restoring bassDataByChordId:', Object.keys(projectData.bassDataByChordId).length, 'entries');
             compositionState.bassDataByChordId = new Map(Object.entries(projectData.bassDataByChordId));
         }
 
@@ -619,7 +574,6 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             }
         }, 1000);
 
-        console.log('[projectManager] Project applied successfully');
         return { success: true };
 
     } catch (error) {

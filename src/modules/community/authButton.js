@@ -264,14 +264,10 @@ async function handleSignOut() {
  * Show the profile settings modal
  */
 async function showProfileSettingsModal() {
-    console.log('[ProfileSettings] showProfileSettingsModal called');
     try {
         // Load current profile
-        console.log('[ProfileSettings] Fetching profile...');
         const profile = await getUserProfile();
-        console.log('[ProfileSettings] Profile fetched:', profile);
         const userInfo = getUserDisplayInfo();
-        console.log('[ProfileSettings] UserInfo:', userInfo);
 
         // Always remove old modal and create fresh (avoids stale event listeners)
         let modal = document.getElementById('profile-settings-modal');

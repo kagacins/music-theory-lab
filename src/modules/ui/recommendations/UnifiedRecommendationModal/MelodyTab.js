@@ -1457,7 +1457,6 @@ function playPhrase(phrase) {
         const baseTime = window.Tone?.now?.() || 0;
 
         // Log rhythm for debugging
-        console.log('Playing phrase with rhythm:', rhythm.map(r => r.toFixed(2)).join(', '), `@ ${tempo} BPM`);
 
         let currentTime = baseTime;
         notes.forEach((note, i) => {
@@ -1641,7 +1640,6 @@ function applyPhrase(phrase) {
         }
 
         const totalPhraseBeats = rhythm.reduce((sum, r) => sum + r, 0);
-        console.log(`Applying phrase (add-to-end): ${notes.length} notes, ${totalPhraseBeats} beats total`);
 
         let addedCount = 0;
         for (let i = 0; i < notes.length; i++) {
@@ -1664,7 +1662,6 @@ function applyPhrase(phrase) {
         }
 
         const totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
-        console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalBeats.toFixed(1)} beats)`);
 
         // Toast notification
         if (window.showToast) {

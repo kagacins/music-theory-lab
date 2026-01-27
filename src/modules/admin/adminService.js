@@ -58,6 +58,15 @@ export async function checkAdminStatus() {
         return adminStatusCache;
     }
 
+    // Check if user is authenticated before making API call
+    const token = await getAuthToken();
+    if (!token) {
+        // Not authenticated - silently return non-admin status
+        adminStatusCache = { isAdmin: false };
+        adminStatusCacheTime = Date.now();
+        return adminStatusCache;
+    }
+
     try {
         const data = await adminFetch('/admin-check');
         adminStatusCache = {
@@ -67,7 +76,7 @@ export async function checkAdminStatus() {
         adminStatusCacheTime = Date.now();
         return adminStatusCache;
     } catch (error) {
-        console.error('[AdminService] Error checking admin status:', error);
+        // Silently fail - user is not admin or API unavailable
         adminStatusCache = { isAdmin: false };
         adminStatusCacheTime = Date.now();
         return adminStatusCache;

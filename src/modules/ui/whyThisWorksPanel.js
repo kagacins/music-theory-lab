@@ -746,8 +746,6 @@ function getAlternativeResolutions(romanNumeral, key, prevChordData) {
  * - "Tell me more" expansion with voice leading details
  */
 function showFallbackExplanation(context, explanation) {
-  console.log('[WhyThisWorks] Context:', JSON.stringify(context, null, 2));
-  console.log('[WhyThisWorks] Explanation:', JSON.stringify(explanation, null, 2));
 
   try {
     // Remove existing modal
@@ -812,9 +810,6 @@ function showFallbackExplanation(context, explanation) {
       ['IV', 'ii', 'II'].includes(baseNumeral) ||
       numeral.startsWith('IV') || numeral.startsWith('ii');
 
-    console.log('[WhyThisWorks] Chord detection:', {
-      numeral, baseNumeral, chordFunction, isDominant, isSubdominant
-    });
 
     // Get tonic chord for resolution playback
     const keyRoot = context.key?.replace('m', '') || 'C';

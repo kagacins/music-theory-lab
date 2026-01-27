@@ -144,7 +144,6 @@ function executePendingRenders() {
     renderDebounceTimer = null;
 
     if (isDebugMode()) {
-        console.log(`[RenderDebounce] Executing batch render for ${toRender.size} container(s):`, Array.from(toRender.keys()));
     }
 
     // Determine which containers to render
@@ -198,7 +197,6 @@ function scheduleRender(containerId, syncBothTabs, skipNotationSync = false) {
     });
 
     if (isDebugMode()) {
-        console.log(`[RenderDebounce] Scheduled: ${containerId} (syncBothTabs=${syncBothTabs}), pending=${pendingRenders.size}`);
     }
 
     // If syncBothTabs is true, also queue the other main container
@@ -4007,11 +4005,9 @@ export function renderProgressionControls() {
         const currentKey = getCurrentKey();
         const newKey = keySelect.value;
 
-        console.log('[KeyChange] Handler triggered:', { currentKey, newKey, chordCount: progressionData?.length || 0 });
 
         // If same key selected or no chords, just proceed normally
         if (newKey === currentKey || !progressionData || progressionData.length === 0) {
-            console.log('[KeyChange] No dialog needed - loading progression normally');
             loadProgression();
             return;
         }
@@ -4024,7 +4020,6 @@ export function renderProgressionControls() {
             return `${key} Major`;
         };
 
-        console.log('[KeyChange] Showing dialog for key change with', progressionData.length, 'chords');
 
         const showKeyChangeDialog = window.showKeyChangeDialog;
 
@@ -4041,7 +4036,6 @@ export function renderProgressionControls() {
             newKey: formatKeyDisplay(newKey),
             chords: progressionData,
             onChoice: (choice) => {
-                console.log('[KeyChange] Dialog choice:', choice);
 
                 // Handle null/cancelled
                 if (!choice) {
@@ -4051,23 +4045,19 @@ export function renderProgressionControls() {
 
                 // Handle bass clef (chords) - choice is an object { bass: 'transpose'|'keep', treble: ... }
                 if (choice.bass === 'transpose') {
-                    console.log('[KeyChange] Transposing from', currentKey, 'to', newKey);
                     // Transpose chords to new key (keep Roman numerals, change notes)
                     transposeProgression(currentKey, newKey);
                 } else if (choice.bass === 'keep') {
-                    console.log('[KeyChange] Keeping chords, updating Roman numerals for', newKey);
                     // Keep same chords but update Roman numerals
                     updateRomanNumerals(newKey);
                 }
 
                 // Handle treble clef (melody) if applicable
                 if (choice.treble === 'transpose') {
-                    console.log('[KeyChange] Transposing melody from', currentKey, 'to', newKey);
                     if (window.transposeTreble) {
                         window.transposeTreble(currentKey, newKey);
                     }
                 } else if (choice.treble === 'adjust') {
-                    console.log('[KeyChange] Transposing melody with mode adjustment');
                     if (window.transposeTrebleWithModeAdjust) {
                         window.transposeTrebleWithModeAdjust(currentKey, newKey);
                     }
@@ -6646,18 +6636,12 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     if (fromSectionId !== toSectionId) {
         saveStateBeforeChange();
 
-        console.log('[handleCardDragWithinSection] === CROSS-SECTION DRAG ===');
-        console.log('  fromSectionId:', fromSectionId);
-        console.log('  toSectionId:', toSectionId);
-        console.log('  oldChordIndex:', oldChordIndex);
-        console.log('  sections BEFORE:', JSON.stringify(compositionState.sections.map(s => ({id: s.id, name: s.name, start: s.startIndex, count: s.chordCount}))));
 
         const trainerState = getTrainerState();
         const toSection = toSectionId && !toSectionId.startsWith('no-group')
             ? compositionState.getSection(toSectionId)
             : null;
 
-        console.log('  toSection:', toSection ? {id: toSection.id, name: toSection.name, start: toSection.startIndex, count: toSection.chordCount} : null);
 
         // Calculate where the chord should be moved to
         let targetIndex = oldChordIndex; // Default: no movement
@@ -6667,7 +6651,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
             // Find position within the new section based on where the card was dropped
             const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
             const positionInSection = Array.from(sectionCards).indexOf(draggedItem);
-            console.log('  positionInSection:', positionInSection, 'of', sectionCards.length, 'cards');
 
             // Calculate target position in the progression
             const sectionStart = toSection.startIndex;
@@ -6689,12 +6672,10 @@ function handleCardDragWithinSection(evt, originalSectionId) {
             if (oldChordIndex < targetIndex) {
                 insertIndex--;
             }
-            console.log('  targetIndex:', targetIndex, 'insertIndex:', insertIndex);
         }
 
         // Step 1: Move the chord data if needed
         if (oldChordIndex !== targetIndex && oldChordIndex !== insertIndex) {
-            console.log('  Moving chord data from', oldChordIndex, 'to', insertIndex);
             const chord = trainerState.progressionData[oldChordIndex];
             const roman = trainerState.progressionRomans[oldChordIndex];
 
@@ -6710,7 +6691,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
 
             // Step 2: Update section indices for the move (preserveMembership=false to update memberships)
             compositionState.updateSectionsAfterChordReorder(oldChordIndex, insertIndex, false);
-            console.log('  sections AFTER updateSectionsAfterChordReorder:', JSON.stringify(compositionState.sections.map(s => ({id: s.id, name: s.name, start: s.startIndex, count: s.chordCount}))));
 
             // Update trainer state
             setProgressionData(newProgressionData);
@@ -6719,31 +6699,24 @@ function handleCardDragWithinSection(evt, originalSectionId) {
             // Step 3: The chord is now at insertIndex and updateSectionsAfterChordReorder has updated memberships
             // But if the chord wasn't in a section before and we want it in one, or vice versa, handle that
             const chordNowInSection = compositionState.getSectionForChord(insertIndex);
-            console.log('  chordNowInSection:', chordNowInSection ? {id: chordNowInSection.id, name: chordNowInSection.name} : null);
 
             if (toSection && (!chordNowInSection || chordNowInSection.id !== toSectionId)) {
                 // Chord should be in toSection but isn't - add it
-                console.log('  Adding chord to section', toSectionId);
                 compositionState.addChordToSection(insertIndex, toSectionId);
             } else if (!toSection && chordNowInSection) {
                 // Chord should be ungrouped but is in a section - remove it
-                console.log('  Removing chord from section');
                 compositionState.removeChordFromSection(insertIndex);
             }
         } else {
-            console.log('  No data movement needed (oldChordIndex === targetIndex or insertIndex)');
             // No data movement needed, just update section membership
             if (fromSectionId && !fromSectionId.startsWith('no-group')) {
-                console.log('  Removing from old section:', fromSectionId);
                 compositionState.removeChordFromSection(oldChordIndex);
             }
             if (toSection) {
-                console.log('  Adding to new section:', toSectionId);
                 compositionState.addChordToSection(oldChordIndex, toSectionId);
             }
         }
 
-        console.log('  sections FINAL:', JSON.stringify(compositionState.sections.map(s => ({id: s.id, name: s.name, start: s.startIndex, count: s.chordCount}))));
 
         // Re-render to reflect section membership changes
         renderProgressionDisplay('progression-visualization', false);

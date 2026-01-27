@@ -1899,7 +1899,6 @@ function applyChordReplacement(chordIndex, newRoot, newType, newInversion, secti
         }
     }
 
-    console.log(`[SongBuilder] Replaced chord ${chordIndex} with ${newRoot} ${newType} (octave: ${octave})`);
 }
 
 /**

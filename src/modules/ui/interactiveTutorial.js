@@ -5445,7 +5445,6 @@ export const letItBeMelodyTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('Let It Be Melody tutorial completed!');
     }
 });
 

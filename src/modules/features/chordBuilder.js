@@ -3853,7 +3853,6 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
     const lhInversion = 0;
     const lhOctaveShift = 0;
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
-    console.log('[addChordToProgression] omittedNotes from builder:', omittedNotes);
     const lhOmittedNotes = []; // LH no longer used in chord cards
     const octaveShift = getBuilderOctaveShift() * 12; // Convert whole octaves to semitones
 
@@ -4403,7 +4402,6 @@ export function updateChordAtIndex(index, root, type) {
         chord.displayName = chord.simpleName || chord.name;
     }
 
-    console.log(`[ChordBuilder] Updated chord at index ${index}: ${chord.simpleName || chord.name}`);
 
     // Trigger re-render
     if (window.renderProgressionDisplay) {

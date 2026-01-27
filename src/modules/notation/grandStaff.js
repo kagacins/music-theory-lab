@@ -1952,7 +1952,6 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
     const controlY = (direction === 'below' ?
       Math.max(startY, endY) : Math.min(startY, endY)) + controlPointOffset;
 
-    console.log('[drawSlurCurve] Drawing slur curve:', { startX, startY, endX, endY, controlX, controlY, direction });
 
     ctx.save();
     ctx.strokeStyle = '#000000';
@@ -1990,7 +1989,6 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
   }
 
   // Debug: Log slurs and available measures
-  console.log('[drawSlurs] Drawing slurs:', slurs.length, 'slurs, renderedMeasures:', renderedMeasures.map(m => m.index));
 
   for (const slur of slurs) {
     try {
@@ -2001,7 +1999,6 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
       const hasStart = !!startMeasureData;
       const hasEnd = !!endMeasureData;
 
-      console.log('[drawSlurs] Processing slur:', { slur, hasStart, hasEnd, startMeasureIndex: slur.startMeasure, endMeasureIndex: slur.endMeasure });
 
       if (!hasStart && !hasEnd) {
         // Neither start nor end visible - skip for now
@@ -2078,16 +2075,6 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
         // Debug: Log VexFlow note details including getYs for accurate positioning
         const startYs = startVexNote?.getYs?.();
         const endYs = endVexNote?.getYs?.();
-        console.log('[drawSlurs] Found VexFlow notes:', {
-          startVexNote: startVexNote?.constructor?.name,
-          endVexNote: endVexNote?.constructor?.name,
-          startHasModifiers: startVexNote?.getModifiers?.()?.length,
-          endHasModifiers: endVexNote?.getModifiers?.()?.length,
-          startAbsoluteX: startVexNote?.getAbsoluteX?.(),
-          endAbsoluteX: endVexNote?.getAbsoluteX?.(),
-          startYs: startYs,
-          endYs: endYs,
-        });
 
         // Determine slur direction based on stem direction
         const direction = getSlurDirection(startVexNote, slur.clef);
@@ -2095,7 +2082,6 @@ function drawSlurs(context, renderedMeasures, slurs, measures) {
         const startPos = getNoteSlurPosition(startVexNote, direction);
         const endPos = getNoteSlurPosition(endVexNote, direction);
 
-        console.log('[drawSlurs] Slur positions:', { startPos, endPos, direction });
 
         drawSlurCurve(startPos.x, startPos.y, endPos.x, endPos.y, direction);
 

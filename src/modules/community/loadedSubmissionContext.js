@@ -37,7 +37,6 @@ export function setLoadedSubmissionContext(context) {
         loadedAt: Date.now()
     };
 
-    console.log('[LoadedSubmissionContext] Context set:', loadedContext.title);
 }
 
 /**
@@ -68,7 +67,6 @@ export function hasLoadedSubmissionContext() {
  */
 export function clearLoadedSubmissionContext() {
     if (loadedContext) {
-        console.log('[LoadedSubmissionContext] Context cleared');
     }
     loadedContext = null;
 }

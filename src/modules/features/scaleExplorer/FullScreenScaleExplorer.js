@@ -117,7 +117,6 @@ class FullScreenScaleExplorer {
     openInTabMode() {
         // If already in tab mode, just re-capture keyboard
         if (this.isTabMode) {
-            console.log('[FullScreenScaleExplorer] Already in tab mode, re-capturing keyboard');
             this._captureKeyboard();
             this._syncFromScaleState();
             // Update keyboard labels when re-entering tab
@@ -177,7 +176,6 @@ class FullScreenScaleExplorer {
         // Initial scale highlighting
         this._highlightScaleNotes();
 
-        console.log('[FullScreenScaleExplorer] Opened in tab mode');
     }
 
     /**
@@ -209,7 +207,6 @@ class FullScreenScaleExplorer {
         }
 
         this.isTabMode = false;
-        console.log('[FullScreenScaleExplorer] Closed tab mode');
     }
 
     // ========================================================================
@@ -512,7 +509,6 @@ class FullScreenScaleExplorer {
                 if (keyboardSection) {
                     keyboardSection.classList.add('hidden');
                 }
-                console.log('[FullScreenScaleExplorer] Keyboard captured');
             }
         } else {
             console.warn('[FullScreenScaleExplorer] Piano keyboard not found');
@@ -528,7 +524,6 @@ class FullScreenScaleExplorer {
             // Restore original styling
             pianoKeyboard.style.maxWidth = '';
             pianoKeyboard.style.width = '';
-            console.log('[FullScreenScaleExplorer] Keyboard restored');
         }
         this.originalKeyboardParent = null;
         this.originalKeyboardNextSibling = null;

@@ -79,7 +79,6 @@ export function toggleTheoryOverlay(forceState) {
         clearOverlay();
     }
 
-    console.log('[TheoryOverlay] Enabled:', isEnabled);
     return isEnabled;
 }
 

@@ -500,7 +500,6 @@ async function loadAudioFile(file) {
 
     // Decode audio data
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    console.log(`[SongAnalyzer] Audio loaded: ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`);
 
     return audioBuffer;
 }
@@ -593,7 +592,6 @@ async function analyzeChords(audioBuffer) {
         sampleRate = audioBuffer.sampleRate;
     }
 
-    console.log(`[SongAnalyzer] Audio: ${audioBuffer.duration.toFixed(2)}s at ${sampleRate}Hz`);
 
     // Convert to Essentia vector
     const audioVector = essentia.arrayToVector(samples);
@@ -603,7 +601,6 @@ async function analyzeChords(audioBuffer) {
     try {
         beats = await detectBeats(audioVector, sampleRate);
         if (beats.length > 0) {
-            console.log(`[SongAnalyzer] Detected ${beats.length} beats, BPM: ${estimateBPM(beats).toFixed(1)}`);
             detectedTempo = estimateBPM(beats);
         }
     } catch (error) {
@@ -615,7 +612,6 @@ async function analyzeChords(audioBuffer) {
     if (beats.length > 2) {
         rawChords = await analyzeChordsWithBeats(samples, sampleRate, beats, audioBuffer.duration);
     } else {
-        console.log('[SongAnalyzer] Using frame-based chord detection (no beats detected)');
         rawChords = await analyzeChordsWithHPCP(samples, sampleRate, audioBuffer.duration);
     }
 
@@ -627,7 +623,6 @@ async function analyzeChords(audioBuffer) {
     updateProgress('Post-processing results...', 90);
 
     if (chords.length > 0) {
-        console.log('[SongAnalyzer] First few chords:', chords.slice(0, 5));
     }
 
     // Filter out very short chords (less than 0.3 seconds)
@@ -771,7 +766,6 @@ async function analyzeChordsWithChordsDetectionBeats(samples, sampleRate, beats,
     }
 
     if (chords.length > 0) {
-        console.log('[SongAnalyzer] First chords from ChordsDetectionBeats:', chords.slice(0, 5).map(c => c.chord));
     }
 
     return chords;
@@ -937,8 +931,6 @@ function applyHMMSmoothing(chords) {
     // Log any changes made by HMM
     const changes = smoothed.filter(c => c.originalChord);
     if (changes.length > 0) {
-        console.log(`[SongAnalyzer] HMM made ${changes.length} corrections:`,
-            changes.map(c => `${c.originalChord}→${c.chord}`).join(', '));
     }
 
     return smoothed;
@@ -1112,7 +1104,6 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
     // Basic Pitch requires 22050 Hz mono audio - resample and convert if needed
     let resampledBuffer = audioBuffer;
     if (audioBuffer.sampleRate !== 22050 || audioBuffer.numberOfChannels !== 1) {
-        console.log(`[SongAnalyzer] Converting to 22050 Hz mono (from ${audioBuffer.sampleRate} Hz, ${audioBuffer.numberOfChannels} channels)`);
         resampledBuffer = await resampleAudioBuffer(audioBuffer, 22050);
     }
 
@@ -1881,8 +1872,6 @@ function detectChordFromHPCP(hpcp) {
     if (detectChordFromHPCP.logCount < 5 && bestMatch.chord !== 'N') {
         // Sort by adjusted confidence and show top matches
         allMatches.sort((a, b) => parseFloat(b.adjConf) - parseFloat(a.adjConf));
-        console.log('  Top 8:', allMatches.slice(0, 8).map(m => `${m.chord}:${m.adjConf}`).join(', '));
-        console.log('  Winner:', bestMatch.chord, 'adj:', bestMatch.confidence.toFixed(3), 'raw:', bestMatch.rawConfidence.toFixed(3));
         detectChordFromHPCP.logCount++;
     }
 
@@ -2603,7 +2592,6 @@ export function setExpectedKey(expectedKey) {
     if (offset > 6) offset -= 12;
     if (offset < -6) offset += 12;
 
-    console.log(`[SongAnalyzer] Key calibration: detected "${detectedKey}" (${detectedRoot}), expected "${expectedKey}" (${expectedRoot}), offset: ${offset}`);
 
     // Set the transpose offset
     transposeOffset = offset;
@@ -2835,7 +2823,6 @@ function parseChordSearchResults(html, songName, artistName) {
         if (match[3].length > 1) chords.add(match[3]);
     }
 
-    console.log('[SongAnalyzer] Found chords before filtering:', Array.from(chords));
 
     // Convert to array and sort by musical order
     const sortOrder = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];

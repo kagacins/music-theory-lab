@@ -216,7 +216,6 @@ async function playABComparison() {
  * Play forward resolution (suggested chord → next chord in progression)
  */
 async function playForwardResolution() {
-    console.log('[WhyThisWorksEnhanced] playForwardResolution called');
 
     if (!currentComparison) {
         console.warn('[WhyThisWorksEnhanced] No currentComparison');
@@ -230,8 +229,6 @@ async function playForwardResolution() {
     const suggestedChord = currentComparison.suggestedChord;
     const nextChord = currentComparison.nextChord;
 
-    console.log('[WhyThisWorksEnhanced] suggestedChord:', suggestedChord);
-    console.log('[WhyThisWorksEnhanced] nextChord:', nextChord);
 
     if (!suggestedChord || !suggestedChord.root) {
         console.warn('[WhyThisWorksEnhanced] No suggested chord');
@@ -255,7 +252,6 @@ async function playForwardResolution() {
         btn.innerHTML = '<span>Playing...</span>';
     }
 
-    console.log('[WhyThisWorksEnhanced] Playing:', suggestedChord, '→', nextChord);
 
     // Play suggested → next chord (pass full chord objects including inversion and notes)
     // playChordSequence handles isPlaying state internally
@@ -377,7 +373,6 @@ async function playChord(root, type, duration = 1, inversion = 0, precomputedNot
             notes = chordInfo?.specificNotes || [];
         }
 
-        console.log('[WhyThisWorksEnhanced] Playing chord:', root, type, 'Inversion:', inversion, 'Notes:', notes);
 
         if (notes.length === 0) {
             console.warn('[WhyThisWorksEnhanced] No notes found for chord');
@@ -727,7 +722,6 @@ function showEnhancedWhyThisWorks(options) {
             explanation.explanation = reason;
         }
     } catch (err) {
-        console.log('[WhyThisWorksEnhanced] Theory lookup failed, using engine reason');
         if (reason) {
             explanation.explanation = reason;
         }
@@ -1204,11 +1198,9 @@ function setupModalEvents() {
         // Forward playback button
         const forwardBtn = document.getElementById('ewtw-play-forward');
         if (forwardBtn) {
-            console.log('[WhyThisWorksEnhanced] Adding click listener to forward button');
             forwardBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[WhyThisWorksEnhanced] Forward button clicked via addEventListener');
                 playForwardResolution();
             });
         }

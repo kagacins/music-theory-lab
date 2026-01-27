@@ -2904,7 +2904,6 @@ export class FullScreenNotationEditor {
             btn.addEventListener('click', (e) => {
                 const arpeggioDirection = e.currentTarget.dataset.arpeggio;
                 const toolbar = getToolbar();
-                console.log('[FS Arpeggio] Button clicked:', { arpeggioDirection, hasToolbar: !!toolbar, hasCallback: !!toolbar?.onArpeggioApply });
                 if (arpeggioDirection && toolbar) {
                     toolbar.onArpeggioApply?.(arpeggioDirection);
                 }
@@ -5293,7 +5292,6 @@ export class FullScreenNotationEditor {
      * Triggers a re-render of notation with the new measures per line
      */
     _onMeasuresPerSystemChange() {
-        console.log('Measures per system changed to:', this.measuresPerSystem);
 
         // Get the NotationComposer and trigger re-render with new measures per line
         const notationComposer = window.getNotationComposer?.();

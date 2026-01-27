@@ -142,7 +142,6 @@ export function showChoiceDialog(options) {
  * @param {Function} options.onChoice - Callback with { bass: 'transpose'|'keep', treble: 'transpose'|'keep'|'adjust' } or null
  */
 export function showKeyChangeDialog(options) {
-    console.log('[showKeyChangeDialog] Called with options:', options);
     const { oldKey, newKey, chords = [], hasMelody = false, modeChange = false, onChoice } = options;
 
     // Remove any existing dialog

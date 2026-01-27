@@ -131,7 +131,6 @@ class FullScreenChordLabEditor {
     openInTabMode() {
         // If already in tab mode, just re-capture keyboard (it may have been restored when switching tabs)
         if (this.isTabMode) {
-            console.log('[FullScreenChordLabEditor] Already in tab mode, re-capturing keyboard');
             this._captureKeyboard();
             this._syncFromBuilderState();
             // Update keyboard labels (Roman numerals) when re-entering tab
@@ -187,7 +186,6 @@ class FullScreenChordLabEditor {
             setTimeout(() => window.updateKeyboardLabels(), 50);
         }
 
-        console.log('[FullScreenChordLabEditor] Opened in tab mode');
     }
 
     /**
@@ -220,7 +218,6 @@ class FullScreenChordLabEditor {
         }
 
         this.isTabMode = false;
-        console.log('[FullScreenChordLabEditor] Closed tab mode');
     }
 
     // ========================================================================
@@ -761,7 +758,6 @@ class FullScreenChordLabEditor {
                 if (keyboardSection) {
                     keyboardSection.classList.add('hidden');
                 }
-                console.log('[FullScreenChordLabEditor] Keyboard captured');
             }
         } else {
             console.warn('[FullScreenChordLabEditor] Piano keyboard not found');
@@ -778,7 +774,6 @@ class FullScreenChordLabEditor {
             pianoKeyboard.style.maxWidth = '';
             pianoKeyboard.style.width = '';
             // tabs.js should handle visibility when switching back
-            console.log('[FullScreenChordLabEditor] Keyboard restored');
         }
         this.originalKeyboardParent = null;
         this.originalKeyboardNextSibling = null;

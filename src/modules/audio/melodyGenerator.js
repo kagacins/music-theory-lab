@@ -499,9 +499,6 @@ function buildPlaybackMeasureOrder(compositionState) {
         measureIndex++;
     }
 
-    console.log('[buildPlaybackMeasureOrder] Repeat signs:', repeatSigns);
-    console.log('[buildPlaybackMeasureOrder] Volta brackets:', voltaBrackets);
-    console.log('[buildPlaybackMeasureOrder] Playback order:', playbackOrder);
 
     return playbackOrder;
 }
@@ -1509,7 +1506,6 @@ export function setTimeSignature(timeSignature) {
         const measureCount = compState.getMeasureCount();
         if (measureCount > 0) {
             interactiveMelody.numMeasures = measureCount;
-            console.log(`[setTimeSignature] Updated numMeasures to ${measureCount} for ${timeSignature}`);
         }
     }
 
@@ -2956,16 +2952,6 @@ function startMeasurePlayback(canvas, measureIndex) {
         const currentKey = getCurrentKey() || 'C';
 
         // DEBUG: Log all notes to see their properties
-        console.log(`[playMeasureNotes] All ${measureMelodyNotes.length} notes in measure ${measureIndex}:`,
-            measureMelodyNotes.map(n => ({
-                pitch: n.pitches?.[0] || n.pitch,
-                beat: n.beat,
-                duration: n.duration,
-                tupletType: n.tupletType,
-                tuplet: n.tuplet,
-                tupletGroupId: n.tupletGroupId
-            }))
-        );
 
         measureMelodyNotes.forEach((note, index) => {
             // Use actual beat position for delay calculation (supports tuplets and complex rhythms)
@@ -2981,7 +2967,6 @@ function startMeasurePlayback(canvas, measureIndex) {
 
                 // DEBUG: Log tuplet note duration calculation
                 if (note.tupletType || note.tuplet) {
-                    console.log(`[playMeasureNotes] TUPLET note: pitch=${pitches[0]}, duration=${note.duration}, tupletType=${note.tupletType}, tuplet=${JSON.stringify(note.tuplet)}, calculatedDuration=${noteDuration.toFixed(4)}s`);
                 }
 
                 // Handle ornaments if present - expand into multiple notes
@@ -3041,7 +3026,6 @@ function startMeasurePlayback(canvas, measureIndex) {
                         activeNotes.add(noteId);
 
                         // DEBUG: Log note ID creation for red highlighting
-                        console.log(`[melodyGenerator] playMeasureNotes: Creating noteId="${noteId}" (beat=${noteBeat}, pitch=${pitch})`);
 
                         // Notify new notation system for red note highlighting
                         if (window.addNotationActiveNote) {
@@ -3640,7 +3624,6 @@ export function playInteractiveMelodyWithChords() {
                 ornament: note.ornament,
                 arpeggio: note.arpeggio
             }));
-        console.log(`[playInteractiveMelodyWithChords] Got ${melodyNotesToPlay.length} melody notes from compositionState (after filtering ties)`);
     }
 
     // Schedule melody notes
@@ -5496,10 +5479,6 @@ function renderBassFromCompositionState(context, chordStaves, numMeasures, chord
             }
 
             // Debug: Log bass notes for this measure - handle polyphony
-            console.log(`[Phase 1C DEBUG] Measure ${measureIndex} bass notes:`, bassVoice.notes.map(n => {
-                const pitches = getNotePitches(n);
-                return pitches.length > 1 ? `[${pitches.join(',')}](${n.duration})` : `${pitches[0] || 'rest'}(${n.duration})`;
-            }).join(', '));
 
             // Convert bass notes to VexFlow format
             const vexBassNotes = [];

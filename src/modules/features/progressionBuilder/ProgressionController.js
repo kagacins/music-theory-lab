@@ -2205,7 +2205,6 @@ export function addNoChordToProgression() {
         window.addToProgressionData(noChordData);
     }
 
-    console.log('[addNoChordToProgression] Added No Chord placeholder');
 }
 
 /**
@@ -2375,8 +2374,6 @@ export function addToProgressionData(chordData, options = {}) {
     if (chordData.roman && !trainerState.progressionRomans.includes(chordData.roman)) {
         trainerState.progressionRomans.push(chordData.roman);
     }
-    console.log('[addToProgressionData] chordData.omittedNotes:', chordData.omittedNotes);
-    console.log('[addToProgressionData] Full chordData:', JSON.stringify(chordData, null, 2));
     setProgressionData(trainerState.progressionData);
 
     // Mark progression as ready when chords are added (fixes Chord Lab playback)
@@ -2396,12 +2393,6 @@ export function addToProgressionData(chordData, options = {}) {
 
     // Dispatch event for Theory Moments (teaching integration)
     const chordIndex = trainerState.progressionData.length - 1;
-    console.log('[addToProgressionData] Dispatching chordAddedForTheory event:', {
-        chord: chordData.root + ' ' + chordData.type,
-        roman: chordData.roman,
-        index: chordIndex,
-        key: trainerState.currentKey
-    });
     window.dispatchEvent(new CustomEvent('chordAddedForTheory', {
         detail: {
             chord: chordData,
@@ -2838,7 +2829,6 @@ export function toggleProgressionLHNote(chordIndex, note) {
  */
 export function toggleProgressionNotation(chordIndex, sourceContainerId) {
     // TODO: Extract implementation from progressionBuilder.js
-    console.log('[ProgressionController] toggleProgressionNotation - placeholder');
 }
 
 // ============================================================================
@@ -4046,7 +4036,6 @@ export function transposeProgression(oldKey, newKey) {
     const enharmonicPref = getEnharmonicPreferenceForKey(newKey);
     const noteArray = enharmonicPref === 'flat' ? FLAT_NOTES : SHARP_NOTES;
 
-    console.log(`[transposeProgression] Transposing from ${oldKey} to ${newKey} (${semitones} semitones, mode changed: ${modeChanged}, ${enharmonicPref} spelling)`);
 
     // Diatonic chord qualities by scale degree (1-7)
     // Major key: I=Major, ii=Minor, iii=Minor, IV=Major, V=Major, vi=Minor, vii°=Diminished
@@ -4060,13 +4049,6 @@ export function transposeProgression(oldKey, newKey) {
 
     // Transpose each chord
     progressionData.forEach((chord, index) => {
-        console.log(`[transposeProgression] Processing chord ${index}:`, {
-            root: chord.root,
-            type: chord.type,
-            roman: chord.roman,
-            simpleName: chord.simpleName,
-            name: chord.name
-        });
 
         if (!chord.root) {
             console.warn(`[transposeProgression] Chord ${index} has no root, skipping`);
@@ -4116,7 +4098,6 @@ export function transposeProgression(oldKey, newKey) {
                 if (basicTriads.includes(chord.type)) {
                     // Simple triad - just change the quality
                     newType = expectedQuality;
-                    console.log(`[transposeProgression] Mode change: ${chord.type} → ${newType} for degree ${degree}`);
                 } else if (chord.type.includes('7') || chord.type.includes('9') || chord.type.includes('11') || chord.type.includes('13')) {
                     // Extended chord - try to update the base quality
                     // e.g., "Major 7th" → "Minor 7th", "Dominant 7th" stays as is (V7 is common in minor)
@@ -4128,7 +4109,6 @@ export function transposeProgression(oldKey, newKey) {
                         newType = 'Half-Diminished 7th';
                     }
                     // Keep Dominant 7th as is - it's used in both modes
-                    console.log(`[transposeProgression] Extended chord mode change: ${chord.type} → ${newType} for degree ${degree}`);
                 }
             }
         }
@@ -4219,7 +4199,6 @@ export function updateRomanNumerals(newKey) {
     const progressionData = getProgressionData();
     if (!progressionData || progressionData.length === 0) return;
 
-    console.log(`[updateRomanNumerals] Updating Roman numerals for key: ${newKey}`);
 
     // Recalculate Roman numeral for each chord
     progressionData.forEach((chord, index) => {
@@ -4229,7 +4208,6 @@ export function updateRomanNumerals(newKey) {
         const newRoman = noteToRomanNumeral(chord.root, newKey, chord.type);
 
         if (newRoman) {
-            console.log(`[updateRomanNumerals] Chord ${index}: ${chord.root} ${chord.type} - ${chord.roman} → ${newRoman}`);
             chord.roman = newRoman;
         } else {
             console.warn(`[updateRomanNumerals] Could not calculate Roman numeral for chord ${index}:`, chord.root, chord.type);

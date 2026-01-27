@@ -204,7 +204,6 @@ export function initProgressionBuilder() {
     // Render progression controls (dropdowns, event listeners, load random progression)
     renderProgressionControls();
 
-    console.log('[ProgressionBuilder] Module initialized');
 }
 
 // ============================================================================

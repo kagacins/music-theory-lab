@@ -83,7 +83,6 @@ function trackCurrentProgression(source) {
     const snapshot = createCompositionSnapshot(trainerState, source);
     addCompositionToHistory(snapshot);
 
-    console.log('[CompositionInsights] Tracked composition:', source);
 }
 
 /**

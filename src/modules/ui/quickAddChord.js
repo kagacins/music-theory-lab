@@ -206,7 +206,6 @@ export function quickAddChordFromForm(formId) {
     // Get root note name
     const rootNoteName = getRootNoteName(rootIndex);
 
-    console.log('[QuickAddChord] Adding chord:', { rootNoteName, chordType, inversion });
 
     // Use the existing addChordToProgressionByParams function
     if (window.addChordToProgressionByParams) {
@@ -229,7 +228,6 @@ export function initQuickAddChordForms() {
     Object.keys(FORM_CONFIGS).forEach(formId => {
         populateScaleDropdown(formId);
     });
-    console.log('[QuickAddChord] Initialized Quick Add Chord forms');
 }
 
 // Export for window binding

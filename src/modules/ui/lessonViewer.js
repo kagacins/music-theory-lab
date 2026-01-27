@@ -2225,7 +2225,6 @@ function initLearnSectionKeyboard(container, lesson) {
         createMiniKeyboard(keyboardContainer, {
             ...config,
             onNotePlay: (noteName, baseName) => {
-                console.log('[Learn Demo] User played:', baseName);
             }
         });
     }
@@ -2496,11 +2495,9 @@ function attachLessonEventListeners(container, lesson) {
                     targetTab: targetTab,
                     steps: fullscreenSteps,
                     onComplete: (actionHistory) => {
-                        console.log('[LessonViewer] Fullscreen guided exercise completed');
                         cleanupFullscreenTutorial();
                     },
                     onCancel: () => {
-                        console.log('[LessonViewer] Fullscreen guided exercise cancelled');
                         cleanupFullscreenTutorial();
                     }
                 });
@@ -2522,10 +2519,8 @@ function attachLessonEventListeners(container, lesson) {
                     targetTab: targetTab,
                     steps: guidedSteps,
                     onComplete: (actionHistory) => {
-                        console.log('[LessonViewer] Guided exercise completed');
                     },
                     onCancel: () => {
-                        console.log('[LessonViewer] Guided exercise cancelled');
                     }
                 });
             }
@@ -2549,11 +2544,9 @@ function attachLessonEventListeners(container, lesson) {
                 targetTab: targetTab,
                 steps: extendedData.steps,
                 onComplete: (actionHistory) => {
-                    console.log('[LessonViewer] Extended guided exercise completed');
                     cleanupFullscreenTutorial();
                 },
                 onCancel: () => {
-                    console.log('[LessonViewer] Extended guided exercise cancelled');
                     cleanupFullscreenTutorial();
                 }
             });

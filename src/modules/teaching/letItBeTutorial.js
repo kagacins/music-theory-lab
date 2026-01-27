@@ -180,7 +180,6 @@ function showTutorialStartModal(onConfirmVerse, onConfirmChorus, onConfirmMelody
  * Complete implementation restored from git commit 6c31253
  */
 function actuallyLaunchLetItBeVerseTutorial() {
-    console.log('[LetItBeVerseTutorial] Starting verse tutorial, clearing progression...');
 
     // Set flag to suppress Theory Moments during tutorial setup
     window.isTutorialSetupInProgress = true;
@@ -931,7 +930,6 @@ function actuallyLaunchLetItBeVerseTutorial() {
         targetTab: 'builder',
         steps: verseTutorialSteps,
         onComplete: (actionHistory) => {
-            console.log('[LetItBeVerseTutorial] Tutorial completed!', actionHistory);
             if (window.switchTab) {
                 window.switchTab('melody');
             }
@@ -940,7 +938,6 @@ function actuallyLaunchLetItBeVerseTutorial() {
             }
         },
         onCancel: () => {
-            console.log('[LetItBeVerseTutorial] Tutorial cancelled by user.');
             if (window.switchTab) {
                 window.switchTab('melody');
             }
@@ -955,7 +952,6 @@ function actuallyLaunchLetItBeVerseTutorial() {
  * Note: In git this was named actuallyLaunchLetItBeTutorial (without Chorus suffix)
  */
 function actuallyLaunchLetItBeChorusTutorial() {
-    console.log('[LetItBeTutorial] Starting tutorial, clearing progression...');
 
     // Set flag to suppress Theory Moments during tutorial setup
     window.isTutorialSetupInProgress = true;
@@ -973,7 +969,6 @@ function actuallyLaunchLetItBeChorusTutorial() {
     if (fabBpmSlider) fabBpmSlider.value = defaultBpm;
     if (fabBpmValue) fabBpmValue.textContent = defaultBpm;
 
-    console.log('[LetItBeTutorial] Progression cleared, chords remaining:', window.getProgressionData?.()?.length || 0);
 
     // Disable chord card tooltips during tutorial for cleaner UI
     document.body.classList.add('progression-tooltips-disabled');
@@ -1415,7 +1410,6 @@ function actuallyLaunchLetItBeChorusTutorial() {
         targetTab: 'builder',
         steps: letItBeTutorialSteps,
         onComplete: (actionHistory) => {
-            console.log('[LetItBeTutorial] Tutorial completed!', actionHistory);
             // Stay in Composition Studio
             if (window.switchTab) {
                 window.switchTab('melody');
@@ -1425,7 +1419,6 @@ function actuallyLaunchLetItBeChorusTutorial() {
             }
         },
         onCancel: () => {
-            console.log('[LetItBeTutorial] Tutorial cancelled by user.');
             // Return to Composition Studio on cancel too
             if (window.switchTab) {
                 window.switchTab('melody');
@@ -1440,7 +1433,6 @@ function actuallyLaunchLetItBeChorusTutorial() {
  * Complete implementation restored from git commit 6c31253
  */
 function actuallyLaunchLetItBeMelodyTutorial() {
-    console.log('[LetItBeMelodyTutorial] Starting melody tutorial, setting up progression...');
 
     // Set flag to suppress Theory Moments during tutorial setup
     window.isTutorialSetupInProgress = true;
@@ -1477,13 +1469,11 @@ function actuallyLaunchLetItBeMelodyTutorial() {
 
     // Set the key to C Major FIRST - use same method as Circle of Fifths
     setTimeout(() => {
-        console.log('[LetItBeMelodyTutorial] Setting key to C Major...');
 
         // Use setKeyDropdownValue which properly handles the key change (same as Circle of Fifths)
         // This internally calls setCurrentKey and updates all necessary state
         if (window.setKeyDropdownValue) {
             window.setKeyDropdownValue('C', false); // 'C' not 'C Major' - the function handles quality
-            console.log('[LetItBeMelodyTutorial] Used setKeyDropdownValue to set key to C Major');
         } else {
             // Fallback: directly update the dropdown and displays
             console.warn('[LetItBeMelodyTutorial] setKeyDropdownValue not available, using fallback');
@@ -1506,7 +1496,6 @@ function actuallyLaunchLetItBeMelodyTutorial() {
             if (el) el.textContent = 'C Major';
         });
 
-        console.log('[LetItBeMelodyTutorial] Key set to C Major');
 
         // Set BPM to 72 (ballad tempo)
         if (window.interactiveMelody) {
@@ -1566,12 +1555,10 @@ function actuallyLaunchLetItBeMelodyTutorial() {
                 if (window.getCompositionState) {
                     const compositionState = window.getCompositionState();
 
-                    console.log('[LetItBeMelodyTutorial] Measure count:', compositionState.getMeasureCount());
 
                     // Ensure measure 0 exists and has the proper structure
                     if (compositionState.getMeasureCount() > 0) {
                         const measure = compositionState.getMeasure(0);
-                        console.log('[LetItBeMelodyTutorial] Measure 0:', measure);
 
                         // Ensure treble clef voice exists
                         if (measure && measure.notation && measure.notation.treble) {
@@ -1593,8 +1580,6 @@ function actuallyLaunchLetItBeMelodyTutorial() {
                             };
 
                             measure.notation.treble.voices[0].notes.push(restNote);
-                            console.log('[LetItBeMelodyTutorial] Added dotted half rest (3 beats) to measure 0 treble clef');
-                            console.log('[LetItBeMelodyTutorial] Treble notes now:', measure.notation.treble.voices[0].notes);
                         } else {
                             console.warn('[LetItBeMelodyTutorial] Measure 0 treble notation not found. Measure:', measure);
                         }
@@ -1612,20 +1597,16 @@ function actuallyLaunchLetItBeMelodyTutorial() {
             const csBeforeRefresh = window.getCompositionState && window.getCompositionState();
             if (csBeforeRefresh) {
                 const m0 = csBeforeRefresh.getMeasure(0);
-                console.log('[LetItBeMelodyTutorial] Before refresh - Measure 0 treble voices:', m0?.notation?.treble?.voices);
             }
 
             // Refresh notation - call render directly on the notationComposer
             // to ensure our compositionState changes are rendered
             const nc = window.getNotationComposer && window.getNotationComposer();
             if (nc) {
-                console.log('[LetItBeMelodyTutorial] Calling syncFromProgression...');
                 nc.syncFromProgression();
-                console.log('[LetItBeMelodyTutorial] syncFromProgression complete');
 
                 // Check measureManager to see what was loaded
                 if (nc.measureManager && nc.measureManager.measures && nc.measureManager.measures[0]) {
-                    console.log('[LetItBeMelodyTutorial] MeasureManager measure 0 trebleNotes:', nc.measureManager.measures[0].trebleNotes);
                 }
             } else if (window.refreshNotationFromProgression) {
                 window.refreshNotationFromProgression();
@@ -1640,7 +1621,6 @@ function actuallyLaunchLetItBeMelodyTutorial() {
     }, 100);
 }
 function launchLetItBeMelodyTutorialSteps() {
-    console.log('[LetItBeMelodyTutorial] Starting tutorial steps...');
 
     // Helper function to expand Staff Notation panel
     function expandStaffNotationPanel() {
@@ -2737,7 +2717,6 @@ function launchLetItBeMelodyTutorialSteps() {
         targetTab: 'melody',
         steps: letItBeMelodySteps,
         onComplete: (actionHistory) => {
-            console.log('[LetItBeMelodyTutorial] Tutorial completed!', actionHistory);
             // Stay in Composition Studio
             if (window.switchTab) {
                 window.switchTab('melody');
@@ -2747,7 +2726,6 @@ function launchLetItBeMelodyTutorialSteps() {
             }
         },
         onCancel: () => {
-            console.log('[LetItBeMelodyTutorial] Tutorial cancelled by user.');
             // Stay in Composition Studio
             if (window.switchTab) {
                 window.switchTab('melody');
@@ -2762,7 +2740,6 @@ function launchLetItBeMelodyTutorialSteps() {
  * Linear flow: C-G-Am-F with G in 1st inversion, grouping, duplication
  */
 function actuallyLaunchLetItBeVerseTutorialFullscreen() {
-    console.log('[LetItBeVerseTutorialFS] Starting fullscreen verse tutorial, clearing progression...');
 
     // Switch to fullscreen Chord Lab first
     if (window.switchTab) {
@@ -3916,7 +3893,6 @@ function actuallyLaunchLetItBeVerseTutorialFullscreen() {
         targetTab: 'chordlab-new',
         steps: verseTutorialStepsFS,
         onComplete: (actionHistory) => {
-            console.log('[LetItBeVerseTutorialFS] Tutorial completed!', actionHistory);
             // Re-enable tooltips in Chord Lab
             const editor = window.getFullScreenChordLabEditor?.();
             if (editor?.bottomPanel?.setTooltipsEnabled) {
@@ -3928,7 +3904,6 @@ function actuallyLaunchLetItBeVerseTutorialFullscreen() {
             }
         },
         onCancel: () => {
-            console.log('[LetItBeVerseTutorialFS] Tutorial cancelled by user.');
             // Re-enable tooltips in Chord Lab
             const editor = window.getFullScreenChordLabEditor?.();
             if (editor?.bottomPanel?.setTooltipsEnabled) {
@@ -3945,7 +3920,6 @@ function actuallyLaunchLetItBeVerseTutorialFullscreen() {
  * Uses the fullscreen Chord Lab and Composition Studio
  */
 function actuallyLaunchLetItBeChorusTutorialFullscreen() {
-    console.log('[LetItBeChorusTutorialFS] Starting chorus tutorial, clearing progression...');
 
     // Switch to fullscreen Chord Lab first
     if (window.switchTab) {
@@ -3972,7 +3946,6 @@ function actuallyLaunchLetItBeChorusTutorialFullscreen() {
     if (fsBpmSlider) fsBpmSlider.value = defaultBpm;
     if (fsBpmValue) fsBpmValue.textContent = defaultBpm;
 
-    console.log('[LetItBeChorusTutorialFS] Progression cleared, chords remaining:', window.getProgressionData?.()?.length || 0);
 
     // Disable chord card tooltips during tutorial
     document.body.classList.add('progression-tooltips-disabled');
@@ -4761,7 +4734,6 @@ function actuallyLaunchLetItBeChorusTutorialFullscreen() {
         targetTab: 'chordlab-new',
         steps: chorusTutorialStepsFS,
         onComplete: (actionHistory) => {
-            console.log('[LetItBeChorusTutorialFS] Tutorial completed!', actionHistory);
             // Re-enable tooltips in Chord Lab
             const editor = window.getFullScreenChordLabEditor?.();
             if (editor?.bottomPanel?.setTooltipsEnabled) {
@@ -4773,7 +4745,6 @@ function actuallyLaunchLetItBeChorusTutorialFullscreen() {
             }
         },
         onCancel: () => {
-            console.log('[LetItBeChorusTutorialFS] Tutorial cancelled by user.');
             // Re-enable tooltips in Chord Lab
             const editor = window.getFullScreenChordLabEditor?.();
             if (editor?.bottomPanel?.setTooltipsEnabled) {

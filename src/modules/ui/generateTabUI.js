@@ -36,7 +36,6 @@ export function initGenerateTabUI() {
         refreshUI();
 
         isInitialized = true;
-        console.log('[Phase 5] Generate Tab UI initialized');
     } catch (error) {
         console.error('[Phase 5] Failed to initialize Generate Tab UI:', error);
         // Still mark as initialized to prevent repeated attempts

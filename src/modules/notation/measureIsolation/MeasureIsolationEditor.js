@@ -3666,24 +3666,18 @@ export class MeasureIsolationEditor {
         }
 
         // DEBUG: Log measure data to identify duplication source
-        console.log('[MeasureIsolationEditor] Loading measure:', measureIndex);
-        console.log('[MeasureIsolationEditor] Bass voices:', JSON.stringify(measure.notation?.bass?.voices, null, 2));
-        console.log('[MeasureIsolationEditor] Treble voices:', JSON.stringify(measure.notation?.treble?.voices, null, 2));
 
         // Get the current key for key signature display
         // Key is stored in compositionState.metadata.key (direct property access)
         this.currentKey = this.compositionState.metadata?.key || 'C';
         this.keyAccidentals = KEY_SIGNATURES[this.currentKey] || [];
-        console.log('[MIE] Key from metadata:', this.currentKey, 'accidentals:', this.keyAccidentals);
 
         // Get the chord for this measure (for harmonic function coloring)
         this.measureChord = measure.chord || null;
-        console.log('[MIE] Measure chord:', this.measureChord);
 
         // Get the next measure's chord for bass approach note suggestions
         const nextMeasure = this.compositionState.getMeasure(measureIndex + 1);
         this.nextMeasureChord = nextMeasure?.chord || null;
-        console.log('[MIE] Next measure chord:', this.nextMeasureChord);
 
         const timeSignature = this.compositionState.getTimeSignature();
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
@@ -6796,7 +6790,6 @@ export class MeasureIsolationEditor {
         this._renderStaves();
         this._updateFillStats();
 
-        console.log('[MeasureIsolationEditor] Reloaded measures:', measureIndices, 'width:', this.STAFF_WIDTH);
     }
 
     /**
@@ -7037,7 +7030,6 @@ export class MeasureIsolationEditor {
             }
         }, 1500);
 
-        console.log('[MeasureIsolationEditor] Applied changes (staying open)');
     }
 
     /**
@@ -7052,7 +7044,6 @@ export class MeasureIsolationEditor {
         // Apply changes
         this._applyChangesToCompositionState();
 
-        console.log('[MeasureIsolationEditor] Applied changes and closing');
 
         // Close modal
         this.modal.classList.add('hidden');

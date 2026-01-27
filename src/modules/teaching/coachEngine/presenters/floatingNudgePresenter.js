@@ -86,17 +86,11 @@ function runCoachDiagnostics() {
 
     // Check if styles are injected
     const styleEl = document.getElementById('coach-nudge-styles');
-    console.log('CSS Styles injected:', !!styleEl);
 
     // Check current nudge state
-    console.log('Current nudge:', currentNudge);
-    console.log('Last shown nudge:', lastShownNudge);
-    console.log('Is enabled:', isEnabled);
-    console.log('Skill level:', skillLevel);
 
     // Check for popup
     const popup = document.getElementById('coach-nudge-popup');
-    console.log('Popup element exists:', !!popup);
 
     if (popup) {
         // Check action buttons
@@ -104,37 +98,22 @@ function runCoachDiagnostics() {
         const hearBtn = popup.querySelector('.coach-action-hear');
         const deepDiveBtn = popup.querySelector('.coach-action-deepdive');
 
-        console.log('Show button found:', !!showBtn);
-        console.log('Hear button found:', !!hearBtn);
-        console.log('Learn More button found:', !!deepDiveBtn);
     }
 
     // Check global functions
-    console.log('window.setCoachHighlight exists:', typeof window.setCoachHighlight === 'function');
-    console.log('window.showUnifiedRecommendationModal exists:', typeof window.showUnifiedRecommendationModal === 'function');
-    console.log('window.playNotesArray exists:', typeof window.playNotesArray === 'function');
-    console.log('window.getPiano exists:', typeof window.getPiano === 'function');
 
     // Check chord cards
     const fsContainer = document.getElementById('fs-chord-cards-container');
     if (fsContainer) {
         const cards = fsContainer.querySelectorAll('[data-chord-index]');
-        console.log('Chord cards in fullscreen container:', cards.length);
         cards.forEach((card, i) => {
-            console.log(`  Card ${i}: data-chord-index="${card.getAttribute('data-chord-index')}"`);
         });
     } else {
-        console.log('Fullscreen chord container not found');
     }
 
     // Check coach engine
     if (window.coachEngine) {
-        console.log('Coach engine instance:', window.coachEngine);
-        console.log('Queue length:', window.coachEngine.queue?.length || 0);
-        console.log('History length:', window.coachEngine.history?.length || 0);
-        console.log('Cooldowns:', window.coachEngine.cooldowns?.size || 0);
     } else {
-        console.log('Coach engine not found on window');
     }
 
     console.groupEnd();
@@ -575,7 +554,6 @@ function setupNudgeEventListeners(popup, item) {
 
     // Instance navigation buttons (clickable location list)
     const instanceBtns = popup.querySelectorAll('.coach-instance-btn');
-    console.log('[FloatingNudgePresenter] Instance buttons found:', instanceBtns.length);
     instanceBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const idx = parseInt(btn.dataset.instanceIndex);
@@ -584,43 +562,34 @@ function setupNudgeEventListeners(popup, item) {
     });
 
     // Action buttons - log what we find
-    console.log('[FloatingNudgePresenter] Setting up action button listeners...');
 
     const showBtn = popup.querySelector('.coach-action-show');
-    console.log('[FloatingNudgePresenter] Show button found:', !!showBtn);
     if (showBtn) {
         showBtn.addEventListener('click', (e) => {
-            console.log('[FloatingNudgePresenter] Show button CLICKED');
             e.stopPropagation();
             handleShowAction(item);
         });
     }
 
     const hearBtn = popup.querySelector('.coach-action-hear');
-    console.log('[FloatingNudgePresenter] Hear button found:', !!hearBtn);
     if (hearBtn) {
         hearBtn.addEventListener('click', (e) => {
-            console.log('[FloatingNudgePresenter] Hear button CLICKED');
             e.stopPropagation();
             handleHearAction(item);
         });
     }
 
     const previewBtn = popup.querySelector('.coach-action-preview');
-    console.log('[FloatingNudgePresenter] Preview button found:', !!previewBtn);
     if (previewBtn) {
         previewBtn.addEventListener('click', (e) => {
-            console.log('[FloatingNudgePresenter] Preview button CLICKED');
             e.stopPropagation();
             handlePreviewAction(item);
         });
     }
 
     const applyBtn = popup.querySelector('.coach-action-apply');
-    console.log('[FloatingNudgePresenter] Apply button found:', !!applyBtn);
     if (applyBtn) {
         applyBtn.addEventListener('click', (e) => {
-            console.log('[FloatingNudgePresenter] Apply button CLICKED');
             e.stopPropagation();
             handleApplyAction(item);
         });
@@ -643,16 +612,13 @@ function setupNudgeEventListeners(popup, item) {
     }
 
     const deepDiveBtn = popup.querySelector('.coach-action-deepdive');
-    console.log('[FloatingNudgePresenter] Learn More button found:', !!deepDiveBtn);
     if (deepDiveBtn) {
         deepDiveBtn.addEventListener('click', (e) => {
-            console.log('[FloatingNudgePresenter] Learn More button CLICKED');
             e.stopPropagation();
             handleDeepDiveAction(item);
         });
     }
 
-    console.log('[FloatingNudgePresenter] Action button setup complete');
 }
 
 // ============================================================================
@@ -672,7 +638,6 @@ function handleInstanceClick(item, instanceIndex) {
     }
 
     const instance = instances[instanceIndex];
-    console.log('[FloatingNudgePresenter] Instance click:', instanceIndex, instance);
 
     // Get chord indices from this instance
     let indices = instance.chordIndices || [];
@@ -727,7 +692,6 @@ function highlightNotesInNotation(instance) {
         window.highlightNotesInStaff(notes, instance.chordIndices || []);
     }
 
-    console.log('[FloatingNudgePresenter] Note highlight requested for:', instance);
 }
 
 /**
@@ -735,13 +699,9 @@ function highlightNotesInNotation(instance) {
  * @param {Object} item - Coach item
  */
 function handleShowAction(item) {
-    console.log('[FloatingNudgePresenter] ========== SHOW ACTION ==========');
-    console.log('[FloatingNudgePresenter] Item ID:', item.id);
-    console.log('[FloatingNudgePresenter] Item data:', JSON.stringify(item.data, null, 2));
 
     // If there are instances, show the first one
     if (item.data?.instances?.length > 0) {
-        console.log('[FloatingNudgePresenter] Has instances, delegating to handleInstanceClick');
         handleInstanceClick(item, 0);
         return;
     }
@@ -750,11 +710,9 @@ function handleShowAction(item) {
     let indices = [];
 
     if (item.data?.chordIndex !== undefined) {
-        console.log('[FloatingNudgePresenter] Found chordIndex:', item.data.chordIndex);
         indices.push(item.data.chordIndex);
     }
     if (item.data?.chordIndices?.length > 0) {
-        console.log('[FloatingNudgePresenter] Found chordIndices:', item.data.chordIndices);
         indices.push(...item.data.chordIndices);
     }
     // For cadences that span two chords
@@ -785,7 +743,6 @@ function handleShowAction(item) {
  * @param {number[]} indices - Chord indices to highlight
  */
 function highlightChordCards(indices) {
-    console.log('[FloatingNudgePresenter] highlightChordCards called with indices:', indices);
 
     // Remove any existing highlights
     document.querySelectorAll('.coach-highlight').forEach(el => {
@@ -815,12 +772,10 @@ function highlightChordCards(indices) {
             totalCardsFound += cards.length;
             cards.forEach(card => {
                 card.classList.add('coach-highlight');
-                console.log('[FloatingNudgePresenter] Added highlight to card:', selector, card);
             });
         }
     }
 
-    console.log('[FloatingNudgePresenter] Total cards found and highlighted:', totalCardsFound);
 
     // Auto-remove highlight after 5 seconds
     setTimeout(() => {
@@ -858,7 +813,6 @@ function scrollToChordCard(index) {
  * @param {Object} item - Coach item
  */
 function handleHearAction(item) {
-    console.log('[FloatingNudgePresenter] Hear action:', item.id);
 
     const chord = item.data?.chord;
     if (!chord) {
@@ -889,7 +843,6 @@ function handleHearAction(item) {
  * @param {Object} item - Coach item
  */
 function handlePreviewAction(item) {
-    console.log('[FloatingNudgePresenter] Preview action:', item.id);
 
     const suggested = item.data?.suggestedChord;
     if (!suggested) {
@@ -919,7 +872,6 @@ function handlePreviewAction(item) {
  * @param {Object} item - Coach item
  */
 function handleApplyAction(item) {
-    console.log('[FloatingNudgePresenter] Apply action:', item.id);
 
     const chordIndex = item.data?.chordIndex;
     if (chordIndex === undefined) {
@@ -958,7 +910,6 @@ function handleApplyAction(item) {
  * @param {Object} item - Coach item
  */
 function handleCompareAction(item) {
-    console.log('[FloatingNudgePresenter] Compare action:', item.id);
 
     // Open the unified recommendation modal in compare mode
     if (window.showUnifiedRecommendationModal) {
@@ -973,7 +924,6 @@ function handleCompareAction(item) {
  * @param {Object} item - Coach item
  */
 function handlePanelAction(item) {
-    console.log('[FloatingNudgePresenter] Panel action:', item.id);
 
     // Determine which panel to open based on category
     const category = item.category;
@@ -996,9 +946,6 @@ function handlePanelAction(item) {
  * @param {Object} item - Coach item
  */
 function handleDeepDiveAction(item) {
-    console.log('[FloatingNudgePresenter] ========== LEARN MORE ACTION ==========');
-    console.log('[FloatingNudgePresenter] Item ID:', item.id);
-    console.log('[FloatingNudgePresenter] Item category:', item.category);
 
     // Show the educational modal with information about this coach item's concept
     showLearnMoreModal(item);

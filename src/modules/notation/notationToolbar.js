@@ -1922,7 +1922,6 @@ export class NotationToolbar {
       if (this.selectedNotesCount >= 2) {
         this.onSlur();
       } else {
-        console.log('Select 2+ notes to create a slur');
       }
     });
 
@@ -1931,7 +1930,6 @@ export class NotationToolbar {
       if (this.selectedNotesCount >= 1) {
         this.onSlurRemove();
       } else {
-        console.log('Select a note within a slur to remove it');
       }
     });
 
@@ -2076,7 +2074,6 @@ export class NotationToolbar {
           this.onHairpinApply(hairpinType);
         } else if (this.selectedNotesCount < 2) {
           // Show feedback that 2 notes must be selected
-          console.log('Select 2 notes first to create a hairpin');
         }
       });
     });
@@ -2087,7 +2084,6 @@ export class NotationToolbar {
         if (this.selectedNotesCount >= 1) {
           this.onHairpinRemove();
         } else {
-          console.log('Select a note within a hairpin to remove it');
         }
       });
     });

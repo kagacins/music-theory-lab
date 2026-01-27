@@ -1339,7 +1339,6 @@ function generatePolyphonySuggestions() {
     chordNotes = chordNotes.filter(n => (n.voiceIndex || 0) === 0);
 
     // Debug logging
-    console.log('[Polyphony] Notes gathered:', chordNotes.length, chordNotes.map(n => n.pitch || n.pitches?.[0]));
 
     // Generate suggestions based on texture type
     const suggestions = generateTextureNotes(
@@ -3158,7 +3157,6 @@ function applyPolyphonySuggestions() {
             // Fallback: manually clear the voice notes
             const measure = compositionState.getMeasure(measureIndex);
             if (measure?.notation?.[staff]?.voices?.[1]) {
-                console.log(`[Polyphony] Clearing existing Voice 2 in measure ${measureIndex} (fallback)`);
                 measure.notation[staff].voices[1].notes = [];
             }
         }

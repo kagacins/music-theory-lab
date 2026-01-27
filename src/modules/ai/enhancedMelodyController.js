@@ -425,7 +425,6 @@ function attachControlListeners() {
         if (styleSelect) {
             styleSelect.addEventListener('change', (e) => {
                 phraseSettings.styleId = e.target.value;
-                console.log('🎼 Phrase style updated:', phraseSettings.styleId);
                 // Regenerate phrases if currently viewing phrases section
                 const phrasesSection = document.getElementById('phrases-section');
                 if (phrasesSection && !phrasesSection.classList.contains('hidden')) {

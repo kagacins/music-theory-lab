@@ -491,7 +491,6 @@ function collectTiedDuration(measures, staff, voiceIndex, startMeasureIndex, sta
 export function redistributeNotesToNewMeasures(compositionState, staff, collectedNotes, newTimeSignature) {
     const newBeatsPerMeasure = getBeatsPerMeasureFromTimeSignature(newTimeSignature);
 
-    console.log(`[redistributeNotesToNewMeasures] Redistributing ${staff} notes to ${newTimeSignature.num}/${newTimeSignature.denom} (${newBeatsPerMeasure} beats/measure)`);
 
     // Clear existing notes in this staff for all measures (but keep measure structure)
     for (const measure of compositionState.measures) {
@@ -934,7 +933,6 @@ export class CompositionState {
             .map(s => s.id);
 
         if (emptySectionIds.length > 0) {
-            console.log('[_cleanupEmptySections] Removing empty sections:', emptySectionIds);
             this.sections = this.sections.filter(s => s.chordCount > 0 || s.isPlaceholder || s.fromTemplate);
             emptySectionIds.forEach(id => {
                 this.events.emit('sectionDeleted', { sectionId: id });
@@ -1023,19 +1021,16 @@ export class CompositionState {
 
             // Check 1: Section boundaries must be valid
             if (s.startIndex < 0 || s.startIndex >= totalChords) {
-                console.log(`[materializeUngroupedSections] Removing out-of-bounds ungrouped section ${s.id} (startIndex=${s.startIndex}, totalChords=${totalChords})`);
                 return false;
             }
 
             // Check 2: Section must have valid chordCount
             if (s.chordCount <= 0) {
-                console.log(`[materializeUngroupedSections] Removing empty ungrouped section ${s.id} (chordCount=${s.chordCount})`);
                 return false;
             }
 
             // Check 3: Section end must not exceed chord array
             if (s.startIndex + s.chordCount > totalChords) {
-                console.log(`[materializeUngroupedSections] Removing ungrouped section ${s.id} exceeding bounds (end=${s.startIndex + s.chordCount}, totalChords=${totalChords})`);
                 return false;
             }
 
@@ -1049,7 +1044,6 @@ export class CompositionState {
             );
 
             if (overlapsWithOther) {
-                console.log(`[materializeUngroupedSections] Removing overlapping ungrouped section ${s.id}`);
                 return false;
             }
 
@@ -1715,7 +1709,6 @@ export class CompositionState {
         // Remove excess measures if we now have fewer than before
         // This happens when chord durations are scaled down during time signature change
         if (this.measures.length > renderedMeasures.length) {
-            console.log(`[renderBassBlocksToMeasures] Trimming measures from ${this.measures.length} to ${renderedMeasures.length}`);
             this.measures.length = renderedMeasures.length;
         }
     }
@@ -2541,7 +2534,6 @@ export class CompositionState {
         // CRITICAL: If measures have been manually edited via shift operations,
         // DO NOT overwrite them from the (now stale) block sequence
         if (this._measuresManuallyEdited) {
-            console.log('[renderTrebleBlocksToMeasures] Skipping - measures were manually edited');
             return;
         }
 
@@ -2748,7 +2740,6 @@ export class CompositionState {
      * @param {Object} attributes - Musical attributes
      */
     insertTrebleNoteWithShift(insertUnit, durationUnits, pitches, attributes = {}) {
-        console.log('[SHIFT-INSERT] insertTrebleNoteWithShift called:', { insertUnit, durationUnits, pitches, attributes });
 
         // ALWAYS sync from measures before modifying the block sequence
         // This ensures we have the latest notes, even if they were added via keyboard
@@ -2774,13 +2765,10 @@ export class CompositionState {
             }
         }
 
-        console.log(`[insertTrebleNoteWithShift] BEFORE: ${notesBefore.length} notes (${actualNotes.length} non-rest), contentEndUnit=${contentEndUnit}`);
-        console.log(`[insertTrebleNoteWithShift] Notes:`, actualNotes.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
 
         // If inserting at or after the content end, no shifting is needed
         // Just add the note at the position (possibly extending the block)
         if (insertUnit >= contentEndUnit) {
-            console.log(`[insertTrebleNoteWithShift] Insert at/after content end - no shift needed`);
 
             // Ensure block is long enough for the new note
             const requiredUnits = insertUnit + durationUnits;
@@ -2793,7 +2781,6 @@ export class CompositionState {
             block.setNote(insertUnit, durationUnits, pitches, attributes);
         } else {
             // Inserting in the middle of content - need to shift
-            console.log(`[insertTrebleNoteWithShift] Insert in middle of content - shifting units ${insertUnit} to ${contentEndUnit}`);
 
             // Step 1: Extend the block by the duration of the new note
             const newTotalUnits = Math.max(totalUnits, contentEndUnit) + durationUnits;
@@ -2840,8 +2827,6 @@ export class CompositionState {
         // Debug: log notes after modification
         const notesAfter = block.getNotes();
         const actualNotesAfter = notesAfter.filter(n => !n.isRest);
-        console.log(`[insertTrebleNoteWithShift] AFTER: ${notesAfter.length} notes (${actualNotesAfter.length} non-rest)`);
-        console.log(`[insertTrebleNoteWithShift] Notes:`, actualNotesAfter.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
 
         // Step 4: Ensure we have enough measures
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
@@ -3038,7 +3023,6 @@ export class CompositionState {
      * @returns {Object} - { success: boolean, truncated: boolean, message: string }
      */
     insertBassNoteWithShift(chordIndex, unitPosition, durationUnits, pitches, options = {}) {
-        console.log('[SHIFT-INSERT-BASS] insertBassNoteWithShift called:', { chordIndex, unitPosition, durationUnits, pitches, options });
 
         const block = this.bassBlockSequence.blocks[chordIndex];
         if (!block) {
@@ -3062,7 +3046,6 @@ export class CompositionState {
             }
         }
 
-        console.log(`[insertBassNoteWithShift] Block ${chordIndex}: ${notesBefore.length} notes (${actualNotes.length} non-rest), contentEndUnit=${contentEndUnit}, totalUnits=${totalUnits}`);
 
         let truncated = false;
         let message = '';
@@ -3076,7 +3059,6 @@ export class CompositionState {
                 actualDuration = Math.max(0, totalUnits - unitPosition);
                 truncated = true;
                 message = `Note truncated from ${durationUnits} to ${actualDuration} units to fit block`;
-                console.log(`[insertBassNoteWithShift] ${message}`);
             }
 
             if (actualDuration > 0) {
@@ -3091,7 +3073,6 @@ export class CompositionState {
                 // Even the new note wouldn't fit - truncate it
                 const availableForNew = totalUnits - unitPosition;
                 if (availableForNew <= 0) {
-                    console.log('[insertBassNoteWithShift] No room to insert at this position');
                     return {
                         success: false,
                         truncated: false,
@@ -3103,7 +3084,6 @@ export class CompositionState {
                 message = `New note truncated to ${durationUnits} units to fit block`;
             }
 
-            console.log(`[insertBassNoteWithShift] Shifting content from unit ${unitPosition} forward by ${durationUnits}`);
 
             // Calculate how much of the shifted content will fit
             // Content currently at [unitPosition, contentEndUnit) will move to [unitPosition + durationUnits, contentEndUnit + durationUnits)
@@ -3116,18 +3096,15 @@ export class CompositionState {
             const survivingUnits = truncatedContentEnd - shiftedContentStart;
             const truncatedUnits = shiftedContentEnd - truncatedContentEnd;
 
-            console.log(`[insertBassNoteWithShift] shiftedContentStart=${shiftedContentStart}, truncatedContentEnd=${truncatedContentEnd}, survivingUnits=${survivingUnits}, truncatedUnits=${truncatedUnits}`);
 
             if (truncatedUnits > 0) {
                 truncated = true;
                 message = `Shifted content truncated by ${truncatedUnits} units at block boundary`;
-                console.log(`[insertBassNoteWithShift] ${message}`);
             }
 
             // Step 1: Shift existing content forward (work backwards to avoid overwriting)
             // We copy from source range [unitPosition, unitPosition + survivingUnits)
             // to target range [shiftedContentStart, truncatedContentEnd)
-            console.log(`[insertBassNoteWithShift] Copying ${survivingUnits} units: source [${unitPosition}, ${unitPosition + survivingUnits}) -> target [${shiftedContentStart}, ${truncatedContentEnd})`);
 
             let copiedCount = 0;
             for (let targetIdx = truncatedContentEnd - 1; targetIdx >= shiftedContentStart; targetIdx--) {
@@ -3156,22 +3133,16 @@ export class CompositionState {
                     }
                 }
             }
-            console.log(`[insertBassNoteWithShift] Copied ${copiedCount} units`);
 
             // Debug: Check what we have after shifting
             const notesAfterShift = block.getNotes();
-            console.log(`[insertBassNoteWithShift] After shift (before insert), block has ${notesAfterShift.length} notes:`,
-                notesAfterShift.map(n => `${n.isRest ? 'REST' : n.pitches.join(',')} at ${n.startUnit} (${n.durationUnits} units)`));
 
             // Step 2: Insert the new note at the insertion position
             // This will overwrite units [unitPosition, unitPosition + durationUnits)
-            console.log(`[insertBassNoteWithShift] Now inserting new note at units [${unitPosition}, ${unitPosition + durationUnits})`);
             block.setNote(unitPosition, durationUnits, pitches, options);
 
             // Debug: Check final state
             const notesAfterInsert = block.getNotes();
-            console.log(`[insertBassNoteWithShift] After insert, block has ${notesAfterInsert.length} notes:`,
-                notesAfterInsert.map(n => `${n.isRest ? 'REST' : n.pitches.join(',')} at ${n.startUnit} (${n.durationUnits} units)`));
         }
 
         // Mark as manually edited - both flags for compatibility
@@ -3183,8 +3154,6 @@ export class CompositionState {
 
         // Debug: Verify block state after render
         const notesAfterRender = block.getNotes();
-        console.log(`[insertBassNoteWithShift] After renderBassBlocksToMeasures, block still has ${notesAfterRender.length} notes:`,
-            notesAfterRender.map(n => `${n.isRest ? 'REST' : n.pitches.join(',')} at ${n.startUnit} (${n.durationUnits} units)`));
 
         // Also mark the measure as edited
         const blockInfo = this.getBassBlockByIndex(chordIndex);
@@ -3198,7 +3167,6 @@ export class CompositionState {
         }
 
         const notesAfter = block.getNotes();
-        console.log(`[insertBassNoteWithShift] AFTER: ${notesAfter.length} notes`);
 
         return {
             success: true,
@@ -3219,7 +3187,6 @@ export class CompositionState {
      * @returns {Object} - { success: boolean, message: string }
      */
     deleteBassNoteWithShift(chordIndex, noteStartUnit, shiftBack = false) {
-        console.log('[SHIFT-DELETE-BASS] deleteBassNoteWithShift called:', { chordIndex, noteStartUnit, shiftBack });
 
         const block = this.bassBlockSequence.blocks[chordIndex];
         if (!block) {
@@ -3240,7 +3207,6 @@ export class CompositionState {
         }
 
         const deleteDurationUnits = noteToDelete.durationUnits;
-        console.log(`[deleteBassNoteWithShift] Deleting note at unit ${noteStartUnit}, duration ${deleteDurationUnits}`);
 
         if (shiftBack) {
             // Shift downstream notes back to fill the gap (within block only)
@@ -3297,7 +3263,6 @@ export class CompositionState {
             }
         }
 
-        console.log('[deleteBassNoteWithShift] Delete complete');
         return { success: true, message: '' };
     }
 
@@ -3309,7 +3274,6 @@ export class CompositionState {
      * @returns {boolean} - Success
      */
     resetBassBlockToDefault(chordIndex) {
-        console.log('[BASS-RESET] resetBassBlockToDefault called for chord:', chordIndex);
 
         const block = this.bassBlockSequence?.blocks?.[chordIndex];
         if (!block) {
@@ -3334,7 +3298,6 @@ export class CompositionState {
         const chordId = chord.id;
         if (chordId && this.bassDataByChordId) {
             this.clearBassDataForChord(chordId);
-            console.log(`[BASS-RESET] Cleared bassDataByChordId entry for chord ${chordId}`);
         }
 
         // Use regenerateAutoBassByChordIndex to generate proper bass based on current settings
@@ -3357,7 +3320,6 @@ export class CompositionState {
             }
         }
 
-        console.log('[BASS-RESET] Reset complete for chord', chordIndex);
         return true;
     }
 
@@ -4522,10 +4484,6 @@ export class CompositionState {
 
             // 1. Collect ALL notes from ALL voices with absolute positions (using OLD time signature)
             const collectedTrebleNotes = collectAllNotesWithAbsolutePositions(this.measures, 'treble', oldTS);
-            console.log(`[CompositionState] Collected treble notes:`, {
-                voice0: collectedTrebleNotes.voice0.length,
-                voice1: collectedTrebleNotes.voice1.length
-            });
 
             // 2. Update metadata to new time signature
             this.metadata.timeSignature = newTS;
@@ -4584,10 +4542,6 @@ export class CompositionState {
 
             // Collect ALL bass notes from ALL voices with absolute positions (using OLD time signature)
             const collectedBassNotes = collectAllNotesWithAbsolutePositions(this.measures, 'bass', oldTS);
-            console.log(`[CompositionState] Collected bass notes:`, {
-                voice0: collectedBassNotes.voice0.length,
-                voice1: collectedBassNotes.voice1.length
-            });
 
             // Redistribute bass notes to new measure structure
             redistributeNotesToNewMeasures(this, 'bass', collectedBassNotes, newTS);
@@ -4602,7 +4556,6 @@ export class CompositionState {
         // calculates totalBeats from measures.length, which is updated by renderBassBlocksToMeasures()
         if (!hasTrebleNotes && !hasTrebleMultiVoice) {
             const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(newTS);
-            console.log(`[setTimeSignature] Reinitializing treble block: measures=${this.measures.length}, beatsPerMeasure=${beatsPerMeasure}, totalBeats=${this.measures.length * beatsPerMeasure}`);
             this.initializeTrebleBlockSequence();
             this.renderTrebleBlocksToMeasures();
         }
@@ -4614,8 +4567,6 @@ export class CompositionState {
         this.buildChordSegments();
 
         // DEBUG: Log chord segments after rebuild
-        console.log(`[setTimeSignature] Rebuilt chord segments for ${num}/${denom}:`,
-            this.chordSegments.map(s => `Chord ${s.chordIndex}: startBeat=${s.startBeat}, duration=${s.durationBeats}`));
 
         // Emit event for any listeners
         this.events.emit('timeSignatureChanged', { num, denom });
@@ -4696,7 +4647,6 @@ export class CompositionState {
             const newBeats = Math.round(oldBeats * scaleFactor * 4) / 4;
             // Ensure minimum of 0.25 beats
             chord.beats = Math.max(0.25, newBeats);
-            console.log(`[scaleChordDurations] Chord ${chord.root} ${chord.type}: ${oldBeats} -> ${chord.beats} (factor: ${scaleFactor})`);
         });
 
         // Update the building blocks with new durations
@@ -4718,7 +4668,6 @@ export class CompositionState {
             });
         }
 
-        console.log(`[scaleChordDurations] Scaled ${progressionData.length} chord(s) by factor ${scaleFactor}`);
 
         // Return the modified data so caller can use it after time signature change
         return progressionData;
@@ -5763,15 +5712,12 @@ export class CompositionState {
      * @returns {Object|null} - Truncation info if warning needed, null if safe
      */
     checkDurationTruncation(chordIndex, newBeats) {
-        console.log('[checkDurationTruncation] chordIndex:', chordIndex, 'newBeats:', newBeats);
         const block = this.bassBlockSequence.getBlock(chordIndex);
-        console.log('[checkDurationTruncation] block:', block ? { beats: block.beats, userEdited: block.userEdited } : null);
         if (!block) {
             return null;
         }
 
         const truncationInfo = block.getTruncationInfo(newBeats);
-        console.log('[checkDurationTruncation] truncationInfo:', truncationInfo);
         if (!truncationInfo) {
             return null;
         }
@@ -5975,7 +5921,6 @@ export class CompositionState {
     clearBassDataForChord(chordId) {
         if (this.bassDataByChordId.has(chordId)) {
             this.bassDataByChordId.delete(chordId);
-            console.log(`[clearBassDataForChord] Removed bass data for chord ${chordId}`);
         }
     }
 
@@ -6026,8 +5971,6 @@ export class CompositionState {
 
         // Log all stored bass data
         for (const [chordId, bassData] of this.bassDataByChordId) {
-            console.log(`  Chord ${chordId}: userEdited=${bassData.userEdited}, notes=${bassData.notes?.length || 0}`,
-                bassData.notes?.map(n => ({ isRest: n.isRest, duration: n.duration, beat: n.beat, pitches: n.pitches })));
         }
 
         // Build a map of chord ID -> new position info
@@ -6216,7 +6159,6 @@ export class CompositionState {
             });
         }
 
-        console.log(`[_clearBassNotesForChord] Cleared bass notes for chord at beats ${chordStartBeat}-${chordEndBeat}`);
     }
 
     // ========================================================================
@@ -6242,33 +6184,25 @@ export class CompositionState {
         }
 
         // Initialize BuildingBlocks if needed
-        console.log('[reorderChord] START - from:', fromIndex, 'to:', toIndex);
-        console.log('[reorderChord] bassBlockSequence.blocks.length:', this.bassBlockSequence.blocks.length);
 
         if (this.bassBlockSequence.blocks.length === 0) {
-            console.log('[reorderChord] Initializing bass block sequence');
             this.initializeBassBlockSequence(progressionData);
         } else {
             // Sync any edits from measures back to blocks before reordering
-            console.log('[reorderChord] Syncing measures to building blocks BEFORE reorder');
             this.syncMeasuresToBuildingBlocks();
         }
 
         // Log block state before reorder
-        console.log('[reorderChord] Block state BEFORE reorder:');
         this.bassBlockSequence.blocks.forEach((block, i) => {
             const notes = block.getNotes ? block.getNotes() : [];
-            console.log(`  Block ${i}: ${notes.length} notes`, notes.map(n => n.pitches?.join(',') || 'rest').join(' | '));
         });
 
         // Reorder the blocks
         this.reorderBassBlock(fromIndex, toIndex);
 
         // Log block state after reorder
-        console.log('[reorderChord] Block state AFTER reorder:');
         this.bassBlockSequence.blocks.forEach((block, i) => {
             const notes = block.getNotes ? block.getNotes() : [];
-            console.log(`  Block ${i}: ${notes.length} notes`, notes.map(n => n.pitches?.join(',') || 'rest').join(' | '));
         });
 
         // Reorder the progression array to match
@@ -6277,7 +6211,6 @@ export class CompositionState {
 
         // Rebuild measures from the reordered progression
         // CRITICAL: skipAutoGenerateBass=true to preserve user edits captured in the reordered blocks
-        console.log('[reorderChord] Calling syncWithProgressionData with skipAutoGenerateBass=true');
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
             timeSignature: this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE,
@@ -6285,32 +6218,25 @@ export class CompositionState {
         });
 
         // Log block state after syncWithProgressionData
-        console.log('[reorderChord] Block state AFTER syncWithProgressionData:');
         this.bassBlockSequence.blocks.forEach((block, i) => {
             const notes = block.getNotes ? block.getNotes() : [];
-            console.log(`  Block ${i}: ${notes.length} notes`, notes.map(n => n.pitches?.join(',') || 'rest').join(' | '));
         });
 
         // Re-render the reordered bass blocks to measures
-        console.log('[reorderChord] Calling renderBassBlocksToMeasures');
         this.renderBassBlocksToMeasures();
 
         // BASS PRESERVATION: Restore user-edited bass from chord ID map
         // This overrides block-based rendering for chords with user edits
         if (this.bassDataByChordId.size > 0) {
-            console.log('[reorderChord] Restoring bass from chord IDs');
             this.restoreBassFromChordIds();
         }
 
         // Log measure bass notes after render
-        console.log('[reorderChord] Measure bass notes AFTER renderBassBlocksToMeasures:');
         this.measures.forEach((m, i) => {
             const notes = m.notation?.bass?.voices?.[0]?.notes || [];
-            console.log(`  Measure ${i}: ${notes.length} notes`, notes.map(n => n.pitches?.join(',') || 'rest').join(' | '));
         });
 
         this.events.emit('chordReordered', fromIndex, toIndex);
-        console.log('[reorderChord] END');
         return true;
     }
 
@@ -7714,26 +7640,17 @@ export class CompositionState {
      * @returns {boolean} True if successful
      */
     reorderSectionsByIds(newSectionOrder, getProgressionData, setProgressionData) {
-        console.log('[reorderSectionsByIds] START - newSectionOrder:', newSectionOrder);
 
         // CRITICAL: Use storedProgressionData directly, NOT the cached getProgressionData()
         // The cache might be stale or return a different array than what we need
         const progressionData = this.storedProgressionData;
         if (!progressionData || progressionData.length === 0) {
-            console.log('[reorderSectionsByIds] No stored progression data, aborting');
             return false;
         }
 
-        console.log('[reorderSectionsByIds] Current progression (from storedProgressionData):', progressionData.map(c => `${c.root}${c.type?.charAt(0) || ''}`));
 
         // Build the current section view (includes pseudo-sections)
         const currentView = this.buildSectionView();
-        console.log('[reorderSectionsByIds] Current section view:', currentView.map(s => ({
-            id: s.id,
-            startIndex: s.startIndex,
-            chordCount: s.chordCount,
-            type: s.type
-        })));
 
         // Map section IDs to their current data
         const sectionMap = new Map();
@@ -7746,18 +7663,15 @@ export class CompositionState {
         newSectionOrder.forEach(sectionId => {
             const section = sectionMap.get(sectionId);
             if (!section) {
-                console.log(`[reorderSectionsByIds] Section ${sectionId} not found in map!`);
                 return;
             }
 
             const newStartIndex = newProgression.length;
-            console.log(`[reorderSectionsByIds] Processing section ${sectionId}: startIndex=${section.startIndex}, count=${section.chordCount}, newStart=${newStartIndex}`);
 
             // Add this section's chords to new progression
             for (let i = section.startIndex; i < section.startIndex + section.chordCount; i++) {
                 if (i < progressionData.length) {
                     const chord = progressionData[i];
-                    console.log(`[reorderSectionsByIds]   Adding chord ${i}: ${chord.root}${chord.type?.charAt(0) || ''}`);
                     newProgression.push({ ...progressionData[i] }); // Deep copy each chord
                 }
             }
@@ -7769,28 +7683,22 @@ export class CompositionState {
             });
         });
 
-        console.log('[reorderSectionsByIds] New progression:', newProgression.map(c => `${c.root}${c.type?.charAt(0) || ''}`));
-        console.log('[reorderSectionsByIds] Section updates:', sectionUpdates);
 
         // CRITICAL: Update storedProgressionData DIRECTLY first, before calling setProgressionData
         // This ensures the data is updated in compositionState before any sync/cache operations
-        console.log('[reorderSectionsByIds] Updating storedProgressionData directly...');
         this.storedProgressionData = newProgression;
 
         // Update section startIndex values
         sectionUpdates.forEach(update => {
             const section = this.sections.find(s => s.id === update.sectionId);
             if (section) {
-                console.log(`[reorderSectionsByIds] Updating section ${update.sectionId}: startIndex ${section.startIndex} -> ${update.newStartIndex}`);
                 section.startIndex = update.newStartIndex;
             }
         });
 
         // Now call the setProgressionData callback to sync with trainerState and trigger re-render
-        console.log('[reorderSectionsByIds] Calling setProgressionData callback...');
         setProgressionData(newProgression);
 
-        console.log('[reorderSectionsByIds] END - success');
         this.events.emit('sectionsReorderedByIds', { newSectionOrder });
         return true;
     }
@@ -7959,7 +7867,6 @@ export class CompositionState {
             const block = this.bassBlockSequence.blocks[chordIdx];
             if (block && block.clone) {
                 const cloned = block.clone();
-                console.log(`[duplicateSection] Cloned bass block ${chordIdx}, notes:`, cloned.getNotes().length);
                 clonedBassBlocks.push({
                     index: i,
                     originalChordIdx: chordIdx,
@@ -8260,30 +8167,23 @@ export class CompositionState {
      * @param {number} insertedIndex - Index where chord was inserted
      */
     updateSectionsAfterChordInsert(insertedIndex) {
-        console.log('[updateSectionsAfterChordInsert] Called with insertedIndex:', insertedIndex);
         this.sections.forEach(section => {
             if (section.chordCount === 0) {
-                console.log(`  Section "${section.name}" (id: ${section.id}): SKIPPED (chordCount=0)`);
                 return;
             }
 
             const beforeState = `startIndex=${section.startIndex}, chordCount=${section.chordCount}, range=[${section.startIndex} to ${section.startIndex + section.chordCount - 1}]`;
-            console.log(`  Section "${section.name}" (id: ${section.id}) BEFORE: ${beforeState}`);
 
             if (insertedIndex <= section.startIndex) {
                 // Inserted before or at section start - shift startIndex forward
-                console.log(`    -> insertedIndex(${insertedIndex}) <= startIndex(${section.startIndex}): SHIFTING startIndex forward`);
                 section.startIndex++;
             } else if (insertedIndex > section.startIndex && insertedIndex <= section.startIndex + section.chordCount) {
                 // Inserted within section - expand section to include it
-                console.log(`    -> insertedIndex(${insertedIndex}) > startIndex(${section.startIndex}) && insertedIndex(${insertedIndex}) <= startIndex+chordCount(${section.startIndex + section.chordCount}): EXPANDING chordCount`);
                 section.chordCount++;
             } else {
-                console.log(`    -> insertedIndex(${insertedIndex}) is after section end (${section.startIndex + section.chordCount - 1}): NO CHANGE`);
             }
 
             const afterState = `startIndex=${section.startIndex}, chordCount=${section.chordCount}, range=[${section.startIndex} to ${section.startIndex + section.chordCount - 1}]`;
-            console.log(`  Section "${section.name}" AFTER: ${afterState}`);
         });
         this.events.emit('sectionsUpdatedAfterInsert', { insertedIndex });
     }
@@ -8298,7 +8198,6 @@ export class CompositionState {
     updateSectionsAfterChordReorder(fromIndex, toIndex, preserveMembership = false) {
         if (fromIndex === toIndex) return;
 
-        console.log(`[CompositionState] updateSectionsAfterChordReorder: ${fromIndex} -> ${toIndex}, preserveMembership=${preserveMembership}`);
 
         this.sections.forEach(section => {
             if (section.chordCount === 0) return;
@@ -8345,12 +8244,10 @@ export class CompositionState {
                         // Chord moved from before section to at/after section start
                         // Section effectively shifts back by 1
                         section.startIndex--;
-                        console.log(`[CompositionState] Section ${section.id}: shifted startIndex to ${section.startIndex} (chord moved from before to after)`);
                     } else if (fromIndex > sectionEnd && toIndex <= section.startIndex) {
                         // Chord moved from after section to before/at section start
                         // Section effectively shifts forward by 1
                         section.startIndex++;
-                        console.log(`[CompositionState] Section ${section.id}: shifted startIndex to ${section.startIndex} (chord moved from after to before)`);
                     }
                 }
             }
@@ -8364,7 +8261,6 @@ export class CompositionState {
      * @param {Array<number>} fullNewOrder - Array where fullNewOrder[newPos] = oldPos
      */
     updateSectionsAfterFullReorder(fullNewOrder) {
-        console.log('[CompositionState] updateSectionsAfterFullReorder called with:', fullNewOrder);
 
         // Create reverse mapping: oldPos -> newPos
         const oldToNew = new Map();
@@ -8381,7 +8277,6 @@ export class CompositionState {
             const newStart = oldToNew.get(oldStart);
 
             if (newStart !== undefined) {
-                console.log(`[CompositionState] Section ${section.id}: startIndex ${oldStart} -> ${newStart}`);
                 section.startIndex = newStart;
             }
         });

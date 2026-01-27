@@ -483,7 +483,6 @@ async function loadPreset(id) {
         return;
     }
 
-    console.log('Loading preset:', preset);
 
     const confirmed = await showConfirmModal({
         title: 'Load Preset',
@@ -497,7 +496,6 @@ async function loadPreset(id) {
     // Load the preset data based on category
     if (window.loadPresetData) {
         try {
-            console.log('Calling loadPresetData with:', preset.category, preset.data);
             window.loadPresetData(preset.category, preset.data);
             closePresetPanel();
             toast.success(`Preset "${preset.name}" loaded!`);

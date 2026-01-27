@@ -146,7 +146,6 @@ function initGuitarSynth() {
         release: 1.5,  // Release time for natural decay
         baseUrl: "public/",  // Path to the sample file
         onload: () => {
-            console.log("Guitar sample (D3) loaded successfully.");
         },
         onerror: (e) => {
             console.error("Error loading guitar sample, falling back to PluckSynth:", e);
@@ -174,7 +173,6 @@ function initGuitarSynth() {
 function initGuitarSynthFallback() {
     if (guitar) return; // Don't create if already exists
     
-    console.log("Using PluckSynth fallback for guitar");
     
     // Use PluckSynth as fallback
     guitar = new Tone.PluckSynth({

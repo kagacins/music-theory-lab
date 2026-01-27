@@ -634,17 +634,14 @@ export class BuildingBlock {
      * @returns {Object|null} - Truncation info or null if safe to truncate
      */
     getTruncationInfo(newBeats) {
-        console.log('[getTruncationInfo] Called with newBeats:', newBeats, 'current beats:', this.beats);
 
         // Only check if we're shortening the duration
         if (newBeats >= this.beats) {
-            console.log('[getTruncationInfo] Returning null - not shortening (newBeats >= current beats)');
             return null;
         }
 
         const newTotalUnits = Math.floor(newBeats * UNITS_PER_BEAT);
         const notes = this.getNotes();
-        console.log('[getTruncationInfo] newTotalUnits:', newTotalUnits, 'notes:', notes.map(n => ({ pitches: n.pitches, startUnit: n.startUnit, durationUnits: n.durationUnits, isRest: n.isRest })));
 
         // Find notes that would be affected
         const truncatedNotes = []; // Notes completely removed

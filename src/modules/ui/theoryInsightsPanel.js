@@ -1986,7 +1986,6 @@ export class TheoryInsightsPanel {
      * Add a borrowed chord to the progression after the selected chord
      */
     addBorrowedChord(root, type, numeral) {
-        console.log(`[TheoryInsights] Adding borrowed chord: ${root} ${type} (${numeral})`);
 
         // Map lowercase type to proper type name
         const typeMap = {
@@ -2030,7 +2029,6 @@ export class TheoryInsightsPanel {
         if (window.insertChordCardAt) {
             const success = window.insertChordCardAt(insertIndex, chordData, 4);
             if (success) {
-                console.log(`[TheoryInsights] Added ${spelledRoot} ${properType} (${numeral}) at end (index ${insertIndex})`);
                 return;
             }
         }

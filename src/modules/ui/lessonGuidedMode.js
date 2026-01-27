@@ -189,7 +189,6 @@ function disableNewTabButtons() {
         }
     }
 
-    console.log('[GuidedMode] Disabled New tab buttons and tooltips toggle for tutorial');
 }
 
 /**
@@ -204,7 +203,6 @@ function enableNewTabButtons() {
         el.style.pointerEvents = '';
     });
 
-    console.log('[GuidedMode] Re-enabled New tab buttons and tooltips toggle');
 }
 
 // ===========================================
@@ -307,7 +305,6 @@ export function startGuidedModeWithConfirmation(config) {
                 // On confirm - start the guided mode
                 () => startGuidedMode(config),
                 // On cancel - do nothing
-                () => console.log('[GuidedMode] User cancelled guided exercise')
             );
         } else {
             // No existing data, start immediately
@@ -1382,7 +1379,6 @@ let currentSpotlightTarget = null;
  * Exported for use by tutorials that need to dynamically spotlight elements
  */
 export function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
-    console.log('[GuidedMode] showSpotlight called with:', targetSelector);
 
     // Remove highlighting from previous target (but keep overlay to prevent flash)
     document.querySelectorAll('.guided-spotlight-target').forEach(el => {
@@ -1390,11 +1386,9 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
     });
 
     let targetEl = document.querySelector(targetSelector);
-    console.log('[GuidedMode] showSpotlight found element:', targetEl ? 'yes' : 'no', targetEl ? targetEl.getBoundingClientRect() : 'N/A');
 
     // Special handling for Circle of Fifths - it may need time to appear
     if (targetSelector === '#circle-of-fifths-panel' && (!targetEl || targetEl.classList.contains('hidden'))) {
-        console.log('[GuidedMode] Circle of Fifths panel not visible yet, waiting...');
         // Retry after a short delay
         setTimeout(() => {
             showSpotlight(targetSelector, position, extraHeight);
@@ -1420,7 +1414,6 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
         const currentStepIndex = guidedModeState?.stepIndex ?? -1;
         if (showSpotlight._playProgressionDelayedStep !== currentStepIndex) {
             showSpotlight._playProgressionDelayedStep = currentStepIndex;
-            console.log('[GuidedMode] Play Progression button - adding initial delay for submenu animation (step', currentStepIndex, ')');
             setTimeout(() => {
                 showSpotlight(targetSelector, position, extraHeight);
             }, 300);
@@ -1433,7 +1426,6 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
         const retryCount = (showSpotlight._retryCount || 0) + 1;
         if (retryCount < 15) {
             showSpotlight._retryCount = retryCount;
-            console.log(`[GuidedMode] Chord Lab dynamic element not found yet, retry ${retryCount}/15:`, targetSelector);
             setTimeout(() => {
                 showSpotlight(targetSelector, position, extraHeight);
             }, 200);
@@ -1465,7 +1457,6 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
         const retryCount = (showSpotlight._retryCount || 0) + 1;
         if (retryCount < 15) {
             showSpotlight._retryCount = retryCount;
-            console.log(`[GuidedMode] Element's parent is hidden, retry ${retryCount}/15:`, targetSelector);
             setTimeout(() => {
                 showSpotlight(targetSelector, position, extraHeight);
             }, 200);
@@ -1481,7 +1472,6 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
     // Special handling for Circle of Fifths - it's a modal, skip the dimming overlay
     const isCircleOfFifthsModal = targetSelector === '#circle-of-fifths-panel';
     if (isCircleOfFifthsModal) {
-        console.log('[GuidedMode] Circle of Fifths modal - skipping dimming overlay');
         // Just add pulsing border to the content area, not the whole modal
         const contentEl = targetEl.querySelector('.circle-of-fifths-content');
         if (contentEl) {
@@ -1501,7 +1491,6 @@ export function showSpotlight(targetSelector, position = 'bottom', extraHeight =
             mainHeader.style.transition = 'margin-top 0.3s ease-in-out';
             mainHeader.style.marginTop = `${bannerHeight}px`;
             mainHeader.dataset.shiftedForSpotlight = 'true';
-            console.log('[GuidedMode] Shifted header below banner for spotlight');
         }
     }
 
@@ -1622,7 +1611,6 @@ function ensureTargetVisible(targetEl) {
 
     if (isFixed) {
         // For fixed elements, just show spotlight immediately without scrolling
-        console.log('[GuidedMode] Fixed position element detected, showing spotlight immediately');
         updateSpotlightPosition(targetEl);
         updateStepIndicatorPosition(targetEl);
         if (spotlightOverlay) {
@@ -1668,14 +1656,6 @@ function ensureTargetVisible(targetEl) {
     // If element is below where we want it, scroll down (positive)
     const scrollAmount = rect.top - desiredTopPosition;
 
-    console.log('[GuidedMode] Scrolling to show element:', {
-        elementTop: rect.top,
-        bannerHeight: currentBannerHeight,
-        keyboardBottom: keyboardBottom,
-        desiredTop: desiredTopPosition,
-        scrollAmount: scrollAmount,
-        currentWindowScroll: window.scrollY
-    });
 
     // Scroll the window
     window.scrollBy({
@@ -1736,7 +1716,6 @@ function removeSpotlight() {
     if (mainHeader && mainHeader.dataset.shiftedForSpotlight === 'true') {
         mainHeader.style.marginTop = '';
         delete mainHeader.dataset.shiftedForSpotlight;
-        console.log('[GuidedMode] Restored header position');
     }
 
     // Clean up any tutorial-applied styles on all elements
@@ -1763,14 +1742,12 @@ function showIntroDimmingOverlay() {
         transition: opacity 0.3s ease-in-out;
     `;
     document.body.appendChild(introDimmingOverlay);
-    console.log('[GuidedMode] Showing intro dimming overlay');
 }
 
 function removeIntroDimmingOverlay() {
     if (introDimmingOverlay) {
         introDimmingOverlay.remove();
         introDimmingOverlay = null;
-        console.log('[GuidedMode] Removed intro dimming overlay');
     }
 }
 
@@ -1819,7 +1796,6 @@ function cleanupTutorialStyles() {
         });
     });
 
-    console.log('[GuidedMode] Cleaned up tutorial styles');
 }
 
 // ===========================================
@@ -1840,7 +1816,6 @@ function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false, extra
         const retryCount = (showStepIndicator._retryCount || 0) + 1;
         if (retryCount < 15) {
             showStepIndicator._retryCount = retryCount;
-            console.log(`[GuidedMode] Step indicator target not found yet, retry ${retryCount}/15:`, targetSelector);
             setTimeout(() => {
                 showStepIndicator(targetSelector, stepNumber, isInfoOnly, extraHeight, indicatorOffset);
             }, 200);

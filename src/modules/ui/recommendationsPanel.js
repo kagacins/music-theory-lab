@@ -24,7 +24,6 @@ export function initRecommendationsPanel() {
     trainerContainer.insertAdjacentHTML('afterbegin', panelHTML);
     attachEventListeners();
 
-    console.log('Smart Recommendations panel initialized successfully');
 }
 
 /**

@@ -341,7 +341,6 @@ export async function getAuthToken() {
         }
 
         // Token is expired or expiring soon - try to refresh it
-        console.log('[AuthService] Token expiring soon, refreshing...');
         try {
             const { data: { session }, error } = await supabase.auth.refreshSession();
             if (!error && session) {
@@ -374,7 +373,6 @@ export async function getAuthToken() {
 
             if (expiresAt && expiresAt <= now) {
                 // Session from storage is expired, try refresh
-                console.log('[AuthService] Stored session expired, refreshing...');
                 const { data: { session: refreshed }, error: refreshError } = await supabase.auth.refreshSession();
                 if (!refreshError && refreshed) {
                     currentSession = refreshed;
@@ -403,7 +401,6 @@ export async function getAuthToken() {
  */
 export async function refreshSession() {
     try {
-        console.log('[AuthService] Attempting session refresh...');
         const { data: { session }, error } = await supabase.auth.refreshSession();
 
         if (error) {
@@ -414,11 +411,9 @@ export async function refreshSession() {
         if (session) {
             currentSession = session;
             currentUser = session.user;
-            console.log('[AuthService] Session refreshed successfully');
             return true;
         }
 
-        console.log('[AuthService] No session returned from refresh');
         return false;
     } catch (err) {
         console.error('[AuthService] Session refresh error:', err);

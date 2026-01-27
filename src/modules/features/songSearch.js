@@ -339,7 +339,6 @@ export async function searchSongChords() {
             }
         }
     } else {
-        console.log(`Found ${localResults.length} local result(s), skipping internet search to save API calls.`);
     }
     
     // Combine results (local first, then internet)
@@ -989,7 +988,6 @@ function addParsedChordToProgression(chordSymbol, key, playShutterSound = false,
                     const lengthAfter = trainerStateAfter.progressionData.length;
                     if (lengthAfter > lengthBefore) {
                         const inversionText = inversion > 0 ? ` (inv. ${inversion})` : '';
-                        console.log(`✓ Added chord ${chordSymbol} (${root} ${chordType}${inversionText}). Progression: ${lengthBefore} → ${lengthAfter} chords.`);
                     } else {
                         console.warn(`⚠ Chord ${chordSymbol} (${root} ${chordType}) was not added. Progression length unchanged: ${lengthBefore}`);
                     }
@@ -1296,7 +1294,6 @@ export function highlightChordInProgression(chordName) {
 
     // Show a brief message
     if (matchCount > 0) {
-        console.log(`[SongSearch] Found ${matchCount} matching chord(s)`);
     } else if (targetRoot) {
     }
 }

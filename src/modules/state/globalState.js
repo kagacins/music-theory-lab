@@ -150,11 +150,9 @@ export function setExperienceMode(mode) {
     }
 
     if (['focus', 'learn'].includes(normalizedMode)) {
-        console.log(`[globalState] setExperienceMode: changing from ${experienceMode} to ${normalizedMode}`);
         experienceMode = normalizedMode;
         localStorage.setItem('experienceMode', normalizedMode);
         // Emit event for listeners to react to mode changes
-        console.log('[globalState] Dispatching experienceModeChanged event');
         window.dispatchEvent(new CustomEvent('experienceModeChanged', { detail: { mode: normalizedMode } }));
     }
 }

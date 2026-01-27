@@ -791,7 +791,6 @@ function applyOptimization() {
     }
 
     // Show success message
-    console.log(`[TensionOptimizer] Applied optimization: ${selectionCount} chord(s) modified`);
 
     // Close modal
     hideTensionOptimizerModal();

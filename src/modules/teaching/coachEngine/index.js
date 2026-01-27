@@ -333,7 +333,6 @@ class CoachEngine {
      * Coach is disabled in Focus mode, enabled in Guided/Explore modes
      */
     _onExperienceModeChanged(event) {
-        console.log('[CoachEngine] experienceModeChanged event received:', event.detail);
         this._syncWithExperienceMode();
     }
 
@@ -640,7 +639,6 @@ class CoachEngine {
             onExpire: () => this._onNudgeExpired(nudgeId)
         });
 
-        console.log('[CoachEngine] Showing nudge:', item.id, item.title);
         */
     }
 

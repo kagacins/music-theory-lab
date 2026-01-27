@@ -141,7 +141,6 @@ function setupEventListeners() {
     const setupStyleListener = () => {
         const styleSelect = document.getElementById('floating-melody-style-select');
         if (styleSelect) {
-            console.log('✅ Floating melody style dropdown found, attaching event listener');
             styleSelect.addEventListener('change', (e) => {
                 setStyle(e.target.value);
             });
@@ -215,7 +214,6 @@ export function refreshSuggestions() {
                 nextChord = chordContextAfterSelected.nextChord;
                 anticipationFactor = chordContextAfterSelected.anticipationFactor;
                 insertionChordContext = chordContextAfterSelected;
-                console.log(`🎯 New note will land in different chord: ${insertionChord.root} ${insertionChord.type}`);
             } else if (insertionChord) {
                 // Same chord, but update context for accurate anticipation
                 effectiveChord = insertionChord;
@@ -695,7 +693,6 @@ export function setCurrentMeasure(measureIndex) {
  * @param {string} styleId - Style preset ID
  */
 export function setStyle(styleId) {
-    console.log('🎵 Melody Style Changed:', styleId);
     currentStyleId = styleId;
     refreshSuggestions();
 }

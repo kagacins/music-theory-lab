@@ -177,7 +177,6 @@ export function getProgressionData() {
 
         // Only re-export if state has changed OR cache is invalidated
         // DEBUGGING: If cards show stale data, add console.log here to check cache hit/miss
-        // console.log('[getProgressionData] cache check:', { cached: cachedProgressionData !== null, hashMatch: cachedMeasuresHash === currentStateHash });
         if (cachedProgressionData === null ||
             cachedMeasuresLength !== currentMeasuresLength ||
             cachedMeasuresHash !== currentStateHash) {
@@ -244,7 +243,6 @@ export function invalidateProgressionDataCache() {
     cachedMeasuresLength = 0;
     cachedMeasuresHash = null;
     // DEBUGGING: Uncomment to trace cache invalidation
-    // console.log('[invalidateProgressionDataCache] Cache cleared');
 }
 
 // Getters and Setters for currentIndex

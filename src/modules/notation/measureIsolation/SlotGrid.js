@@ -299,7 +299,6 @@ export class SlotGrid {
             const actualNotes = group.length;
 
             if (actualNotes < expectedNotes) {
-                console.log(`[SlotGrid] Incomplete tuplet group ${groupId}: ${actualNotes}/${expectedNotes} notes - stripping tuplet attributes and recalculating beats`);
 
                 // Sort by original beat position first
                 group.sort((a, b) => {
@@ -334,7 +333,6 @@ export class SlotGrid {
                     // Each note now takes its full duration (e.g., 0.5 beats for eighth notes)
                     const newBeat = groupStartBeat + (positionInGroup * baseDurationBeats);
                     correctedBeats[item.idx] = newBeat;
-                    console.log(`[SlotGrid]   Note ${item.idx}: original beat=${item.note.beat}, new beat=${newBeat} (converted to regular ${item.note.duration})`);
                 });
 
                 continue;
@@ -370,16 +368,13 @@ export class SlotGrid {
 
             if (spacingIsCorrect) {
                 // Beats are already correct, no correction needed
-                console.log(`[SlotGrid] Tuplet group ${groupId}: beats already correct (spacing=${actualSpacing.toFixed(3)}, expected=${tupletNoteSpacing.toFixed(3)})`);
                 continue;
             }
 
             // Recalculate correct beat positions for each note in the group
-            console.log(`[SlotGrid] Tuplet group ${groupId}: correcting beats (actualSpacing=${actualSpacing.toFixed(3)}, expectedSpacing=${tupletNoteSpacing.toFixed(3)})`);
             group.forEach((item, positionInGroup) => {
                 const correctedBeat = startBeat + (positionInGroup * tupletNoteSpacing);
                 correctedBeats[item.idx] = correctedBeat;
-                console.log(`[SlotGrid]   Note ${item.idx}: original=${item.note.beat}, corrected=${correctedBeat.toFixed(4)}`);
             });
         }
 
@@ -408,19 +403,6 @@ export class SlotGrid {
             // DEBUG: Log tuplet notes being loaded
             const tupletNotes = notes.filter(n => n.tuplet || n.tupletGroupId || n.tupletType);
             if (tupletNotes.length > 0) {
-                console.log(`[SlotGrid._loadVoicesToSlots] Loading ${tupletNotes.length} tuplet notes in ${clef} voice ${voiceIndex}:`,
-                    tupletNotes.map((n, idx) => {
-                        const noteIdx = notes.indexOf(n);
-                        return {
-                            pitch: n.pitches?.[0] || n.pitch,
-                            originalBeat: n.beat,
-                            correctedBeat: correctedBeats[noteIdx],
-                            duration: n.duration,
-                            tupletType: n.tupletType || n.tuplet?.type,
-                            tupletGroupId: n.tupletGroupId || n.tuplet?.groupId
-                        };
-                    })
-                );
             }
 
             notes.forEach((note, noteIndex) => {
@@ -467,7 +449,6 @@ export class SlotGrid {
 
                 // DEBUG: Log each tuplet note placement
                 if (isTuplet) {
-                    console.log(`[SlotGrid._loadVoicesToSlots] Tuplet note ${noteIndex}: originalBeat=${note.beat}, correctedBeat=${noteBeat}, slotIndex=${slotIndex}, durationBeats=${durationBeats}, durationSlots=${durationSlots}, type=${note.tupletType || note.tuplet?.type}`);
                 }
 
                 if (slotIndex >= 0 && slotIndex < this.totalSlots) {
@@ -933,16 +914,6 @@ export class SlotGrid {
 
                     // DEBUG: Log tuplet note export
                     if (isTupletNote) {
-                        console.log(`[SlotGrid._voiceSlotsToNotation] Exporting tuplet note at slot ${i}:`, {
-                            pitches: notePitches,
-                            calculatedBeat,
-                            originalBeat: slot.originalBeat,
-                            duration: slot.duration,
-                            durationSlots: slot.durationSlots,
-                            tupletType: slot.tupletType,
-                            tupletGroupId: slot.tupletGroupId,
-                            tuplet: slot.tuplet
-                        });
                     }
 
                     if (isTupletNote && slot.duration) {
@@ -1043,15 +1014,6 @@ export class SlotGrid {
             // DEBUG: Log summary of exported notes including tuplets
             const tupletNotesExported = notes.filter(n => n.tuplet || n.tupletGroupId || n.tupletType);
             if (tupletNotesExported.length > 0) {
-                console.log(`[SlotGrid._voiceSlotsToNotation] EXPORT SUMMARY - ${tupletNotesExported.length} tuplet notes from ${clef} voice ${v}:`,
-                    tupletNotesExported.map(n => ({
-                        pitch: n.pitches?.[0] || n.pitch,
-                        beat: n.beat,
-                        duration: n.duration,
-                        tupletType: n.tupletType || n.tuplet?.type,
-                        tupletGroupId: n.tupletGroupId || n.tuplet?.groupId
-                    }))
-                );
             }
 
             // Merge consecutive rests into optimal single rests

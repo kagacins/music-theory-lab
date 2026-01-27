@@ -2502,31 +2502,15 @@ export class FullScreenBottomPanel {
         if (!compState) return;
 
         // === DEBUG LOGGING START ===
-        console.log('=== QUICK ADD CHORD DEBUG ===');
-        console.log('1. Selected chord index (insertAfterIdx):', insertAfterIdx);
-        console.log('2. Total chords BEFORE insert:', compState.getChords?.()?.length);
 
         // Log all sections BEFORE insert
         const sectionsBefore = compState.getSections?.() || [];
-        console.log('3. Sections BEFORE insert:', JSON.stringify(sectionsBefore.map(s => ({
-            id: s.id,
-            name: s.name,
-            startIndex: s.startIndex,
-            chordCount: s.chordCount,
-            coversChords: `[${s.startIndex} to ${s.startIndex + s.chordCount - 1}]`
-        })), null, 2));
 
         // Get section info for the selected chord (before insertion)
         let sectionInfo = null;
         if (insertAfterIdx >= 0) {
             sectionInfo = compState.getSectionForChord?.(insertAfterIdx);
         }
-        console.log('4. Section info for selected chord:', sectionInfo ? JSON.stringify({
-            id: sectionInfo.id,
-            name: sectionInfo.name,
-            startIndex: sectionInfo.startIndex,
-            chordCount: sectionInfo.chordCount
-        }) : 'null (no section)');
 
         // Build chord data using the app's helper
         // key was already retrieved above (line 2495)
@@ -2571,21 +2555,12 @@ export class FullScreenBottomPanel {
 
         // Calculate insert position: after selected chord, or at end
         const insertAtIndex = insertAfterIdx >= 0 ? insertAfterIdx + 1 : compState.getChords?.()?.length || 0;
-        console.log('5. Will insert at index:', insertAtIndex);
 
         // Use compositionState.insertChord which handles bass blocks and basic section shifting
         const success = compState.insertChord(insertAtIndex, chordData);
-        console.log('6. insertChord success:', success);
 
         // Log sections AFTER insertChord (which calls updateSectionsAfterChordInsert internally)
         const sectionsAfterInsert = compState.getSections?.() || [];
-        console.log('7. Sections AFTER insertChord (before our manual fix):', JSON.stringify(sectionsAfterInsert.map(s => ({
-            id: s.id,
-            name: s.name,
-            startIndex: s.startIndex,
-            chordCount: s.chordCount,
-            coversChords: `[${s.startIndex} to ${s.startIndex + s.chordCount - 1}]`
-        })), null, 2));
 
         if (success) {
             // ALWAYS expand the section by 1 when the selected chord was in a section
@@ -2593,50 +2568,27 @@ export class FullScreenBottomPanel {
             // We check if the new chord index falls within the section's range AFTER the insert.
             // If not, we expand the section to include it.
             if (sectionInfo && sectionInfo.id) {
-                console.log('8. Checking if we need manual section expansion...');
-                console.log('   Looking for section with id:', sectionInfo.id);
 
                 const sections = compState.getSections?.() || [];
                 const section = sections.find(s => s.id === sectionInfo.id);
-                console.log('   Found section:', section ? JSON.stringify({
-                    id: section.id,
-                    name: section.name,
-                    startIndex: section.startIndex,
-                    chordCount: section.chordCount
-                }) : 'NOT FOUND');
 
                 if (section) {
                     // After insertChord, check if the new chord is actually in the section
                     const sectionStart = section.startIndex;
                     const sectionEnd = section.startIndex + section.chordCount - 1;
-                    console.log('   Section range: [', sectionStart, 'to', sectionEnd, ']');
-                    console.log('   insertAtIndex:', insertAtIndex);
-                    console.log('   Is insertAtIndex in range?', insertAtIndex >= sectionStart && insertAtIndex <= sectionEnd);
 
                     // If the inserted chord index is outside the section range, expand to include it
                     if (insertAtIndex < sectionStart || insertAtIndex > sectionEnd) {
-                        console.log('   --> EXPANDING section by 1 (chord was outside range)');
                         // The new chord should be right after the selected chord, so expand to include it
                         section.chordCount++;
                     } else {
-                        console.log('   --> No expansion needed (chord already in range)');
                     }
                 }
             } else {
-                console.log('8. No section info or no section id - skipping manual expansion');
             }
 
             // Log final sections state
             const sectionsFinal = compState.getSections?.() || [];
-            console.log('9. FINAL Sections state:', JSON.stringify(sectionsFinal.map(s => ({
-                id: s.id,
-                name: s.name,
-                startIndex: s.startIndex,
-                chordCount: s.chordCount,
-                coversChords: `[${s.startIndex} to ${s.startIndex + s.chordCount - 1}]`
-            })), null, 2));
-            console.log('10. Total chords AFTER insert:', compState.getChords?.()?.length);
-            console.log('=== END QUICK ADD CHORD DEBUG ===\n');
 
             // Sync state first (no visual update yet)
             if (window.syncProgressionToMelodyComposer) {

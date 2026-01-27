@@ -81,7 +81,10 @@
       "Bash(do md5sum src/modules/ui/recommendations/UnifiedRecommendationModal/ChordTab.js)",
       "Bash(git grep:*)",
       "Bash(python3:*)",
-      "Bash(paste:*)"
+      "Bash(paste:*)",
+      "Bash(sort:*)",
+      "Bash(while read f)",
+      "Bash(do node scripts/remove-debug-logs.cjs \"$f\")"
     ],
     "deny": [],
     "ask": []

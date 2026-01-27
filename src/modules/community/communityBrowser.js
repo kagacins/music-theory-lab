@@ -1361,26 +1361,19 @@ window.playSubmissionPreview = playSubmissionPreview;
  * Upvote a submission
  */
 async function upvoteSubmission(submissionId, buttonElement) {
-    console.log('[upvoteSubmission] Called with submissionId:', submissionId);
-    console.log('[upvoteSubmission] Button element:', buttonElement);
 
     // Check if user is signed in
     if (!isSignedIn()) {
-        console.log('[upvoteSubmission] User not signed in');
         toast.warning('Please sign in to upvote submissions.');
         return;
     }
-    console.log('[upvoteSubmission] User is signed in');
 
     try {
-        console.log('[upvoteSubmission] Getting auth token...');
         const token = await getAuthToken();
         if (!token) {
-            console.log('[upvoteSubmission] No token returned');
             toast.error('Authentication error. Please sign in again.');
             return;
         }
-        console.log('[upvoteSubmission] Got token, making API call...');
 
         const response = await fetchWithTimeout('/.netlify/functions/upvote', {
             method: 'POST',
@@ -1391,30 +1384,24 @@ async function upvoteSubmission(submissionId, buttonElement) {
             body: JSON.stringify({ submissionId })
         });
 
-        console.log('[upvoteSubmission] Response status:', response.status);
         const result = await response.json();
-        console.log('[upvoteSubmission] Response body:', result);
 
         if (!response.ok) {
             throw new Error(result.error || 'Failed to upvote');
         }
 
-        console.log('[upvoteSubmission] Success! Action:', result.action);
 
         // Update ALL upvote buttons for this submission (it may appear in multiple places)
         const allUpvoteButtons = document.querySelectorAll(`button[onclick*="upvoteSubmission"][onclick*="${submissionId}"]`);
-        console.log('[upvoteSubmission] Found', allUpvoteButtons.length, 'buttons to update');
 
         allUpvoteButtons.forEach((btn, index) => {
             const countSpan = btn.querySelector('.upvote-count');
             const currentCount = parseInt(countSpan?.textContent) || 0;
-            console.log(`[upvoteSubmission] Button ${index}: currentCount=${currentCount}, countSpan=`, countSpan);
 
             if (result.action === 'added') {
                 // Upvote was added
                 if (countSpan) {
                     countSpan.textContent = currentCount + 1;
-                    console.log(`[upvoteSubmission] Button ${index}: Updated count to`, currentCount + 1);
                 }
                 btn.classList.add('text-indigo-500', 'bg-indigo-100', 'dark:bg-indigo-900/50');
                 btn.classList.remove('text-gray-400', 'text-gray-600', 'bg-gray-100');
@@ -1422,7 +1409,6 @@ async function upvoteSubmission(submissionId, buttonElement) {
                 // Upvote was removed (toggled off)
                 if (countSpan) {
                     countSpan.textContent = Math.max(0, currentCount - 1);
-                    console.log(`[upvoteSubmission] Button ${index}: Updated count to`, Math.max(0, currentCount - 1));
                 }
                 btn.classList.remove('text-indigo-500', 'bg-indigo-100', 'dark:bg-indigo-900/50');
                 btn.classList.add('text-gray-600', 'bg-gray-100');
@@ -2630,7 +2616,6 @@ async function loadFullComposition(compositionState, compositionData, title) {
         const { BuildingBlockSequence } = window.buildingBlockModule || {};
         if (BuildingBlockSequence) {
             compositionState.bassBlockSequence = BuildingBlockSequence.fromJSON(compositionData.bassBlockSequence);
-            console.log('[Community Load] Bass BuildingBlockSequence loaded');
         }
     }
 
@@ -2639,7 +2624,6 @@ async function loadFullComposition(compositionState, compositionData, title) {
         const { BuildingBlockSequence } = window.buildingBlockModule || {};
         if (BuildingBlockSequence) {
             compositionState.trebleBlockSequence = BuildingBlockSequence.fromJSON(compositionData.trebleBlockSequence);
-            console.log('[Community Load] Treble BuildingBlockSequence loaded');
         }
     }
 
@@ -2647,7 +2631,6 @@ async function loadFullComposition(compositionState, compositionData, title) {
     if (compositionData.measures && Array.isArray(compositionData.measures)) {
         const savedCount = compositionData.measures.length;
         const currentCount = compositionState.measures.length;
-        console.log(`[Community Load] Restoring notation data. Saved: ${savedCount} measures, Current: ${currentCount} measures`);
 
         for (let i = 0; i < compositionData.measures.length && i < compositionState.measures.length; i++) {
             const savedMeasure = compositionData.measures[i];
@@ -2671,7 +2654,6 @@ async function loadFullComposition(compositionState, compositionData, title) {
                 currentMeasure.notation.dynamics = JSON.parse(JSON.stringify(savedMeasure.notation.dynamics));
             }
         }
-        console.log('[Community Load] All measure notation data restored');
 
         // CRITICAL: Set flag to skip syncWithProgressionData calls for a short period
         // This prevents the bass notes (with ornaments, articulations, etc.) from being regenerated
@@ -2681,25 +2663,21 @@ async function loadFullComposition(compositionState, compositionData, title) {
 
     // 8. Restore tempo markings
     if (compositionData.tempoMarkings && Array.isArray(compositionData.tempoMarkings)) {
-        console.log('[Community Load] Restoring tempo markings:', compositionData.tempoMarkings.length);
         compositionState.tempoMarkings = [...compositionData.tempoMarkings];
     }
 
     // 9. Restore repeat signs
     if (compositionData.repeatSigns && Array.isArray(compositionData.repeatSigns)) {
-        console.log('[Community Load] Restoring repeat signs:', compositionData.repeatSigns.length);
         compositionState.repeatSigns = [...compositionData.repeatSigns];
     }
 
     // 10. Restore hairpins (crescendo/decrescendo)
     if (compositionData.hairpins && Array.isArray(compositionData.hairpins)) {
-        console.log('[Community Load] Restoring hairpins:', compositionData.hairpins.length);
         compositionState.hairpins = [...compositionData.hairpins];
     }
 
     // 11. Restore slurs
     if (compositionData.slurs && Array.isArray(compositionData.slurs)) {
-        console.log('[Community Load] Restoring slurs:', compositionData.slurs.length);
         compositionState.slurs = [...compositionData.slurs];
         // Update next ID counter
         const maxSlurId = compositionData.slurs.reduce((max, s) => {
@@ -2711,7 +2689,6 @@ async function loadFullComposition(compositionState, compositionData, title) {
 
     // 12. Restore volta brackets
     if (compositionData.voltaBrackets && Array.isArray(compositionData.voltaBrackets)) {
-        console.log('[Community Load] Restoring volta brackets:', compositionData.voltaBrackets.length);
         compositionState.voltaBrackets = [...compositionData.voltaBrackets];
         // Update next ID counter
         const maxVoltaId = compositionData.voltaBrackets.reduce((max, v) => {
@@ -2724,11 +2701,9 @@ async function loadFullComposition(compositionState, compositionData, title) {
     // 13. BASS PRESERVATION: Restore bass data by chord ID
     // This enables bass edits to survive chord reordering across save/load cycles
     if (compositionData.bassDataByChordId && typeof compositionData.bassDataByChordId === 'object') {
-        console.log('[Community Load] Restoring bassDataByChordId:', Object.keys(compositionData.bassDataByChordId).length, 'entries');
         compositionState.bassDataByChordId = new Map(Object.entries(compositionData.bassDataByChordId));
     }
 
-    console.log('[Community Load] Full composition loaded successfully');
 }
 
 /**
@@ -2994,7 +2969,6 @@ export async function loadCompositionData(compositionData, options = {}) {
         window.refreshNotationFromProgression();
     }
 
-    console.log('[Community] Composition data loaded successfully');
 }
 
 // Export for window access

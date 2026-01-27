@@ -406,8 +406,6 @@ export function getVoiceLeadingOptimizedProgression(chordData) {
         });
     }
 
-    console.log(`[VoiceLeadingOptimizer] Original score: ${originalScore.score}, Optimized score: ${optimizedScore.score}`);
-    console.log(`[VoiceLeadingOptimizer] Movement reduced from ${originalScore.totalMovement} to ${optimizedScore.totalMovement} semitones`);
 
     return optimized;
 }

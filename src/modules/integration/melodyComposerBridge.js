@@ -563,7 +563,6 @@ export function setAutoGenerateBass(enabled) {
         if (!restored) {
             // No edited state available - clear bass notes as fallback
             // This happens when auto-generate was never turned on before
-            console.log('[setAutoGenerateBass] No edited state to restore, clearing bass');
             for (let i = 0; i < compositionState.getMeasureCount(); i++) {
                 const measure = compositionState.getMeasure(i);
                 if (measure && measure.notation && measure.notation.bass) {

@@ -88,7 +88,6 @@ export function initializeRecommendationSystem(options = {}) {
     // Phase 6: Initialize harmony module
     const smartHarmonizer = initializeSmartHarmonizer({ key, style });
 
-    console.log('[Phase 5 & 6] Recommendation system initialized with harmony features');
 
     return {
         context,

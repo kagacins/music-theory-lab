@@ -340,15 +340,11 @@ export function updateSuggestions({
 }) {
     showLoadingState();
 
-    console.log('🎼 Generating melody suggestions with styleId:', styleId);
     if (nextChord && anticipationFactor > 0) {
-        console.log(`🎯 Anticipation active: ${(anticipationFactor * 100).toFixed(0)}% toward ${nextChord.root} ${nextChord.type}`);
     }
     if (sectionIntent) {
-        console.log(`📍 Section intent: mode=${sectionIntent.mode}, subMode=${sectionIntent.subMode}, newSectionType=${sectionIntent.newSectionType}`);
     }
     if (actualBassNotes && actualBassNotes.length > 0) {
-        console.log(`🎸 Actual bass notes: ${actualBassNotes.join(', ')}`);
     }
 
     // Generate suggestions

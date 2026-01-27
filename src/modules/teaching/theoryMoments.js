@@ -98,7 +98,6 @@ export function toggleTheoryMoments(forceState) {
     // Update toggle UI
     updateToggleButton();
 
-    console.log('[TheoryMoments] Enabled:', isEnabled);
     return isEnabled;
 }
 
@@ -140,7 +139,6 @@ function syncWithExperienceMode() {
     if (isEnabled !== shouldBeEnabled) {
         isEnabled = shouldBeEnabled;
         updateToggleButton();
-        console.log(`[TheoryMoments] ${shouldBeEnabled ? 'Enabled' : 'Disabled'} based on Experience Mode: ${mode}`);
 
         // If switching to focus mode, hide any visible moment
         if (!shouldBeEnabled) {
@@ -158,47 +156,32 @@ function syncWithExperienceMode() {
  * @param {CustomEvent} event - The chord added event
  */
 function handleChordAdded(event) {
-    console.log('[TheoryMoments] handleChordAdded called, isEnabled:', isEnabled);
     if (!isEnabled) {
-        console.log('[TheoryMoments] Theory Moments is disabled, skipping');
         return;
     }
 
     // Skip during interactive tutorials/exercises
     if (isGuidedModeActive() || window.isTutorialSetupInProgress) {
-        console.log('[TheoryMoments] Tutorial active or setup in progress, skipping');
         return;
     }
 
     const { chord, index, key, progression } = event.detail;
-    console.log('[TheoryMoments] Event detail:', {
-        chordRoot: chord?.root,
-        chordType: chord?.type,
-        chordRoman: chord?.roman || chord?.romanNumeral,
-        index,
-        key
-    });
 
     // Check cooldown
     const now = Date.now();
     const timeSinceLastMoment = now - lastMomentTime;
     if (timeSinceLastMoment < MOMENT_COOLDOWN_MS) {
-        console.log('[TheoryMoments] Cooldown active, skipping. Time since last:', timeSinceLastMoment, 'ms');
         return;
     }
 
     // Detect if this chord creates a theory moment
     const moment = detectTheoryMoment(chord, index, key, progression);
-    console.log('[TheoryMoments] detectTheoryMoment result:', moment);
 
     if (moment && !dismissedTypes.has(moment.type)) {
-        console.log('[TheoryMoments] Showing theory moment:', moment.type);
         lastMomentTime = now;
         showTheoryMoment(moment);
     } else if (moment) {
-        console.log('[TheoryMoments] Moment type was dismissed:', moment.type);
     } else {
-        console.log('[TheoryMoments] No theory moment detected for this chord');
     }
 }
 
@@ -299,17 +282,12 @@ function detectSecondaryDominantByRoot(chordRoot, key) {
  */
 function detectTheoryMoment(chord, index, key, progression) {
     const romanNumeral = chord.romanNumeral || chord.roman;
-    console.log('[TheoryMoments] detectTheoryMoment - romanNumeral:', romanNumeral);
     if (!romanNumeral) {
-        console.log('[TheoryMoments] No roman numeral found on chord');
         return null;
     }
 
     // Normalize roman numeral
     const normalized = normalizeRoman(romanNumeral);
-    console.log('[TheoryMoments] Normalized roman:', normalized);
-    console.log('[TheoryMoments] BORROWED_CHORDS keys:', Object.keys(BORROWED_CHORDS));
-    console.log('[TheoryMoments] Is borrowed chord?', BORROWED_CHORDS[normalized] ? 'YES' : 'NO');
 
     // Check for borrowed chords (modal interchange)
     if (BORROWED_CHORDS[normalized]) {
@@ -708,7 +686,6 @@ function openLesson(lessonId) {
         if (window.switchTab) {
             window.switchTab('learn');
         }
-        console.log('[TheoryMoments] Would open lesson:', lessonId);
     }
 }
 

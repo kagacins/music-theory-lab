@@ -1346,7 +1346,6 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
             if (allChecked) {
                 activeFilterSet.clear();
             }
-            console.log('Filter applied for', columnName, ':', Array.from(activeFilterSet));
             currentMenu = null;
             menu.remove();
             applyFiltersCallback();
@@ -1629,7 +1628,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     // Helper function to play a chord
     async function playChord(chordType, root, inversion) {
         try {
-            console.log(`Playing chord: ${root} ${chordType} (inversion ${inversion})`);
 
         // Stop any currently playing notes
             if (piano && currentNotes) {
@@ -2034,13 +2032,11 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
 
             if (action === 'play-current') {
-                console.log('Play current chord (hold)');
                 e.preventDefault();
                 e.stopPropagation();
                 // Play the current chord
                 await playChord(currentChordType, currentRoot, currentInversion);
             } else if (action === 'play-this') {
-                console.log('Play suggested chord (hold)');
                 e.preventDefault();
                 e.stopPropagation();
                 // Play the suggested chord (from the recommendation)

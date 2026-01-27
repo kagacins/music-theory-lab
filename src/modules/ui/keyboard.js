@@ -700,13 +700,6 @@ export function updateKeyboardLabels() {
         return; // Exit if the feature is turned off
     }
 
-    console.log('[RomanNumeral] updateKeyboardLabels called, currentTab:', currentTab);
-    console.log('[RomanNumeral] Globals available:', {
-        SHARP_NOTES: !!SHARP_NOTES,
-        FLAT_NOTES: !!FLAT_NOTES,
-        ALL_NOTES: !!ALL_NOTES,
-        MAJOR_SCALE_STEPS: !!MAJOR_SCALE_STEPS
-    });
 
     // Get root note name based on current tab
     let rootNoteName;
@@ -763,7 +756,6 @@ export function updateKeyboardLabels() {
             rootNoteName = 'C'; // Default fallback
         }
     } else {
-        console.log('[RomanNumeral] Tab not supported:', currentTab);
         return; // Don't show labels on other tabs
     }
 

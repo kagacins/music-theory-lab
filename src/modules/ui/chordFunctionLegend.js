@@ -295,7 +295,6 @@ export function showLegend(expanded = true) {
     // Don't show in Focus mode
     const mode = getExperienceMode?.() || 'learn';
     if (mode === 'focus') {
-        console.log('[ChordFunctionLegend] Legend hidden in Focus mode');
         return;
     }
 

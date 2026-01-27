@@ -1022,7 +1022,6 @@ export function exportToMIDI(options = {}) {
                 });
 
                 tracks.push(chordTrack);
-                console.log('[Export] Chord track created with', progressionData.length, 'chords (with IMTL metadata)');
             } catch (err) {
                 console.error('[Export] Error creating chord track:', err);
             }
@@ -1144,7 +1143,6 @@ export function exportToMIDI(options = {}) {
         if (includeMelody) trackNames.push('Melody');
         if (includeBass) trackNames.push('Bass');
 
-        console.log(`[Export] MIDI exported: ${filename}.mid (${trackNames.join(', ')})`);
 
     } catch (error) {
         console.error('[Export] MIDI export error:', error);
@@ -1257,8 +1255,6 @@ function detectChordFromNotes(midiNotes) {
     if (matches.length > 0) {
         matches.sort((a, b) => b.score - a.score);
         const best = matches[0];
-        console.log('[Import] Detected chord:', best.root, best.type, 'inv:', best.inversion,
-            'from notes:', sorted.map(n => midiNumberToNoteName(n)).join(', '));
         return {
             root: best.root,
             type: best.type,
@@ -1624,11 +1620,6 @@ function extractProgressionFromMidi(midiData) {
     const melodyNotes = extractNotesFromTrack(melodyTrackIndex);
     const bassNotes = extractNotesFromTrack(bassTrackIndex);
 
-    console.log('[Import] Extracted notes:', {
-        melodyNotes: melodyNotes.length,
-        bassNotes: bassNotes.length,
-        imtlChords: imtlChords.length
-    });
 
     // =========================================================================
     // STEP 4: Build result
@@ -1768,11 +1759,6 @@ export async function importFromMIDI(file) {
                 const midiData = parseMidiFile(arrayBuffer);
                 const extracted = extractProgressionFromMidi(midiData);
 
-                console.log('[Import] Parsed MIDI:', {
-                    tracks: midiData.tracks.length,
-                    tempo: extracted.tempo,
-                    chords: extracted.chords.length
-                });
 
                 resolve({
                     success: true,
@@ -2216,7 +2202,6 @@ function showToast(message, type = 'success') {
         window.showToast(message, type);
     } else {
         // Fallback: simple console log
-        console.log(`[Toast] ${message}`);
     }
 }
 
