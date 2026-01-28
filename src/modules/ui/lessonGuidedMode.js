@@ -441,8 +441,8 @@ function createFloatingBanner() {
     floatingBanner.id = 'lesson-guided-banner';
     floatingBanner.className = 'fixed top-0 left-0 right-0 z-[10001] transform transition-transform duration-300';
     floatingBanner.style.cssText = `
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+        background: linear-gradient(135deg, #1e3a5f 0%, #172554 100%);
+        box-shadow: 0 4px 20px rgba(30, 58, 95, 0.6);
         pointer-events: auto;
     `;
 

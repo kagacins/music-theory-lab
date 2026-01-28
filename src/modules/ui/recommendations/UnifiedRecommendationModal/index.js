@@ -253,7 +253,7 @@ export function showUnifiedRecommendationModal(options = {}) {
     modalState.callbacks.onPlayChord = options.onPlayChord;
     modalState.callbacks.onStopChord = options.onStopChord;
 
-    // Set initial tab if specified, otherwise use last used
+    // Set initial tab if specified, otherwise restore from localStorage
     if (options.initialTab && Object.values(TABS).includes(options.initialTab)) {
         // Special handling for harmonize tab - fall back to chord if no melody notes
         if (options.initialTab === TABS.HARMONIZE) {
@@ -263,6 +263,20 @@ export function showUnifiedRecommendationModal(options = {}) {
         } else {
             modalState.activeTab = options.initialTab;
         }
+    } else {
+        // Restore last used tab from localStorage
+        const savedTab = localStorage.getItem('unified-modal-active-tab');
+        if (savedTab && Object.values(TABS).includes(savedTab)) {
+            // Special handling for harmonize tab - fall back to chord if no melody notes
+            if (savedTab === TABS.HARMONIZE) {
+                const compositionState = getCompositionState();
+                const hasMelodyNotes = compositionState?.getAllMelodyNotes?.()?.length > 0;
+                modalState.activeTab = hasMelodyNotes ? TABS.HARMONIZE : TABS.CHORD;
+            } else {
+                modalState.activeTab = savedTab;
+            }
+        }
+        // If no saved tab or invalid, keep the default (TABS.CHORD from ModalState.js)
     }
     if (options.initialView && Object.values(CHORD_VIEWS).includes(options.initialView)) {
         modalState.chordView = options.initialView;

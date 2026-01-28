@@ -95,9 +95,18 @@ export function getFullscreenTab(classicTab) {
 // ===========================================
 
 /**
- * Standard purple glow effect used for highlighted elements
+ * Standard glow effects used for highlighted elements
+ * Blue/cyan matches the landing page color scheme
  */
 export const HIGHLIGHT_STYLES = {
+    blue: {
+        boxShadow: '0 0 15px 5px rgba(59, 130, 246, 0.7)',
+        color: 'rgba(59, 130, 246, 0.7)'
+    },
+    cyan: {
+        boxShadow: '0 0 15px 5px rgba(6, 182, 212, 0.7)',
+        color: 'rgba(6, 182, 212, 0.7)'
+    },
     purple: {
         boxShadow: '0 0 15px 5px rgba(139, 92, 246, 0.6)',
         color: 'rgba(139, 92, 246, 0.6)'
@@ -123,17 +132,17 @@ export const HIGHLIGHT_STYLES = {
 /**
  * Apply pulsing highlight to an element
  * @param {HTMLElement|string} elementOrSelector - Element or CSS selector
- * @param {string} color - Color name from HIGHLIGHT_STYLES (default: 'purple')
+ * @param {string} color - Color name from HIGHLIGHT_STYLES (default: 'blue')
  * @param {boolean} scale - Whether to also scale the element (default: false)
  */
-export function applyHighlight(elementOrSelector, color = 'purple', scale = false) {
+export function applyHighlight(elementOrSelector, color = 'blue', scale = false) {
     const element = typeof elementOrSelector === 'string'
         ? document.querySelector(elementOrSelector)
         : elementOrSelector;
 
     if (!element) return;
 
-    const styles = HIGHLIGHT_STYLES[color] || HIGHLIGHT_STYLES.purple;
+    const styles = HIGHLIGHT_STYLES[color] || HIGHLIGHT_STYLES.blue;
     element.classList.add('animate-pulse');
     element.style.boxShadow = styles.boxShadow;
 
@@ -173,9 +182,9 @@ export function clearRootButtonHighlights() {
 /**
  * Highlight a specific root button by note name
  * @param {string} noteName - The note name (e.g., "C", "G", "A")
- * @param {string} color - Color from HIGHLIGHT_STYLES (default: 'purple')
+ * @param {string} color - Color from HIGHLIGHT_STYLES (default: 'blue')
  */
-export function highlightRootButton(noteName, color = 'purple') {
+export function highlightRootButton(noteName, color = 'blue') {
     clearRootButtonHighlights();
 
     setTimeout(() => {
@@ -193,9 +202,9 @@ export function highlightRootButton(noteName, color = 'purple') {
 /**
  * Highlight a chord type button in the fullscreen Chord Lab library
  * @param {string} chordType - The chord type (e.g., "Major", "Minor")
- * @param {string} color - Color from HIGHLIGHT_STYLES (default: 'purple')
+ * @param {string} color - Color from HIGHLIGHT_STYLES (default: 'blue')
  */
-export function highlightChordTypeButton(chordType, color = 'purple') {
+export function highlightChordTypeButton(chordType, color = 'blue') {
     setTimeout(() => {
         const selector = getChordTypeSelector(chordType);
         const btn = document.querySelector(selector);
@@ -219,9 +228,9 @@ export function removeChordTypeHighlight(chordType) {
 
 /**
  * Highlight the Add Chord FAB button
- * @param {string} color - Color from HIGHLIGHT_STYLES (default: 'indigo')
+ * @param {string} color - Color from HIGHLIGHT_STYLES (default: 'cyan')
  */
-export function highlightAddChordButton(color = 'indigo') {
+export function highlightAddChordButton(color = 'cyan') {
     setTimeout(() => {
         const addBtn = document.querySelector('#fs-chordlab-fab button:first-child');
         if (addBtn) {
@@ -373,10 +382,10 @@ export function transformStepsForFullscreen(steps, options = {}) {
 /**
  * Create an onEnter callback for highlighting a root button
  * @param {string} noteName - The note to highlight
- * @param {string} color - Highlight color (default: 'purple')
+ * @param {string} color - Highlight color (default: 'blue')
  * @returns {Function} onEnter callback
  */
-export function createRootButtonOnEnter(noteName, color = 'purple') {
+export function createRootButtonOnEnter(noteName, color = 'blue') {
     return () => {
         highlightRootButton(noteName, color);
     };
@@ -395,10 +404,10 @@ export function createRootButtonOnExit() {
 /**
  * Create an onEnter callback for highlighting a chord type button
  * @param {string} chordType - The chord type to highlight
- * @param {string} color - Highlight color (default: 'purple')
+ * @param {string} color - Highlight color (default: 'blue')
  * @returns {Function} onEnter callback
  */
-export function createChordTypeOnEnter(chordType, color = 'purple') {
+export function createChordTypeOnEnter(chordType, color = 'blue') {
     return () => {
         highlightChordTypeButton(chordType, color);
     };
@@ -417,10 +426,10 @@ export function createChordTypeOnExit(chordType) {
 
 /**
  * Create an onEnter callback for highlighting the Add Chord button
- * @param {string} color - Highlight color (default: 'indigo')
+ * @param {string} color - Highlight color (default: 'cyan')
  * @returns {Function} onEnter callback
  */
-export function createAddChordOnEnter(color = 'indigo') {
+export function createAddChordOnEnter(color = 'cyan') {
     return () => {
         highlightAddChordButton(color);
     };
@@ -489,7 +498,7 @@ export function createRootSelectionStep(noteName, options = {}) {
         validation: { type: 'root_selected', value: noteName },
         successMessage: options.successMessage || `${noteName} selected!`,
         quickAdvance: true,
-        onEnter: createRootButtonOnEnter(noteName, options.color || 'purple'),
+        onEnter: createRootButtonOnEnter(noteName, options.color || 'blue'),
         onExit: createRootButtonOnExit()
     };
 }
@@ -510,7 +519,7 @@ export function createChordTypeSelectionStep(chordType, options = {}) {
         validation: { type: 'type_selected', value: chordType },
         successMessage: options.successMessage || `${chordType} selected!`,
         quickAdvance: options.quickAdvance !== false,
-        onEnter: createChordTypeOnEnter(chordType, options.color || 'purple'),
+        onEnter: createChordTypeOnEnter(chordType, options.color || 'blue'),
         onExit: createChordTypeOnExit(chordType)
     };
 }
@@ -525,14 +534,14 @@ export function createChordTypeSelectionStep(chordType, options = {}) {
 export function createAddChordStep(root, type, options = {}) {
     const chordName = `${root} ${type}`;
     return {
-        instruction: options.instruction || 'Click the indigo "+" button to add this chord to your progression.',
+        instruction: options.instruction || 'Click the blue "+" button to add this chord to your progression.',
         spotlight: '#fs-chordlab-fab button:first-child',
         targetElement: '#fs-chordlab-fab button:first-child',
         spotlightPadding: 12,
         callout: options.callout || null,
         validation: { type: 'chord_added_to_progression', value: chordName },
         successMessage: options.successMessage || `${chordName} added!`,
-        onEnter: createAddChordOnEnter('indigo'),
+        onEnter: createAddChordOnEnter('cyan'),
         onExit: createAddChordOnExit()
     };
 }
