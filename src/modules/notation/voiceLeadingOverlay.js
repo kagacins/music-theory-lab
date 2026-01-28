@@ -1077,8 +1077,13 @@ export class VoiceLeadingDiagram {
                 transitionWarnings.push({ type: 'crossing', description: `Voice crossing (${voiceCrossing.count})` });
             }
 
-            // Count large leaps
-            const largeLeaps = motions.filter(m => m.interval >= MOTION_THRESHOLDS.leapWarning).length;
+            // Count large leaps (exclude new/dropped voices which have null intervals)
+            const largeLeaps = motions.filter(m =>
+                m.type !== 'new' &&
+                m.type !== 'dropped' &&
+                m.interval !== null &&
+                m.interval >= MOTION_THRESHOLDS.leapWarning
+            ).length;
             if (largeLeaps > 0) {
                 transitionWarnings.push({ type: 'leap', description: `Large leap${largeLeaps > 1 ? 's' : ''} (${largeLeaps})` });
             }
@@ -1407,32 +1412,38 @@ export class VoiceLeadingDiagram {
             badge.style.background = quality.color;
         }
 
-        // Update warning summary - count individual arcs with warnings
+        // Update warning summary - count warnings per transition (not per arc)
+        // Parallel 5ths/8ves are counted per transition (one instance = one warning)
+        // Large leaps and crossings are counted individually
         const warningSummary = document.getElementById('vl-warning-summary');
         if (warningSummary) {
-            // Count warnings from actual arc motions, not just transitions
-            const arcWarningCounts = { P5: 0, P8: 0, crossing: 0, leap: 0 };
+            const warningCounts = { P5: 0, P8: 0, crossing: 0, leap: 0 };
             transitions.forEach(t => {
+                // Count transition-level warnings (P5/P8 count once per transition where they occur)
+                if (t.warnings) {
+                    t.warnings.forEach(w => {
+                        if (w.type === 'P5') warningCounts.P5++;
+                        else if (w.type === 'P8') warningCounts.P8++;
+                    });
+                }
+                // Count individual leaps and crossings from motions
                 t.motions.forEach(m => {
                     if (m.warnings) {
-                        m.warnings.forEach(w => {
-                            if (arcWarningCounts.hasOwnProperty(w)) {
-                                arcWarningCounts[w]++;
-                            }
-                        });
+                        if (m.warnings.includes('leap')) warningCounts.leap++;
+                        if (m.warnings.includes('crossing')) warningCounts.crossing++;
                     }
                 });
             });
 
-            const totalWarnings = Object.values(arcWarningCounts).reduce((a, b) => a + b, 0);
+            const totalWarnings = Object.values(warningCounts).reduce((a, b) => a + b, 0);
             if (totalWarnings === 0) {
                 warningSummary.innerHTML = '<span class="text-green-600">No issues detected</span>';
             } else {
                 const parts = [];
-                if (arcWarningCounts.P5 > 0) parts.push(`<span class="text-red-600">${arcWarningCounts.P5} Parallel 5ths</span>`);
-                if (arcWarningCounts.P8 > 0) parts.push(`<span class="text-red-600">${arcWarningCounts.P8} Parallel 8ves</span>`);
-                if (arcWarningCounts.leap > 0) parts.push(`<span class="text-red-600">${arcWarningCounts.leap} Large leaps</span>`);
-                if (arcWarningCounts.crossing > 0) parts.push(`<span class="text-red-600">${arcWarningCounts.crossing} Voice crossings</span>`);
+                if (warningCounts.P5 > 0) parts.push(`<span class="text-red-600">${warningCounts.P5} Parallel 5ths</span>`);
+                if (warningCounts.P8 > 0) parts.push(`<span class="text-red-600">${warningCounts.P8} Parallel 8ves</span>`);
+                if (warningCounts.leap > 0) parts.push(`<span class="text-red-600">${warningCounts.leap} Large leaps</span>`);
+                if (warningCounts.crossing > 0) parts.push(`<span class="text-red-600">${warningCounts.crossing} Voice crossings</span>`);
                 warningSummary.innerHTML = parts.join(' · ');
             }
         }
