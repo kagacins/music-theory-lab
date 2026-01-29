@@ -4144,7 +4144,10 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
     // This function is used by the Unified Recommendations Modal which NEEDS position-based insertion
     // Do NOT add appendToEnd here - only addChordToProgression (Chord Lab) should append to end
     if (window.addToProgressionData) {
-        window.addToProgressionData(newChordData, { skipRender: options.skipRender });
+        window.addToProgressionData(newChordData, {
+            skipRender: options.skipRender,
+            skipSuccessToast: options.skipSuccessToast  // Allow caller to suppress toast (e.g., modal shows its own)
+        });
 
         // Skip rendering if in batch mode
         if (!options.skipRender) {

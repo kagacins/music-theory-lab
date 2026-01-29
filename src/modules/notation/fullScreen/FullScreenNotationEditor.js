@@ -2426,10 +2426,11 @@ export class FullScreenNotationEditor {
             window.stopMelody?.();
         });
 
-        // Quick suggestions button - opens chord suggestions (same as Classic view)
+        // Quick suggestions button - opens recommendations modal (restores last used tab)
         quickSuggestions?.addEventListener('click', () => {
             if (window.showUnifiedRecommendationModal) {
-                window.showUnifiedRecommendationModal({ initialTab: 'chord' });
+                // Don't pass initialTab - let modal restore from localStorage
+                window.showUnifiedRecommendationModal({});
             }
         });
 

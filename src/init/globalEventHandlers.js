@@ -256,15 +256,9 @@ function setupKeyboardShortcuts() {
                 if (existingModal) {
                     window.closeUnifiedRecommendationModal && window.closeUnifiedRecommendationModal();
                 } else {
-                    // Open modal based on current tab
+                    // Open modal - let it restore last used tab from localStorage
                     // The modal will use getSelectedChordIndex() to determine which chord is selected
-                    if (window.currentTab === 'melody') {
-                        // In Melody Composer - show melody recommendations
-                        window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'melody' });
-                    } else if (window.currentTab === 'trainer' || window.currentTab === 'builder' || window.currentTab === 'studio-new') {
-                        // In Progression Builder, Chord Builder, or Composition Studio (New) - show chord recommendations
-                        window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'chord' });
-                    }
+                    window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({});
                 }
             }
         }

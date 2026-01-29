@@ -1291,6 +1291,36 @@ export class FullScreenBottomPanel {
     // HELPERS
     // ========================================================================
 
+    /**
+     * Update Apply to Selected button visibility in Auto-Bass panel
+     * Called by MutationObserver when chord selection changes
+     */
+    _updateApplyToSelectedButton() {
+        // Only relevant when auto-bass panel is active
+        if (this.activePanel !== 'auto-bass') return;
+
+        const selectedCard = document.querySelector('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
+        const hasCardSelection = selectedCard !== null;
+
+        const globalIndices = window.getSelectedChordIndicesArray ? window.getSelectedChordIndicesArray() : [];
+        const singleIdx = window.getSelectedChordIndex ? window.getSelectedChordIndex() : -1;
+        const hasGlobalSelection = globalIndices.length > 0 || singleIdx >= 0;
+
+        const hasSelection = hasCardSelection || hasGlobalSelection;
+
+        const applyBtn = this.container?.querySelector('#fs-bass-apply-selected');
+        if (applyBtn) {
+            applyBtn.disabled = !hasSelection;
+            applyBtn.style.opacity = hasSelection ? '1' : '0.5';
+        }
+
+        const revertBtn = this.container?.querySelector('#fs-bass-revert-selected');
+        if (revertBtn) {
+            revertBtn.disabled = !hasSelection;
+            revertBtn.style.opacity = hasSelection ? '1' : '0.5';
+        }
+    }
+
     _getChords(compState) {
         const segments = compState?.getChordSegments?.() || [];
         return segments.map(seg => seg.chord).filter(Boolean);

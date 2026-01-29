@@ -352,7 +352,8 @@ export function initMobileFab() {
     if (fabSuggestionsQuick) {
         fabSuggestionsQuick.addEventListener('click', () => {
             if (window.showUnifiedRecommendationModal) {
-                window.showUnifiedRecommendationModal({ initialTab: 'chord' });
+                // Don't pass initialTab - let modal restore from localStorage
+                window.showUnifiedRecommendationModal({});
             }
         });
     }
